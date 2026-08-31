@@ -1,0 +1,180 @@
+name: Build release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        default: 0.1.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: Build application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix web ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix web run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm prune --omit=dev --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package and smoke-test Windows x64
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packageName = "webspeak-webclient-v$env:RELEASE_VERSION-windows-x64"
+          $packageRoot = Join-Path $env:RUNNER_TEMP $packageName
+          $runtimeRoot = Split-Path -Parent (Get-Command node).Source
+          New-Item -ItemType Directory -Path $packageRoot | Out-Null
+          Copy-Item -Recurse -LiteralPath dist -Destination $packageRoot
+          New-Item -ItemType Directory -Path (Join-Path $packageRoot "web") | Out-Null
+          Copy-Item -Recurse -LiteralPath web/dist -Destination (Join-Path $packageRoot "web")
+          Copy-Item -Recurse -LiteralPath node_modules -Destination $packageRoot
+          Copy-Item -LiteralPath config.example.json,README.md,LICENSE,package.json,package-lock.json -Destination $packageRoot
+          New-Item -ItemType Directory -Path (Join-Path $packageRoot "runtime") | Out-Null
+          Copy-Item -LiteralPath (Join-Path $runtimeRoot "node.exe") -Destination (Join-Path $packageRoot "runtime")
+          Copy-Item -LiteralPath (Join-Path $runtimeRoot "LICENSE") -Destination (Join-Path $packageRoot "runtime/NODE-LICENSE")
+          @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          "%~dp0runtime\node.exe" "%~dp0dist\index.js"
+          if errorlevel 1 (
+            echo.
+            echo WebSpeak stopped with an error. Check data\logs for details.
+            pause
+          )
+          '@ | Set-Content -LiteralPath (Join-Path $packageRoot "start-webspeak.cmd") -Encoding ascii
+
+          $smokeRoot = Join-Path $env:RUNNER_TEMP ($packageName + "-smoke")
+          Copy-Item -Recurse -LiteralPath $packageRoot -Destination $smokeRoot
+          @{
+            port = 31440
+            tsHost = "106.15.36.235"
+            tsPort = 9987
+            tsServerPassword = ""
+            tsServerProtocol = "ts6"
+            maxClients = 20
+            trustProxy = $false
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $smokeRoot "config.json") -Encoding utf8
+          $process = $null
+          try {
+            $process = Start-Process -FilePath (Join-Path $smokeRoot "runtime/node.exe") -ArgumentList "dist/index.js" -WorkingDirectory $smokeRoot -WindowStyle Hidden -PassThru
+            $health = $null
+            for ($attempt = 0; $attempt -lt 30 -and -not $health; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:31440/api/health" -TimeoutSec 2 } catch {}
+            }
+            if (-not $health -or $health.status -ne "ok" -or $health.version -ne $env:RELEASE_VERSION) {
+              throw "Windows release health check failed"
+            }
+          } finally {
+            if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+          Compress-Archive -LiteralPath $packageRoot -DestinationPath (Join-Path $env:GITHUB_WORKSPACE ($packageName + ".zip")) -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: webspeak-webclient-v${{ inputs.version }}-windows-x64.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: Build application
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm --prefix web ci --no-audit --no-fund
+          npm --prefix web run build
+          npm run build
+          npm prune --omit=dev --no-audit --no-fund
+      - name: Package and smoke-test Linux x64
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          package_name="webspeak-webclient-v${RELEASE_VERSION}-linux-x64"
+          package_root="$RUNNER_TEMP/$package_name"
+          runtime_root="$(dirname "$(dirname "$(command -v node)")")"
+          mkdir -p "$package_root/web" "$package_root/runtime"
+          cp -a dist "$package_root/dist"
+          cp -a web/dist "$package_root/web/dist"
+          cp -a node_modules "$package_root/node_modules"
+          cp config.example.json README.md LICENSE package.json package-lock.json "$package_root/"
+          cp "$runtime_root/bin/node" "$package_root/runtime/node"
+          cp "$runtime_root/LICENSE" "$package_root/runtime/NODE-LICENSE"
+          chmod 0755 "$package_root/runtime/node"
+          cat > "$package_root/start-webspeak.sh" <<'LAUNCHER'
+          #!/usr/bin/env sh
+          set -eu
+          cd -- "$(dirname -- "$0")"
+          exec "$PWD/runtime/node" "$PWD/dist/index.js"
+          LAUNCHER
+          chmod 0755 "$package_root/start-webspeak.sh"
+
+          smoke_root="$RUNNER_TEMP/${package_name}-smoke"
+          cp -a "$package_root" "$smoke_root"
+          cat > "$smoke_root/config.json" <<'CONFIG'
+          {
+            "port": 31441,
+            "tsHost": "106.15.36.235",
+            "tsPort": 9987,
+            "tsServerPassword": "",
+            "tsServerProtocol": "ts6",
+            "maxClients": 20,
+            "trustProxy": false
+          }
+          CONFIG
+          (
+            cd "$smoke_root"
+            "$smoke_root/runtime/node" dist/index.js >"$RUNNER_TEMP/linux-smoke.log" 2>&1 &
+            app_pid=$!
+            trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
+            health=""
+            for _ in $(seq 1 30); do
+              health="$(curl -fsS --max-time 2 http://127.0.0.1:31441/api/health 2>/dev/null || true)"
+              if grep -q '"status":"ok"' <<<"$health" && grep -q "\"version\":\"$RELEASE_VERSION\"" <<<"$health"; then break; fi
+              sleep 0.5
+            done
+            grep -q '"status":"ok"' <<<"$health"
+            grep -q "\"version\":\"$RELEASE_VERSION\"" <<<"$health"
+          )
+          tar -czf "$GITHUB_WORKSPACE/${package_name}.tar.gz" -C "$RUNNER_TEMP" "$package_name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: webspeak-webclient-v${{ inputs.version }}-linux-x64.tar.gz
+          if-no-files-found: error
+          compression-level: 0

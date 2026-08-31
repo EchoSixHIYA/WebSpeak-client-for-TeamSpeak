@@ -1,0 +1,9 @@
+node_modules/
+dist/
+web/dist/
+data/
+config.json
+*.log
+.env
+webspeak-update.tar.gz
+claude.pem
