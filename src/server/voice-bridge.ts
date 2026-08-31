@@ -4,6 +4,14 @@ import type { Server } from "node:http";
 import { createRequire } from "node:module";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
+import { canAcceptSession, MAX_ACTIVE_SESSIONS } from "../constants.js";
+import { normalizeTeamSpeakError } from "../errors.js";
+import {
+  formatTeamSpeakTarget,
+  parseTeamSpeakTarget,
+  parseTeamSpeakTargetParts,
+  type TeamSpeakTarget,
+} from "../domain/teamspeak-target.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -11,11 +19,8 @@ const { OpusEncoder } = require("@discordjs/opus") as {
 };
 
 export interface VoiceBridgeOptions {
-  tsHost: string;
-  tsPort: number;
+  defaultTarget: TeamSpeakTarget;
   tsServerPassword: string;
-  tsServerProtocol?: "ts3" | "ts6";
-  maxClients: number;
 }
 
 interface ChannelMember {
@@ -28,8 +33,7 @@ interface WebClientEntry {
   tsClient: TSClient;
   ws: WebSocket;
   nickname: string;
-  tsHost: string;
-  tsPort: number;
+  target: TeamSpeakTarget;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
   opusEncoder: { encode(pcm: Buffer): Buffer };
@@ -56,33 +60,36 @@ export class VoiceBridge {
       const url = new URL(req.url ?? "/", `https://${req.headers.host ?? "localhost"}`);
       const channelName = url.searchParams.get("channel") ?? undefined;
       const nickname = (url.searchParams.get("nickname") ?? "WebUser").trim().slice(0, 30) || "WebUser";
-      const tsHost = normalizeHost(url.searchParams.get("tsHost") ?? this.options.tsHost);
-      const parsedPort = Number.parseInt(url.searchParams.get("tsPort") ?? String(this.options.tsPort), 10);
-      const tsPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
-        ? parsedPort
-        : this.options.tsPort;
 
-      if (!tsHost) {
-        this.logger.warn({ nickname }, "Invalid TeamSpeak host");
-        ws.close(4002, "Invalid TeamSpeak host");
+      let target: TeamSpeakTarget;
+      try {
+        const rawTarget = url.searchParams.get("target");
+        target = rawTarget?.trim()
+          ? parseTeamSpeakTarget(rawTarget)
+          : parseTeamSpeakTargetParts(
+            url.searchParams.get("tsHost") ?? this.options.defaultTarget.host,
+            url.searchParams.get("tsPort") ?? undefined,
+            this.options.defaultTarget.port,
+          );
+      } catch (error: unknown) {
+        this.logger.warn({ nickname, err: error instanceof Error ? error.message : String(error) }, "Invalid TeamSpeak target");
+        ws.close(4002, "Invalid TeamSpeak target");
         return;
       }
 
-      if (this.clients.size >= this.options.maxClients) {
-        this.logger.warn({ max: this.options.maxClients }, "Max clients reached");
+      if (!canAcceptSession(this.clients.size)) {
+        this.logger.warn({ max: MAX_ACTIVE_SESSIONS }, "Max clients reached");
         ws.close(4004, "Server full");
         return;
       }
 
       const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-      this.logger.info({ entryId, nickname, channel: channelName, tsHost, tsPort }, "WebClient connecting");
+      this.logger.info({ entryId, nickname, channel: channelName, target: formatTeamSpeakTarget(target) }, "WebClient connecting");
 
       const tsClient = new TSClient({
-        host: tsHost,
-        port: tsPort,
+        target,
         nickname,
         serverPassword: this.options.tsServerPassword,
-        serverProtocol: this.options.tsServerProtocol,
         defaultChannel: channelName,
       }, this.logger);
 
@@ -91,8 +98,7 @@ export class VoiceBridge {
         tsClient,
         ws,
         nickname,
-        tsHost,
-        tsPort,
+        target,
         channelTree: [],
         members: new Map(),
         opusEncoder: new OpusEncoder(48000, 1),
@@ -241,8 +247,9 @@ export class VoiceBridge {
           sendInitialState();
         })
         .catch((error: Error) => {
-          this.logger.error({ err: error, entryId }, "TS connect failed");
-          if (ws.readyState === WebSocket.OPEN) ws.close(4003, `Connection failed: ${error.message}`);
+          const normalized = normalizeTeamSpeakError(error);
+          this.logger.error({ code: normalized.code, entryId }, "TS connect failed");
+          if (ws.readyState === WebSocket.OPEN) ws.close(4003, normalized.code);
           else this.cleanup(entryId);
         });
     });
@@ -303,12 +310,6 @@ async function handleCommand(entry: WebClientEntry, command: { type: string; [ke
       break;
     }
   }
-}
-
-function normalizeHost(value: string): string | null {
-  const host = value.trim();
-  if (!host || host.length > 255 || /[\s/\\]/.test(host)) return null;
-  return host;
 }
 
 function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {

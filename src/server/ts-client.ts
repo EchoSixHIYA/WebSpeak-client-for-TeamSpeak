@@ -1,21 +1,19 @@
 import { EventEmitter } from "node:events";
 import {
   Client as TS3FullClient,
-  generateIdentity,
   clientMove as tsClientMove,
-  type Identity,
   type VoiceData,
   type ChannelInfo,
   type ClientInfo,
 } from "@honeybbq/teamspeak-client";
 import type { Logger } from "../logger.js";
+import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
+import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 
 export interface TSClientOptions {
-  host: string;
-  port: number;
+  target: TeamSpeakTarget;
   nickname: string;
   serverPassword?: string;
-  serverProtocol?: "ts3" | "ts6";
   defaultChannel?: string;
   channelPassword?: string;
 }
@@ -33,36 +31,25 @@ export interface TSDirectorySnapshot {
 
 export class TSClient extends EventEmitter {
   private client: TS3FullClient | null = null;
-  private identity: Identity;
+  private adapter: TeamSpeakAdapter | null = null;
   private logger: Logger;
   private clientId = 0;
   private connected = false;
 
-  constructor(
-    private options: TSClientOptions,
-    logger: Logger,
-  ) {
+  constructor(private options: TSClientOptions, logger: Logger) {
     super();
     this.logger = logger.child({ nickname: options.nickname });
-    this.identity = generateIdentity(8);
   }
 
   async connect(): Promise<void> {
-    const addr = `${this.options.host}:${this.options.port}`;
-
-    this.logger.info({ addr }, "Connecting to TeamSpeak");
-
-    this.client = new TS3FullClient(this.identity, addr, this.options.nickname, {
+    this.adapter = new TeamSpeakAdapter({
+      target: this.options.target,
+      nickname: this.options.nickname,
       serverPassword: this.options.serverPassword,
       defaultChannel: this.options.defaultChannel,
-      defaultChannelPassword: this.options.channelPassword,
-      logger: {
-        debug: (msg: string) => this.logger.debug(msg),
-        info: (msg: string) => this.logger.info(msg),
-        warn: (msg: string) => this.logger.warn(msg),
-        error: (msg: string) => this.logger.error(msg),
-      },
-    });
+      channelPassword: this.options.channelPassword,
+    }, this.logger);
+    this.client = this.adapter.client;
 
     this.client.on("voiceData", (data: VoiceData) => {
       this.emit("voiceData", {
@@ -110,8 +97,7 @@ export class TSClient extends EventEmitter {
       this.emit("clientMoved", info);
     });
 
-    await this.client.connect();
-    await this.client.waitConnected();
+    await this.adapter.connect();
 
     this.clientId = this.client.clientID();
     try {
@@ -164,6 +150,10 @@ export class TSClient extends EventEmitter {
     return this.client?.clientID() ?? this.clientId;
   }
 
+  getProtocol(): TeamSpeakProtocol | null {
+    return this.adapter?.protocol ?? null;
+  }
+
   getChannelId(): bigint {
     if (!this.client) return 0n;
     const sdkClient = this.client as unknown as { channelID?: () => bigint };
@@ -176,14 +166,9 @@ export class TSClient extends EventEmitter {
 
   async disconnect(): Promise<void> {
     this.connected = false;
-    if (this.client) {
-      try {
-        await this.client.disconnect();
-      } catch {
-        // ignore
-      }
-      this.client = null;
-    }
+    if (this.adapter) await this.adapter.disconnect();
+    this.adapter = null;
+    this.client = null;
     this.clientId = 0;
   }
 }

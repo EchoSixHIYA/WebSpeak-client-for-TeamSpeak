@@ -1,65 +1,74 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import {
+  DEFAULT_TEAM_SPEAK_PORT,
+  parseTeamSpeakTargetParts,
+} from "./domain/teamspeak-target.js";
 
+/** The only TeamSpeak state still read from the legacy bootstrap file. */
 export interface AppConfig {
-  /** HTTP server port */
-  port: number;
-  /** TeamSpeak server host */
   tsHost: string;
-  /** TeamSpeak voice/UDP port */
   tsPort: number;
-  /** TS server password (empty if none) */
   tsServerPassword: string;
-  /** Force protocol: "ts3" | "ts6" | undefined for auto-detect */
-  tsServerProtocol?: "ts3" | "ts6";
-  /** Max concurrent web clients */
-  maxClients: number;
-  /** Trust X-Forwarded-* headers (for reverse proxy) */
-  trustProxy: boolean;
 }
 
 export function getDefaultConfig(): AppConfig {
   return {
-    port: 3040,
     tsHost: "127.0.0.1",
-    tsPort: 9987,
+    tsPort: DEFAULT_TEAM_SPEAK_PORT,
     tsServerPassword: "",
-    tsServerProtocol: undefined,
-    maxClients: 20,
-    trustProxy: false,
+  };
+}
+
+/**
+ * Convert both the old JSON shape and the M000 shape into the normalized
+ * bootstrap model. Deprecated fields are intentionally ignored and disappear
+ * when the migrated model is written back.
+ */
+export function migrateConfig(input: unknown): AppConfig {
+  const defaults = getDefaultConfig();
+  if (!isRecord(input)) return defaults;
+
+  const rawHost = typeof input.tsHost === "string" && input.tsHost.trim()
+    ? input.tsHost.trim()
+    : defaults.tsHost;
+  const rawPort = input.tsPort === undefined ? undefined : input.tsPort;
+  let target;
+  try {
+    target = parseTeamSpeakTargetParts(rawHost, toPortValue(rawPort), defaults.tsPort);
+  } catch {
+    target = { host: defaults.tsHost, port: defaults.tsPort };
+  }
+
+  return {
+    tsHost: target.host,
+    tsPort: target.port,
+    tsServerPassword: typeof input.tsServerPassword === "string" ? input.tsServerPassword : defaults.tsServerPassword,
   };
 }
 
 export function loadConfig(path: string): AppConfig {
-  const defaults = getDefaultConfig();
   try {
-    const input = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
-    const positiveInt = (value: unknown, fallback: number) => {
-      const number = typeof value === "number" ? value : Number(value);
-      return Number.isInteger(number) && number > 0 ? number : fallback;
-    };
-    const protocol = input.tsServerProtocol === "ts3" || input.tsServerProtocol === "ts6"
-      ? input.tsServerProtocol
-      : defaults.tsServerProtocol;
-    return {
-      port: positiveInt(input.port, defaults.port),
-      tsHost: typeof input.tsHost === "string" && input.tsHost.trim() ? input.tsHost.trim() : defaults.tsHost,
-      tsPort: positiveInt(input.tsPort, defaults.tsPort),
-      tsServerPassword: typeof input.tsServerPassword === "string" ? input.tsServerPassword : defaults.tsServerPassword,
-      tsServerProtocol: protocol,
-      maxClients: positiveInt(input.maxClients, defaults.maxClients),
-      trustProxy: typeof input.trustProxy === "boolean" ? input.trustProxy : defaults.trustProxy,
-    };
+    return migrateConfig(JSON.parse(readFileSync(path, "utf-8")) as unknown);
   } catch {
-    return defaults;
+    return getDefaultConfig();
   }
 }
 
+/** Write only the normalized M000 shape; this is the one-time legacy cleanup. */
 export function saveConfig(path: string, config: AppConfig): void {
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
+    writeFileSync(path, JSON.stringify(migrateConfig(config), null, 2), "utf-8");
   } catch {
     // config.json may be read-only (e.g. running under systemd as non-root)
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toPortValue(value: unknown): string | number | undefined {
+  return typeof value === "string" || typeof value === "number" ? value : undefined;
 }

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { loadConfig, saveConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createWebServer } from "./server/server.js";
+import { APP_PORT } from "./constants.js";
+import { parseTeamSpeakTargetParts } from "./domain/teamspeak-target.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -24,16 +26,12 @@ async function main() {
   const hasCert = existsSync(path.join(CERT_DIR, "cert.pem"));
 
   const webServer = createWebServer({
-    port: config.port,
-    trustProxy: config.trustProxy,
+    port: APP_PORT,
     staticDir: STATIC_DIR,
     certDir: hasCert ? CERT_DIR : undefined,
     voiceBridgeOptions: {
-      tsHost: config.tsHost,
-      tsPort: config.tsPort,
+      defaultTarget: parseTeamSpeakTargetParts(config.tsHost, config.tsPort),
       tsServerPassword: config.tsServerPassword,
-      tsServerProtocol: config.tsServerProtocol,
-      maxClients: config.maxClients,
     },
     logger,
   });

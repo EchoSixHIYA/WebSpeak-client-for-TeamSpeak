@@ -74,27 +74,21 @@ Copy `config.example.json` to `config.json` in the project root, then edit the v
 
 ```json
 {
-  "port": 3040,
   "tsHost": "127.0.0.1",
   "tsPort": 9987,
-  "tsServerPassword": "",
-  "tsServerProtocol": "ts6",
-  "maxClients": 20,
-  "trustProxy": false
+  "tsServerPassword": ""
 }
 ```
 
 | Field | Description |
 | --- | --- |
-| `port` | Local HTTP/HTTPS port for WebSpeak. |
 | `tsHost` | TeamSpeak server address. Use `127.0.0.1` when it runs on the same host. |
 | `tsPort` | TeamSpeak voice port, commonly `9987`. |
 | `tsServerPassword` | TeamSpeak server password, if required. |
-| `tsServerProtocol` | `"ts3"` or `"ts6"`; omit it to use protocol detection. |
-| `maxClients` | Maximum number of simultaneous browser sessions. |
-| `trustProxy` | Set to `true` only when a trusted reverse proxy is in front of WebSpeak. |
 
-The join page includes a **Setup guide** button. It generates a copyable `config.json` preview from the server address, voice port, protocol, WebSpeak port, and optional password entered in the page. A browser cannot write files on the server, so save the copied JSON as `config.json` in the project root and restart WebSpeak after changing it.
+WebSpeak listens on the fixed internal port `3040` and accepts at most `100` active browser sessions; change the external port in Docker or the reverse proxy. TS3/TS6 is detected automatically by the TeamSpeak adapter. The join page includes a **Setup guide** button and generates a copyable `config.json` preview from the TeamSpeak address, voice port, and optional password. A browser cannot write files on the server, so save the copied JSON as `config.json` in the project root and restart WebSpeak after changing it.
+
+When an older `config.json` contains `port`, `tsServerProtocol`, `maxClients`, or `trustProxy`, WebSpeak reads the TeamSpeak target and password, ignores those implementation controls, and rewrites the file in the normalized three-field shape above.
 
 WebSpeak uses each user's regular TeamSpeak client connection for both voice and directory data. TeamSpeak sends the initial channel/member snapshot during the normal client welcome sequence; WebSpeak then subscribes that regular client to the complete channel tree, just as a native client does, and applies channel/member notifications immediately afterward. A member moving out of the current channel is retained and reassigned to the target channel instead of being mistaken for a server disconnect. WebSpeak does not start a maintenance client and does not call the permission-restricted `channellist` or `clientlist` commands. The visible result is the same view available to that TeamSpeak identity.
 
@@ -182,7 +176,7 @@ server {
 }
 ```
 
-Set `trustProxy` to `true` only after verifying that the proxy is trusted and cannot be bypassed.
+WebSpeak does not use forwarded headers as an authentication or authorization boundary. Keep the gateway behind a trusted reverse proxy and configure the proxy to forward WebSocket upgrades.
 
 ### Troubleshooting
 
@@ -190,17 +184,20 @@ Set `trustProxy` to `true` only after verifying that the proxy is trusted and ca
 | --- | --- |
 | Microphone is unavailable | Use HTTPS, grant the browser microphone permission, and check the selected device in Audio settings. |
 | Only the default microphone appears | Reload after granting permission; browser device labels are hidden until permission is granted. Disconnect/reconnect if the device was plugged in later. |
-| Channel/member list is empty | Check the TeamSpeak address/voice port and `tsServerProtocol`. The directory is populated from the normal client welcome sequence. |
+| Channel/member list is empty | Check the TeamSpeak address and voice port. The directory is populated from the normal client welcome sequence. |
 | The channel directory is still loading | Keep the page connected briefly while the welcome snapshot arrives. Later member and channel changes are pushed to the page automatically in real time. |
 | The current user is missing | Keep the connection open until the TeamSpeak welcome snapshot arrives. WebSpeak uses the current channel ID to place the user in the default channel, then updates the tree from realtime member notifications. |
 | Page loads without audio | Use a recent Chrome/Edge build, verify HTTPS, and check browser output volume. |
 | `Cannot find module '@discordjs/opus'` | Install the native build prerequisites and run `npm install` again. |
-| `EADDRINUSE` | Change `port` or stop the process already listening on that port. |
+| `EADDRINUSE` | Stop the process already listening on fixed port `3040`, or change the external proxy/container port. |
 
 ### Project layout
 
 ```text
 src/
+  domain/teamspeak-target.ts  Normalized host[:port] parsing and endpoint keys
+  server/teamspeak-adapter.ts TS3/TS6 negotiation boundary and protocol cache
+  errors.ts                    Normalized connection error model
   server/voice-bridge.ts       WebSocket bridge and per-user voice clients
   server/ts-client.ts          TeamSpeak protocol adapter and live directory adapter
 config.example.json            Safe starting configuration; copy to config.json
@@ -223,6 +220,9 @@ npm --prefix web run build
 
 # Type-check backend
 npm run build
+
+# Run M000 unit tests
+npm test
 ```
 
 Contributions and issue reports are welcome. Please do not include `config.json`, certificates, private keys, or server logs in issues or pull requests.
@@ -276,13 +276,9 @@ npm run build
 
 ```json
 {
-  "port": 3040,
   "tsHost": "127.0.0.1",
   "tsPort": 9987,
-  "tsServerPassword": "",
-  "tsServerProtocol": "ts6",
-  "maxClients": 20,
-  "trustProxy": false
+  "tsServerPassword": ""
 }
 ```
 
@@ -290,8 +286,11 @@ npm run build
 
 - `tsHost`：TeamSpeak 地址；同机部署使用 `127.0.0.1`。
 - `tsPort`：语音端口，通常为 `9987`。
-- `tsServerProtocol`：填写 `"ts3"` 或 `"ts6"`，也可以省略并使用自动检测。
-加入页面提供“配置引导”按钮，可以根据页面中填写的服务器地址、语音端口、协议、WebSpeak 端口和可选密码生成可复制的 `config.json` 预览。浏览器不能直接写入服务器文件，请将复制的内容保存到项目根目录的 `config.json`，再重启 WebSpeak。
+- `tsServerPassword`：TeamSpeak 服务器密码，没有密码时留空。
+
+WebSpeak 内部监听端口固定为 `3040`，最多接受 `100` 个活动网页 Session；外部端口请在 Docker 或反向代理层修改。TS3/TS6 由 TeamSpeak Adapter 自动检测，不需要在配置或网页中选择协议。加入页面提供“配置引导”按钮，可以根据页面中填写的服务器地址、语音端口和可选密码生成可复制的 `config.json` 预览。浏览器不能直接写入服务器文件，请将复制的内容保存到项目根目录的 `config.json`，再重启 WebSpeak。
+
+如果旧版 `config.json` 中仍有 `port`、`tsServerProtocol`、`maxClients` 或 `trustProxy`，WebSpeak 会读取其中的 TeamSpeak 地址和密码，忽略这些实现细节，并在启动时将文件改写为上面的三项配置。
 WebSpeak 使用每个网页用户自己的普通 TeamSpeak 客户端连接获取语音和目录数据，不连接 WebQuery/SSH Query，也不启动维护客户端。TeamSpeak 会在普通客户端登录握手阶段下发频道和成员快照；随后 WebSpeak 会像原生客户端一样订阅完整频道树，并实时应用频道/成员通知。成员切换到其他频道时会被移动到目标频道，不再被误判为退出服务器。不会主动调用受权限限制的 `channellist` 或 `clientlist` 命令，显示内容与该 TeamSpeak 身份实际可见的内容一致。
 
 进入后的成员/频道树位于页面左侧。首次进入时，WebSpeak 会使用 TeamSpeak 欢迎握手中返回的当前频道 ID，把自己放入实际所在的默认频道；不会把已进入默认频道的用户显示到错误的占位分组。“正在语音中”旁边不再使用没有功能的禁麦图标；它只是状态提示，真正发言时头像边框会实时变绿，停止发声后自动恢复。
@@ -314,13 +313,13 @@ https://你的域名或IP:3040/
 
 ### HTTPS 与反向代理
 
-如果项目根目录存在 `certs/cert.pem` 和 `certs/key.pem`，WebSpeak 会直接提供 HTTPS。公网部署建议使用 Let's Encrypt，或让 Nginx 终止 HTTPS 后反向代理到 `http://127.0.0.1:3040`，并转发 WebSocket 升级请求。使用可信反向代理时，将 `trustProxy` 设置为 `true`。
+如果项目根目录存在 `certs/cert.pem` 和 `certs/key.pem`，WebSpeak 会直接提供 HTTPS。公网部署建议使用 Let's Encrypt，或让 Nginx 终止 HTTPS 后反向代理到 `http://127.0.0.1:3040`，并转发 WebSocket 升级请求。WebSpeak 不使用转发头作为认证或授权边界，请确保网关只位于可信反向代理之后。
 
 ### 常见问题
 
 - **无法使用麦克风**：确认使用 HTTPS、已经允许浏览器访问麦克风，并在“音频设置”中检查设备。
 - **只能看到默认麦克风**：授权前浏览器会隐藏设备名称；授权后刷新页面，或重新连接一次。
-- **频道/成员列表为空**：检查网页中的 TeamSpeak 地址、语音端口和协议设置；目录来自普通客户端登录握手数据。
+- **频道/成员列表为空**：检查网页中的 TeamSpeak 地址和语音端口；协议会自动检测，目录来自普通客户端登录握手数据。
 - **频道/成员目录仍在加载**：保持页面连接，等待登录握手快照到达；之后成员和频道变化会自动实时推送到页面。
 - **首次进入看不到自己**：保持连接直到 TeamSpeak 欢迎握手完成；WebSpeak 会根据当前频道 ID 将自己归入默认频道，并在频道成员变化时实时更新。
 - **没有声音**：使用较新的 Chrome/Edge，通过 HTTPS 访问，并检查浏览器输出音量。
@@ -337,6 +336,9 @@ npm --prefix web run build
 
 # 后端 TypeScript 构建
 npm run build
+
+# 运行 M000 单元测试
+npm test
 ```
 
 请不要在 Issue 或 Pull Request 中提交 `config.json`、API 密钥、证书、私钥或服务器日志。

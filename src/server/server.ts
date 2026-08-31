@@ -6,12 +6,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { VoiceBridge, type VoiceBridgeOptions } from "./voice-bridge.js";
 import type { Logger } from "../logger.js";
+import { formatTeamSpeakTarget } from "../domain/teamspeak-target.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export interface WebServerOptions {
   port: number;
-  trustProxy: boolean;
   staticDir?: string;
   certDir?: string; // path to cert.pem + key.pem for HTTPS
   voiceBridgeOptions: VoiceBridgeOptions;
@@ -38,10 +38,6 @@ export function createWebServer(options: WebServerOptions): WebServer {
     server = createHttpServer(app);
   }
 
-  if (options.trustProxy) {
-    app.set("trust proxy", true);
-  }
-
   app.use(express.json({ limit: "100kb" }));
 
   app.get("/api/health", (_req, res) => {
@@ -52,9 +48,9 @@ export function createWebServer(options: WebServerOptions): WebServer {
   // the join form. No credentials are exposed here.
   app.get("/api/public-config", (_req, res) => {
     res.json({
-      tsHost: options.voiceBridgeOptions.tsHost,
-      tsPort: options.voiceBridgeOptions.tsPort,
-      tsServerProtocol: options.voiceBridgeOptions.tsServerProtocol ?? null,
+      tsHost: options.voiceBridgeOptions.defaultTarget.host,
+      tsPort: options.voiceBridgeOptions.defaultTarget.port,
+      target: formatTeamSpeakTarget(options.voiceBridgeOptions.defaultTarget),
     });
   });
 

@@ -1,9 +1,5 @@
 {
-  "port": 3040,
   "tsHost": "127.0.0.1",
   "tsPort": 9987,
-  "tsServerPassword": "",
-  "tsServerProtocol": "ts6",
-  "maxClients": 20,
-  "trustProxy": false
+  "tsServerPassword": ""
 }

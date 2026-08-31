@@ -171,7 +171,7 @@
             <article><span>2</span><div><strong>{{ t('configStepEditTitle') }}</strong><p>{{ t('configStepEditLead') }}</p></div></article>
             <article><span>3</span><div><strong>{{ t('configStepRestartTitle') }}</strong><p>{{ t('configStepRestartLead') }}</p><code>node dist/index.js</code></div></article>
           </div>
-          <section class="config-editor"><div class="config-editor-heading"><div><span class="section-kicker">{{ t('configPreview') }}</span><strong>{{ t('configPreviewLead') }}</strong></div><button class="copy-config-button" type="button" @click="copyConfigTemplate"><Icon name="copy" :size="15" /> {{ t('copyConfig') }}</button></div><div class="config-guide-fields"><label><span>{{ t('webPort') }}</span><input v-model="guideWebPort" type="number" min="1" max="65535" /></label><label><span>{{ t('protocol') }}</span><select v-model="guideProtocol"><option value="">{{ t('autoDetect') }}</option><option value="ts3">TeamSpeak 3</option><option value="ts6">TeamSpeak 6</option></select></label><label class="config-guide-wide"><span>{{ t('serverPassword') }}</span><input v-model="guideServerPassword" type="password" :placeholder="t('optionalPassword')" /></label></div><pre>{{ configTemplate }}</pre></section>
+          <section class="config-editor"><div class="config-editor-heading"><div><span class="section-kicker">{{ t('configPreview') }}</span><strong>{{ t('configPreviewLead') }}</strong></div><button class="copy-config-button" type="button" @click="copyConfigTemplate"><Icon name="copy" :size="15" /> {{ t('copyConfig') }}</button></div><div class="config-guide-fields"><label class="config-guide-wide"><span>{{ t('serverPassword') }}</span><input v-model="guideServerPassword" type="password" :placeholder="t('optionalPassword')" /></label></div><pre>{{ configTemplate }}</pre></section>
           <div class="config-guide-note"><Icon name="help" :size="16" /><span>{{ t('configGuideNote') }}</span></div>
         </div>
         <footer class="config-guide-footer"><button class="text-button" type="button" @click="configGuideOpen = false">{{ t('close') }}</button><button class="primary-button save-button" type="button" @click="copyConfigTemplate"><Icon name="copy" :size="16" /> {{ t('copyConfig') }}</button></footer>
@@ -246,8 +246,6 @@ const messageDraft = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
 const configGuideOpen = ref(false);
-const guideWebPort = ref(location.port || "3040");
-const guideProtocol = ref<"" | "ts3" | "ts6">("ts6");
 const guideServerPassword = ref("");
 const audioSettingsError = ref("");
 const pttActive = ref(false);
@@ -310,7 +308,7 @@ const translations: Record<Language, Record<string, string>> = {
     configStepCopyTitle: "复制配置模板",
     configStepCopyLead: "在项目根目录执行命令，创建服务端配置文件。",
     configStepEditTitle: "确认连接参数",
-    configStepEditLead: "在下方预览中填写 WebSpeak 端口、TeamSpeak 协议和密码；地址与语音端口取自当前连接表单。",
+    configStepEditLead: "在下方预览中确认 TeamSpeak 服务器地址、语音端口和密码；应用端口固定为 3040，协议会自动检测。",
     configStepRestartTitle: "保存并重启服务",
     configStepRestartLead: "保存 config.json 后重新启动 WebSpeak 服务，新的默认配置才会生效。",
     configPreview: "配置预览",
@@ -319,9 +317,6 @@ const translations: Record<Language, Record<string, string>> = {
     configGuideNote: "浏览器不能直接写入服务器文件；复制后请在运行 WebSpeak 的服务器上保存 config.json。",
     configCopiedToast: "配置 JSON 已复制",
     configCopyFailedToast: "复制失败，请手动复制配置内容",
-    webPort: "WebSpeak 端口",
-    protocol: "TeamSpeak 协议",
-    autoDetect: "自动检测",
     serverPassword: "服务器密码",
     optionalPassword: "没有密码可留空",
     switchChannel: "切换频道",
@@ -464,7 +459,7 @@ const translations: Record<Language, Record<string, string>> = {
     configStepCopyTitle: "Copy the template",
     configStepCopyLead: "Run the command in the project root to create the server configuration file.",
     configStepEditTitle: "Confirm connection settings",
-    configStepEditLead: "Set the WebSpeak port, TeamSpeak protocol, and password below; the server address and voice port come from the connection form.",
+    configStepEditLead: "Confirm the TeamSpeak address, voice port, and password below; WebSpeak listens on fixed port 3040 and detects the protocol automatically.",
     configStepRestartTitle: "Save and restart",
     configStepRestartLead: "Save config.json and restart WebSpeak for the new default settings to take effect.",
     configPreview: "CONFIG PREVIEW",
@@ -473,9 +468,6 @@ const translations: Record<Language, Record<string, string>> = {
     configGuideNote: "A browser cannot write files on the server. Copy this content, then save config.json on the machine running WebSpeak.",
     configCopiedToast: "Config JSON copied",
     configCopyFailedToast: "Copy failed. Copy the configuration manually",
-    webPort: "WebSpeak port",
-    protocol: "TeamSpeak protocol",
-    autoDetect: "Auto-detect",
     serverPassword: "Server password",
     optionalPassword: "Leave blank if not required",
     switchChannel: "Switch channel",
@@ -739,17 +731,12 @@ const validServerPort = computed(() => {
 });
 
 const configTemplate = computed(() => {
-  const webPort = Number.parseInt(guideWebPort.value, 10);
   const tsPort = Number.parseInt(serverPort.value, 10);
   const config: Record<string, unknown> = {
-    port: Number.isInteger(webPort) && webPort > 0 && webPort <= 65535 ? webPort : 3040,
     tsHost: serverHost.value.trim() || "127.0.0.1",
     tsPort: Number.isInteger(tsPort) && tsPort > 0 && tsPort <= 65535 ? tsPort : 9987,
     tsServerPassword: guideServerPassword.value,
-    maxClients: 20,
-    trustProxy: false,
   };
-  if (guideProtocol.value) config.tsServerProtocol = guideProtocol.value;
   return JSON.stringify(config, null, 2);
 });
 
@@ -767,15 +754,12 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { tsHost?: unknown; tsPort?: unknown; tsServerProtocol?: unknown };
+    const config = await response.json() as { tsHost?: unknown; tsPort?: unknown };
     if (!query.has("tsHost") && !localStorage.getItem("webspeak:ts-host") && typeof config.tsHost === "string" && config.tsHost.trim()) {
       serverHost.value = config.tsHost.trim();
     }
     if (!query.has("tsPort") && !localStorage.getItem("webspeak:ts-port") && Number.isInteger(config.tsPort)) {
       serverPort.value = String(config.tsPort);
-    }
-    if (config.tsServerProtocol === "ts3" || config.tsServerProtocol === "ts6") {
-      guideProtocol.value = config.tsServerProtocol;
     }
   } catch {
     // The sensible browser-host/9987 defaults remain usable when the API is unavailable.
