@@ -32,7 +32,7 @@
 
           <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span>{{ localizedMessage(voiceState.error) }}</span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
-          <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin/setup">{{ t('configureNow') }}</a></span></div>
+          <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin">{{ t('configureNow') }}</a></span></div>
 
           <form v-if="initialized" class="join-form" @submit.prevent="doConnect">
             <div v-if="accessMode === 'open'">
@@ -245,8 +245,8 @@ const translations: Record<Language, Record<string, string>> = {
     browserWorkspace: "浏览器语音工作台",
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
-    notConfigured: "WebSpeak 尚未完成首次配置。",
-    configureNow: "立即配置",
+    notConfigured: "WebSpeak 尚未配置 TeamSpeak 目标。",
+    configureNow: "打开管理控制台",
     privateAudio: "私密社区语音",
     joinLine1: "连接服务器，",
     joinLine2: "马上开始交流。",
@@ -381,8 +381,8 @@ const translations: Record<Language, Record<string, string>> = {
     browserWorkspace: "Browser voice workspace",
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",
-    notConfigured: "WebSpeak setup has not been completed.",
-    configureNow: "Configure now",
+    notConfigured: "The WebSpeak TeamSpeak target has not been configured.",
+    configureNow: "Open admin console",
     privateAudio: "Private community audio",
     joinLine1: "Connect to your server,",
     joinLine2: "start the conversation.",
@@ -552,7 +552,7 @@ function localizedMessage(message: string) {
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
     "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
-    "WebSpeak 尚未完成首次配置": "WebSpeak setup has not been completed",
+    "WebSpeak 尚未配置 TeamSpeak 目标。": "The WebSpeak TeamSpeak target has not been configured",
     "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
     "请输入有效的昵称": "Enter a valid nickname",
   };

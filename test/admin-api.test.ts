@@ -9,24 +9,20 @@ import { createAdminRouter } from "../src/admin/admin-router.js";
 import { AdminService } from "../src/admin/admin-service.js";
 import { AdminSessionStore } from "../src/admin/admin-session.js";
 import { WebSpeakDatabase } from "../src/persistence/database.js";
-import { BootstrapManager } from "../src/security/bootstrap.js";
 import { loadOrCreateMasterSecret } from "../src/security/master-secret.js";
 import { silentLogger } from "./helpers/logger.js";
 
-test("admin API completes bootstrap, authentication, test, save, CSRF, and logout", async (context) => {
+test("admin API requires the default password to be changed before administration", async (context) => {
   const directory = mkdtempSync(path.join(tmpdir(), "webspeak-admin-api-"));
   const database = new WebSpeakDatabase(path.join(directory, "webspeak.db"));
-  const bootstrap = new BootstrapManager(path.join(directory, "bootstrap"));
   const service = new AdminService(
     database,
     loadOrCreateMasterSecret(path.join(directory, "master.key")),
-    bootstrap,
     silentLogger,
     path.join(directory, "missing-config.json"),
     async (_target, password) => ({ ok: true, protocol: "ts6", latencyMs: 7, serverName: "Mock Server", requiresPassword: Boolean(password) }),
   );
-  service.initialize();
-  const bootstrapCode = bootstrap.ensure();
+  await service.initialize();
 
   const app = express();
   app.use(express.json());
@@ -51,53 +47,49 @@ test("admin API completes bootstrap, authentication, test, save, CSRF, and logou
   const status = await request(origin, "/api/admin/status");
   assert.equal(status.response.status, 200);
   assert.equal(status.response.headers.get("cache-control"), "no-store");
-  assert.equal(status.body.initialized, false);
+  assert.equal(status.body.initialized, true);
   assert.equal("setupDefaults" in status.body, false);
 
-  const rejectedDefaults = await request(origin, "/api/admin/setup/defaults", {
+  const login = await request(origin, "/api/admin/login", {
     method: "POST",
-    body: { bootstrapCode: "not-the-bootstrap-code" },
+    body: { username: "admin", password: "admin" },
   });
-  assert.equal(rejectedDefaults.response.status, 403);
-  assert.equal(rejectedDefaults.body.code, "INVALID_BOOTSTRAP");
-
-  const defaults = await request(origin, "/api/admin/setup/defaults", {
-    method: "POST",
-    body: { bootstrapCode },
-  });
-  assert.equal(defaults.body.target, "127.0.0.1:9987");
-
-  const tested = await request(origin, "/api/admin/setup/test", {
-    method: "POST",
-    body: { bootstrapCode, target: "voice.example.com:9987", serverPassword: "server-secret", passwordAction: "replace" },
-  });
-  assert.equal(tested.body.ok, true);
-  assert.equal(tested.body.protocol, "ts6");
-
-  const setup = await request(origin, "/api/admin/setup", {
-    method: "POST",
-    body: {
-      bootstrapCode,
-      adminPassword: "integration-admin-password",
-      target: "voice.example.com:9987",
-      serverPassword: "server-secret",
-      passwordAction: "replace",
-      accessMode: "fixed",
-      siteName: "Integration WebSpeak",
-      welcomeText: "Welcome",
-    },
-  });
-  assert.equal(setup.response.status, 201);
-  assert.equal(setup.body.ok, true);
-  assert.equal(typeof setup.body.csrfToken, "string");
-  const cookie = setup.response.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.equal(login.response.status, 200);
+  assert.equal(login.body.mustChangePassword, true);
+  assert.equal(typeof login.body.csrfToken, "string");
+  const cookie = login.response.headers.get("set-cookie")?.split(";", 1)[0];
   assert.ok(cookie?.startsWith("webspeak_admin="));
-  assert.match(setup.response.headers.get("set-cookie") ?? "", /HttpOnly/i);
-  assert.match(setup.response.headers.get("set-cookie") ?? "", /SameSite=Strict/i);
+  assert.match(login.response.headers.get("set-cookie") ?? "", /HttpOnly/i);
+  assert.match(login.response.headers.get("set-cookie") ?? "", /SameSite=Strict/i);
 
   const session = await request(origin, "/api/admin/session", { cookie });
   assert.equal(session.body.authenticated, true);
+  assert.equal(session.body.mustChangePassword, true);
 
+  const blockedOverview = await request(origin, "/api/admin/overview", { cookie });
+  assert.equal(blockedOverview.response.status, 403);
+  assert.equal(blockedOverview.body.code, "PASSWORD_CHANGE_REQUIRED");
+
+  const shortPassword = await request(origin, "/api/admin/change-password", {
+    method: "POST",
+    cookie,
+    csrf: login.body.csrfToken,
+    body: { newPassword: "too-short" },
+  });
+  assert.equal(shortPassword.response.status, 400);
+  assert.equal(shortPassword.body.code, "INVALID_ADMIN_PASSWORD");
+
+  const changed = await request(origin, "/api/admin/change-password", {
+    method: "POST",
+    cookie,
+    csrf: login.body.csrfToken,
+    body: { newPassword: "integration-admin-password" },
+  });
+  assert.equal(changed.response.status, 200);
+  assert.equal(changed.body.mustChangePassword, false);
+
+  const updatedSession = await request(origin, "/api/admin/session", { cookie });
+  assert.equal(updatedSession.body.mustChangePassword, false);
   const overview = await request(origin, "/api/admin/overview", { cookie });
   assert.deepEqual(overview.body.sessions, { active: 2, peak: 4, limit: 100 });
 
@@ -112,7 +104,7 @@ test("admin API completes bootstrap, authentication, test, save, CSRF, and logou
   const saved = await request(origin, "/api/admin/server", {
     method: "PUT",
     cookie,
-    csrf: setup.body.csrfToken,
+    csrf: login.body.csrfToken,
     body: {
       target: "voice.example.com:9988",
       passwordAction: "remove",
@@ -129,7 +121,7 @@ test("admin API completes bootstrap, authentication, test, save, CSRF, and logou
   const probe = await request(origin, "/api/admin/server/test", {
     method: "POST",
     cookie,
-    csrf: setup.body.csrfToken,
+    csrf: login.body.csrfToken,
     body: { target: "voice.example.com:9988", passwordAction: "remove" },
   });
   assert.equal(probe.body.protocol, "ts6");
@@ -137,10 +129,22 @@ test("admin API completes bootstrap, authentication, test, save, CSRF, and logou
   assert.equal(settings.body.detectedProtocol, "ts6");
   assert.equal(settings.body.lastTestLatencyMs, 7);
 
-  const logout = await request(origin, "/api/admin/logout", { method: "POST", cookie, csrf: setup.body.csrfToken, body: {} });
+  const logout = await request(origin, "/api/admin/logout", { method: "POST", cookie, csrf: login.body.csrfToken, body: {} });
   assert.equal(logout.body.ok, true);
   const denied = await request(origin, "/api/admin/overview", { cookie });
   assert.equal(denied.response.status, 401);
+
+  const oldPassword = await request(origin, "/api/admin/login", {
+    method: "POST",
+    body: { username: "admin", password: "admin" },
+  });
+  assert.equal(oldPassword.response.status, 401);
+  const newPassword = await request(origin, "/api/admin/login", {
+    method: "POST",
+    body: { username: "admin", password: "integration-admin-password" },
+  });
+  assert.equal(newPassword.response.status, 200);
+  assert.equal(newPassword.body.mustChangePassword, false);
 });
 
 async function request(

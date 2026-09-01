@@ -33,47 +33,9 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     response.json({
       initialized: options.service.isInitialized(),
       authenticated: Boolean(session),
+      mustChangePassword: Boolean(session) && options.service.isPasswordChangeRequired(),
       ...(session ? { csrfToken: session.csrfToken, expiresAt: session.expiresAt } : {}),
     });
-  });
-
-  router.post("/setup/test", requireSameOrigin, async (request, response) => {
-    const body = asRecord(request.body);
-    if (!options.service.verifyBootstrap(readString(body, "bootstrapCode", 128))) {
-      response.status(403).json({ ok: false, code: "INVALID_BOOTSTRAP" });
-      return;
-    }
-    const action = readPasswordAction(body.passwordAction);
-    const password = action === "remove"
-      ? ""
-      : action === "replace"
-        ? readOptionalString(body, "serverPassword", 512)
-        : options.service.getConnectionPolicy().serverPassword;
-    await runProbe(options.service, response, readString(body, "target", 300), password, false);
-  });
-
-  router.post("/setup/defaults", requireSameOrigin, (request, response) => {
-    const body = asRecord(request.body);
-    if (!options.service.verifyBootstrap(readString(body, "bootstrapCode", 128))) {
-      response.status(403).json({ ok: false, code: "INVALID_BOOTSTRAP" });
-      return;
-    }
-    response.json(options.service.getSetupDefaults());
-  });
-
-  router.post("/setup", requireSameOrigin, async (request, response) => {
-    try {
-      const body = asRecord(request.body);
-      await options.service.setup({
-        bootstrapCode: readString(body, "bootstrapCode", 128),
-        adminPassword: readString(body, "adminPassword", 1024),
-        ...readSettingsInput(body),
-      });
-      const session = options.sessions.create(response, isSecureRequest(request));
-      response.status(201).json({ ok: true, csrfToken: session.csrfToken });
-    } catch (error: unknown) {
-      sendAdminError(response, error);
-    }
   });
 
   router.post("/login", requireSameOrigin, async (request, response) => {
@@ -89,8 +51,9 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       return;
     }
     const body = asRecord(request.body);
+    const username = readString(body, "username", 64).trim();
     const password = readOptionalString(body, "password", 1024);
-    if (!await options.service.verifyPassword(password)) {
+    if (!await options.service.verifyPassword(username, password)) {
       const delayMs = limiter.recordFailure(peer);
       await waitFor(delayMs);
       options.service.database.addAudit("ADMIN_LOGIN_FAILED");
@@ -101,10 +64,26 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     limiter.recordSuccess(peer);
     options.service.database.addAudit("ADMIN_LOGIN_SUCCEEDED");
     const session = options.sessions.create(response, isSecureRequest(request));
-    response.json({ ok: true, csrfToken: session.csrfToken, expiresAt: session.expiresAt });
+    response.json({ ok: true, csrfToken: session.csrfToken, expiresAt: session.expiresAt, mustChangePassword: options.service.isPasswordChangeRequired() });
   });
 
-  router.use(requireAdmin(options.sessions));
+  router.post("/change-password", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    try {
+      const body = asRecord(request.body);
+      await options.service.changePassword(readString(body, "newPassword", 1024));
+      response.json({ ok: true, mustChangePassword: false });
+    } catch (error: unknown) {
+      sendAdminError(response, error);
+    }
+  });
+
+  router.post("/logout", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
+    options.sessions.destroy(request, response, isSecureRequest(request));
+    options.service.database.addAudit("ADMIN_LOGOUT");
+    response.json({ ok: true });
+  });
+
+  router.use(requireAdmin(options.sessions, options.service));
 
   router.get("/overview", (_request, response) => {
     response.json(options.service.getOverview(
@@ -143,12 +122,6 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     response.json({ ok: true });
   });
 
-  router.post("/logout", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
-    options.sessions.destroy(request, response, isSecureRequest(request));
-    options.service.database.addAudit("ADMIN_LOGOUT");
-    response.json({ ok: true });
-  });
-
   router.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     sendAdminError(response, error);
   });
@@ -156,10 +129,14 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   return router;
 }
 
-function requireAdmin(sessions: AdminSessionStore) {
+function requireAdmin(sessions: AdminSessionStore, service: AdminService) {
   return (request: Request, response: Response, next: NextFunction): void => {
     if (!sessions.get(request)) {
       response.status(401).json({ ok: false, code: "AUTH_REQUIRED" });
+      return;
+    }
+    if (service.isPasswordChangeRequired()) {
+      response.status(403).json({ ok: false, code: "PASSWORD_CHANGE_REQUIRED" });
       return;
     }
     next();

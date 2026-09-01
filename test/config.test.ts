@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { migrateConfig, saveConfig } from "../src/config.js";
 
-describe("bootstrap config migration", () => {
+describe("legacy config migration", () => {
   it("drops deprecated runtime controls while preserving the TeamSpeak target", () => {
     assert.deepEqual(migrateConfig({
       port: 3999,

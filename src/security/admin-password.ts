@@ -5,6 +5,8 @@ const SCRYPT_PARAMETERS = Object.freeze({ N: 32768, r: 8, p: 1, maxmem: 64 * 102
 
 export interface AdminCredential {
   version: 1;
+  username: string;
+  mustChangePassword: boolean;
   salt: string;
   hash: string;
   parameters: {
@@ -14,19 +16,27 @@ export interface AdminCredential {
   };
 }
 
+export interface AdminPasswordOptions {
+  username?: string;
+  mustChangePassword?: boolean;
+  allowWeakPassword?: boolean;
+}
+
 export function validateAdminPassword(password: string): string | null {
   if (password.length < 12) return "Admin password must contain at least 12 characters";
   if (password.length > 1024) return "Admin password is too long";
   return null;
 }
 
-export async function hashAdminPassword(password: string): Promise<AdminCredential> {
-  const validationError = validateAdminPassword(password);
+export async function hashAdminPassword(password: string, options: AdminPasswordOptions = {}): Promise<AdminCredential> {
+  const validationError = options.allowWeakPassword ? null : validateAdminPassword(password);
   if (validationError) throw new Error(validationError);
   const salt = randomBytes(16);
   const hash = await derive(password, salt, SCRYPT_PARAMETERS);
   return {
     version: 1,
+    username: options.username ?? "admin",
+    mustChangePassword: options.mustChangePassword ?? false,
     salt: salt.toString("base64url"),
     hash: hash.toString("base64url"),
     parameters: {

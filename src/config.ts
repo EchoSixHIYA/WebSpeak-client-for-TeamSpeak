@@ -5,7 +5,7 @@ import {
   parseTeamSpeakTargetParts,
 } from "./domain/teamspeak-target.js";
 
-/** The only TeamSpeak state still read from the legacy bootstrap file. */
+/** The only TeamSpeak state still read from the legacy JSON config. */
 export interface AppConfig {
   tsHost: string;
   tsPort: number;
@@ -22,7 +22,7 @@ export function getDefaultConfig(): AppConfig {
 
 /**
  * Convert both the old JSON shape and the M000 shape into the normalized
- * bootstrap model. Deprecated fields are intentionally ignored and disappear
+ * normalized legacy model. Deprecated fields are intentionally ignored and disappear
  * when the migrated model is written back.
  */
 export function migrateConfig(input: unknown): AppConfig {
@@ -55,7 +55,7 @@ export function loadConfig(path: string): AppConfig {
   }
 }
 
-/** Write only the normalized M000 shape; this is the one-time legacy cleanup. */
+/** Write only the normalized legacy shape; this is the one-time legacy cleanup. */
 export function saveConfig(path: string, config: AppConfig): void {
   try {
     mkdirSync(dirname(path), { recursive: true });

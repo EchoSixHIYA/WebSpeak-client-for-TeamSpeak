@@ -1,12 +1,11 @@
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createLogger } from "./logger.js";
 import { createWebServer } from "./server/server.js";
 import { APP_PORT } from "./constants.js";
 import { WebSpeakDatabase } from "./persistence/database.js";
 import { loadOrCreateMasterSecret } from "./security/master-secret.js";
-import { BootstrapManager } from "./security/bootstrap.js";
 import { AdminService } from "./admin/admin-service.js";
 import { JoinTicketStore } from "./server/join-ticket.js";
 
@@ -25,11 +24,11 @@ async function main() {
   const adminService = new AdminService(
     database,
     masterSecret,
-    new BootstrapManager(path.join(DATA_DIR, "bootstrap")),
     logger,
     CONFIG_PATH,
   );
-  adminService.initialize();
+  await adminService.initialize();
+  removeObsoleteBootstrapFile();
   const joinTickets = new JoinTicketStore();
 
   logger.info({ dataDir: DATA_DIR }, "Starting WebSpeak server");
@@ -58,6 +57,14 @@ async function main() {
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+function removeObsoleteBootstrapFile(): void {
+  try {
+    unlinkSync(path.join(DATA_DIR, "bootstrap"));
+  } catch (error: unknown) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+  }
 }
 
 main().catch((err) => {

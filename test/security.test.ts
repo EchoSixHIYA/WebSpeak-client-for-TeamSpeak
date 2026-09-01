@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { loadOrCreateMasterSecret } from "../src/security/master-secret.js";
 import { decryptSecret, encryptSecret } from "../src/security/secret-crypto.js";
 import { hashAdminPassword, verifyAdminPassword } from "../src/security/admin-password.js";
-import { BootstrapManager } from "../src/security/bootstrap.js";
 
 test("master secret is stable and protects authenticated ciphertext", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "webspeak-secret-"));
@@ -32,17 +31,8 @@ test("admin password uses a salted scrypt credential", async () => {
   assert.equal(await verifyAdminPassword("a-long-admin-password", first), true);
   assert.equal(await verifyAdminPassword("wrong-password-value", first), false);
   assert.equal(JSON.stringify(first).includes("a-long-admin-password"), false);
-});
 
-test("bootstrap code persists until it is consumed", () => {
-  const directory = mkdtempSync(path.join(tmpdir(), "webspeak-bootstrap-"));
-  const bootstrapPath = path.join(directory, "bootstrap");
-  const firstManager = new BootstrapManager(bootstrapPath);
-  const code = firstManager.ensure();
-  assert.match(code, /^(?:[A-F0-9]{4}-){7}[A-F0-9]{4}$/);
-  assert.equal(new BootstrapManager(bootstrapPath).ensure(), code);
-  assert.equal(firstManager.verify(code.toLocaleLowerCase()), true);
-  assert.equal(firstManager.verify("0000-0000"), false);
-  firstManager.consume();
-  assert.throws(() => readFileSync(bootstrapPath));
+  const pending = await hashAdminPassword("admin", { username: "admin", mustChangePassword: true, allowWeakPassword: true });
+  assert.equal(pending.username, "admin");
+  assert.equal(pending.mustChangePassword, true);
 });

@@ -4,7 +4,6 @@ import { loadConfig } from "../config.js";
 import { formatTeamSpeakTarget, parseTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { type AccessMode, type SettingsUpdate, WebSpeakDatabase } from "../persistence/database.js";
 import { hashAdminPassword, validateAdminPassword, verifyAdminPassword } from "../security/admin-password.js";
-import { BootstrapManager } from "../security/bootstrap.js";
 import { decryptSecret, encryptSecret } from "../security/secret-crypto.js";
 import { probeTeamSpeak, TeamSpeakProbeError, type TeamSpeakProbeResult } from "../server/teamspeak-probe.js";
 
@@ -15,11 +14,6 @@ export interface AdminSettingsInput {
   accessMode: AccessMode;
   siteName: string;
   welcomeText: string;
-}
-
-export interface SetupInput extends AdminSettingsInput {
-  bootstrapCode: string;
-  adminPassword: string;
 }
 
 export interface ConnectionPolicy {
@@ -34,17 +28,17 @@ export class AdminService {
   constructor(
     readonly database: WebSpeakDatabase,
     private readonly masterSecret: Buffer,
-    private readonly bootstrap: BootstrapManager,
     private readonly logger: Logger,
     private readonly legacyConfigPath: string,
     private readonly probe: ProbeFunction = probeTeamSpeak,
   ) {}
 
-  initialize(): void {
+  async initialize(): Promise<void> {
     this.importLegacyConfigOnce();
     if (!this.database.hasAdmin()) {
-      const code = this.bootstrap.ensure();
-      this.logger.warn(`WebSpeak is not initialized. Open /admin/setup and enter bootstrap code: ${code}`);
+      const credential = await hashAdminPassword("admin", { username: "admin", mustChangePassword: true, allowWeakPassword: true });
+      this.database.initializeAdmin(credential, this.toSettingsUpdate(this.database.getSettings()));
+      this.logger.warn("Default admin account created. Change the password on first login.");
     }
   }
 
@@ -52,27 +46,23 @@ export class AdminService {
     return this.database.hasAdmin();
   }
 
-  verifyBootstrap(code: string): boolean {
-    return !this.isInitialized() && this.bootstrap.verify(code);
-  }
-
-  async setup(input: SetupInput): Promise<void> {
-    if (this.isInitialized()) throw new AdminInputError("ALREADY_INITIALIZED", "WebSpeak is already initialized");
-    if (!this.bootstrap.verify(input.bootstrapCode)) {
-      throw new AdminInputError("INVALID_BOOTSTRAP", "Bootstrap code is invalid");
-    }
-    const passwordError = validateAdminPassword(input.adminPassword);
-    if (passwordError) throw new AdminInputError("INVALID_ADMIN_PASSWORD", passwordError);
-    const credential = await hashAdminPassword(input.adminPassword);
-    const settings = this.normalizeSettings(input, this.database.getSettings());
-    this.database.initializeAdmin(credential, settings);
-    this.bootstrap.consume();
-    this.logger.info("WebSpeak administrator initialized");
-  }
-
-  async verifyPassword(password: string): Promise<boolean> {
+  async verifyPassword(username: string, password: string): Promise<boolean> {
     const credential = this.database.getAdminCredential();
-    return credential ? verifyAdminPassword(password, credential) : false;
+    return credential?.username === username && await verifyAdminPassword(password, credential);
+  }
+
+  isPasswordChangeRequired(): boolean {
+    return this.database.getAdminCredential()?.mustChangePassword === true;
+  }
+
+  async changePassword(password: string): Promise<void> {
+    const credential = this.database.getAdminCredential();
+    if (!credential) throw new AdminInputError("NOT_INITIALIZED", "The administrator account is not initialized");
+    const passwordError = validateAdminPassword(password);
+    if (passwordError) throw new AdminInputError("INVALID_ADMIN_PASSWORD", passwordError);
+    const replacement = await hashAdminPassword(password, { username: credential.username, mustChangePassword: false });
+    this.database.updateAdminCredential(replacement);
+    this.database.addAudit("ADMIN_PASSWORD_CHANGED");
   }
 
   getPublicConfig(): Record<string, unknown> {
@@ -87,18 +77,6 @@ export class AdminService {
         tsPort: settings.tsPort,
         target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
       } : {}),
-    };
-  }
-
-  getSetupDefaults(): Record<string, unknown> {
-    const settings = this.database.getSettings();
-    return {
-      target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
-      hasPassword: Boolean(settings.tsPasswordEncrypted),
-      accessMode: settings.accessMode,
-      siteName: settings.siteName,
-      welcomeText: settings.welcomeText,
-      legacyConfigImported: this.database.getMeta("legacy_config_imported") === "1",
     };
   }
 
@@ -220,6 +198,17 @@ export class AdminService {
       tsHost: target.host,
       tsPort: target.port,
       tsPasswordEncrypted: encryptedPassword,
+    };
+  }
+
+  private toSettingsUpdate(settings: ReturnType<WebSpeakDatabase["getSettings"]>): SettingsUpdate {
+    return {
+      siteName: settings.siteName,
+      welcomeText: settings.welcomeText,
+      accessMode: settings.accessMode,
+      tsHost: settings.tsHost,
+      tsPort: settings.tsPort,
+      tsPasswordEncrypted: settings.tsPasswordEncrypted,
     };
   }
 

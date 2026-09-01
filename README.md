@@ -14,7 +14,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - PCM/Opus 语音桥接、自由麦、按键说话、麦克风选择与音量控制。
 - 发言成员头像显示绿色动态边框。
 - 中英文访客页面和中英文管理控制台。
-- Web 管理闭环：首次配置、单管理员登录、概览、服务器设置和真实连接测试。
+- Web 管理闭环：默认账号首次登录强制改密、单管理员登录、概览、服务器设置和真实连接测试。
 - `fixed` 与 `open` 两种访问模式。
 - TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
 - 旧 `config.json` 一次性导入，导入后不再作为实时配置源。
@@ -46,32 +46,22 @@ npm run build
 node dist/index.js
 ```
 
-WebSpeak 内部端口固定为 `3040`。首次启动会输出一次初始化提示：
+WebSpeak 内部端口固定为 `3040`。首次启动会自动创建默认管理员账号：
 
 ```text
-WebSpeak is not initialized.
-Open /admin/setup and enter bootstrap code: XXXX-XXXX-...
+账号：admin
+密码：admin
 ```
 
-然后打开：
-
-```text
-http://127.0.0.1:3040/admin/setup
-```
-
-三步完成配置：
-
-1. 输入启动日志中的一次性初始化代码，创建至少 12 字符的管理员密码。
-2. 输入 `host[:port]` 形式的 TeamSpeak 地址和可选密码，执行真实短连接测试。
-3. 选择访问模式，并设置站点名称和欢迎文本。
-
-配置完成后初始化代码立即失效并从数据目录删除。后续管理入口为：
+然后打开管理入口：
 
 ```text
 http://127.0.0.1:3040/admin
 ```
 
-管理员只有密码，没有用户名、用户列表或角色系统。
+首次登录后必须设置一个至少 12 个字符的新密码。改密完成后，在“服务器设置”中填写 TeamSpeak 目标并执行连接测试，再保存访问模式和站点信息。
+
+后续管理入口仍为 `/admin`。管理员账号名固定为 `admin`，当前版本不提供用户列表或角色系统。
 
 ### 访问模式
 
@@ -89,11 +79,11 @@ http://127.0.0.1:3040/admin
 data/
   webspeak.db   SQLite 配置、管理员凭据和有限审计事件
   master.key    32 字节安装级主密钥
-  bootstrap     仅在首次初始化完成前存在
   logs/         本地日志
 ```
 
 - 管理员密码使用 Node.js `crypto.scrypt`、随机 salt 和 constant-time compare。
+- 新部署首次使用 `admin/admin` 登录后必须立即修改密码；修改完成后默认密码失效。
 - TeamSpeak 服务器密码使用 AES-256-GCM 加密。
 - 管理 Session 是随机服务端 Session；Cookie 为 `HttpOnly`、`SameSite=Strict`，直接 HTTPS 下同时启用 `Secure`。
 - 管理 mutation 检查同源请求、JSON Content-Type、服务端 Session 与 CSRF token。
@@ -182,14 +172,14 @@ npm audit
 src/
   admin/                         管理服务、API、Session 与登录限速
   persistence/database.ts        SQLite schema、repository 和迁移边界
-  security/                      主密钥、秘密加密、scrypt、Bootstrap 与网络策略
+  security/                      主密钥、秘密加密、scrypt 与网络策略
   domain/teamspeak-target.ts     host[:port] 规范化解析
   server/teamspeak-adapter.ts    TeamSpeak 协议边界与 endpoint 协议缓存
   server/teamspeak-probe.ts      可清理的短连接测试
   server/join-ticket.ts          一次性访客连接票据
   server/voice-bridge.ts         每用户语音 WebSocket 桥接
 web/src/views/
-  AdminView.vue                  双语 Setup/Login/Overview/Server UI
+  AdminView.vue                  双语 Login/Password change/Overview/Server UI
   WebClient.vue                  双语访客与语音工作台
 ```
 
@@ -204,7 +194,7 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Channel/member directory, channel switching, channel text chat, and live member movement.
 - PCM/Opus voice bridge, VOX, push-to-talk, microphone selection, and volume controls.
 - Bilingual guest UI and bilingual admin console.
-- Browser-based first setup, single-admin login, Overview, server settings, and a real short-lived connection test.
+- Browser-based admin login, mandatory first-login password change, Overview, server settings, and a real short-lived connection test.
 - Fixed and open guest access modes.
 - Encrypted TeamSpeak server password and one-time legacy config import.
 - No ServerQuery, WebQuery, admin token, or maintenance bot.
@@ -224,17 +214,17 @@ npm run build
 node dist/index.js
 ```
 
-WebSpeak always listens on internal port `3040`. On first boot, read the one-time bootstrap code from startup output and open:
+WebSpeak always listens on internal port `3040`. On first boot it creates the default administrator `admin` with password `admin`. Open the admin console:
 
 ```text
-http://127.0.0.1:3040/admin/setup
+http://127.0.0.1:3040/admin
 ```
 
-Create the admin password, test the TeamSpeak target, choose the access mode, and finish setup. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
+The first login is forced to a password-change screen. Set a password of at least 12 characters, then configure and test the TeamSpeak target from Server settings. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
 
 ### Security and persistence
 
-Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
+Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. A new instance starts with `admin/admin` and marks that credential for mandatory rotation on first login. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
 
 In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
 
