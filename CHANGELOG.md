@@ -10,15 +10,24 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - Persistent managed invites with expiry, optional maximum uses, revocation, hashed opaque tokens, and encrypted TeamSpeak credentials at rest.
 - Mobile-aware invite joining through the `invite` URL parameter without placing a TeamSpeak password in the URL.
 - M010 hardening for per-peer join-ticket rate limiting and bounded rotating runtime logs.
+- Bilingual README documentation with parallel Chinese and English feature, deployment, security, and operations sections.
 
 ### Changed
 
 - Database schema is now version 2 and migrates existing version 1 installations transactionally with a migration copy.
 - Admin overview and diagnostics use the application package version instead of a hard-coded display value.
+- The README architecture section now uses GitHub-native Markdown instead of a Mermaid rich-display block.
+- The README badge set now uses stable static Shields badges without a repository-metadata 404 dependency.
+
+### Fixed
+
+- Late WebSpeak browser sessions now reconcile and merge the complete TeamSpeak directory, so members who joined earlier remain visible.
+- Private-message delivery no longer disconnects the browser session.
+- Member actions are presented through the right-click context menu with hover feedback.
 
 ### Verification
 
-- `npm test` — 47 tests passed.
+- `npm test` — 51 tests passed.
 - `npm run build` — backend TypeScript build passed.
 - `npm run web:build` — frontend production build passed.
 - `npm audit --omit=dev --audit-level=high` — no high or critical vulnerabilities reported.

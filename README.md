@@ -6,12 +6,11 @@
 
 自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音接入网关。无需安装桌面客户端，打开浏览器即可进入你的语音空间。
 
-[![License](https://img.shields.io/github/license/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&color=0f766e)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-0f766e?style=flat-square)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/License-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5.0-0f766e?style=flat-square)](https://nodejs.org/)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
-[![AGPL](https://img.shields.io/badge/license-AGPL--3.0-only-0f766e?style=flat-square)](LICENSE)
 
-[中文](#中文) · [English](#english) · [快速开始](#快速开始) · [架构](#架构) · [安全边界](#安全边界)
+[中文](#中文) · [English](#english) · [快速开始](#快速开始) · [Quick Start](#quick-start) · [更新日志](#更新日志--changelog) · [安全边界](#安全边界)
 
 </div>
 
@@ -43,13 +42,11 @@
 
 ### 架构
 
-```mermaid
-flowchart LR
-    B[浏览器会话] -->|HTTPS / WSS| G[WebSpeak 网关]
-    A[管理控制台] -->|HTTPS| G
-    G -->|语音与数据连接| T[TeamSpeak 3 / 6]
-    T -->|频道 / 成员 / 文字 / 语音| G
-```
+| 层级 | 职责 | 连接 |
+| --- | --- | --- |
+| 浏览器会话 | 昵称、设备、频道、成员、文字和语音交互 | HTTPS / WSS → WebSpeak |
+| WebSpeak 网关 | 会话管理、访问控制、语音桥接、目录同步、管理控制台 | TeamSpeak 客户端协议 |
+| TeamSpeak 3 / 6 | 提供频道、成员、文字和语音服务 | 目标地址与语音端口 |
 
 ### 快速开始
 
@@ -214,28 +211,63 @@ web/src/
 
 ## English
 
-WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6. Open a link, choose a nickname, and join from a modern browser.
+WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6: open a link, choose a nickname, and join from a modern browser without installing a desktop client.
 
-### Highlights
+### Why WebSpeak
 
-- Browser-native voice with Opus / PCM bridging, free mic, push-to-talk, VOX, reconnect feedback, and speaking indicators.
-- Real microphone and speaker selection, volume controls, live input level, and a local microphone test.
-- Live channel/member directory, channel switching, text chat, private messages, Poke, Away state, and member volume.
-- Bilingual guest UI and admin console with theme switching and responsive mobile layouts.
-- Admin console with mandatory first-login password rotation, default TeamSpeak target, connection testing, invites, sessions, audit events, logs, diagnostics, and SQLite backup export.
-- Fixed and open access modes plus opaque, expiring, bounded, revocable managed invites.
-- Optional remembered device identity stored only in browser IndexedDB. The web UI intentionally has no identity import/export controls.
+| Experience | WebSpeak's answer |
+| --- | --- |
+| Joining | Open a browser link and join without installing the desktop client |
+| Compatibility | Supports TeamSpeak 3 and TeamSpeak 6 with automatic protocol detection |
+| Connection model | The browser connects to WebSpeak over HTTPS / WSS, and WebSpeak connects to TeamSpeak |
+| Access control | Fixed targets, open targets, and one-time managed invites |
+| Language and theme | Chinese and English interfaces with theme switching for guests and administrators |
 
-### Quick start
+### Core capabilities
+
+| Area | Included |
+| --- | --- |
+| Voice | Opus / PCM bridging, free mic, push-to-talk, VOX, connection state, reconnect feedback, and speaking indicators |
+| Devices | Browser microphone and speaker selection, volume controls, live input level, and a local microphone test |
+| Channels | Channel tree, channel switching, member movement, channel text chat, server events, and status display |
+| Members | Online members, green speaking borders, Away state, private messages, Poke, nickname copy, and per-member volume |
+| Administration | Mandatory first-login password rotation, default TeamSpeak target, site information, and real connection tests |
+| Operations | Active sessions, invite creation and revocation, audit events, structured logs, diagnostics, and SQLite backup |
+| Browser experience | Responsive layouts, press-and-hold mobile PTT, compact scrolling regions, local favorites, and recent connections |
+
+### Architecture
+
+| Layer | Responsibility | Connection |
+| --- | --- | --- |
+| Browser session | Nickname, device, channel, member, text, and voice interactions | HTTPS / WSS → WebSpeak |
+| WebSpeak gateway | Session management, access control, voice bridging, directory synchronization, and admin console | TeamSpeak client protocol |
+| TeamSpeak 3 / 6 | Channel, member, text, and voice services | Configured host and voice port |
+
+### Quick Start
+
+#### Option A: Build with Docker
 
 ```bash
 docker build -t webspeak:local .
 docker volume create webspeak-data
-docker run -d --name webspeak --restart unless-stopped \
-  -p 3040:3040 -v webspeak-data:/data webspeak:local
+docker run -d \
+  --name webspeak \
+  --restart unless-stopped \
+  -p 3040:3040 \
+  -v webspeak-data:/data \
+  webspeak:local
 ```
 
-Or run from source:
+The container listens on `3040`. SQLite data, the installation master key, and logs are stored in `/data`. If `certs/cert.pem` and `certs/key.pem` are present, the service enables HTTPS directly; for public deployments, an HTTPS reverse proxy is recommended. Microphone access and some browser audio features require a secure context.
+
+#### Option B: Run from source
+
+Requirements:
+
+- Node.js `22.5.0` or newer.
+- Native build tools required by `@discordjs/opus`; Linux installations typically need `python3`, `make`, and `g++`.
+- An accessible TeamSpeak 3 or TeamSpeak 6 server.
+- A recent Chrome or Edge release; HTTPS is recommended for production.
 
 ```bash
 npm ci
@@ -245,28 +277,134 @@ npm run build
 node dist/index.js
 ```
 
-Open `/admin`, sign in with `admin/admin`, rotate the password, then configure and test the default TeamSpeak target. WebSpeak listens on `3040`; TeamSpeak targets use the address plus voice port, with `9987` as the default.
+Then open:
 
-### Access, storage, and security
+```text
+http://127.0.0.1:3040/
+```
 
-`fixed` mode keeps guests on the configured target. `open` mode accepts public targets only after DNS and network-policy validation. Managed invites can be time-limited, usage-limited, and revoked. Passwords never appear in share links or WebSocket URLs.
+Use `https://127.0.0.1:3040/` when direct certificates are enabled. On first run, WebSpeak creates its SQLite database and installation master key in the data directory.
 
-Runtime state lives in `data/` (`/data` in Docker): SQLite, a 32-byte installation master key, and rotated logs. Admin passwords use `crypto.scrypt`; TeamSpeak passwords use AES-256-GCM; admin sessions use server-side cookies with same-origin and CSRF protection. Keep the database and master key together when backing up.
+### First login and default target
 
-A remembered user identity stays in browser IndexedDB and is never uploaded to the gateway. The web UI has no identity file import/export controls. Legacy `config.json` is imported once for the TeamSpeak target and password, after which SQLite is the live source of configuration.
+1. Open `/admin`.
+2. Sign in with the default account `admin / admin`.
+3. Follow the prompt to set a new administrator password of at least 12 characters.
+4. In **Servers**, configure the **Default TeamSpeak target** with a host and voice port.
+5. Run the connection test and save the settings.
 
-### Development
+When a welcome link has no target parameters, the welcome page pre-fills the administrator's default TeamSpeak target. Invite parameters take precedence. In fixed mode, guests stay on the administrator-configured target; in open mode, guests may enter a public target that passes the network policy.
+
+WebSpeak's web port is fixed at `3040`, and TeamSpeak's default voice port is `9987`. The web fields use separate host and voice-port inputs; legacy `host:port` and `host#port` text remains accepted by the parser.
+
+### Access modes and invites
+
+| Mode | Behavior | Typical use |
+| --- | --- | --- |
+| `fixed` | Guests cannot change the target; the server and password are managed by the administrator | Private communities and a single permanent server |
+| `open` | Guests may enter a public target and a password for that session | Temporary access and multi-server entry points |
+| Managed invite | An administrator creates a one-time, expiring, usage-limited, revocable link | Events, temporary rooms, and targeted sharing |
+
+In open mode, DNS resolution is followed by blocking loopback, private, link-local, multicast, broadcast, and reserved addresses. The verified IP is used for the actual connection. Server passwords never appear in share links, browser storage, or WebSocket URLs.
+
+### Audio and devices
+
+Inside a voice space, the settings panel lets users:
+
+- Choose a microphone and speaker detected by the browser.
+- Switch between free mic and push-to-talk.
+- Adjust input, output, notification, and VOX-threshold volumes.
+- Inspect microphone permission, live input level, and audio-context state.
+- Run a local microphone test of up to five seconds; the recording is played in the browser and is not sent to TeamSpeak.
+
+Device labels are controlled by the browser permission model. The first device selection may request microphone permission. Output-device selection depends on browser support; unsupported browsers clearly fall back to the default speaker.
+
+### Data and Security Boundary
+
+Runtime data is stored in `data/` by default and in `/data` in Docker:
+
+```text
+data/
+├── webspeak.db   SQLite settings, admin credentials, invites, and bounded audit events
+├── master.key    32-byte installation master key
+└── logs/         Locally rotated logs
+```
+
+- Administrator passwords use Node.js `crypto.scrypt`, a random salt, and constant-time comparison.
+- TeamSpeak server passwords are encrypted with AES-256-GCM; admin APIs never return them in plaintext.
+- Admin sessions use server-side sessions, HttpOnly / SameSite Strict cookies, same-origin checks, and CSRF tokens.
+- Admin login applies bounded-window rate limiting and failure delays.
+- A user identity is used only by the current join ticket and session. When “remember this device” is enabled, the private key stays in browser IndexedDB and is not uploaded to the gateway or written to logs, diagnostics, or the database.
+- WebSpeak has no identity-file import/export controls; clearing browser data removes the remembered identity and local preferences.
+- Logs, diagnostic reports, and the overview do not return server passwords, admin passwords, or private identity keys.
+- Back up `webspeak.db` together with `master.key`; an encrypted TeamSpeak password cannot be recovered from the database alone.
+
+### Upgrading from a legacy version
+
+If an old `config.json` is still present in the project root at startup, WebSpeak imports these fields once:
+
+- `tsHost`
+- `tsPort`
+- `tsServerPassword`
+
+After the import, `data/webspeak.db` is the only live configuration source. The legacy file is not deleted or rewritten. Legacy `port`, `tsServerProtocol`, `maxClients`, and `trustProxy` values are no longer runtime controls.
+
+### Health, development, and verification
+
+Unauthenticated health endpoints:
+
+```text
+GET /health
+GET /api/health
+```
+
+Development commands:
 
 ```bash
+# Backend: fixed port 3040
 npm run dev
+
+# Frontend: Vite on 5173, proxying /api and /ws to 3040
 npm run web:dev
+
+# Frontend production build
 npm --prefix web run build
+
+# Backend type check and build
 npm run build
+
+# Automated tests
 npm test
+
+# Dependency audit
 npm audit
 ```
 
-`/demo` is a simulated UI route and never connects to a real TeamSpeak server. Production microphone access requires HTTPS and a browser with the required audio permissions.
+`/demo` is an interactive simulated page that never connects to a real TeamSpeak server. It is useful for UI previews, recordings, and frontend regression checks, but does not replace real TS3 / TS6 verification.
+
+### Project layout
+
+```text
+src/
+├── admin/                   Admin service, login, sessions, invites, and operations APIs
+├── persistence/             SQLite schema, repositories, and migration boundaries
+├── security/                Master key, secret encryption, passwords, and target policy
+├── domain/                  TeamSpeak target and port parsing
+└── server/                  TeamSpeak adapter, sessions, tickets, and voice bridge
+
+web/src/
+├── views/WebClient.vue      Guest client, voice space, chat, and audio settings
+├── views/AdminView.vue      Admin login, server, overview, and operations console
+├── composables/             WebSocket and voice state
+└── services/                Theme, local persistence, and target parsing
+```
+
+### Known boundaries
+
+- The server has a fixed limit of 100 active connections.
+- The current administrator model is single-admin; there is no user, role, or permission-management panel.
+- Browser microphone permissions, HTTPS, and browser support for output-device selection affect the final experience.
+- WebSpeak does not replace TeamSpeak server version, protocol-compatibility, or network-reachability management.
 
 ### License
 
@@ -274,6 +412,30 @@ WebSpeak is licensed under the [GNU Affero General Public License v3.0 only](LIC
 
 ### Community
 
-QQ群 / QQ group: `869500475`
+QQ group: `869500475`
 
-![WebSpeak 群聊二维码](group-chat.png)
+![WebSpeak group QR code](group-chat.png)
+
+## 更新日志 / Changelog
+
+### [Unreleased]
+
+#### 中文
+
+- 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
+- 修复私聊消息到达后网页端断开连接的问题。
+- 优化成员右键菜单、悬停高亮和语音活动状态展示。
+- 完成管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
+- 完成中英文界面、默认 TeamSpeak 目标、配置迁移和首次登录改密流程。
+
+#### English
+
+- Fixed late WebSpeak sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
+- Fixed browser sessions disconnecting after receiving a private message.
+- Improved member context menus, hover highlighting, and speaking-state presentation.
+- Added the administrator console, managed invites, session operations, audit records, diagnostics, and SQLite backup support.
+- Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
+
+### v0.1.0
+
+The first normalized WebSpeak release provides the browser client, TeamSpeak 3 / 6 gateway, browser audio controls, configurable access modes, administrator operations, and AGPL-3.0-only licensing.
