@@ -516,10 +516,10 @@ const translations: Record<Language, Record<string, string>> = {
 };
 
 function initialServerAddress(): string {
-  const explicit = query.get("server") ?? query.get("target") ?? localStorage.getItem("webspeak:server-target");
+  const explicit = query.get("server") ?? query.get("target");
   if (explicit?.trim()) return explicit.trim();
-  const host = (query.get("tsHost") ?? localStorage.getItem("webspeak:ts-host") ?? location.hostname).trim();
-  const port = (query.get("tsPort") ?? localStorage.getItem("webspeak:ts-port") ?? "9987").trim();
+  const host = (query.get("tsHost") ?? location.hostname).trim();
+  const port = (query.get("tsPort") ?? "9987").trim();
   if (!host) return `127.0.0.1:${port}`;
   if (/^[^:]+:\d+$/.test(host) || /^\[[^\]]+\]:\d+$/.test(host)) return host;
   if (host.startsWith("[") || !host.includes(":")) return `${host}:${port}`;
@@ -656,7 +656,6 @@ function doConnect() {
   localStorage.setItem("webspeak:nickname", nickname.value);
   if (accessMode.value === "open") {
     serverAddress.value = serverAddress.value.trim();
-    localStorage.setItem("webspeak:server-target", serverAddress.value);
   }
   selectedChannelId.value = "";
   connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "");
@@ -710,8 +709,8 @@ async function loadPublicConfig() {
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeText.value = config.welcomeText;
     accessMode.value = config.accessMode === "open" ? "open" : "fixed";
-    const hasUserTarget = query.has("server") || query.has("target") || query.has("tsHost") || Boolean(localStorage.getItem("webspeak:server-target"));
-    if (!hasUserTarget && typeof config.target === "string" && config.target.trim()) serverAddress.value = config.target.trim();
+    const hasInviteTarget = query.has("server") || query.has("target") || query.has("tsHost") || query.has("tsPort");
+    if (!hasInviteTarget && typeof config.target === "string" && config.target.trim()) serverAddress.value = config.target.trim();
   } catch {
     // Keep joining disabled until the gateway can confirm its initialized policy.
   } finally {

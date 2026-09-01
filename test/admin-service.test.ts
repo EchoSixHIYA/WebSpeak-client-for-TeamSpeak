@@ -45,7 +45,7 @@ test("legacy config imports once, seeds the default admin, and allows password r
   assert.equal(await service.verifyPassword("admin", "admin"), false);
   assert.equal(service.isPasswordChangeRequired(), false);
   assert.equal(service.getPublicConfig().accessMode, "fixed");
-  assert.equal("target" in service.getPublicConfig(), false);
+  assert.equal(service.getPublicConfig().target, "legacy.example.com:9988");
 
   service.updateSettings({
     target: "public.example.com:9987",

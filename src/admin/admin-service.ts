@@ -72,11 +72,7 @@ export class AdminService {
       siteName: settings.siteName,
       welcomeText: settings.welcomeText,
       accessMode: settings.accessMode,
-      ...(settings.accessMode === "open" ? {
-        tsHost: settings.tsHost,
-        tsPort: settings.tsPort,
-        target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
-      } : {}),
+      target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
     };
   }
 

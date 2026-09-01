@@ -67,6 +67,8 @@ http://127.0.0.1:3040/admin
 
 `fixed` 是默认模式。访客页只显示昵称和频道，TeamSpeak 目标与服务器密码由服务端管理。
 
+欢迎页没有邀请链接目标参数时，地址和端口输入框会预填管理控制台中配置的“默认 TeamSpeak 目标”；邀请链接中的目标参数优先使用。
+
 `open` 模式允许访客输入其他公网 TeamSpeak 地址和本次 Session 使用的密码。WebSpeak 会解析 DNS，并阻止 loopback、私网、链路本地、组播、广播及保留地址；实际连接使用已经验证过的 IP，避免 DNS rebinding。
 
 访客密码只存在于一次性 Join Ticket 中，不写入 URL、本地存储或数据库。普通分享链接也不会包含密码。
@@ -227,6 +229,8 @@ The first login is forced to a password-change screen. Set a password of at leas
 Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. A new instance starts with `admin/admin` and marks that credential for mandatory rotation on first login. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
 
 In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
+
+When the welcome page has no target parameters from an invite link, its address and port field is prefilled from the admin-configured default TeamSpeak target. Invite-link target parameters take precedence.
 
 If a legacy `config.json` exists on the first upgraded start, only `tsHost`, `tsPort`, and `tsServerPassword` are imported. The original file is preserved, and SQLite becomes the sole live settings source.
 
