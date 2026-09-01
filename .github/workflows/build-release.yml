@@ -26,11 +26,15 @@ jobs:
             web/package-lock.json
       - name: Build application
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           $ErrorActionPreference = "Stop"
           npm ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm version --no-git-tag-version $env:RELEASE_VERSION
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -71,7 +75,7 @@ jobs:
           $smokeRoot = Join-Path $env:RUNNER_TEMP ($packageName + "-smoke")
           Copy-Item -Recurse -LiteralPath $packageRoot -Destination $smokeRoot
           @{
-            port = 31440
+            port = 3040
             tsHost = "106.15.36.235"
             tsPort = 9987
             tsServerPassword = ""
@@ -85,7 +89,7 @@ jobs:
             $health = $null
             for ($attempt = 0; $attempt -lt 30 -and -not $health; $attempt++) {
               Start-Sleep -Milliseconds 500
-              try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:31440/api/health" -TimeoutSec 2 } catch {}
+              try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:3040/api/health" -TimeoutSec 2 } catch {}
             }
             if (-not $health -or $health.status -ne "ok" -or $health.version -ne $env:RELEASE_VERSION) {
               throw "Windows release health check failed"
@@ -113,10 +117,13 @@ jobs:
             package-lock.json
             web/package-lock.json
       - name: Build application
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
+          npm version --no-git-tag-version "$RELEASE_VERSION"
           npm --prefix web run build
           npm run build
           npm prune --omit=dev --no-audit --no-fund
@@ -148,7 +155,7 @@ jobs:
           cp -a "$package_root" "$smoke_root"
           cat > "$smoke_root/config.json" <<'CONFIG'
           {
-            "port": 31441,
+            "port": 3040,
             "tsHost": "106.15.36.235",
             "tsPort": 9987,
             "tsServerPassword": "",
@@ -164,7 +171,7 @@ jobs:
             trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
             health=""
             for _ in $(seq 1 30); do
-              health="$(curl -fsS --max-time 2 http://127.0.0.1:31441/api/health 2>/dev/null || true)"
+              health="$(curl -fsS --max-time 2 http://127.0.0.1:3040/api/health 2>/dev/null || true)"
               if grep -q '"status":"ok"' <<<"$health" && grep -q "\"version\":\"$RELEASE_VERSION\"" <<<"$health"; then break; fi
               sleep 0.5
             done

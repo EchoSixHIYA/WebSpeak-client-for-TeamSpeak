@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+node_modules
+web/node_modules
+dist
+web/dist
+data
+certs
+release-artifacts
+*.tar.gz
+*.tar.xz
+claude.pem
+config.json
+*.log

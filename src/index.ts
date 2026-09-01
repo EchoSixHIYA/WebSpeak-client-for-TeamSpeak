@@ -1,5 +1,5 @@
 import path from "node:path";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createLogger } from "./logger.js";
 import { createWebServer } from "./server/server.js";
@@ -13,9 +13,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
 const CONFIG_PATH = path.join(ROOT_DIR, "config.json");
 const CERT_DIR = path.join(ROOT_DIR, "certs");
-const DATA_DIR = path.join(ROOT_DIR, "data");
+// Production images mount the persistent volume at /data. Source installs
+// keep the historical project-local data directory unless overridden.
+const DATA_DIR = process.env.WEBSPEAK_DATA_DIR?.trim() || path.join(ROOT_DIR, "data");
 const LOG_DIR = path.join(DATA_DIR, "logs");
 const STATIC_DIR = path.join(ROOT_DIR, "web", "dist");
+const APP_VERSION = readPackageVersion();
 
 async function main() {
   const logger = createLogger(LOG_DIR);
@@ -37,6 +40,7 @@ async function main() {
 
   const webServer = createWebServer({
     port: APP_PORT,
+    version: APP_VERSION,
     staticDir: STATIC_DIR,
     certDir: hasCert ? CERT_DIR : undefined,
     voiceBridgeOptions: {
@@ -57,6 +61,15 @@ async function main() {
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+function readPackageVersion(): string {
+  try {
+    const packageJson = JSON.parse(readFileSync(path.join(ROOT_DIR, "package.json"), "utf8")) as { version?: unknown };
+    return typeof packageJson.version === "string" && packageJson.version ? packageJson.version : "0.1.0";
+  } catch {
+    return "0.1.0";
+  }
 }
 
 function removeObsoleteBootstrapFile(): void {

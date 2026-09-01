@@ -1,0 +1,12 @@
+services:
+  webspeak:
+    image: ghcr.io/EchoSixHIYA/webspeak:latest
+    container_name: webspeak
+    restart: unless-stopped
+    ports:
+      - "3040:3040"
+    volumes:
+      - webspeak-data:/data
+
+volumes:
+  webspeak-data:

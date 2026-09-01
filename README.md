@@ -29,6 +29,28 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - 可访问的 TeamSpeak 3 或 TeamSpeak 6 服务器。
 - 较新的 Chrome 或 Edge；生产环境应使用 HTTPS。
 
+### Docker 部署（推荐）
+
+全新 Linux 主机只需要 Docker：
+
+```bash
+docker run -d \
+  --name webspeak \
+  --restart unless-stopped \
+  -p 3040:3040 \
+  -v webspeak-data:/data \
+  ghcr.io/EchoSixHIYA/webspeak:latest
+```
+
+容器内部端口固定为 `3040`，SQLite 数据库、主密钥和日志持久化在 `/data`。启动后打开 `http://你的地址:3040/admin`，使用 `admin/admin` 登录并按页面要求修改密码。生产环境请在前面配置 HTTPS 反向代理。
+
+也可以使用仓库附带的 `docker-compose.yml`：
+
+```bash
+docker compose up -d
+docker logs webspeak
+```
+
 Ubuntu / Debian：
 
 ```bash
@@ -211,6 +233,28 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Native build tools for `@discordjs/opus`.
 - A reachable TS3 or TS6 server.
 - A recent Chrome or Edge browser; use HTTPS in production.
+
+### Docker deployment (recommended)
+
+On a fresh Linux host, Docker is the only requirement:
+
+```bash
+docker run -d \
+  --name webspeak \
+  --restart unless-stopped \
+  -p 3040:3040 \
+  -v webspeak-data:/data \
+  ghcr.io/EchoSixHIYA/webspeak:latest
+```
+
+The container always listens on `3040`. SQLite, the installation master key, and logs persist under `/data`. Open `http://your-host:3040/admin`, sign in with `admin/admin`, and change the password when prompted. Put an HTTPS reverse proxy in front of the container for production microphone access.
+
+The repository also includes `docker-compose.yml`:
+
+```bash
+docker compose up -d
+docker logs webspeak
+```
 
 ```bash
 npm install

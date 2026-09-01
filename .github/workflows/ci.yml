@@ -1,0 +1,52 @@
+name: Continuous integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npm --prefix web ci --no-audit --no-fund
+      - name: Test and build
+        run: |
+          npm test
+          npm run build
+          npm --prefix web run build
+
+  docker-smoke:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        run: docker build --tag webspeak:ci .
+      - name: Run health smoke test
+        run: |
+          set -euo pipefail
+          docker run --detach --name webspeak-ci --publish 3040:3040 webspeak:ci
+          trap 'docker logs webspeak-ci; docker rm --force webspeak-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3040/health | grep -q '"status":"ok"'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1

@@ -13,6 +13,7 @@ import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
 
 export interface WebServerOptions {
   port: number;
+  version?: string;
   staticDir?: string;
   certDir?: string; // path to cert.pem + key.pem for HTTPS
   voiceBridgeOptions: VoiceBridgeOptions;
@@ -47,7 +48,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
   const startedAt = Date.now();
 
   const healthHandler: express.RequestHandler = (_request, response) => {
-    response.json({ status: "ok", version: "0.1.0" });
+    response.json({ status: "ok", version: options.version ?? "0.1.0" });
   };
   app.get("/health", healthHandler);
   app.get("/api/health", healthHandler);
