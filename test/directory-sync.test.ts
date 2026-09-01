@@ -31,3 +31,16 @@ test("directory state and movement events remain isolated per session", () => {
   assert.deepEqual(first.getSnapshot()?.clients.map((item) => [item.id, item.channelID]), [[3, 2n]]);
   assert.deepEqual(second.getSnapshot()?.clients.map((item) => [item.id, item.channelID]), [[3, 1n]]);
 });
+
+test("directory synchronizer keeps clients across staged partial snapshots", () => {
+  const sync = new DirectorySynchronizer();
+  const alice = client(7, "Alice", 1n);
+  const bob = client(8, "Bob", 1n);
+
+  sync.applySnapshot({ channels: [root], clients: [alice, bob] });
+  sync.applySnapshot({ channels: [root], clients: [bob] });
+  assert.deepEqual(sync.getSnapshot()?.clients.map((item) => item.id), [7, 8]);
+
+  sync.applyClientLeave(alice.id);
+  assert.deepEqual(sync.getSnapshot()?.clients.map((item) => item.id), [8]);
+});

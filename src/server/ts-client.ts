@@ -2,6 +2,8 @@ import { EventEmitter } from "node:events";
 import {
   Client as TS3FullClient,
   clientMove as tsClientMove,
+  listChannels as tsListChannels,
+  listClients as tsListClients,
   poke as tsPoke,
   sendTextMessage as tsSendTextMessage,
   generateIdentity,
@@ -116,10 +118,27 @@ export class TSClient extends EventEmitter {
       }, "Could not subscribe to all TeamSpeak channels");
     }
     // Directory snapshots are dispatched through two setImmediate layers in
-    // the SDK. Let both flush so the gateway's first connected state already
-    // contains members from every subscribed channel.
+    // the SDK. Let both flush before reconciling with a direct client-protocol
+    // snapshot so the gateway's first connected state contains every member.
     await new Promise<void>((resolve) => setImmediate(resolve));
     await new Promise<void>((resolve) => setImmediate(resolve));
+
+    // TS6 can finish the welcome event stream before it has exposed every
+    // existing client to a newly connected session. Pull one authoritative
+    // snapshot through this same client protocol session so users who joined
+    // earlier are visible immediately as well. Realtime events continue to
+    // keep the snapshot current after this reconciliation.
+    try {
+      const [channels, clients] = await Promise.all([
+        tsListChannels(client),
+        tsListClients(client),
+      ]);
+      this.emit("directorySnapshot", { channels, clients });
+    } catch (error: unknown) {
+      this.logger.warn({
+        err: error instanceof Error ? error.message : String(error),
+      }, "Could not reconcile the TeamSpeak directory snapshot");
+    }
 
     const connectedChannelId = client.channelID();
     if (this.preferredChannelId === 0n) {
@@ -154,12 +173,15 @@ export class TSClient extends EventEmitter {
     });
 
     // The SDK patch exposes the directory that TeamSpeak sends during the
-    // normal client welcome sequence. This is the same data a native client
-    // receives and does not require channellist/clientlist permissions.
+    // normal client welcome sequence. The connect path also reconciles this
+    // event stream with a complete client-protocol snapshot.
     (client as unknown as {
       on(event: "directorySnapshot", handler: (snapshot: TSDirectorySnapshot) => void): unknown;
     }).on("directorySnapshot", (snapshot) => {
-      this.emit("directorySnapshot", snapshot);
+      this.emit("directorySnapshot", {
+        channels: snapshot.channels.slice(),
+        clients: snapshot.clients.slice(),
+      });
     });
 
     client.on("textMessage", (msg) => {

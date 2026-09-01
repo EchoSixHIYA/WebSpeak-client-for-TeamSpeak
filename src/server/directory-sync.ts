@@ -7,9 +7,10 @@ type DirectoryDelta =
   | { type: "clientMoved"; id: number; channelID: bigint };
 
 /**
- * Merges the welcome snapshot with events received while that snapshot is in
- * flight. Each TeamSpeak connection owns its own instance, so no directory
- * event can leak into another browser session.
+ * Merges staged welcome snapshots with events received while the snapshot is
+ * in flight. Some TS6 welcome data arrives in more than one partial snapshot,
+ * so a later snapshot must not hide clients that were present in an earlier
+ * one. Explicit leave events remain authoritative removals.
  */
 export class DirectorySynchronizer {
   private snapshot: TSDirectorySnapshot | null = null;
@@ -22,8 +23,10 @@ export class DirectorySynchronizer {
 
   applySnapshot(snapshot: TSDirectorySnapshot): void {
     this.snapshot = { channels: snapshot.channels.slice(), clients: [] };
-    this.clients.clear();
-    for (const client of snapshot.clients) this.clients.set(client.id, client);
+    for (const client of snapshot.clients) {
+      const previous = this.clients.get(client.id);
+      this.clients.set(client.id, previous ? { ...previous, ...client } : client);
+    }
     const pending = this.pending.splice(0);
     for (const delta of pending) this.applyDelta(delta);
   }
