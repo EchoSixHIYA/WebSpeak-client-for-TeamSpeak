@@ -1,7 +1,7 @@
 <template>
   <div class="web-client" @keydown="onKeyDown" @keyup="onKeyUp" tabindex="0">
     <!-- Connection / welcome screen -->
-    <section v-if="!voiceState.connected" class="join-page">
+    <section v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed" class="join-page">
       <header class="join-header">
         <div class="brand-lockup">
           <div class="brand-mark"><Icon name="waveform" :size="22" /></div>
@@ -91,6 +91,11 @@
             <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /> {{ t('exit') }}</button>
           </div>
         </header>
+
+        <div v-if="voiceState.reconnecting || voiceState.reconnectFailed" :class="['reconnect-banner', { failed: voiceState.reconnectFailed }]" role="status">
+          <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
+          <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectNow">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="doDisconnect">{{ t('back') }}</button></div>
+        </div>
 
         <div class="workspace-scroll">
           <div class="workspace-content">
@@ -207,6 +212,7 @@ const {
   startMicrophoneTest,
   stopMicrophoneTest,
   connect,
+  reconnectNow,
   disconnect,
   switchChannel,
   sendTextMessage,
@@ -342,6 +348,11 @@ const translations: Record<Language, Record<string, string>> = {
     volumeTip: "拖动成员右侧滑杆，单独调整听到的音量。",
     moreMemberOptions: "更多成员选项",
     connectedToast: "当前已连接到此服务器",
+    connectionInterrupted: "连接已中断，正在尝试恢复…",
+    reconnectingAttempt: "第 {{attempt}} 次重连",
+    reconnectFailed: "无法恢复连接",
+    reconnectNow: "立即重连",
+    back: "返回",
     volumeToast: "成员音量可以在列表中单独调整",
     copiedToast: "邀请链接已复制",
     copyFailedToast: "复制失败，请手动复制浏览器地址",
@@ -478,6 +489,11 @@ const translations: Record<Language, Record<string, string>> = {
     volumeTip: "Drag a member slider to adjust their volume just for you.",
     moreMemberOptions: "More member options",
     connectedToast: "You are connected to this server",
+    connectionInterrupted: "Connection interrupted",
+    reconnectingAttempt: "Reconnecting… Attempt {{attempt}}",
+    reconnectFailed: "Could not restore the connection",
+    reconnectNow: "Reconnect now",
+    back: "Back",
     volumeToast: "Adjust each member's volume from the list",
     copiedToast: "Invite link copied",
     copyFailedToast: "Copy failed. Copy the browser address manually",
@@ -982,6 +998,14 @@ function stopPointerTalk() {
 .settings-select:disabled { cursor: wait; opacity: .65; }
 .settings-error { margin: -9px 0 15px; color: #b14e47; font-size: 10px; line-height: 1.5; }
 .settings-footer { justify-content: flex-end; }
+.reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 14px auto 0; width: min(950px, calc(100% - 64px)); padding: 12px 16px; color: #6c5a2c; border: 1px solid #f0dfae; border-radius: 10px; background: #fff9e8; }
+.reconnect-banner.failed { color: #8f4540; border-color: #f2d1cd; background: #fff2f1; }
+.reconnect-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.reconnect-copy strong { font-size: 13px; }
+.reconnect-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.reconnect-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.reconnect-actions .secondary-button { min-height: 34px; padding-inline: 13px; }
+@media (max-width: 740px) { .reconnect-banner { align-items: flex-start; flex-direction: column; gap: 10px; width: calc(100% - 30px); }.reconnect-copy { align-items: flex-start; flex-direction: column; gap: 4px; }.reconnect-actions { width: 100%; justify-content: flex-end; } }
 .save-button { min-height: 38px; }
 
 /* Increase connected-view typography by 25% while keeping the layout compact. */

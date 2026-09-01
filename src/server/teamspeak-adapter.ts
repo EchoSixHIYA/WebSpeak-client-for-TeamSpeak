@@ -73,6 +73,7 @@ export interface TeamSpeakAdapterOptions {
  */
 export class TeamSpeakAdapter {
   readonly client: TeamSpeakClient;
+  readonly identity: Identity;
   private detectedProtocol: TeamSpeakProtocol | null = null;
 
   constructor(
@@ -80,6 +81,7 @@ export class TeamSpeakAdapter {
     private readonly logger: Logger,
     private readonly protocolCache: EndpointProtocolCache = endpointProtocolCache,
   ) {
+    this.identity = options.identity ?? generateIdentity(8);
     const clientOptions: ClientOptions = {
       serverPassword: options.serverPassword,
       defaultChannel: options.defaultChannel,
@@ -92,7 +94,7 @@ export class TeamSpeakAdapter {
       },
     };
     this.client = new TeamSpeakClient(
-      options.identity ?? generateIdentity(8),
+      this.identity,
       formatTeamSpeakTarget(options.target),
       options.nickname,
       clientOptions,

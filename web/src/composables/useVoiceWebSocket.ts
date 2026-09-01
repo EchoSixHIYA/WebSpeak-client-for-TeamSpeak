@@ -3,6 +3,9 @@ import { reactive, ref } from "vue";
 export interface VoiceState {
   connected: boolean;
   connecting: boolean;
+  reconnecting: boolean;
+  reconnectAttempt: number;
+  reconnectFailed: boolean;
   tsClientId: number;
   error: string;
 }
@@ -37,11 +40,13 @@ export interface ChatMessage {
 
 export function useVoiceWebSocket() {
   const ws = ref<WebSocket | null>(null);
-  const state = reactive<VoiceState>({ connected: false, connecting: false, tsClientId: 0, error: "" });
+  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "" });
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
   let connectionSequence = 0;
+  let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string } | null = null;
+  let microphoneStartPromise: Promise<void> | null = null;
 
   // Audio capture. The ScriptProcessor path remains the most compatible option
   // for the current browser support matrix, but the graph now has an explicit
@@ -199,6 +204,16 @@ export function useVoiceWebSocket() {
     await refreshInputDevices();
   }
 
+  async function ensureMicrophone(): Promise<void> {
+    if (micStream) return;
+    if (!microphoneStartPromise) {
+      microphoneStartPromise = startMicrophone().finally(() => {
+        microphoneStartPromise = null;
+      });
+    }
+    await microphoneStartPromise;
+  }
+
   function voxGate(samples: Float32Array): boolean {
     let sum = 0;
     const count = Math.min(256, samples.length);
@@ -313,10 +328,14 @@ export function useVoiceWebSocket() {
   }
 
   function connect(target: string, channel: string, nickname: string, serverPassword = ""): void {
-    disconnect();
+    disconnect(true);
+    lastConnection = { target, channel, nickname, serverPassword };
     const sequence = ++connectionSequence;
     state.error = "";
     state.connecting = true;
+    state.reconnecting = false;
+    state.reconnectAttempt = 0;
+    state.reconnectFailed = false;
     void openTicketedConnection(sequence, target, channel, nickname, serverPassword);
   }
 
@@ -350,7 +369,7 @@ export function useVoiceWebSocket() {
         socket.close(1000);
         return;
       }
-      startMicrophone().catch((error: unknown) => {
+      ensureMicrophone().catch((error: unknown) => {
         state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
       });
     };
@@ -369,7 +388,8 @@ export function useVoiceWebSocket() {
       if (sequence !== connectionSequence) return;
       state.connected = false;
       state.connecting = false;
-      if (event.code !== 1000 && !state.error) state.error = closeReason(event.code);
+      state.reconnecting = false;
+      if (event.code !== 1000 && !state.error && !state.reconnectFailed) state.error = closeReason(event.code);
       stopMicrophone();
     };
     socket.onerror = () => {
@@ -392,14 +412,18 @@ export function useVoiceWebSocket() {
     return "连接已断开";
   }
 
-  function disconnect(): void {
+  function disconnect(preserveConnection = false): void {
     connectionSequence++;
+    if (!preserveConnection) lastConnection = null;
     stopMicrophone();
     const socket = ws.value;
     ws.value = null;
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000);
     state.connected = false;
     state.connecting = false;
+    state.reconnecting = false;
+    state.reconnectAttempt = 0;
+    state.reconnectFailed = false;
     state.tsClientId = 0;
     members.length = 0;
     channels.length = 0;
@@ -417,14 +441,24 @@ export function useVoiceWebSocket() {
   function handleMessage(msg: any): void {
     switch (msg.type) {
       case "connected":
+        const wasReconnecting = state.reconnecting;
         state.connected = true;
         state.connecting = false;
+        state.reconnecting = false;
+        state.reconnectAttempt = 0;
+        state.reconnectFailed = false;
+        state.error = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
         if (Array.isArray(msg.members)) {
           members.length = 0;
           for (const member of msg.members) {
             members.push({ ...member, isSelf: Number(member.id) === state.tsClientId });
           }
+        }
+        if (wasReconnecting) {
+          ensureMicrophone().catch((error: unknown) => {
+            state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
+          });
         }
         break;
       case "memberEnter":
@@ -458,7 +492,29 @@ export function useVoiceWebSocket() {
       case "disconnected":
         state.connected = false;
         state.connecting = false;
-        state.error = "TeamSpeak 连接已断开";
+        state.reconnecting = Boolean(msg.recoverable !== false);
+        state.reconnectFailed = false;
+        if (!state.reconnecting) state.error = "TeamSpeak 连接已断开";
+        stopMicrophone();
+        break;
+      case "reconnecting":
+        state.connected = false;
+        state.connecting = false;
+        state.reconnecting = true;
+        state.reconnectFailed = false;
+        state.reconnectAttempt = Number(msg.attempt) || state.reconnectAttempt + 1;
+        stopMicrophone();
+        break;
+      case "reconnected":
+        state.reconnecting = false;
+        state.reconnectFailed = false;
+        break;
+      case "reconnectFailed":
+        state.connected = false;
+        state.connecting = false;
+        state.reconnecting = false;
+        state.reconnectFailed = true;
+        state.error = "连接已中断，无法自动恢复";
         break;
       case "error":
         state.error = protocolErrorMessage(String(msg.error?.code || ""), String(msg.error?.message || msg.message || "操作失败"));
@@ -493,6 +549,11 @@ export function useVoiceWebSocket() {
       timestamp: Date.now(),
       isSelf: true,
     });
+  }
+
+  function reconnectNow(): void {
+    if (!lastConnection || state.connecting) return;
+    connect(lastConnection.target, lastConnection.channel, lastConnection.nickname, lastConnection.serverPassword);
   }
 
   function setMicMode(mode: "vox" | "ptt"): void {
@@ -564,6 +625,7 @@ export function useVoiceWebSocket() {
     startMicrophoneTest,
     stopMicrophoneTest,
     connect,
+    reconnectNow,
     disconnect,
     switchChannel,
     sendTextMessage,

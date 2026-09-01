@@ -14,6 +14,18 @@ test("connection state machine accepts the normal lifecycle and rejects illegal 
   assert.throws(() => machine.transition("connected"), /Illegal connection state transition/);
 });
 
+test("connection state machine can retry a transient authentication phase", () => {
+  const machine = new ConnectionStateMachine();
+  machine.transition("connecting");
+  machine.transition("authenticating");
+  machine.transition("reconnecting");
+  machine.transition("connecting");
+  machine.transition("authenticating");
+  machine.transition("syncing");
+  machine.transition("connected");
+  assert.equal(machine.state, "connected");
+});
+
 test("managed session teardown is idempotent and reaches idle even when cleanup fails", async () => {
   const manager = new SessionManager();
   let cleanupCalls = 0;

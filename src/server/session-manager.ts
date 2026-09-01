@@ -23,9 +23,9 @@ export type SessionTeardownReason =
 
 const ALLOWED_TRANSITIONS: Record<ConnectionState, readonly ConnectionState[]> = {
   idle: ["connecting", "disconnecting"],
-  connecting: ["authenticating", "failed", "disconnecting"],
-  authenticating: ["syncing", "failed", "disconnecting"],
-  syncing: ["connected", "failed", "disconnecting"],
+  connecting: ["authenticating", "reconnecting", "failed", "disconnecting"],
+  authenticating: ["syncing", "reconnecting", "failed", "disconnecting"],
+  syncing: ["connected", "reconnecting", "failed", "disconnecting"],
   connected: ["interrupted", "failed", "disconnecting"],
   interrupted: ["reconnecting", "failed", "disconnecting"],
   reconnecting: ["connecting", "failed", "disconnecting"],

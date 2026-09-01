@@ -9,6 +9,7 @@ import { formatTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { SessionManager, type ManagedSession, type SessionTeardownReason } from "./session-manager.js";
 import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
+import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnect-policy.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -38,6 +39,7 @@ interface WebClientEntry {
   members: Map<number, ChannelMember>;
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
   isAlive: boolean;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export class VoiceBridge {
@@ -100,6 +102,7 @@ export class VoiceBridge {
         members: new Map(),
         opusEncoder: null,
         isAlive: true,
+        reconnectTimer: null,
       };
       this.entries.set(entryId, entry);
       try {
@@ -116,6 +119,9 @@ export class VoiceBridge {
       let initialStateSent = false;
       let audioReady = true;
       let realtimeReady = false;
+      let hasConnectedOnce = false;
+      let reconnectStartedAt = 0;
+      let reconnectAttempt = 0;
       const directory = new DirectorySynchronizer();
 
       const sendJson = (message: Record<string, unknown>) => {
@@ -137,9 +143,106 @@ export class VoiceBridge {
       const sendInitialState = () => {
         if (initialStateSent || !tsReady || !directory.ready || !realtimeReady || !audioReady || session.state !== "syncing") return;
         initialStateSent = true;
+        const wasReconnecting = hasConnectedOnce;
+        hasConnectedOnce = true;
+        reconnectAttempt = 0;
+        reconnectStartedAt = 0;
         session.transition("connected");
         sendJson({ type: "connected", tsClientId: selfId, members: Array.from(entry!.members.values()) });
         sendJson({ type: "channelList", channels: entry!.channelTree });
+        if (wasReconnecting) sendJson({ type: "reconnected" });
+      };
+
+      const resetDirectoryForReconnect = () => {
+        tsReady = false;
+        initialStateSent = false;
+        selfId = 0;
+        selfChannelId = 0n;
+        directory.clear();
+        entry!.channelTree = [];
+        entry!.members.clear();
+      };
+
+      const failReconnect = (normalized: ReturnType<typeof normalizeTeamSpeakError>) => {
+        if (entry!.reconnectTimer) {
+          clearTimeout(entry!.reconnectTimer);
+          entry!.reconnectTimer = null;
+        }
+        try {
+          if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
+        } catch { /* teardown below remains authoritative */ }
+        sendJson({ type: "reconnectFailed", code: normalized.code });
+        void this.teardown(entryId, "teamSpeak-connect-failed");
+      };
+
+      const scheduleReconnect = (normalized: ReturnType<typeof normalizeTeamSpeakError> | null) => {
+        if (session.state === "disconnecting" || session.state === "idle" || session.state === "failed") return;
+        if (!isRecoverable(normalized)) {
+          failReconnect(normalized ?? normalizeTeamSpeakError(new Error("TeamSpeak connection failed")));
+          return;
+        }
+        const now = Date.now();
+        if (!reconnectStartedAt) reconnectStartedAt = now;
+        reconnectAttempt += 1;
+        if (!reconnectWindowOpen(reconnectStartedAt, now)) {
+          failReconnect(normalized ?? normalizeTeamSpeakError(new Error("Reconnect window expired")));
+          return;
+        }
+        if (session.state === "connected") session.transition("interrupted");
+        if (session.state === "interrupted") session.transition("reconnecting");
+        if (entry!.reconnectTimer) return;
+        const delayMs = reconnectDelayMs(reconnectAttempt);
+        sendJson({ type: "reconnecting", attempt: reconnectAttempt, delayMs });
+        entry!.reconnectTimer = setTimeout(() => {
+          entry!.reconnectTimer = null;
+          if (session.state !== "reconnecting") return;
+          try {
+            session.transition("connecting");
+            session.transition("authenticating");
+          } catch {
+            failReconnect(normalizeTeamSpeakError(new Error("Reconnect state initialization failed")));
+            return;
+          }
+          void connectTeamSpeak(true);
+        }, delayMs);
+        entry!.reconnectTimer.unref?.();
+      };
+
+      const connectTeamSpeak = async (isReconnect: boolean): Promise<void> => {
+        try {
+          await tsClient.connect();
+          if (session.state !== "authenticating") return;
+          session.transition("syncing");
+          tsReady = true;
+          selfId = tsClient.getClientId();
+          const sdkChannelId = tsClient.getChannelId();
+          if (sdkChannelId !== 0n) selfChannelId = sdkChannelId;
+          refreshDirectory();
+          if (selfId > 0 && !entry!.members.has(selfId)) {
+            directory.applyClientEnter({ id: selfId, nickname, channelID: selfChannelId, uid: "", type: 1, serverGroups: [] });
+            refreshDirectory();
+          }
+          sendInitialState();
+        } catch (error: unknown) {
+          const normalized = normalizeTeamSpeakError(error);
+          this.logger.error({ code: normalized.code, entryId, reconnect: isReconnect, attempt: reconnectAttempt }, "TS connect failed");
+          if (!isReconnect) {
+            try {
+              if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
+            } catch { /* teardown below remains authoritative */ }
+            if (ws.readyState === WebSocket.OPEN) ws.close(4003, normalized.code);
+            void this.teardown(entryId, "teamSpeak-connect-failed");
+            return;
+          }
+          if (isReconnect && isRecoverable(normalized)) {
+            try {
+              if (session.state !== "disconnecting" && session.state !== "idle") session.transition("reconnecting");
+            } catch { /* teardown below remains authoritative */ }
+            scheduleReconnect(normalized);
+            return;
+          }
+          failReconnect(normalized);
+        }
       };
 
       // Register every directory listener before connect(). Events emitted by
@@ -204,12 +307,12 @@ export class VoiceBridge {
         });
       });
 
-      tsClient.on("disconnected", () => {
-        if (session.state !== "disconnecting" && session.state !== "idle") {
-          try { session.transition("interrupted"); } catch { /* teardown below is authoritative */ }
-          sendJson({ type: "disconnected" });
-          void this.teardown(entryId, "teamSpeak-disconnect");
-        }
+      tsClient.on("disconnected", (error?: Error) => {
+        if (!hasConnectedOnce || session.state !== "connected") return;
+        resetDirectoryForReconnect();
+        const normalized = error ? normalizeTeamSpeakError(error) : null;
+        sendJson({ type: "disconnected", recoverable: isRecoverable(normalized) });
+        scheduleReconnect(normalized);
       });
 
       ws.on("pong", () => { if (entry) entry.isAlive = true; });
@@ -259,28 +362,7 @@ export class VoiceBridge {
         return;
       }
 
-      tsClient.connect()
-        .then(() => {
-          if (session.state !== "authenticating") return;
-          session.transition("syncing");
-          tsReady = true;
-          selfId = tsClient.getClientId();
-          const sdkChannelId = tsClient.getChannelId();
-          if (sdkChannelId !== 0n) selfChannelId = sdkChannelId;
-          refreshDirectory();
-          if (selfId > 0 && !entry!.members.has(selfId)) {
-            directory.applyClientEnter({ id: selfId, nickname, channelID: selfChannelId, uid: "", type: 1, serverGroups: [] });
-            refreshDirectory();
-          }
-          sendInitialState();
-        })
-        .catch((error: Error) => {
-          const normalized = normalizeTeamSpeakError(error);
-          this.logger.error({ code: normalized.code, entryId }, "TS connect failed");
-          try { if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed"); } catch { /* cleanup below */ }
-          if (ws.readyState === WebSocket.OPEN) ws.close(4003, normalized.code);
-          void this.teardown(entryId, "teamSpeak-connect-failed");
-        });
+      void connectTeamSpeak(false);
     });
 
     this.wss.on("error", (error) => {
@@ -321,6 +403,10 @@ export class VoiceBridge {
 
   private async cleanupEntry(entry: WebClientEntry, reason: SessionTeardownReason): Promise<void> {
     if (this.entries.get(entry.id) === entry) this.entries.delete(entry.id);
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer);
+      entry.reconnectTimer = null;
+    }
     entry.opusEncoder = null;
     entry.channelTree = [];
     entry.members.clear();
