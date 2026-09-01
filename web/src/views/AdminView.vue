@@ -31,7 +31,7 @@
         <header class="admin-topbar"><div><small>{{ tr('adminConsole') }}</small><h1>{{ currentPageTitle }}</h1></div><div><span class="running-dot"></span>{{ tr('gatewayRunning') }}<button type="button" :title="themeLabel" @click="cycleTheme">{{ themeLabel }}</button><button type="button" @click="toggleLanguage">{{ tr('languageSwitch') }}</button></div></header>
 
         <div v-if="errorMessage" class="alert error page-alert">{{ errorMessage }}</div>
-        <section v-if="route.path === '/admin/server'" class="page-content">
+        <section v-if="route.path === '/admin/server'" class="page-content server-page">
           <div class="page-heading"><div><h2>{{ tr('serverSettings') }}</h2><p>{{ tr('serverSettingsLead') }}</p></div><button class="primary-button" :disabled="submitting" @click="saveServerSettings">{{ submitting ? tr('saving') : tr('saveChanges') }}</button></div>
           <div class="settings-grid">
             <article class="settings-card"><h3>{{ tr('teamSpeakTarget') }}</h3><div class="target-fields"><label><span>{{ tr('serverAddress') }}</span><input v-model.trim="serverForm.address" :placeholder="tr('serverPlaceholder')" /></label><label><span>{{ tr('serverPort') }}</span><input v-model.trim="serverForm.port" inputmode="numeric" type="text" maxlength="5" :placeholder="tr('serverPortPlaceholder')" /></label></div><div class="password-row"><label><span>{{ tr('serverPassword') }}</span><input v-model="serverForm.serverPassword" type="password" autocomplete="off" :disabled="serverForm.passwordAction !== 'replace'" :placeholder="serverForm.hasPassword ? tr('passwordConfigured') : tr('optionalPassword')" /></label><div class="password-actions"><button type="button" :class="{ active: serverForm.passwordAction === 'replace' }" @click="serverForm.passwordAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasPassword" type="button" :class="{ danger: serverForm.passwordAction === 'remove' }" @click="serverForm.passwordAction = 'remove'">{{ tr('remove') }}</button></div></div><button class="secondary-button" type="button" :disabled="testing" @click="testServerConnection"><span v-if="testing" class="spinner small"></span><Icon v-else name="activity" :size="17" />{{ testing ? tr('testing') : tr('testConnection') }}</button><div v-if="testResult" :class="['test-result', testResult.ok ? 'success' : 'error']"><Icon :name="testResult.ok ? 'check' : 'close'" :size="18" /><div><strong>{{ testResult.ok ? tr('connectionReady') : tr('connectionFailed') }}</strong><small>{{ testResultText }}</small></div></div></article>
@@ -50,11 +50,11 @@
           <div class="operations-grid lower-operations"><article class="operation-card diagnostics-card"><header><div><h3>{{ tr('diagnostics') }}</h3><p>{{ tr('diagnosticsLead') }}</p></div><a class="text-link" href="/api/admin/diagnostics/report">{{ tr('downloadReport') }}</a></header><dl class="diagnostic-list"><div><dt>{{ tr('version') }}</dt><dd>{{ operations.diagnostics.version || '—' }}</dd></div><div><dt>{{ tr('runtime') }}</dt><dd>{{ operations.diagnostics.node || '—' }}</dd></div><div><dt>{{ tr('platform') }}</dt><dd>{{ operations.diagnostics.platform || '—' }} / {{ operations.diagnostics.arch || '—' }}</dd></div><div><dt>{{ tr('databaseSchema') }}</dt><dd>v{{ operations.diagnostics.schemaVersion || '—' }}</dd></div><div><dt>{{ tr('createdSessions') }}</dt><dd>{{ operations.diagnostics.createdSessions }}</dd></div></dl><button class="secondary-button" type="button" @click="downloadBackup">{{ tr('exportBackup') }}</button></article><article class="operation-card logs-card"><header><div><h3>{{ tr('logViewer') }}</h3><p>{{ tr('logViewerLead') }}</p></div><span v-if="!operations.logs.available" class="muted-label">{{ tr('logsUnavailable') }}</span></header><div v-if="operations.logs.entries.length" class="log-list"><div v-for="(entry, index) in operations.logs.entries" :key="`${entry.timestamp}-${index}`" class="log-row"><span :class="['log-level', entry.level.toLowerCase()]">{{ entry.level }}</span><div><strong>{{ entry.message || '—' }}</strong><small>{{ formatDate(entry.timestamp) }}<template v-if="Object.keys(entry.context).length"> · {{ formatContext(entry.context) }}</template></small></div></div></div><div v-else class="operation-empty"><Icon name="activity" :size="22" /><span>{{ tr('noLogs') }}</span></div></article><article class="operation-card audit-card"><header><div><h3>{{ tr('audit') }}</h3><p>{{ tr('auditLead') }}</p></div></header><ul class="event-list"><li v-for="event in operations.audit" :key="`${event.event}-${event.createdAt}`"><span><Icon name="check" :size="14" /></span><div><strong>{{ eventName(event.event) }}</strong><small>{{ formatDate(event.createdAt) }}</small></div></li><li v-if="!operations.audit.length" class="empty-event">{{ tr('auditEmpty') }}</li></ul></article></div>
         </section>
 
-        <section v-else class="page-content">
+        <section v-else class="page-content overview-page">
           <div v-if="overview.legacyConfigImported" class="alert info import-notice"><span>{{ tr('legacyImported') }}</span><button type="button" @click="dismissLegacyNotice">{{ tr('gotIt') }}</button></div>
           <div class="hero-status"><div><small>{{ tr('systemStatus') }}</small><h2>{{ tr('everythingRunning') }}</h2><p>{{ tr('overviewLead') }}</p></div><span class="status-badge"><i></i>{{ tr('running') }}</span></div>
           <div class="metric-grid"><article><span><Icon name="activity" :size="20" /></span><small>{{ tr('gateway') }}</small><strong>{{ overview.gateway.version || '—' }}</strong><em>{{ formatUptime(overview.gateway.uptimeSeconds) }}</em></article><article><span><Icon name="server" :size="20" /></span><small>{{ tr('teamSpeakTarget') }}</small><strong>{{ overview.teamSpeak.target || '—' }}</strong><em>{{ targetStatusText }}</em></article><article><span><Icon name="users" :size="20" /></span><small>{{ tr('activeSessions') }}</small><strong>{{ overview.sessions.active }} / {{ overview.sessions.limit }}</strong><em>{{ tr('peakSessions', { count: overview.sessions.peak }) }}</em></article></div>
-          <div class="overview-columns"><article class="overview-card"><header><div><h3>{{ tr('targetHealth') }}</h3><p>{{ tr('targetHealthLead') }}</p></div><RouterLink to="/admin/server">{{ tr('manage') }}</RouterLink></header><dl><div><dt>{{ tr('status') }}</dt><dd><i :class="overview.teamSpeak.status"></i>{{ targetStatusText }}</dd></div><div><dt>{{ tr('detectedProtocol') }}</dt><dd>{{ overview.teamSpeak.protocol?.toUpperCase() || tr('unknown') }}</dd></div><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(overview.teamSpeak.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ overview.teamSpeak.latencyMs == null ? '—' : `${overview.teamSpeak.latencyMs} ms` }}</dd></div></dl></article><article class="overview-card"><header><div><h3>{{ tr('recentEvents') }}</h3><p>{{ tr('recentEventsLead') }}</p></div></header><ul class="event-list"><li v-for="event in overview.recentEvents" :key="`${event.event}-${event.createdAt}`"><span><Icon name="check" :size="14" /></span><div><strong>{{ eventName(event.event) }}</strong><small>{{ formatDate(event.createdAt) }}</small></div></li><li v-if="!overview.recentEvents.length" class="empty-event">{{ tr('noRecentEvents') }}</li></ul></article></div>
+          <div class="overview-columns"><article class="overview-card target-health-card"><header><div><h3>{{ tr('targetHealth') }}</h3><p>{{ tr('targetHealthLead') }}</p></div><RouterLink to="/admin/server">{{ tr('manage') }}</RouterLink></header><dl><div><dt>{{ tr('status') }}</dt><dd><i :class="overview.teamSpeak.status"></i>{{ targetStatusText }}</dd></div><div><dt>{{ tr('detectedProtocol') }}</dt><dd>{{ overview.teamSpeak.protocol?.toUpperCase() || tr('unknown') }}</dd></div><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(overview.teamSpeak.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ overview.teamSpeak.latencyMs == null ? '—' : `${overview.teamSpeak.latencyMs} ms` }}</dd></div></dl></article><article class="overview-card recent-events-card"><header><div><h3>{{ tr('recentEvents') }}</h3><p>{{ tr('recentEventsLead') }}</p></div></header><ul class="event-list"><li v-for="event in overview.recentEvents" :key="`${event.event}-${event.createdAt}`"><span><Icon name="check" :size="14" /></span><div><strong>{{ eventName(event.event) }}</strong><small>{{ formatDate(event.createdAt) }}</small></div></li><li v-if="!overview.recentEvents.length" class="empty-event">{{ tr('noRecentEvents') }}</li></ul></article></div>
         </section>
       </main>
     </div>
@@ -492,5 +492,66 @@ async function parseResponse(response: Response) { const value = await response.
 @media(max-width:850px){
   .admin-shell{display:flex;flex-direction:column}
   .admin-main{height:auto;flex:1 1 auto}
+}
+
+/* Keep static admin cards at their own height. Only long data collections
+   become scroll surfaces, so a busy event feed cannot stretch its neighbour
+   or turn the whole admin view into a second page. */
+.admin-main>.page-alert{flex:0 0 auto}
+.page-content{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;overflow:hidden}
+.overview-page{padding:28px 0 18px}
+.overview-page .import-notice{flex:0 0 auto;margin-top:0;margin-bottom:12px}
+.overview-page .hero-status{flex:0 0 auto;padding:24px}
+.overview-page .metric-grid{flex:0 0 auto;gap:12px;margin:14px 0}
+.overview-page .metric-grid article{padding:18px}
+.overview-page .overview-columns{flex:1 1 0;min-height:0;align-items:stretch;gap:14px}
+.target-health-card{align-self:start}
+.recent-events-card{display:flex;height:100%;min-height:0;flex-direction:column;overflow:hidden}
+.recent-events-card .event-list{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+.server-page{padding:28px 0 18px}
+.server-page .page-heading{flex:0 0 auto;margin-bottom:14px}
+.server-page .settings-grid{flex:1 1 auto;min-height:0;align-items:stretch;gap:14px}
+.server-page .settings-card{min-height:0;overflow-y:auto;padding:20px}
+.server-page .readonly-card{flex:0 0 auto;margin-top:14px;padding:16px 20px}
+.server-page .readonly-card dl{gap:10px;margin-top:12px}
+.operations-page{height:auto;min-height:0}
+.operations-primary{flex:0 0 250px}
+.operations-primary>.operation-card{overflow-y:auto}
+.operations-primary>.operation-card{padding:14px 16px}
+.operations-primary .operation-card header p{line-height:1.3}
+.operations-primary .invite-form{gap:6px;margin-top:8px}
+.operations-primary label>span{margin-bottom:4px}
+.operations-primary input{height:34px;padding:7px 10px}
+.operations-primary .field-help{margin-top:-4px}
+.operations-primary .primary-button{min-height:34px}
+
+/* Theme all native scrollbars used by the admin surfaces. */
+:global(*){scrollbar-color:#8fcfc7 transparent;scrollbar-width:thin}
+:global(*::-webkit-scrollbar){width:8px;height:8px}
+:global(*::-webkit-scrollbar-track){background:transparent}
+:global(*::-webkit-scrollbar-thumb){background:#a7d9d2;background-clip:padding-box;border:2px solid transparent;border-radius:999px}
+:global(*::-webkit-scrollbar-thumb:hover){background:#6bbab1;background-clip:padding-box;border-width:1px}
+:global(:root[data-theme="dark"] *){scrollbar-color:#438f88 transparent}
+:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb){background:#438f88;border-color:transparent}
+:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover){background:#69c7bc}
+
+@media(max-width:850px){
+  .page-content{width:min(100% - 28px,700px);padding-top:20px;padding-bottom:14px}
+  .overview-page .hero-status{padding:18px}
+  .overview-page .hero-status h2{font-size:24px}
+  .overview-page .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}
+  .overview-page .metric-grid article{padding:12px}
+  .overview-page .metric-grid article>span{top:10px;right:10px;width:28px;height:28px}
+  .overview-page .metric-grid strong{margin-top:9px;font-size:15px}
+  .overview-page .overview-columns{grid-template-rows:minmax(0,1fr) minmax(0,1fr);overflow:hidden}
+  .overview-page .target-health-card{align-self:stretch;min-height:0;overflow-y:auto}
+  .overview-page .recent-events-card{height:100%}
+  .server-page .settings-grid{grid-template-columns:1fr;grid-auto-rows:minmax(190px,1fr);overflow-y:auto}
+  .server-page .readonly-card dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .operations-page{height:100%;overflow:hidden}
+  .operations-page .operations-primary,.operations-page .lower-operations{grid-template-columns:1fr;min-height:0;overflow-y:auto;align-content:start}
+  .operations-page .operations-primary{grid-auto-rows:240px}
+  .operations-page .lower-operations{grid-auto-rows:190px}
+  .operations-page .lower-operations{flex:1 1 0}
 }
 </style>

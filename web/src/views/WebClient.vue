@@ -1792,4 +1792,14 @@ function stopWhisperTalk(): void {
   .app-shell .member-panel.mobile-section-visible { flex: 1 1 auto; min-height: 0; max-height: none; }
   .mobile-more-panel { min-height: 0; max-height: none; margin-bottom: 0; overflow-y: auto; }
 }
+
+/* Match every native scroll surface to the WebSpeak palette. */
+:global(*) { scrollbar-color: #8fcfc7 transparent; scrollbar-width: thin; }
+:global(*::-webkit-scrollbar) { width: 8px; height: 8px; }
+:global(*::-webkit-scrollbar-track) { background: transparent; }
+:global(*::-webkit-scrollbar-thumb) { background: #a7d9d2; background-clip: padding-box; border: 2px solid transparent; border-radius: 999px; }
+:global(*::-webkit-scrollbar-thumb:hover) { background: #6bbab1; background-clip: padding-box; border-width: 1px; }
+:global(:root[data-theme="dark"] *) { scrollbar-color: #438f88 transparent; }
+:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb) { background: #438f88; border-color: transparent; }
+:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover) { background: #69c7bc; }
 </style>
