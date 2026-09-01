@@ -13,7 +13,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
 **[中文](#中文)**<br />
-[更新日志](#更新日志) · [为什么是 WebSpeak](#为什么是-webspeak) · [核心能力](#核心能力) · [架构](#架构) · [快速开始](#快速开始) · [首次登录与默认目标](#首次登录与默认目标) · [访问模式与邀请](#访问模式与邀请) · [音频与设备](#音频与设备) · [数据与安全边界](#数据与安全边界) · [旧版本升级](#旧版本升级) · [健康检查](#健康检查开发与验证) · [项目结构](#项目结构) · [已知边界](#已知边界)
+[更新日志](#更新日志) · [为什么是 WebSpeak](#为什么是-webspeak) · [核心能力](#核心能力) · [架构](#架构) · [快速开始](#快速开始) · [首次登录与默认目标](#首次登录与默认目标) · [访问模式与邀请](#访问模式与邀请) · [音频与设备](#音频与设备) · [数据与安全边界](#数据与安全边界) · [旧版本升级](#旧版本升级) · [健康检查](#健康检查开发与验证) · [项目结构](#项目结构) · [已知边界](#已知边界) · [社区](#社区)
 
 **[English](#english)**<br />
 [Changelog](#changelog) · [Why WebSpeak](#why-webspeak) · [Core capabilities](#core-capabilities) · [Architecture](#architecture) · [Quick Start](#quick-start) · [First login](#first-login-and-default-target) · [Access modes](#access-modes-and-invites) · [Audio](#audio-and-devices) · [Security](#data-and-security-boundary) · [Upgrade](#upgrading-from-a-legacy-version) · [Health](#health-development-and-verification) · [Project layout](#project-layout) · [Known boundaries](#known-boundaries) · [License](#license) · [Community](#community)
@@ -28,22 +28,13 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 ### 更新日志
 
-#### 2026-09-02 · v0.1.3
+#### 2026-09-02 · v0.1.1
 
-- 修复发布工作流在项目版本号已经一致时错误退出的问题，确保 Windows/Linux 部署包能够正常生成并发布。
-
-#### 2026-09-02 · v0.1.2
-
-- 修复 Docker 构建阶段未复制 `postinstall` 脚本导致依赖安装失败的问题。
-- 版本标签现在会自动发布 Windows/Linux 部署包到 GitHub Release，并同步发布 Docker 镜像。
-
-#### 2026-09-01 · v0.1.1
-
+- 汇总并正式发布浏览器客户端、管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
 - 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
-- 修复私聊消息到达后网页端断开连接的问题。
-- 优化成员右键菜单、悬停高亮和语音活动状态展示。
-- 完成管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
-- 完成中英文界面、默认 TeamSpeak 目标、配置迁移和首次登录改密流程。
+- 修复私聊消息到达后网页端断开连接的问题，完善成员右键菜单、悬停高亮和语音活动状态展示。
+- 完成中英文界面、默认 TeamSpeak 目标、旧版配置迁移和首次登录强制改密流程。
+- 发布流程稳定生成 Windows/Linux 部署包并同步发布 Docker 镜像；Docker 构建会正确处理依赖安装脚本。
 
 #### 2026-08-31 · v0.1.0
 
@@ -254,22 +245,13 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 ### Changelog
 
-#### 2026-09-02 · v0.1.3
+#### 2026-09-02 · v0.1.1
 
-- Fixed the release workflow exiting with an error when the project version already matched the requested release version, so Windows/Linux deployment packages can be generated and published reliably.
-
-#### 2026-09-02 · v0.1.2
-
-- Fixed the Docker build failing during dependency installation because the `postinstall` patch script was not copied into the build stage.
-- Version tags now publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
-
-#### 2026-09-01 · v0.1.1
-
+- Consolidated and officially released the browser client, administrator console, managed invites, session operations, audit records, diagnostics, and SQLite backup support.
 - Fixed late WebSpeak browser sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
-- Fixed browser sessions disconnecting after receiving a private message.
-- Improved member context menus, hover highlighting, and speaking-state presentation.
-- Added the administrator console, managed invites, session operations, audit records, diagnostics, and SQLite backup support.
+- Fixed browser sessions disconnecting after receiving a private message, and improved member context menus, hover highlighting, and speaking-state presentation.
 - Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
+- Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now handle the dependency patch script correctly.
 
 #### 2026-08-31 · v0.1.0
 

@@ -2,23 +2,7 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
-## [0.1.3] — 2026-09-02
-
-### Fixed
-
-- Release builds now skip `npm version` when the project version already matches the requested version, preventing Windows/Linux package builds from failing with `Version not changed`.
-
-## [0.1.2] — 2026-09-02
-
-### Changed
-
-- Version tags now publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
-
-### Fixed
-
-- Docker builds now copy the root `postinstall` patch script before running `npm ci`.
-
-## [0.1.1] — 2026-09-01
+## [0.1.1] — 2026-09-02
 
 ### Added
 
@@ -34,12 +18,15 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - Admin overview and diagnostics use the application package version instead of a hard-coded display value.
 - The README architecture section now uses GitHub-native Markdown instead of a Mermaid rich-display block.
 - The README badge set now uses stable static Shields badges without a repository-metadata 404 dependency.
+- Version tags publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
 
 ### Fixed
 
 - Late WebSpeak browser sessions now reconcile and merge the complete TeamSpeak directory, so members who joined earlier remain visible.
 - Private-message delivery no longer disconnects the browser session.
 - Member actions are presented through the right-click context menu with hover feedback.
+- Docker release builds copy the root `postinstall` patch script before running `npm ci`.
+- Release builds skip `npm version` when the project version already matches the requested version, preventing false `Version not changed` failures.
 
 ### Verification
 
