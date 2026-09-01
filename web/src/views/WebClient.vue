@@ -64,7 +64,7 @@
               <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
             </div>
 
-            <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label><div class="identity-tools"><button type="button" class="identity-tool-button" @click="identityFileInput?.click()">{{ t('identityImport') }}</button><button v-if="identityMaterial" type="button" class="identity-tool-button" @click="exportIdentity">{{ t('identityExport') }}</button><input ref="identityFileInput" class="visually-hidden" type="file" accept=".json,.txt,application/json,text/plain" @change="importIdentity" /></div></details>
+            <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label></details>
 
             <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
@@ -331,7 +331,6 @@ const audioSettingsError = ref("");
 const pttActive = ref(false);
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
-const identityFileInput = ref<HTMLInputElement | null>(null);
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const chatTab = ref<"channel" | "server" | "private" | "events">("channel");
 const privateClientId = ref(0);
@@ -387,12 +386,6 @@ const translations: Record<Language, Record<string, string>> = {
     rememberIdentityHint: "仅保存在本设备，用于下次连接时保持身份。",
     identityOptions: "设备身份选项",
     localPersistenceUnavailable: "当前浏览器无法使用持久化存储，本次将使用临时身份。",
-    identityImport: "导入身份",
-    identityExport: "导出身份",
-    identityExportWarning: "身份文件包含私密凭据，任何拿到文件的人都可以冒充此身份。请妥善保管。",
-    identityExportedToast: "身份文件已下载，请妥善保管",
-    identityImportedToast: "身份已导入，将在下次连接时使用",
-    identityImportFailed: "身份文件无效，请选择 WebSpeak 身份文件",
     favoriteServers: "常用服务器",
     recentServers: "最近连接",
     saveFavorite: "保存到常用",
@@ -608,12 +601,6 @@ const translations: Record<Language, Record<string, string>> = {
     rememberIdentityHint: "Stored only on this device and reused on the next connection.",
     identityOptions: "Device identity options",
     localPersistenceUnavailable: "Persistent browser storage is unavailable; this session will use an ephemeral identity.",
-    identityImport: "Import identity",
-    identityExport: "Export identity",
-    identityExportWarning: "Identity files contain private credentials. Anyone with the file can impersonate this identity. Keep it safe.",
-    identityExportedToast: "Identity file downloaded. Keep it safe.",
-    identityImportedToast: "Identity imported and will be used on the next connection.",
-    identityImportFailed: "Invalid identity file. Choose a WebSpeak identity file.",
     favoriteServers: "Favorites",
     recentServers: "Recent servers",
     saveFavorite: "Save favorite",
@@ -1157,40 +1144,6 @@ async function clearBrowserData(): Promise<void> {
   showToast(t("localDataCleared"));
 }
 
-function exportIdentity(): void {
-  if (!identityMaterial.value) return;
-  if (!window.confirm(t("identityExportWarning"))) return;
-  const contents = JSON.stringify({
-    format: "webspeak-identity",
-    version: 1,
-    privateMaterial: identityMaterial.value,
-    exportedAt: new Date().toISOString(),
-  }, null, 2);
-  const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "webspeak-identity.json";
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast(t("identityExportedToast"));
-}
-
-async function importIdentity(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file) return;
-  try {
-    const parsed = JSON.parse(await file.text()) as { format?: unknown; version?: unknown; privateMaterial?: unknown };
-    if (parsed.format !== "webspeak-identity" || parsed.version !== 1 || typeof parsed.privateMaterial !== "string" || parsed.privateMaterial.length === 0 || parsed.privateMaterial.length > 8192) throw new Error("invalid identity");
-    identityMaterial.value = parsed.privateMaterial;
-    rememberIdentity.value = true;
-    showToast(t("identityImportedToast"));
-  } catch {
-    showToast(t("identityImportFailed"));
-  }
-}
-
 async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
@@ -1461,7 +1414,7 @@ function stopWhisperTalk(): void {
 .language-switch { min-width: 50px; min-height: 28px; padding: 0 9px; color: #006a64; background: #e2f2ef; border: 1px solid #c8e6e1; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; transition: .18s; }
 .language-switch:hover { color: #fff; background: #006a64; border-color: #006a64; }
 .tiny-dot, .online-dot, .status-pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #65d879; box-shadow: 0 0 0 4px rgba(101, 216, 121, .14); }
-.join-content { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 430px; align-items: center; gap: clamp(60px, 10vw, 148px); padding: 58px 0 80px; }
+.join-content { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(480px, 520px); align-items: center; gap: clamp(40px, 6vw, 88px); padding: 38px 0 56px; }
 .join-copy { max-width: 630px; }
 .eyebrow, .room-eyebrow { display: flex; align-items: center; gap: 9px; color: #006a64; font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .eyebrow-dot { width: 9px; height: 9px; border-radius: 50%; background: #90f691; }
@@ -1476,25 +1429,25 @@ function stopWhisperTalk(): void {
 .promise-item b, .promise-item small { display: block; }
 .promise-item b { color: #283431; font-size: 12px; }
 .promise-item small { margin-top: 3px; color: #87938f; font-size: 10px; }
-.join-card { padding: 36px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
+.join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
-.card-lead { margin: 0 0 26px; color: #7b8885; font-size: 13px; }
-.notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 11px 12px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.card-lead { margin: 0 0 18px; color: #7b8885; font-size: 13px; }
+.notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
 .error-notice { color: #a53c38; background: #fff0ef; border: 1px solid #f7d4d1; }
 .warning-notice { color: #8a6537; background: #fff8e9; border: 1px solid #f2dfb3; }
 .notice-symbol { display: grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; color: #fff; background: currentColor; color: #fff; font-size: 10px; font-weight: 800; }
 .error-notice .notice-symbol { background: #d95d55; }
 .warning-notice .notice-symbol { background: #c89143; }
-.join-form { display: grid; gap: 8px; }
+.join-form { display: grid; gap: 6px; }
 .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 12px; }
 .field-grid .field-label { display: block; }
 .field-grid .field-label:not(:first-child) { margin-top: 0; }
 .field-hint { margin: 1px 0 5px; color: #879590; font-size: 10px; line-height: 1.5; }
 .field-label, .settings-label { color: #43514d; font-size: 11px; font-weight: 600; }
-.field-label:not(:first-child) { margin-top: 10px; }
+.field-label:not(:first-child) { margin-top: 6px; }
 .field-label span { color: #a2aaa7; font-weight: 400; }
-.field-wrap { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; color: #8b9b96; border-radius: 10px; background: #f3f6f5; transition: .2s ease; }
+.field-wrap { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; color: #8b9b96; border-radius: 10px; background: #f3f6f5; transition: .2s ease; }
 .field-wrap:focus-within { color: #006a64; background: #fff; box-shadow: 0 0 0 2px #81d8d0; }
 .field-wrap input { width: 100%; min-width: 0; padding: 0; color: #24312f; outline: none; border: 0; background: transparent; font-size: 13px; }
 .field-wrap input::placeholder { color: #a5b0ad; }
@@ -1502,9 +1455,9 @@ function stopWhisperTalk(): void {
 .primary-button:hover:not(:disabled) { background: #005650; box-shadow: 0 9px 20px rgba(0, 106, 100, .18); transform: translateY(-1px); }
 .primary-button:active:not(:disabled) { transform: translateY(0); }
 .primary-button:disabled { cursor: not-allowed; opacity: .45; }
-.connect-button { width: 100%; min-height: 48px; margin-top: 17px; font-size: 13px; }
+.connect-button { width: 100%; min-height: 44px; margin-top: 10px; font-size: 13px; }
 .button-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
-.join-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 20px; color: #96a29f; font-size: 10px; }
+.join-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; color: #96a29f; font-size: 10px; }
 .join-footer { display: flex; align-items: center; min-height: 68px; color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
 .footer-separator { margin: 0 8px; color: #ccd5d1; }.footer-spacer { flex: 1; }
 
@@ -1552,15 +1505,11 @@ function stopWhisperTalk(): void {
 .app-shell { grid-template-columns: minmax(0, 1fr) 318px; }
 .nav-rail, .channel-sidebar { display: none; }
 .workspace { min-width: 0; }
-.identity-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1px; }
 .identity-options { margin-top: 8px; color: #677872; font-size: 11px; }
 .identity-options summary { width: fit-content; color: #277970; cursor: pointer; }
 .identity-options[open] summary { margin-bottom: 10px; }
 .cancel-connect-button { justify-self: center; min-height: 32px; padding: 0 10px; color: #6b7d77; background: transparent; font-size: 11px; cursor: pointer; }
 .cancel-connect-button:hover { color: #006a64; text-decoration: underline; }
-.identity-tool-button { padding: 5px 8px; color: #277970; background: #eef8f5; border: 1px solid #d7ebe6; border-radius: 6px; font-size: 10px; cursor: pointer; }
-.identity-tool-button:hover { background: #e0f3ee; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .channel-switcher { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; }
 .channel-switcher select { max-width: 165px; padding: 0 2px; color: #31514b; border: 0; outline: 0; background: transparent; font-size: 11px; cursor: pointer; }
 .member-panel { display: flex; flex-direction: column; min-height: 0; padding: 26px 18px 18px; overflow: hidden; }
@@ -1814,5 +1763,33 @@ function stopWhisperTalk(): void {
   .whisper-strip-copy { width: 100%; flex: 1 0 100%; }
   .whisper-ptt-button { flex: 1; min-height: 46px; }
   .whisper-strip > .text-button { min-height: 38px; }
+}
+
+/* Keep the desktop join card comfortable without making the welcome page
+   taller than the browser. Smaller viewports can scroll inside the card. */
+@media (min-width: 741px) {
+  .join-header { min-height: 72px; }
+  .join-content { padding: 28px 0 36px; }
+  .join-card { max-height: calc(100dvh - 190px); overflow-y: auto; }
+  .join-footer { min-height: 54px; }
+}
+
+@media (max-width: 740px) {
+  .join-card { max-height: none; overflow: visible; }
+}
+
+/* The document itself never becomes the scroll surface. Each view owns its
+   content scroll area so headers, controls and mobile navigation stay fixed. */
+:global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; overflow: hidden; }
+.join-page { height: 100dvh; min-height: 0; overflow: hidden; }
+.join-content { min-height: 0; }
+
+@media (max-width: 740px) {
+  .join-content { overflow-y: auto; }
+  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell .workspace { height: auto; min-height: 0; flex: 1 1 auto; }
+  .app-shell.mobile-view-channels .workspace { display: none; }
+  .app-shell .member-panel.mobile-section-visible { flex: 1 1 auto; min-height: 0; max-height: none; }
+  .mobile-more-panel { min-height: 0; max-height: none; margin-bottom: 0; overflow-y: auto; }
 }
 </style>

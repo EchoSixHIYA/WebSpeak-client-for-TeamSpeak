@@ -24,7 +24,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - Web 管理闭环：默认账号首次登录强制改密、单管理员登录、概览、服务器设置和真实连接测试。
 - 运维控制台：受控邀请创建/撤销/过期/限次、活动会话列表与单会话断开、审计事件、结构化日志查看、脱敏诊断报告和 SQLite 备份导出。
 - `fixed` 与 `open` 两种访问模式。
-- 可选的持久 TeamSpeak identity：身份私钥仅保存在浏览器 IndexedDB，可导入/导出；访客也可继续使用临时身份。
+- 可选的持久 TeamSpeak identity：身份私钥仅保存在浏览器 IndexedDB，访客也可继续使用临时身份。
 - 浏览器本地收藏、最近服务器、昵称、语言、音频设备/模式/音量和按 TeamSpeak UID 保存的成员音量。
 - 可清除全部 WebSpeak 本地数据；不保存服务器密码。
 - TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
@@ -130,7 +130,7 @@ data/
 - 日志、管理 API 和 Overview 不返回服务器密码、管理员密码或身份私钥。
 - 普通用户 identity 只通过当前 Join Ticket/Session 在内存中使用，不写入 Gateway 数据库、日志或诊断信息。
 
-浏览器身份导出文件包含可冒用该 TeamSpeak identity 的私密凭据，只应保存到可信位置；不要上传到 WebSpeak 或提交到 Git。
+浏览器保存的 TeamSpeak identity 私钥不会上传到 WebSpeak，也不会写入网关数据库、日志或诊断信息。
 
 请备份整个 `data/` 目录。只有数据库而没有对应 `master.key` 时，已加密的 TeamSpeak 密码无法恢复。不要提交 `data/`、`config.json`、证书、私钥或日志。
 
@@ -307,7 +307,7 @@ The first login is forced to a password-change screen. Set a password of at leas
 
 Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. A new instance starts with `admin/admin` and marks that credential for mandatory rotation on first login. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
 
-A normal user's identity is used only in memory for the current Join Ticket/Session and is never written to the Gateway database, logs, or diagnostics. An exported browser identity file contains private credentials that can impersonate the TeamSpeak identity. Keep it in a trusted location; never upload it to WebSpeak or commit it to Git.
+A normal user's identity is used only in memory for the current Join Ticket/Session unless the user enables device remembering. When enabled, the private material stays in browser IndexedDB and is never written to the Gateway database, logs, or diagnostics; the web client does not provide identity file import/export.
 
 In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
 
