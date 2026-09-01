@@ -41,6 +41,10 @@
     <path v-else-if="name === 'bell'" d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
     <path v-else-if="name === 'clock'" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-14v5l3 2" />
     <path v-else-if="name === 'help'" d="M9.3 9a3 3 0 1 1 4.9 2.3c-1.3 1-2.2 1.5-2.2 3m0 3h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+    <template v-else-if="name === 'info'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10v6m0-9h.01" />
+    </template>
     <template v-else-if="name === 'plus'">
       <path d="M12 5v14M5 12h14" />
     </template>

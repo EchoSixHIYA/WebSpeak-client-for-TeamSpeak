@@ -4,10 +4,13 @@ import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
 import WebClient from "./views/WebClient.vue";
 import AdminView from "./views/AdminView.vue";
+import DemoView from "./views/DemoView.vue";
+import "./services/theme.js";
 
 const routes = [
   { path: "/", name: "webclient", component: WebClient },
   { path: "/join", name: "join", component: WebClient },
+  { path: "/demo", name: "demo", component: DemoView },
   { path: "/admin/:pathMatch(.*)*", name: "admin", component: AdminView },
 ];
 

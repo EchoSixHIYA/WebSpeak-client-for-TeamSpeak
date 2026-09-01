@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -64,18 +64,14 @@
               <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
             </div>
 
-            <label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label>
-            <div class="identity-tools">
-              <button type="button" class="identity-tool-button" @click="identityFileInput?.click()">{{ t('identityImport') }}</button>
-              <button v-if="identityMaterial" type="button" class="identity-tool-button" @click="exportIdentity">{{ t('identityExport') }}</button>
-              <input ref="identityFileInput" class="visually-hidden" type="file" accept=".json,.txt,application/json,text/plain" @change="importIdentity" />
-            </div>
+            <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label><div class="identity-tools"><button type="button" class="identity-tool-button" @click="identityFileInput?.click()">{{ t('identityImport') }}</button><button v-if="identityMaterial" type="button" class="identity-tool-button" @click="exportIdentity">{{ t('identityExport') }}</button><input ref="identityFileInput" class="visually-hidden" type="file" accept=".json,.txt,application/json,text/plain" @change="importIdentity" /></div></details>
 
             <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
               <span>{{ voiceState.connecting ? t('connecting') : t('enterVoice') }}</span>
               <Icon v-if="!voiceState.connecting" name="chevron-right" :size="17" />
             </button>
+            <button v-if="voiceState.connecting" type="button" class="cancel-connect-button" @click="doDisconnect">{{ t('cancel') }}</button>
           </form>
           <div class="join-meta"><Icon name="lock" :size="14" /> {{ t('connectionAuthorized') }}</div>
         </div>
@@ -99,7 +95,8 @@
               </select>
             </label>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
-            <button class="header-action" :title="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+            <button class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+            <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button>
             <button class="language-switch workspace-language" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button>
             <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /> {{ t('exit') }}</button>
           </div>
@@ -129,11 +126,11 @@
               <div v-if="currentMembers.length" class="voice-grid">
                 <article v-for="member in roomMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]">
                   <div class="voice-avatar-wrap"><div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}</div></div>
-                  <strong>{{ member.isSelf ? (language === 'zh' ? '你' : 'You') : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
+                  <strong>{{ member.isSelf ? t('you') : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
                 </article>
                 <article v-if="currentMembers.length > roomMembers.length" class="voice-card more-card"><div class="more-count">+{{ currentMembers.length - roomMembers.length }}</div><strong>{{ t('moreMembers') }}</strong><span>{{ t('viewLeft') }}</span></article>
               </div>
-              <div v-else class="voice-empty"><span class="empty-icon"><Icon name="users" :size="20" /></span><strong>{{ language === 'zh' ? '等待成员加入语音' : 'Waiting for people to join' }}</strong><span>{{ language === 'zh' ? '你可以先在这里准备好麦克风。' : 'You can get your microphone ready.' }}</span></div>
+              <div v-else class="voice-empty"><span class="empty-icon"><Icon name="users" :size="20" /></span><strong>{{ t('waitingForMembers') }}</strong><span>{{ t('prepareMicrophone') }}</span></div>
             </section>
 
             <section class="chat-panel">
@@ -153,7 +150,7 @@
                 <template v-for="message in visibleChatMessages" :key="message.id">
                   <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]">
                   <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf)">{{ avatarInitial(message.invokerName) }}</div>
-                  <div class="message-body"><div class="message-meta"><strong>{{ message.isSelf ? (language === 'zh' ? '你' : 'You') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
+                  <div class="message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
                   </article>
                 </template>
               </div>
@@ -181,7 +178,7 @@
             <div v-if="channelItem.members.length" class="member-list">
               <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" class="member-row" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
-                <div class="member-copy"><strong>{{ member.isSelf ? `${member.nickname}${language === 'zh' ? '（你）' : ' (You)'}` : member.nickname }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
+                <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
                 <button v-if="!member.isSelf" type="button" class="member-more" :aria-label="t('moreMemberOptions')" :title="t('moreMemberOptions')" @click.stop="openMemberMenu(member, $event)"><Icon name="more" :size="17" /></button>
@@ -197,6 +194,7 @@
 
     <div v-if="memberMenu" class="member-context-menu" :style="memberMenuStyle" @click.stop>
       <strong>{{ memberMenu.member.nickname }}</strong>
+      <label class="menu-volume"><span>{{ t('memberVolume') }}</span><input type="range" min="0" max="400" :value="(volumes[memberMenu.member.id] ?? 1) * 100" :style="rangeStyle((volumes[memberMenu.member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(memberMenu.member.id, $event)" /></label>
       <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
@@ -221,6 +219,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import { useVoiceWebSocket, type ChannelInfo, type ChannelMember } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
+import { applyTheme, getStoredTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 
 interface TreeChannel extends ChannelInfo {
   depth: number;
@@ -313,8 +312,14 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 type Language = "zh" | "en";
 const language = ref<Language>(getInitialLanguage());
+const themeMode = ref<ThemeMode>(getStoredTheme());
+const themeLabel = computed(() => themeMode.value === "dark" ? t("themeDark") : themeMode.value === "light" ? t("themeLight") : t("themeSystem"));
+applyTheme(themeMode.value);
 const translations: Record<Language, Record<string, string>> = {
   zh: {
+    themeSystem: "跟随系统",
+    themeLight: "浅色主题",
+    themeDark: "深色主题",
     browserWorkspace: "浏览器语音工作台",
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
@@ -346,6 +351,7 @@ const translations: Record<Language, Record<string, string>> = {
     emptyDefault: "留空进入默认频道",
     rememberIdentity: "记住此设备的 TeamSpeak 身份",
     rememberIdentityHint: "仅保存在本设备，用于下次连接时保持身份。",
+    identityOptions: "设备身份选项",
     localPersistenceUnavailable: "当前浏览器无法使用持久化存储，本次将使用临时身份。",
     identityImport: "导入身份",
     identityExport: "导出身份",
@@ -403,9 +409,13 @@ const translations: Record<Language, Record<string, string>> = {
     voiceActivity: "语音活动",
     speakingNow: "正在语音中",
     onlineShort: "{{count}} 在线",
+    you: "你",
+    selfSuffix: "（你）",
     connected: "已连接",
     speaking: "正在说话…",
     connectedYou: "已连接 · 你",
+    waitingForMembers: "等待成员加入语音",
+    prepareMicrophone: "你可以先在这里准备好麦克风。",
     moreMembers: "更多成员",
     viewLeft: "在左侧查看",
     textChannel: "文字频道",
@@ -515,6 +525,9 @@ const translations: Record<Language, Record<string, string>> = {
     langSwitch: "English",
   },
   en: {
+    themeSystem: "System theme",
+    themeLight: "Light theme",
+    themeDark: "Dark theme",
     browserWorkspace: "Browser voice workspace",
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",
@@ -546,6 +559,7 @@ const translations: Record<Language, Record<string, string>> = {
     emptyDefault: "Leave empty to use the default channel",
     rememberIdentity: "Remember this TeamSpeak identity on this device",
     rememberIdentityHint: "Stored only on this device and reused on the next connection.",
+    identityOptions: "Device identity options",
     localPersistenceUnavailable: "Persistent browser storage is unavailable; this session will use an ephemeral identity.",
     identityImport: "Import identity",
     identityExport: "Export identity",
@@ -603,9 +617,13 @@ const translations: Record<Language, Record<string, string>> = {
     voiceActivity: "VOICE ACTIVITY",
     speakingNow: "Speaking now",
     onlineShort: "{{count}} online",
+    you: "You",
+    selfSuffix: " (You)",
     connected: "Connected",
     speaking: "Speaking…",
     connectedYou: "Connected · you",
+    waitingForMembers: "Waiting for people to join",
+    prepareMicrophone: "You can get your microphone ready.",
     moreMembers: "More members",
     viewLeft: "See them on the left",
     textChannel: "TEXT CHANNEL",
@@ -730,9 +748,7 @@ function initialServerAddress(): string {
 function getInitialLanguage(): Language {
   const stored = localStorage.getItem("webspeak:language");
   if (stored === "zh" || stored === "en") return stored;
-  // Keep the existing Chinese-first experience; the choice is remembered
-  // after the visitor uses the language switcher.
-  return "zh";
+  return typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
 function t(key: string, variables: Record<string, string | number> = {}) {
@@ -788,6 +804,12 @@ function toggleLanguage() {
   language.value = language.value === "zh" ? "en" : "zh";
   localStorage.setItem("webspeak:language", language.value);
   void saveLocalPreferences({ schemaVersion: 1, language: language.value });
+}
+
+function cycleTheme() {
+  themeMode.value = nextTheme(themeMode.value);
+  saveTheme(themeMode.value);
+  void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value });
 }
 
 const heroBars = [12, 24, 18, 35, 18, 28, 42, 23, 50, 34, 19, 28, 39, 22, 46, 25, 17, 31, 14];
@@ -944,6 +966,10 @@ onMounted(() => {
   void loadPublicConfig();
   void loadLocalPreferences().then((preferences) => {
     if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en")) language.value = preferences.language;
+    if (!localStorage.getItem("webspeak:theme") && (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark")) {
+      themeMode.value = preferences.theme;
+      applyTheme(themeMode.value);
+    }
   });
   void loadStoredIdentity().then((stored) => {
     if (stored) {
@@ -1054,7 +1080,9 @@ async function toggleFavorite(): Promise<void> {
 async function clearBrowserData(): Promise<void> {
   if (!window.confirm(t("clearLocalDataConfirm"))) return;
   await clearStoredLocalData();
-  for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:input-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
+  for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:theme", "webspeak:input-device", "webspeak:output-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
+  themeMode.value = "system";
+  applyTheme(themeMode.value);
   identityMaterial.value = "";
   rememberIdentity.value = false;
   favoriteServers.value = [];
@@ -1181,6 +1209,10 @@ function avatarStyle(name: string, isSelf = false) {
 
 function isSpeaking(member: ChannelMember) {
   return speakingIds.has(member.id) || Boolean(member.isSelf && pttActive.value);
+}
+
+function memberDisplayName(member: ChannelMember): string {
+  return member.isSelf ? `${member.nickname}${t("selfSuffix")}` : member.nickname;
 }
 
 function formatTime(timestamp: number) {
@@ -1413,6 +1445,11 @@ function onMobilePttUp(event: PointerEvent) {
 .nav-rail, .channel-sidebar { display: none; }
 .workspace { min-width: 0; }
 .identity-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1px; }
+.identity-options { margin-top: 8px; color: #677872; font-size: 11px; }
+.identity-options summary { width: fit-content; color: #277970; cursor: pointer; }
+.identity-options[open] summary { margin-bottom: 10px; }
+.cancel-connect-button { justify-self: center; min-height: 32px; padding: 0 10px; color: #6b7d77; background: transparent; font-size: 11px; cursor: pointer; }
+.cancel-connect-button:hover { color: #006a64; text-decoration: underline; }
 .identity-tool-button { padding: 5px 8px; color: #277970; background: #eef8f5; border: 1px solid #d7ebe6; border-radius: 6px; font-size: 10px; cursor: pointer; }
 .identity-tool-button:hover { background: #e0f3ee; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -1524,8 +1561,9 @@ function onMobilePttUp(event: PointerEvent) {
 /* Keep the connected workspace sized to the browser viewport and let the
    workspace and member tree own their scroll areas when the window shrinks. */
 :global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; }
-:global(body) { overflow: hidden; }
+:global(body) { overflow-x: hidden; overflow-y: auto; }
 .web-client { height: 100dvh; min-height: 0; max-height: 100dvh; }
+.web-client { overflow: hidden; }
 .join-page { height: 100dvh; min-height: 0; overflow-y: auto; }
 .app-shell { grid-template-columns: 318px minmax(0, 1fr); height: 100dvh; min-height: 0; max-height: 100dvh; }
 .workspace { grid-column: 2; grid-row: 1; min-height: 0; height: 100%; }
@@ -1581,6 +1619,10 @@ function onMobilePttUp(event: PointerEvent) {
 .member-context-menu strong { padding: 4px 8px 7px; color: #2a3934; font-size: 12px; }
 .member-context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; color: #52625c; background: transparent; border-radius: 6px; font-size: 11px; text-align: left; cursor: pointer; }
 .member-context-menu button:hover { color: #006a64; background: #edf6f3; }
+.menu-volume { display: grid; gap: 6px; padding: 4px 8px 8px; color: #71817c; font-size: 10px; }
+.menu-volume input { width: 100%; height: 5px; appearance: none; border-radius: 99px; outline: none; cursor: pointer; }
+.menu-volume input::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; cursor: pointer; }
+.menu-volume input::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; cursor: pointer; }
 .poke-banner { position: fixed; z-index: 35; top: 82px; right: 24px; display: flex; align-items: center; gap: 9px; max-width: min(380px, calc(100% - 48px)); padding: 10px 11px; color: #52645c; background: #fffdf6; border: 1px solid #f0dfbd; border-radius: 9px; box-shadow: 0 8px 22px rgba(88, 65, 28, .12); font-size: 12px; }
 .poke-banner > .ui-icon { color: #d2973d; }
 .poke-banner span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1598,4 +1640,33 @@ function onMobilePttUp(event: PointerEvent) {
 .mobile-ptt-button { display: none; align-items: center; justify-content: center; gap: 9px; min-height: 54px; margin-top: 12px; color: #fff; background: #006a64; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
 .mobile-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
 @media (max-width: 740px) { .mobile-ptt-button { display: flex; } }
+
+/* M008 semantic theme tokens and keyboard-safe surfaces. */
+:global(:root) { color-scheme: light; --surface-0: #f7f9f8; --surface-1: #fff; --surface-2: #f1f6f4; --text-primary: #192120; --text-muted: #71807c; --border: #e4ece9; --accent: #006a64; --success: #65d879; --warning: #c89143; --danger: #c95a54; }
+:global(:root[data-theme="dark"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; }
+@media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; } }
+.web-client, .join-page { background: var(--surface-0); color: var(--text-primary); }
+.app-shell, .workspace { background: var(--surface-1); }
+.workspace-header, .member-panel, .voice-card, .settings-modal { background: var(--surface-1); border-color: var(--border); }
+.workspace-header { border-bottom-color: var(--border); }
+.workspace-content { color: var(--text-primary); }
+.join-card { background: color-mix(in srgb, var(--surface-1) 92%, transparent); border-color: var(--border); }
+.field-wrap, .message-composer, .member-search, .mic-mode-switch, .mode-note { background: var(--surface-2); }
+.field-wrap input, .message-composer input, .member-search input, .settings-select { color: var(--text-primary); }
+.room-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--surface-1)), var(--surface-1) 75%); }
+.voice-card, .member-panel, .settings-modal { box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.section-heading h2, .room-hero h1, .join-card h2, .member-panel-heading h2, .message-meta strong, .member-copy strong { color: var(--text-primary); }
+.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead { color: var(--text-muted); }
+.chat-panel, .chat-heading, .settings-header, .settings-footer, .settings-separator { border-color: var(--border); }
+.message-bubble { color: var(--text-primary); background: var(--surface-2); }
+.settings-content, .settings-nav { background: var(--surface-1); }
+.settings-nav { border-right-color: var(--border); }
+.settings-section h3, .settings-header h2 { color: var(--text-primary); }
+.settings-select { background: var(--surface-2); border-color: var(--border); }
+.audio-level-track, .meter i { background: var(--border); }
+.member-presence { border-color: var(--surface-1); }
+:global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible), :global(textarea:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
+.message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
+@media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; }.mobile-ptt-button { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; } }
+@media (max-width: 740px) { .member-context-menu { left: 12px !important; right: 12px; top: auto !important; bottom: env(safe-area-inset-bottom, 0px); min-width: 0; border-radius: 16px 16px 0 0; padding: 14px; } .member-context-menu button { min-height: 42px; font-size: 13px; } .member-context-menu strong { padding: 4px 8px 11px; font-size: 14px; } .menu-volume { font-size: 12px; } }
 </style>

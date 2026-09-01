@@ -28,6 +28,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - 可清除全部 WebSpeak 本地数据；不保存服务器密码。
 - TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
 - 旧 `config.json` 一次性导入，导入后不再作为实时配置源。
+- `/demo` 提供不连接真实 TeamSpeak 的交互式模拟页面，可用于产品预览和录屏。
 
 ### 环境要求
 
@@ -190,6 +191,9 @@ npm run dev
 # 前端开发服务；/api 和 /ws 代理到 3040
 npm run web:dev
 
+# 浏览器打开演示页（不会连接真实 TeamSpeak）
+# http://localhost:5173/demo
+
 # 自动测试（覆盖 M000–M007 已实现的后端协议与安全边界）
 npm test
 
@@ -245,6 +249,7 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Clear all WebSpeak local data at any time; server passwords are never stored there.
 - Encrypted TeamSpeak server password and one-time legacy config import.
 - No ServerQuery, WebQuery, admin token, or maintenance bot.
+- `/demo` is a clearly labeled interactive simulation and never opens a real TeamSpeak connection.
 
 ### Requirements and startup
 
