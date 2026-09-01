@@ -130,7 +130,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       });
     },
     async stop(): Promise<void> {
-      voiceBridge.shutdown();
+      await voiceBridge.shutdown();
       adminSessions.clear();
       return new Promise((resolve) => {
         server.close(() => resolve());

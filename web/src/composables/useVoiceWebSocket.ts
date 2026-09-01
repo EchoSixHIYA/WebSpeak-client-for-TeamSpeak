@@ -461,7 +461,7 @@ export function useVoiceWebSocket() {
         state.error = "TeamSpeak 连接已断开";
         break;
       case "error":
-        state.error = String(msg.message || "操作失败");
+        state.error = protocolErrorMessage(String(msg.error?.code || ""), String(msg.error?.message || msg.message || "操作失败"));
         break;
     }
   }
@@ -474,18 +474,18 @@ export function useVoiceWebSocket() {
     playAudioFrame(clientId, data.slice(3));
   }
 
-  function sendCmd(command: Record<string, unknown>): void {
-    if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify(command));
+  function sendCmd(type: string, payload: Record<string, unknown> = {}): void {
+    if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify({ type, payload }));
   }
 
   function switchChannel(channelId: string): void {
-    sendCmd({ type: "switchChannel", channelId });
+    sendCmd("switchChannel", { channelId });
   }
 
   function sendTextMessage(message: string): void {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 500) return;
-    sendCmd({ type: "sendTextMessage", message: trimmed });
+    sendCmd("sendTextMessage", { message: trimmed });
     chatMessages.push({
       id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       invokerName: "你",
@@ -506,6 +506,22 @@ export function useVoiceWebSocket() {
 
   function clearError(): void {
     state.error = "";
+  }
+
+  function protocolErrorMessage(code: string, fallback: string): string {
+    const messages: Record<string, string> = {
+      INVALID_JSON: "消息格式无效",
+      INVALID_MESSAGE: "消息格式无效",
+      INVALID_REQUEST_ID: "请求标识无效",
+      UNKNOWN_MESSAGE_TYPE: "不支持的操作",
+      INVALID_PAYLOAD: "操作参数无效",
+      INVALID_CHANNEL_ID: "频道标识无效",
+      INVALID_TEXT_MESSAGE: "文字消息无效",
+      INVALID_AUDIO_FRAME: "音频帧格式无效",
+      SESSION_NOT_READY: "TeamSpeak 会话尚未就绪",
+      CHANNEL_SWITCH_FAILED: "频道切换失败",
+    };
+    return messages[code] || fallback;
   }
 
   function setVolume(clientId: number, volume: number): void {

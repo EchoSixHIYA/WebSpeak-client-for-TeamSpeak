@@ -1,21 +1,22 @@
 import { WebSocketServer, WebSocket } from "ws";
-import type { IncomingMessage } from "node:http";
-import type { Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
 import { createRequire } from "node:module";
+import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
-import { canAcceptSession, MAX_ACTIVE_SESSIONS } from "../constants.js";
 import { normalizeTeamSpeakError } from "../errors.js";
-import {
-  formatTeamSpeakTarget,
-  type TeamSpeakTarget,
-} from "../domain/teamspeak-target.js";
+import { formatTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
+import { SessionManager, type ManagedSession, type SessionTeardownReason } from "./session-manager.js";
+import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
   OpusEncoder: new (sampleRate: number, channels: number) => { encode(pcm: Buffer): Buffer };
 };
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const AUDIO_FRAME_BYTES = 1_920;
 
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
@@ -28,22 +29,23 @@ interface ChannelMember {
 
 interface WebClientEntry {
   id: string;
+  session: ManagedSession;
   tsClient: TSClient;
   ws: WebSocket;
   nickname: string;
   target: TeamSpeakTarget;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
-  opusEncoder: { encode(pcm: Buffer): Buffer };
+  opusEncoder: { encode(pcm: Buffer): Buffer } | null;
+  isAlive: boolean;
 }
 
 export class VoiceBridge {
-  // Connecting sessions are tracked immediately so a dropped browser socket
-  // cannot leave a half-open TeamSpeak client behind.
-  private clients = new Map<string, WebClientEntry>();
+  private readonly sessionManager = new SessionManager();
+  private readonly entries = new Map<string, WebClientEntry>();
   private wss: WebSocketServer | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private logger: LoggerType;
-  private peakClients = 0;
 
   constructor(
     private options: VoiceBridgeOptions,
@@ -54,6 +56,7 @@ export class VoiceBridge {
 
   attach(server: Server): void {
     this.wss = new WebSocketServer({ server, path: "/ws/voice", maxPayload: 256 * 1024 });
+    this.startHeartbeat();
 
     this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       const url = new URL(req.url ?? "/", `https://${req.headers.host ?? "localhost"}`);
@@ -62,104 +65,125 @@ export class VoiceBridge {
         ws.close(4001, "Join ticket required");
         return;
       }
+
       const { target, serverPassword, nickname } = connection;
       const channelName = connection.channel;
-
-      if (!canAcceptSession(this.clients.size)) {
-        this.logger.warn({ max: MAX_ACTIVE_SESSIONS }, "Max clients reached");
-        ws.close(4004, "Server full");
+      const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      let entry: WebClientEntry | null = null;
+      const session = this.sessionManager.admit(entryId, async (reason) => {
+        if (entry) await this.cleanupEntry(entry, reason);
+      });
+      if (!session) {
+        this.logger.warn({ max: this.sessionManager.maxSessions }, "Max clients reached");
+        ws.close(4004, "GATEWAY_FULL");
         return;
       }
 
-      const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       this.logger.info({ entryId, nickname, channel: channelName, target: formatTeamSpeakTarget(target) }, "WebClient connecting");
-
-      const tsClient = new TSClient({
-        target,
-        nickname,
-        serverPassword,
-        defaultChannel: channelName,
-      }, this.logger);
-
-      const entry: WebClientEntry = {
+      let tsClient: TSClient;
+      try {
+        tsClient = new TSClient({ target, nickname, serverPassword, defaultChannel: channelName }, this.logger);
+      } catch (error: unknown) {
+        this.logger.error({ err: error, entryId }, "Could not create TeamSpeak client");
+        void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
+        ws.close(4003, "TeamSpeak client unavailable");
+        return;
+      }
+      entry = {
         id: entryId,
+        session,
         tsClient,
         ws,
         nickname,
         target,
         channelTree: [],
         members: new Map(),
-        opusEncoder: new OpusEncoder(48000, 1),
+        opusEncoder: null,
+        isAlive: true,
       };
-      this.clients.set(entryId, entry);
-      this.peakClients = Math.max(this.peakClients, this.clients.size);
+      this.entries.set(entryId, entry);
+      try {
+        entry.opusEncoder = new OpusEncoder(48000, 1);
+      } catch (error: unknown) {
+        this.logger.error({ err: error, entryId }, "Could not create Opus encoder");
+        void this.teardown(entryId, "teamSpeak-connect-failed");
+        return;
+      }
 
       let tsReady = false;
       let selfId = 0;
       let selfChannelId = 0n;
-      let directoryReady = false;
       let initialStateSent = false;
-      let latestDirectorySnapshot: TSDirectorySnapshot | null = null;
+      let audioReady = true;
+      let realtimeReady = false;
+      const directory = new DirectorySynchronizer();
+
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
       };
       const refreshDirectory = () => {
-        if (!latestDirectorySnapshot) return;
+        const snapshot = directory.getSnapshot();
+        if (!snapshot) return;
         const effectiveSelfId = selfId || tsClient.getClientId();
         const sdkChannelId = tsClient.getChannelId();
         if (selfChannelId === 0n && sdkChannelId !== 0n) selfChannelId = sdkChannelId;
-        const normalizedSnapshot = normalizeDirectorySnapshot(latestDirectorySnapshot, effectiveSelfId, selfChannelId, nickname, channelName);
-        entry.channelTree = mapChannelTree(normalizedSnapshot);
-        entry.members.clear();
+        const normalizedSnapshot = normalizeDirectorySnapshot(snapshot, effectiveSelfId, selfChannelId, nickname, channelName);
+        entry!.channelTree = mapChannelTree(normalizedSnapshot);
+        entry!.members.clear();
         for (const client of normalizedSnapshot.clients) {
-          entry.members.set(client.id, { id: client.id, nickname: client.nickname });
+          entry!.members.set(client.id, { id: client.id, nickname: client.nickname });
         }
       };
       const sendInitialState = () => {
-        if (!tsReady || !directoryReady || initialStateSent) return;
+        if (initialStateSent || !tsReady || !directory.ready || !realtimeReady || !audioReady || session.state !== "syncing") return;
         initialStateSent = true;
-        sendJson({
-          type: "connected",
-          tsClientId: selfId,
-          members: Array.from(entry.members.values()),
-        });
-        sendJson({ type: "channelList", channels: entry.channelTree });
+        session.transition("connected");
+        sendJson({ type: "connected", tsClientId: selfId, members: Array.from(entry!.members.values()) });
+        sendJson({ type: "channelList", channels: entry!.channelTree });
       };
 
+      // Register every directory listener before connect(). Events emitted by
+      // the welcome flow are queued by DirectorySynchronizer until its
+      // snapshot establishes the baseline.
+      realtimeReady = true;
       tsClient.on("directorySnapshot", (snapshot: TSDirectorySnapshot) => {
-        latestDirectorySnapshot = snapshot;
-        directoryReady = true;
+        directory.applySnapshot(snapshot);
         refreshDirectory();
-        if (tsReady && !initialStateSent) sendInitialState();
-        else if (tsReady) sendJson({ type: "channelList", channels: entry.channelTree });
+        sendInitialState();
+        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
       });
 
-      // These listeners must be attached before connect(): TeamSpeak emits the
-      // initial clientEnter events during the handshake.
       tsClient.on("clientEnter", (info) => {
         const candidateSelfId = tsClient.getClientId();
         if (candidateSelfId > 0 && info.id === candidateSelfId) {
           selfId = candidateSelfId;
           if (info.channelID !== undefined && info.channelID !== 0n) selfChannelId = info.channelID;
-          refreshDirectory();
-          if (tsReady && directoryReady && initialStateSent) {
-            sendJson({ type: "channelList", channels: entry.channelTree });
-          }
         }
-        entry.members.set(info.id, { id: info.id, nickname: info.nickname });
-        if (tsReady) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, isSelf: info.id === selfId });
+        const wasKnown = entry!.members.has(info.id);
+        directory.applyClientEnter(info);
+        refreshDirectory();
+        if (tsReady && initialStateSent) {
+          sendJson({ type: "channelList", channels: entry!.channelTree });
+          if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, isSelf: info.id === selfId });
+        }
       });
 
       tsClient.on("clientLeave", (info) => {
-        entry.members.delete(info.id);
-        if (tsReady) sendJson({ type: "memberLeave", id: info.id });
+        const wasKnown = entry!.members.has(info.id);
+        directory.applyClientLeave(info.id);
+        refreshDirectory();
+        if (tsReady && initialStateSent && wasKnown) {
+          sendJson({ type: "memberLeave", id: info.id });
+          sendJson({ type: "channelList", channels: entry!.channelTree });
+        }
       });
 
       tsClient.on("clientMoved", (info) => {
-        if (info.id === selfId && info.targetChannelID !== undefined && info.targetChannelID !== 0n) {
-          selfChannelId = info.targetChannelID;
-          refreshDirectory();
-        }
+        if (info.targetChannelID === undefined || info.targetChannelID === 0n) return;
+        if (info.id === selfId) selfChannelId = info.targetChannelID;
+        directory.applyClientMoved(info.id, info.targetChannelID);
+        refreshDirectory();
+        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
       });
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
@@ -181,94 +205,150 @@ export class VoiceBridge {
       });
 
       tsClient.on("disconnected", () => {
-        if (ws.readyState === WebSocket.OPEN) sendJson({ type: "disconnected" });
-        this.cleanup(entryId);
+        if (session.state !== "disconnecting" && session.state !== "idle") {
+          try { session.transition("interrupted"); } catch { /* teardown below is authoritative */ }
+          sendJson({ type: "disconnected" });
+          void this.teardown(entryId, "teamSpeak-disconnect");
+        }
       });
 
-      ws.on("message", (data: Buffer | string) => {
-        if (typeof data === "string" || (data.length > 0 && data[0] === 0x7b)) {
-          try {
-            const command = JSON.parse(typeof data === "string" ? data : data.toString("utf-8"));
-            if (command && typeof command.type === "string") {
-              if (tsReady && ["switchChannel", "sendTextMessage"].includes(command.type)) {
-                handleCommand(entry, command).catch((error: unknown) => {
-                  this.logger.error({ err: error instanceof Error ? error.message : String(error) }, "Command failed");
-                });
-              }
-              return;
-            }
-          } catch {
-            // Not JSON; let the binary audio path handle it below.
+      ws.on("pong", () => { if (entry) entry.isAlive = true; });
+      ws.on("message", (data: Buffer | string, isBinary: boolean) => {
+        if (isBinary) {
+          const frame = typeof data === "string" ? Buffer.from(data) : data;
+          if (!tsReady || frame.length !== AUDIO_FRAME_BYTES) {
+            sendProtocolError(sendJson, "INVALID_AUDIO_FRAME", "音频帧格式无效");
+            return;
           }
-        }
-
-        // Browser sends exactly 1920 bytes: 960 samples at 48 kHz, one 20 ms frame.
-        if (Buffer.isBuffer(data) && tsReady && data.length >= 1920) {
-          const pcm = data.length === 1920 ? data : data.subarray(0, 1920);
           try {
-            tsClient.sendVoice(entry.opusEncoder.encode(pcm), 4);
+            if (entry!.opusEncoder) tsClient.sendVoice(entry!.opusEncoder.encode(frame), 4);
           } catch {
             // A frame arriving during shutdown is safe to discard.
           }
+          return;
         }
+
+        const command = parseClientCommand(typeof data === "string" ? data : data.toString("utf-8"));
+        if ("error" in command) {
+          sendProtocolError(sendJson, command.error.code, command.error.message);
+          return;
+        }
+        if (!tsReady || session.state !== "connected") {
+          sendProtocolError(sendJson, "SESSION_NOT_READY", "TeamSpeak 会话尚未就绪");
+          return;
+        }
+        void handleCommand(entry!, command, sendJson);
       });
 
       ws.on("close", () => {
         this.logger.info({ entryId }, "WebSocket closed");
-        this.cleanup(entryId);
+        void this.teardown(entryId, "websocket-close");
       });
 
       ws.on("error", (error) => {
         this.logger.error({ err: error, entryId }, "WebSocket error");
-        this.cleanup(entryId);
+        void this.teardown(entryId, "websocket-error");
       });
+
+      try {
+        session.transition("connecting");
+        session.transition("authenticating");
+      } catch (error: unknown) {
+        this.logger.error({ err: error instanceof Error ? error.message : String(error), entryId }, "Session state initialization failed");
+        void this.teardown(entryId, "protocol-error");
+        return;
+      }
 
       tsClient.connect()
         .then(() => {
+          if (session.state !== "authenticating") return;
+          session.transition("syncing");
           tsReady = true;
           selfId = tsClient.getClientId();
           const sdkChannelId = tsClient.getChannelId();
           if (sdkChannelId !== 0n) selfChannelId = sdkChannelId;
           refreshDirectory();
-          if (selfId > 0 && !entry.members.has(selfId)) {
-            entry.members.set(selfId, { id: selfId, nickname });
+          if (selfId > 0 && !entry!.members.has(selfId)) {
+            directory.applyClientEnter({ id: selfId, nickname, channelID: selfChannelId, uid: "", type: 1, serverGroups: [] });
+            refreshDirectory();
           }
           sendInitialState();
         })
         .catch((error: Error) => {
           const normalized = normalizeTeamSpeakError(error);
           this.logger.error({ code: normalized.code, entryId }, "TS connect failed");
+          try { if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed"); } catch { /* cleanup below */ }
           if (ws.readyState === WebSocket.OPEN) ws.close(4003, normalized.code);
-          else this.cleanup(entryId);
+          void this.teardown(entryId, "teamSpeak-connect-failed");
         });
     });
 
+    this.wss.on("error", (error) => {
+      this.logger.error({ err: error }, "Voice WebSocket server error");
+    });
     this.logger.info("Voice WebSocket endpoint ready at /ws/voice");
   }
 
-  private cleanup(entryId: string): void {
-    const entry = this.clients.get(entryId);
-    if (!entry) return;
-    this.clients.delete(entryId);
-    entry.tsClient.disconnect().catch(() => {});
-    this.logger.info({ entryId }, "Client cleaned up");
+  async shutdown(): Promise<void> {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    await this.sessionManager.shutdown("gateway-shutdown");
+    const wss = this.wss;
+    this.wss = null;
+    if (!wss) return;
+    await new Promise<void>((resolve) => {
+      try { wss.close(() => resolve()); } catch { resolve(); }
+    });
   }
 
   getActiveCount(): number {
-    return this.clients.size;
+    return this.sessionManager.activeCount;
   }
 
   getPeakCount(): number {
-    return this.peakClients;
+    return this.sessionManager.peakCount;
   }
 
-  shutdown(): void {
-    for (const [id, entry] of this.clients) {
-      this.clients.delete(id);
-      entry.ws.terminate();
-      entry.tsClient.disconnect().catch(() => {});
+  getCreatedCount(): number {
+    return this.sessionManager.createdCount;
+  }
+
+  private async teardown(entryId: string, reason: SessionTeardownReason): Promise<void> {
+    await this.sessionManager.teardown(entryId, reason);
+  }
+
+  private async cleanupEntry(entry: WebClientEntry, reason: SessionTeardownReason): Promise<void> {
+    if (this.entries.get(entry.id) === entry) this.entries.delete(entry.id);
+    entry.opusEncoder = null;
+    entry.channelTree = [];
+    entry.members.clear();
+    entry.tsClient.removeAllListeners();
+    try { await entry.tsClient.disconnect(); } catch { /* disconnect is intentionally idempotent */ }
+    entry.ws.removeAllListeners();
+    if (entry.ws.readyState === WebSocket.OPEN || entry.ws.readyState === WebSocket.CONNECTING) {
+      if (reason === "heartbeat-timeout" || reason === "gateway-shutdown") entry.ws.terminate();
+      else entry.ws.close(reason === "protocol-error" ? 1008 : 1000, reason);
     }
-    this.wss?.close();
+    this.logger.info({ entryId: entry.id, reason }, "Client session torn down");
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = setInterval(() => {
+      for (const entry of this.entries.values()) {
+        if (entry.ws.readyState !== WebSocket.OPEN) continue;
+        if (!entry.isAlive) {
+          entry.ws.terminate();
+          void this.teardown(entry.id, "heartbeat-timeout");
+          continue;
+        }
+        entry.isAlive = false;
+        entry.ws.ping();
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+    this.heartbeatTimer.unref?.();
   }
 
   private resolveConnection(url: URL): JoinTicketPayload | null {
@@ -277,37 +357,33 @@ export class VoiceBridge {
   }
 }
 
-async function handleCommand(entry: WebClientEntry, command: { type: string; [key: string]: unknown }) {
-  switch (command.type) {
-    case "switchChannel": {
-      const rawId = command.channelId;
-      if (typeof rawId !== "string" || !/^\d+$/.test(rawId)) {
-        if (entry.ws.readyState === WebSocket.OPEN) entry.ws.send(JSON.stringify({ type: "error", message: "无效的频道" }));
-        break;
+async function handleCommand(
+  entry: WebClientEntry,
+  command: ClientCommand,
+  sendJson: (message: Record<string, unknown>) => void,
+): Promise<void> {
+  if (command.type === "switchChannel") {
+    const rawId = command.payload.channelId as string;
+    try {
+      await entry.tsClient.switchChannel(BigInt(rawId));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("already member")) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CHANNEL_SWITCH_FAILED", message: "频道切换失败", recoverable: false } });
+        return;
       }
-      try {
-        await entry.tsClient.switchChannel(BigInt(rawId));
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        // Double-clicking the current channel is harmless.
-        if (!message.includes("already member")) {
-          if (entry.ws.readyState === WebSocket.OPEN) entry.ws.send(JSON.stringify({ type: "error", message: `切换失败：${message}` }));
-          break;
-        }
-      }
-      if (entry.ws.readyState === WebSocket.OPEN) {
-        entry.ws.send(JSON.stringify({ type: "channelSwitched", channelId: rawId }));
-        entry.ws.send(JSON.stringify({ type: "channelList", channels: entry.channelTree }));
-      }
-      break;
     }
-    case "sendTextMessage": {
-      if (typeof command.message !== "string") break;
-      const message = command.message.trim().slice(0, 500);
-      if (message) entry.tsClient.sendTextMessage(message);
-      break;
-    }
+    sendJson({ type: "channelSwitched", requestId: command.requestId, channelId: rawId });
+    sendJson({ type: "channelList", channels: entry.channelTree });
+    return;
   }
+
+  const message = (command.payload.message as string).trim();
+  if (message) entry.tsClient.sendTextMessage(message);
+}
+
+function sendProtocolError(sendJson: (message: Record<string, unknown>) => void, code: string, message: string): void {
+  sendJson({ type: "error", error: { code, message, recoverable: false } });
 }
 
 function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
@@ -318,10 +394,7 @@ function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
     description: channel.description || "",
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
-      .map((client) => ({
-        id: client.id,
-        nickname: client.nickname || "未知用户",
-      })),
+      .map((client) => ({ id: client.id, nickname: client.nickname || "未知用户" })),
   }));
 }
 
@@ -341,10 +414,6 @@ function normalizeDirectorySnapshot(
   const requestedChannel = requestedName
     ? snapshot.channels.find((channel) => channel.name.trim().toLocaleLowerCase() === requestedName)
     : undefined;
-  // TS6 may report channelID=0 for the newly connected normal client even
-  // though the server has already placed it. The requested channel is the
-  // authoritative fallback; an empty request means the first welcome channel,
-  // which is the server's default channel in the normal client snapshot.
   const resolvedChannelId = selfChannelId !== 0n
     ? selfChannelId
     : snapshotChannelId !== 0n
@@ -354,14 +423,7 @@ function normalizeDirectorySnapshot(
     const current = clients[selfIndex]!;
     if (resolvedChannelId !== 0n) clients[selfIndex] = { ...current, channelID: resolvedChannelId };
   } else if (resolvedChannelId !== 0n) {
-    clients.push({
-      id: selfId,
-      nickname,
-      uid: "",
-      channelID: resolvedChannelId,
-      type: 1,
-      serverGroups: [],
-    });
+    clients.push({ id: selfId, nickname, uid: "", channelID: resolvedChannelId, type: 1, serverGroups: [] });
   }
 
   return { ...snapshot, clients };

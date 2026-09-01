@@ -555,6 +555,15 @@ function localizedMessage(message: string) {
     "WebSpeak 尚未配置 TeamSpeak 目标。": "The WebSpeak TeamSpeak target has not been configured",
     "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
     "请输入有效的昵称": "Enter a valid nickname",
+    "消息格式无效": "The message format is invalid",
+    "请求标识无效": "The request id is invalid",
+    "不支持的操作": "This operation is not supported",
+    "操作参数无效": "The operation payload is invalid",
+    "频道标识无效": "The channel id is invalid",
+    "文字消息无效": "The text message is invalid",
+    "音频帧格式无效": "The audio frame is invalid",
+    "TeamSpeak 会话尚未就绪": "The TeamSpeak session is not ready",
+    "频道切换失败": "Channel switch failed",
   };
   if (exact[message]) return exact[message];
   if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;

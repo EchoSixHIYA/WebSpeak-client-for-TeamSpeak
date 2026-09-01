@@ -10,6 +10,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 
 - TeamSpeak 3 / TeamSpeak 6 自动探测，无需选择协议。
 - 每个浏览器 Session 独立连接，硬上限固定为 100。
+- Session 生命周期统一管理：连接状态机、WebSocket 心跳、幂等清理和优雅关闭。
 - 完整频道/成员树、频道切换、频道文字聊天和成员实时移动。
 - PCM/Opus 语音桥接、自由麦、按键说话、麦克风选择与音量控制。
 - 发言成员头像显示绿色动态边框。
@@ -155,7 +156,7 @@ npm run dev
 # 前端开发服务；/api 和 /ws 代理到 3040
 npm run web:dev
 
-# M000/M001 自动测试
+# 自动测试（覆盖 M000、M001、M002）
 npm test
 
 # 后端类型检查与构建
@@ -193,6 +194,7 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 
 - Automatic TeamSpeak 3 / TeamSpeak 6 detection.
 - Independent browser sessions with a fixed hard limit of 100.
+- Managed session lifecycle with a connection state machine, WebSocket heartbeat, idempotent teardown, and graceful shutdown.
 - Channel/member directory, channel switching, channel text chat, and live member movement.
 - PCM/Opus voice bridge, VOX, push-to-talk, microphone selection, and volume controls.
 - Bilingual guest UI and bilingual admin console.
