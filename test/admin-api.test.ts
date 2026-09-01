@@ -116,6 +116,50 @@ test("admin API requires the default password to be changed before administratio
   assert.equal(saved.body.ok, true);
   assert.equal(saved.body.settings.accessMode, "open");
   assert.equal(saved.body.settings.hasPassword, false);
+
+  const invite = await request(origin, "/api/admin/invites", {
+    method: "POST",
+    cookie,
+    csrf: login.body.csrfToken,
+    body: { channel: "Lobby", expiresInHours: 4, maxUses: 2 },
+  });
+  assert.equal(invite.response.status, 201);
+  assert.equal(invite.body.ok, true);
+  assert.match(invite.body.token, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(invite.body.invite.channel, "Lobby");
+  assert.equal("token" in invite.body.invite, false);
+
+  const invites = await request(origin, "/api/admin/invites", { cookie });
+  assert.equal(invites.body.invites.length, 1);
+  assert.equal(invites.body.invites[0].status, "active");
+  assert.equal(invites.body.invites[0].target, "voice.example.com:9988");
+
+  const sessions = await request(origin, "/api/admin/sessions", { cookie });
+  assert.deepEqual(sessions.body.sessions, []);
+  const diagnostics = await request(origin, "/api/admin/diagnostics", { cookie });
+  assert.equal(diagnostics.body.database.schemaVersion, 2);
+  assert.equal("target" in diagnostics.body.teamSpeak, true);
+
+  const report = await request(origin, "/api/admin/diagnostics/report", { cookie });
+  assert.equal(report.response.status, 200);
+  assert.match(report.response.headers.get("content-disposition") ?? "", /diagnostic-report\.json/);
+  assert.equal("target" in report.body.teamSpeak, false);
+  assert.equal("serverPassword" in report.body, false);
+
+  const revoked = await request(origin, `/api/admin/invites/${encodeURIComponent(invite.body.invite.id)}/revoke`, {
+    method: "POST",
+    cookie,
+    csrf: login.body.csrfToken,
+    body: {},
+  });
+  assert.equal(revoked.body.ok, true);
+  const revokedList = await request(origin, "/api/admin/invites", { cookie });
+  assert.equal(revokedList.body.invites[0].status, "revoked");
+
+  const backup = await download(origin, "/api/admin/backup", cookie);
+  assert.equal(backup.response.status, 200);
+  assert.equal(backup.response.headers.get("content-type"), "application/octet-stream");
+  assert.ok(backup.bytes.length > 100);
   assert.equal("serverPassword" in saved.body.settings, false);
 
   const probe = await request(origin, "/api/admin/server/test", {
@@ -164,4 +208,11 @@ async function request(
     ...(method !== "GET" ? { body: JSON.stringify(options.body ?? {}) } : {}),
   });
   return { response, body: await response.json() };
+}
+
+async function download(origin: string, pathname: string, cookie?: string): Promise<{ response: Response; bytes: Uint8Array }> {
+  const response = await fetch(`${origin}${pathname}`, {
+    headers: { accept: "application/octet-stream", ...(cookie ? { cookie } : {}) },
+  });
+  return { response, bytes: new Uint8Array(await response.arrayBuffer()) };
 }

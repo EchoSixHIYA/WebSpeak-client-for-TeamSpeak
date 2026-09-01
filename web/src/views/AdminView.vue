@@ -23,7 +23,7 @@
     <div v-else class="admin-shell">
       <aside class="admin-sidebar">
         <div class="admin-brand"><span><Icon name="waveform" :size="22" /></span><div><strong>WebSpeak</strong><small>{{ tr('adminConsole') }}</small></div></div>
-        <nav><RouterLink to="/admin" exact-active-class="active"><Icon name="activity" :size="18" />{{ tr('overview') }}</RouterLink><RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('server') }}</RouterLink></nav>
+        <nav><RouterLink to="/admin" exact-active-class="active"><Icon name="activity" :size="18" />{{ tr('overview') }}</RouterLink><RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('server') }}</RouterLink><RouterLink to="/admin/operations" active-class="active"><Icon name="users" :size="18" />{{ tr('operations') }}</RouterLink></nav>
         <div class="sidebar-bottom"><a href="/" target="_blank"><Icon name="share" :size="16" />{{ tr('openGuest') }}</a><button type="button" @click="logout"><Icon name="door" :size="16" />{{ tr('logout') }}</button></div>
       </aside>
 
@@ -38,6 +38,15 @@
             <article class="settings-card"><h3>{{ tr('accessAndIdentity') }}</h3><fieldset><legend>{{ tr('accessMode') }}</legend><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset><label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label><label><span>{{ tr('welcomeText') }}</span><textarea v-model="serverForm.welcomeText" maxlength="500" rows="4"></textarea></label></article>
           </div>
           <article class="readonly-card"><h3>{{ tr('runtimeFacts') }}</h3><dl><div><dt>{{ tr('detectedProtocol') }}</dt><dd>{{ serverForm.detectedProtocol?.toUpperCase() || tr('unknown') }}</dd></div><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(serverForm.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ serverForm.lastTestLatencyMs == null ? '—' : `${serverForm.lastTestLatencyMs} ms` }}</dd></div><div><dt>{{ tr('internalPort') }}</dt><dd>3040</dd></div></dl></article>
+        </section>
+
+        <section v-else-if="route.path === '/admin/operations'" class="page-content operations-page">
+          <div class="page-heading"><div><h2>{{ tr('operations') }}</h2><p>{{ tr('operationsLead') }}</p></div><button class="secondary-button" :disabled="operationsLoading" @click="loadOperations"><span v-if="operationsLoading" class="spinner small"></span><Icon v-else name="refresh" :size="17" />{{ tr('refresh') }}</button></div>
+          <div class="operations-grid">
+            <article class="operation-card operation-wide"><header><div><h3>{{ tr('sessions') }}</h3><p>{{ tr('sessionsLead') }}</p></div><strong>{{ operations.sessions.length }}</strong></header><div v-if="operations.sessions.length" class="table-wrap"><table><thead><tr><th>{{ tr('nickname') }}</th><th>{{ tr('sessionState') }}</th><th>{{ tr('age') }}</th><th>{{ tr('memberCount') }}</th><th></th></tr></thead><tbody><tr v-for="session in operations.sessions" :key="session.id"><td><strong>{{ session.nickname }}</strong><small>{{ session.target }}</small></td><td><span class="state-pill">{{ sessionStateLabel(session.state) }}</span></td><td>{{ formatAge(session.ageSeconds) }}</td><td>{{ session.memberCount }}</td><td><button class="danger-button" type="button" :disabled="terminatingSession === session.id" @click="terminateSession(session)">{{ terminatingSession === session.id ? tr('terminating') : tr('endSession') }}</button></td></tr></tbody></table></div><div v-else class="operation-empty"><Icon name="users" :size="22" /><span>{{ tr('sessionEmpty') }}</span></div></article>
+            <article class="operation-card"><header><div><h3>{{ tr('invites') }}</h3><p>{{ tr('invitesLead') }}</p></div></header><form class="invite-form" @submit.prevent="createInvite"><label><span>{{ tr('inviteChannel') }}</span><input v-model.trim="inviteForm.channel" maxlength="100" :placeholder="tr('inviteChannelPlaceholder')" /></label><div class="invite-form-grid"><label><span>{{ tr('expiresIn') }}</span><input v-model.number="inviteForm.expiresInHours" type="number" min="1" max="720" /></label><label><span>{{ tr('maxUses') }}</span><input v-model.number="inviteForm.maxUses" type="number" min="0" max="10000" /></label></div><small class="field-help">{{ tr('unlimitedUses') }}</small><button class="primary-button" type="submit" :disabled="submitting"><span v-if="submitting" class="spinner small"></span>{{ tr('createInvite') }}</button></form><div v-if="createdInvite" class="generated-invite"><strong>{{ tr('inviteCreated') }}</strong><div class="generated-link"><input :value="createdInvite.link" readonly /><button class="secondary-button" type="button" @click="copyInviteLink">{{ tr('copyLink') }}</button></div><small>{{ tr('inviteSecurity') }}</small></div><div v-if="operations.invites.length" class="invite-list"><div v-for="invite in operations.invites" :key="invite.id" class="invite-row"><div><strong>{{ invite.channel || tr('defaultChannel') }}</strong><small>{{ invite.target }} · {{ formatDate(invite.expiresAt) }}</small></div><div class="invite-row-meta"><span :class="['state-pill', invite.status]">{{ inviteStatusLabel(invite.status) }}</span><span>{{ invite.useCount }}/{{ invite.maxUses || '∞' }}</span><button v-if="invite.status === 'active'" class="text-danger" type="button" @click="revokeInvite(invite)">{{ tr('revoke') }}</button></div></div></div></article>
+          </div>
+          <div class="operations-grid lower-operations"><article class="operation-card"><header><div><h3>{{ tr('diagnostics') }}</h3><p>{{ tr('diagnosticsLead') }}</p></div><a class="text-link" href="/api/admin/diagnostics/report">{{ tr('downloadReport') }}</a></header><dl class="diagnostic-list"><div><dt>{{ tr('runtime') }}</dt><dd>{{ operations.diagnostics.node || '—' }}</dd></div><div><dt>{{ tr('platform') }}</dt><dd>{{ operations.diagnostics.platform || '—' }} / {{ operations.diagnostics.arch || '—' }}</dd></div><div><dt>{{ tr('databaseSchema') }}</dt><dd>v{{ operations.diagnostics.schemaVersion || '—' }}</dd></div><div><dt>{{ tr('createdSessions') }}</dt><dd>{{ operations.diagnostics.createdSessions }}</dd></div></dl><button class="secondary-button" type="button" @click="downloadBackup">{{ tr('exportBackup') }}</button></article><article class="operation-card logs-card"><header><div><h3>{{ tr('logViewer') }}</h3><p>{{ tr('logViewerLead') }}</p></div><span v-if="!operations.logs.available" class="muted-label">{{ tr('logsUnavailable') }}</span></header><div v-if="operations.logs.entries.length" class="log-list"><div v-for="(entry, index) in operations.logs.entries" :key="`${entry.timestamp}-${index}`" class="log-row"><span :class="['log-level', entry.level.toLowerCase()]">{{ entry.level }}</span><div><strong>{{ entry.message || '—' }}</strong><small>{{ formatDate(entry.timestamp) }}<template v-if="Object.keys(entry.context).length"> · {{ formatContext(entry.context) }}</template></small></div></div></div><div v-else class="operation-empty"><Icon name="file" :size="22" /><span>{{ tr('noLogs') }}</span></div></article></div>
         </section>
 
         <section v-else class="page-content">
@@ -82,6 +91,14 @@ const testResult = ref<ProbeState | null>(null);
 
 const serverForm = reactive({ target: "", serverPassword: "", passwordAction: "keep" as "keep" | "replace" | "remove", hasPassword: false, accessMode: "fixed" as AccessMode, siteName: "WebSpeak", welcomeText: "", detectedProtocol: null as string | null, lastTestAt: null as string | null, lastTestLatencyMs: null as number | null });
 const overview = reactive({ gateway: { version: "", uptimeSeconds: 0 }, teamSpeak: { target: "", status: "unknown", protocol: null as string | null, lastTestAt: null as string | null, latencyMs: null as number | null }, sessions: { active: 0, peak: 0, limit: 100 }, recentEvents: [] as Array<{ event: string; createdAt: string }>, legacyConfigImported: false });
+interface AdminSession { id: string; nickname: string; target: string; state: string; createdAt: string; ageSeconds: number; tsClientId: number | null; channelId: string | null; memberCount: number }
+interface ManagedInvite { id: string; target: string; channel: string; expiresAt: string; maxUses: number; useCount: number; createdAt: string; revokedAt: string | null; status: "active" | "expired" | "exhausted" | "revoked" }
+interface AdminLog { timestamp: string | null; level: string; message: string; context: Record<string, string | number | boolean> }
+const operationsLoading = ref(false);
+const terminatingSession = ref("");
+const inviteForm = reactive({ channel: "", expiresInHours: 24, maxUses: 0 });
+const createdInvite = ref<{ token: string; link: string } | null>(null);
+const operations = reactive({ sessions: [] as AdminSession[], invites: [] as ManagedInvite[], diagnostics: { node: "", platform: "", arch: "", schemaVersion: 0, createdSessions: 0 }, logs: { available: false, entries: [] as AdminLog[] } });
 
 const copy = {
   zh: {
@@ -106,6 +123,7 @@ const copy = {
     login: "登录",
     overview: "概览",
     server: "服务器",
+    operations: "运维",
     openGuest: "打开访客页面",
     logout: "退出登录",
     gatewayRunning: "网关运行中",
@@ -171,6 +189,49 @@ const copy = {
     initializedEvent: "默认管理员账号已创建",
     importedEvent: "已导入旧配置",
     testEvent: "连接测试完成",
+    operationsLead: "无需登录服务器终端即可完成日常维护和问题定位。",
+    refresh: "刷新",
+    sessions: "活动会话",
+    sessionsLead: "查看当前浏览器连接，并在必要时安全断开单个会话。",
+    sessionEmpty: "当前没有活动会话。",
+    sessionState: "状态",
+    age: "持续时间",
+    memberCount: "成员数",
+    endSession: "断开",
+    terminating: "断开中…",
+    sessionTerminated: "会话已断开。",
+    invites: "受控邀请",
+    invitesLead: "创建可过期、可限次的邀请链接；链接中不包含服务器密码。",
+    inviteChannel: "目标频道",
+    inviteChannelPlaceholder: "留空使用默认频道",
+    expiresIn: "有效期（小时）",
+    maxUses: "最多使用次数",
+    unlimitedUses: "填写 0 表示不限次数。",
+    createInvite: "创建邀请链接",
+    inviteCreated: "邀请链接已创建",
+    inviteSecurity: "请立即复制并分享链接。出于安全原因，页面不会再次显示完整令牌。",
+    copyLink: "复制链接",
+    copiedLink: "邀请链接已复制。",
+    defaultChannel: "默认频道",
+    revoke: "撤销",
+    inviteRevoked: "邀请链接已撤销。",
+    active: "有效",
+    expired: "已过期",
+    exhausted: "已用尽",
+    revoked: "已撤销",
+    diagnostics: "诊断信息",
+    diagnosticsLead: "用于反馈问题的运行时摘要；导出的报告会自动脱敏。",
+    runtime: "运行时",
+    platform: "平台",
+    databaseSchema: "数据库版本",
+    createdSessions: "累计会话",
+    downloadReport: "下载诊断报告",
+    exportBackup: "导出数据库备份",
+    logViewer: "运行日志",
+    logViewerLead: "最近的网关日志，不包含聊天内容。",
+    logsUnavailable: "未配置日志文件",
+    noLogs: "暂无可查看日志。",
+    operationFailed: "运维操作失败，请稍后重试。",
   },
   en: {
     loading: "Loading the admin console…",
@@ -194,6 +255,7 @@ const copy = {
     login: "Sign in",
     overview: "Overview",
     server: "Server",
+    operations: "Operations",
     openGuest: "Open guest page",
     logout: "Log out",
     gatewayRunning: "Gateway running",
@@ -259,24 +321,75 @@ const copy = {
     initializedEvent: "Default administrator account created",
     importedEvent: "Legacy configuration imported",
     testEvent: "Connection test completed",
+    operationsLead: "Handle routine maintenance and troubleshooting without shell access.",
+    refresh: "Refresh",
+    sessions: "Active sessions",
+    sessionsLead: "Inspect browser connections and safely terminate an individual session when needed.",
+    sessionEmpty: "There are no active sessions.",
+    sessionState: "State",
+    age: "Age",
+    memberCount: "Members",
+    endSession: "Terminate",
+    terminating: "Terminating…",
+    sessionTerminated: "Session terminated.",
+    invites: "Managed invites",
+    invitesLead: "Create expiring, usage-limited invite links without putting the server password in the URL.",
+    inviteChannel: "Target channel",
+    inviteChannelPlaceholder: "Leave blank for the default channel",
+    expiresIn: "Expires in (hours)",
+    maxUses: "Maximum uses",
+    unlimitedUses: "Use 0 for unlimited uses.",
+    createInvite: "Create invite link",
+    inviteCreated: "Invite link created",
+    inviteSecurity: "Copy and share it now. For security, the full token will not be shown again.",
+    copyLink: "Copy link",
+    copiedLink: "Invite link copied.",
+    defaultChannel: "Default channel",
+    revoke: "Revoke",
+    inviteRevoked: "Invite link revoked.",
+    active: "Active",
+    expired: "Expired",
+    exhausted: "Exhausted",
+    revoked: "Revoked",
+    diagnostics: "Diagnostics",
+    diagnosticsLead: "Runtime facts for troubleshooting; downloaded reports are sanitized.",
+    runtime: "Runtime",
+    platform: "Platform",
+    databaseSchema: "Database schema",
+    createdSessions: "Sessions created",
+    downloadReport: "Download diagnostic report",
+    exportBackup: "Export database backup",
+    logViewer: "Runtime logs",
+    logViewerLead: "Recent gateway logs; chat content is not recorded.",
+    logsUnavailable: "Log file unavailable",
+    noLogs: "No logs are available.",
+    operationFailed: "The operation failed. Try again later.",
   },
 } as const;
 
 function tr(key: keyof typeof copy.zh, vars: Record<string, string | number> = {}): string { let value: string = language.value === "zh" ? copy.zh[key] : copy.en[key] ?? copy.zh[key]; for (const [name, replacement] of Object.entries(vars)) value = value.replaceAll(`{{${name}}}`, String(replacement)); return value; }
 const passwordStrength = computed(() => Math.min(100, Math.max(8, newPassword.value.length * 5 + (/[\s\W]/.test(newPassword.value) ? 15 : 0))));
-const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : tr('overview'));
+const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : route.path === "/admin/operations" ? tr('operations') : tr('overview'));
 const testResultText = computed(() => { if (!testResult.value) return ""; if (!testResult.value.ok) return errorText(testResult.value.code); return [testResult.value.protocol?.toUpperCase(), testResult.value.serverName, testResult.value.latencyMs == null ? null : `${testResult.value.latencyMs} ms`].filter(Boolean).join(" · "); });
 const targetStatusText = computed(() => overview.teamSpeak.status === "reachable" ? tr('reachable') : overview.teamSpeak.status === "unreachable" ? tr('unreachable') : tr('notTested'));
 
 onMounted(loadAdminView);
 watch(() => [serverForm.target, serverForm.serverPassword, serverForm.passwordAction], () => { if (!testing.value && screen.value === "admin") testResult.value = null; });
+watch(() => route.path, () => { if (screen.value === "admin" && route.path === "/admin/operations") void loadOperations(); });
 
-async function loadAdminView() { loading.value = true; try { const session = await getJson("/api/admin/session"); if (!session.authenticated) { screen.value = "login"; if (route.path !== "/admin/login") await router.replace("/admin/login"); } else if (session.mustChangePassword) { csrfToken.value = String(session.csrfToken || ""); screen.value = "change-password"; if (route.path !== "/admin/change-password") await router.replace("/admin/change-password"); } else { csrfToken.value = String(session.csrfToken || ""); screen.value = "admin"; if (route.path === "/admin/login" || route.path === "/admin/change-password") await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } } catch { errorMessage.value = tr('requestFailed'); } finally { loading.value = false; } }
+async function loadAdminView() { loading.value = true; try { const session = await getJson("/api/admin/session"); if (!session.authenticated) { screen.value = "login"; if (route.path !== "/admin/login") await router.replace("/admin/login"); } else if (session.mustChangePassword) { csrfToken.value = String(session.csrfToken || ""); screen.value = "change-password"; if (route.path !== "/admin/change-password") await router.replace("/admin/change-password"); } else { csrfToken.value = String(session.csrfToken || ""); screen.value = "admin"; if (route.path === "/admin/login" || route.path === "/admin/change-password") await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); if (route.path === "/admin/operations") await loadOperations(); } } catch { errorMessage.value = tr('requestFailed'); } finally { loading.value = false; } }
 async function login() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/login", "POST", { username: loginUsername.value, password: loginPassword.value }, false); csrfToken.value = String(result.csrfToken || ""); loginPassword.value = ""; if (result.mustChangePassword) { screen.value = "change-password"; await router.replace("/admin/change-password"); } else { screen.value = "admin"; await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function changePassword() { errorMessage.value = ""; if (newPassword.value.length < 12) { errorMessage.value = tr('setupPasswordShort'); return; } if (newPassword.value !== confirmNewPassword.value) { errorMessage.value = tr('setupPasswordsMismatch'); return; } submitting.value = true; try { await sendJson("/api/admin/change-password", "POST", { newPassword: newPassword.value }); newPassword.value = ""; confirmNewPassword.value = ""; screen.value = "admin"; await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function logout() { try { await sendJson("/api/admin/logout", "POST", {}); } finally { csrfToken.value = ""; screen.value = "login"; await router.replace("/admin/login"); } }
 async function loadOverview() { Object.assign(overview, await getJson("/api/admin/overview")); }
 async function loadServerSettings() { const value = await getJson("/api/admin/server"); Object.assign(serverForm, value, { serverPassword: "", passwordAction: "keep" }); }
+async function loadOperations() { operationsLoading.value = true; try { const [sessions, invites, diagnostics, logs] = await Promise.all([getJson("/api/admin/sessions"), getJson("/api/admin/invites"), getJson("/api/admin/diagnostics"), getJson("/api/admin/logs?limit=100")]); operations.sessions = Array.isArray(sessions.sessions) ? sessions.sessions : []; operations.invites = Array.isArray(invites.invites) ? invites.invites : []; operations.diagnostics = { node: String(diagnostics.gateway?.node || ""), platform: String(diagnostics.gateway?.platform || ""), arch: String(diagnostics.gateway?.arch || ""), schemaVersion: Number(diagnostics.database?.schemaVersion || 0), createdSessions: Number(diagnostics.sessions?.created || 0) }; operations.logs = { available: Boolean(logs.available), entries: Array.isArray(logs.entries) ? logs.entries : [] }; } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { operationsLoading.value = false; } }
+async function terminateSession(session: AdminSession) { if (!window.confirm(`${tr('endSession')}「${session.nickname}」？`)) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
+async function createInvite() { submitting.value = true; errorMessage.value = ""; createdInvite.value = null; try { const result = await sendJson("/api/admin/invites", "POST", { channel: inviteForm.channel, expiresInHours: inviteForm.expiresInHours, maxUses: inviteForm.maxUses }); if (typeof result.token !== "string") throw new Error("INVITE_CREATE_FAILED"); createdInvite.value = { token: result.token, link: `${location.origin}/?invite=${encodeURIComponent(result.token)}` }; inviteForm.channel = ""; await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
+async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(`${tr('revoke')}「${invite.channel || tr('defaultChannel')}」？`)) return; try { await sendJson(`/api/admin/invites/${encodeURIComponent(invite.id)}/revoke`, "POST", {}); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
+async function copyInviteLink() { if (!createdInvite.value) return; try { await navigator.clipboard.writeText(createdInvite.value.link); showOperationNotice(tr('copiedLink')); } catch { errorMessage.value = tr('operationFailed'); } }
+function showOperationNotice(message: string) { errorMessage.value = message; window.setTimeout(() => { if (errorMessage.value === message) errorMessage.value = ""; }, 2200); }
+async function downloadBackup() { try { const response = await fetch("/api/admin/backup", { headers: { accept: "application/octet-stream" } }); if (!response.ok) throw new Error("BACKUP_FAILED"); const blob = await response.blob(); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `webspeak-backup-${new Date().toISOString().slice(0, 10)}.db`; anchor.click(); URL.revokeObjectURL(url); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
 async function saveServerSettings() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/server", "PUT", serverPayload()); Object.assign(serverForm, result.settings, { serverPassword: "", passwordAction: "keep" }); await loadOverview(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function testServerConnection() { await runTest("/api/admin/server/test", { target: serverForm.target, serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction }); if (testResult.value?.ok) { await loadOverview(); serverForm.detectedProtocol = testResult.value.protocol ?? null; serverForm.lastTestAt = new Date().toISOString(); serverForm.lastTestLatencyMs = testResult.value.latencyMs ?? null; } }
 function serverPayload() { return { target: serverForm.target, serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName, welcomeText: serverForm.welcomeText }; }
@@ -286,6 +399,10 @@ function toggleLanguage() { language.value = language.value === "zh" ? "en" : "z
 function cycleTheme() { themeMode.value = nextTheme(themeMode.value); saveTheme(themeMode.value); }
 function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat(language.value === "zh" ? "zh-CN" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
 function formatUptime(seconds: number) { const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); return language.value === "zh" ? `已运行 ${hours} 小时 ${minutes} 分钟` : `Up ${hours}h ${minutes}m`; }
+function formatAge(seconds: number) { if (seconds < 60) return language.value === "zh" ? `${seconds} 秒` : `${seconds}s`; const minutes = Math.floor(seconds / 60); if (minutes < 60) return language.value === "zh" ? `${minutes} 分钟` : `${minutes}m`; const hours = Math.floor(minutes / 60); return language.value === "zh" ? `${hours} 小时 ${minutes % 60} 分钟` : `${hours}h ${minutes % 60}m`; }
+function sessionStateLabel(state: string) { const names: Record<string, { zh: string; en: string }> = { connecting: { zh: "连接中", en: "Connecting" }, authenticating: { zh: "认证中", en: "Authenticating" }, syncing: { zh: "同步中", en: "Syncing" }, connected: { zh: "已连接", en: "Connected" }, interrupted: { zh: "已中断", en: "Interrupted" }, reconnecting: { zh: "重连中", en: "Reconnecting" }, disconnecting: { zh: "断开中", en: "Disconnecting" }, failed: { zh: "失败", en: "Failed" }, idle: { zh: "空闲", en: "Idle" } }; return names[state]?.[language.value] ?? state; }
+function inviteStatusLabel(status: ManagedInvite["status"]) { const names: Record<ManagedInvite["status"], keyof typeof copy.zh> = { active: "active", expired: "expired", exhausted: "exhausted", revoked: "revoked" }; return tr(names[status]); }
+function formatContext(context: Record<string, string | number | boolean>) { return Object.entries(context).map(([key, value]) => `${key}=${value}`).join(" · "); }
 function eventName(event: string) { if (event === "ADMIN_LOGIN_FAILED") return language.value === "zh" ? "管理员登录失败" : "Administrator login failed"; if (event === "CONNECTION_TEST_SUCCEEDED") return language.value === "zh" ? "连接测试成功" : "Connection test succeeded"; if (event === "CONNECTION_TEST_FAILED") return language.value === "zh" ? "连接测试失败" : "Connection test failed"; const names: Record<string, keyof typeof copy.zh> = { ADMIN_LOGIN_SUCCEEDED: "loginEvent", ADMIN_LOGOUT: "logoutEvent", SETTINGS_CHANGED: "settingsEvent", ADMIN_INITIALIZED: "initializedEvent", LEGACY_CONFIG_IMPORTED: "importedEvent", CONNECTION_TEST: "testEvent" }; return names[event] ? tr(names[event]) : language.value === "zh" ? "系统事件" : event.replaceAll("_", " "); }
 function errorText(code?: string) { if (code === "INVALID_PASSWORD") return tr('invalidPassword'); if (code === "INVALID_ADMIN_PASSWORD") return tr('setupPasswordShort'); if (code === "PASSWORD_CHANGE_REQUIRED") return tr('changePasswordLead'); if (code === "RATE_LIMITED") return tr('rateLimited'); const probe: Record<string, { zh: string; en: string }> = { INVALID_TARGET: { zh: "TeamSpeak 服务器地址格式无效。", en: "The TeamSpeak server address is invalid." }, HOST_NOT_FOUND: { zh: "找不到服务器主机名。", en: "The server hostname could not be resolved." }, UNREACHABLE: { zh: "无法连接 TeamSpeak 服务器。", en: "The TeamSpeak server is unreachable." }, TIMEOUT: { zh: "连接 TeamSpeak 超时。", en: "The TeamSpeak connection timed out." }, PROTOCOL_NEGOTIATION_FAILED: { zh: "无法识别 TeamSpeak 协议。", en: "TeamSpeak protocol negotiation failed." }, SERVER_REJECTED: { zh: "TeamSpeak 服务器拒绝了连接。", en: "The TeamSpeak server rejected the connection." }, TARGET_NOT_ALLOWED: { zh: "此地址不允许在开放模式中使用。", en: "This target is not allowed in open mode." } }; return probe[code || ""]?.[language.value] ?? tr('requestFailed'); }
 
@@ -308,4 +425,8 @@ async function parseResponse(response: Response) { const value = await response.
 :global(:root[data-theme="dark"]) .page-heading p, :global(:root[data-theme="dark"]) .admin-topbar small, :global(:root[data-theme="dark"]) label > span, :global(:root[data-theme="dark"]) .page-heading p { color: #9bb0aa; }
 :global(:root[data-theme="dark"]) .metric-grid article, :global(:root[data-theme="dark"]) .readonly-card dl div, :global(:root[data-theme="dark"]) .overview-card dl div, :global(:root[data-theme="dark"]) .event-list li { background: #202f2c; border-color: #30413d; }
 @media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) .admin-root, :global(:root[data-theme="system"]) .login-page, :global(:root[data-theme="system"]) .auth-panel { color: #e8f3f0; background: #101918; } :global(:root[data-theme="system"]) .admin-topbar, :global(:root[data-theme="system"]) .setup-card, :global(:root[data-theme="system"]) .login-card, :global(:root[data-theme="system"]) .settings-card, :global(:root[data-theme="system"]) .readonly-card, :global(:root[data-theme="system"]) .overview-card { background: #172321; border-color: #30413d; } }
+.operations-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(340px,.88fr);gap:18px}.operation-card{min-width:0;padding:22px;background:#fff;border:1px solid #dfe8e5;border-radius:14px}.operation-card header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}.operation-card h3{margin:0;font-size:15px}.operation-card header p{margin:5px 0 0;color:#7e8c88;font-size:10px;line-height:1.5}.operation-card header>strong{color:#087d74;font-size:22px}.table-wrap{margin:18px -22px -22px;overflow:auto;border-top:1px solid #edf1ef}.table-wrap table{width:100%;min-width:600px;border-collapse:collapse;text-align:left}.table-wrap th,.table-wrap td{padding:12px 14px;border-bottom:1px solid #edf1ef;font-size:11px;white-space:nowrap}.table-wrap th{color:#83928d;font-size:10px;font-weight:700}.table-wrap td strong,.table-wrap td small{display:block}.table-wrap td small{margin-top:3px;color:#8a9994;font-size:9px}.state-pill{display:inline-flex;padding:4px 7px;color:#236c63;background:#e5f5f1;border-radius:99px;font-size:10px;font-weight:700}.state-pill.expired,.state-pill.exhausted,.state-pill.revoked{color:#8b6259;background:#f8ece9}.danger-button,.text-danger{color:#a34f48;background:#fff0ee;border:1px solid #f1d2cd;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer}.danger-button{padding:7px 9px}.text-danger{padding:4px 7px;border:0}.danger-button:disabled{opacity:.55;cursor:wait}.operation-empty{display:grid;place-items:center;gap:8px;min-height:130px;color:#8b9994;text-align:center;font-size:11px}.operation-empty .ui-icon{color:#72afa7}.invite-form{display:grid;gap:14px;margin-top:18px}.invite-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field-help{margin-top:-8px;color:#899792;font-size:10px}.generated-invite{display:grid;gap:8px;margin-top:17px;padding:12px;color:#29685f;background:#eaf7f3;border-radius:9px}.generated-invite strong{font-size:11px}.generated-invite small{color:#648780;font-size:9px;line-height:1.45}.generated-link{display:flex;gap:6px}.generated-link input{height:36px;min-width:0;padding:8px;font-size:10px}.generated-link .secondary-button{min-height:36px;padding-inline:9px;white-space:nowrap;font-size:10px}.invite-list{display:grid;gap:9px;margin-top:18px;padding-top:15px;border-top:1px solid #edf1ef}.invite-row{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:10px;background:#f6f9f8;border-radius:9px}.invite-row>div:first-child{min-width:0}.invite-row strong,.invite-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.invite-row strong{font-size:11px}.invite-row small{max-width:260px;margin-top:4px;color:#86958f;font-size:9px}.invite-row-meta{display:flex;align-items:center;gap:7px;flex:none;color:#70827b;font-size:9px}.lower-operations{margin-top:18px}.text-link{color:#087d74;font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap}.diagnostic-list{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0}.diagnostic-list div{padding:10px;background:#f6f9f8;border-radius:8px}.diagnostic-list dt{color:#8a9893;font-size:9px}.diagnostic-list dd{margin:4px 0 0;overflow:hidden;font-size:11px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}.logs-card{display:flex;min-height:250px;flex-direction:column}.muted-label{color:#9aa6a2;font-size:9px}.log-list{display:grid;gap:7px;max-height:280px;margin-top:16px;overflow:auto}.log-row{display:flex;align-items:flex-start;gap:8px;padding:8px;background:#f6f9f8;border-radius:7px}.log-row>div{min-width:0}.log-row strong,.log-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.log-row strong{font-size:10px}.log-row small{margin-top:4px;color:#899792;font-size:8px}.log-level{flex:none;padding:3px 5px;border-radius:4px;color:#356c62;background:#e3f3ef;font-size:8px;font-weight:800}.log-level.warn{color:#8b6a3e;background:#fbf1dc}.log-level.error,.log-level.fatal{color:#a34f48;background:#fff0ee}
+:global(:root[data-theme="dark"]) .operation-card,:global(:root[data-theme="dark"]) .invite-row,:global(:root[data-theme="dark"]) .diagnostic-list div,:global(:root[data-theme="dark"]) .log-row{color:#e8f3f0;background:#202f2c;border-color:#30413d}:global(:root[data-theme="dark"]) .table-wrap{border-color:#30413d}:global(:root[data-theme="dark"]) .table-wrap th,:global(:root[data-theme="dark"]) .table-wrap td,:global(:root[data-theme="dark"]) .invite-list{border-color:#30413d}:global(:root[data-theme="dark"]) .operation-card header p,:global(:root[data-theme="dark"]) .table-wrap th,:global(:root[data-theme="dark"]) .table-wrap td small,:global(:root[data-theme="dark"]) .invite-row small{color:#9bb0aa}
+@media(max-width:850px){.operations-grid{grid-template-columns:1fr}.operation-wide{overflow:hidden}}
+@media(max-width:520px){.operation-card{padding:18px}.table-wrap{margin-left:-18px;margin-right:-18px;margin-bottom:-18px}.invite-form-grid,.diagnostic-list{grid-template-columns:1fr}.generated-link{display:grid}.invite-row{align-items:flex-start;flex-direction:column}.invite-row-meta{width:100%;justify-content:flex-end}.lower-operations{margin-top:14px}}
 </style>
