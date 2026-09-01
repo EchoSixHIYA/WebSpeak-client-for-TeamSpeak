@@ -36,16 +36,16 @@
           <div v-if="!localPersistenceAvailable" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('localPersistenceUnavailable') }}</span></div>
 
           <form v-if="initialized" class="join-form" @submit.prevent="doConnect">
-            <div v-if="accessMode === 'open'">
-              <label class="field-label" for="server-address">{{ t('serverAddress') }}</label>
-              <div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverAddress" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div>
+            <div v-if="accessMode === 'open'" class="field-grid target-fields">
+              <label class="field-label" for="server-address"><span>{{ t('serverAddress') }}</span><div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverHost" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div></label>
+              <label class="field-label" for="server-port"><span>{{ t('serverPort') }}</span><div class="field-wrap"><Icon name="hash" :size="17" /><input id="server-port" v-model="serverPort" inputmode="numeric" type="text" maxlength="5" :placeholder="t('serverPortPlaceholder')" /></div></label>
             </div>
             <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
             <div v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)" class="local-servers">
               <div v-if="favoriteServers.length" class="local-server-group"><span>{{ t('favoriteServers') }}</span><button v-for="favorite in favoriteServers" :key="favorite.id" type="button" @click="selectLocalServer(favorite.address, favorite.nickname)">{{ favorite.label }}</button></div>
               <div v-if="recentServers.length" class="local-server-group"><span>{{ t('recentServers') }}</span><button v-for="recent in recentServers" :key="recent.id" type="button" @click="selectLocalServer(recent.address, recent.nickname)">{{ recent.address }}</button></div>
             </div>
-            <button v-if="accessMode === 'open' && serverAddress.trim()" type="button" class="favorite-toggle" @click="toggleFavorite">{{ isFavorite ? t('removeFavorite') : t('saveFavorite') }}</button>
+            <button v-if="accessMode === 'open' && serverHost.trim()" type="button" class="favorite-toggle" @click="toggleFavorite">{{ isFavorite ? t('removeFavorite') : t('saveFavorite') }}</button>
 
             <template v-if="accessMode === 'open'">
               <label class="field-label" for="server-password">{{ t('serverPassword') }} <span>{{ t('optional') }}</span></label>
@@ -242,6 +242,7 @@ import Icon from "../components/Icon.vue";
 import { useVoiceWebSocket, type ChannelInfo, type ChannelMember } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
+import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 interface TreeChannel extends ChannelInfo {
   depth: number;
@@ -307,9 +308,11 @@ const {
 const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
 const inviteToken = query.get("invite") ?? "";
+const initialTarget = initialServerTarget();
 const nickname = ref(localStorage.getItem("webspeak:nickname") ?? "");
 const channel = ref(initialChannel);
-const serverAddress = ref(initialServerAddress());
+const serverHost = ref(initialTarget.address);
+const serverPort = ref(initialTarget.port);
 const serverPassword = ref("");
 const accessMode = ref<"fixed" | "open">("fixed");
 const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") === "1");
@@ -372,7 +375,9 @@ const translations: Record<Language, Record<string, string>> = {
     joinLead: "输入一个昵称，选择进入的频道。",
     serverAddress: "TeamSpeak 服务器地址",
     serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
-    serverAddressHint: "这是网关服务器连接的 TeamSpeak 地址，不是浏览器直接连接地址。",
+    serverPort: "语音端口",
+    serverPortPlaceholder: "9987",
+    serverAddressHint: "这是网关服务器连接的 TeamSpeak 地址和端口，不是浏览器直接连接地址。",
     nickname: "你的昵称",
     nicknamePlaceholder: "例如：Alex Rivera",
     targetChannel: "目标频道",
@@ -591,7 +596,9 @@ const translations: Record<Language, Record<string, string>> = {
     joinLead: "Choose a nickname and the channel to enter.",
     serverAddress: "TeamSpeak server address",
     serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
-    serverAddressHint: "This is the TeamSpeak address reached by the gateway, not a direct browser connection.",
+    serverPort: "Voice port",
+    serverPortPlaceholder: "9987",
+    serverAddressHint: "This is the TeamSpeak address and port reached by the gateway, not a direct browser connection.",
     nickname: "Your nickname",
     nicknamePlaceholder: "e.g. Alex Rivera",
     targetChannel: "Target channel",
@@ -785,15 +792,12 @@ const translations: Record<Language, Record<string, string>> = {
   },
 };
 
-function initialServerAddress(): string {
+function initialServerTarget() {
   const explicit = query.get("server") ?? query.get("target");
-  if (explicit?.trim()) return explicit.trim();
+  if (explicit?.trim()) return splitTeamSpeakTarget(explicit);
   const host = (query.get("tsHost") ?? location.hostname).trim();
-  const port = (query.get("tsPort") ?? "9987").trim();
-  if (!host) return `127.0.0.1:${port}`;
-  if (/^[^:]+:\d+$/.test(host) || /^\[[^\]]+\]:\d+$/.test(host)) return host;
-  if (host.startsWith("[") || !host.includes(":")) return `${host}:${port}`;
-  return `[${host}]:${port}`;
+  const port = (query.get("tsPort") ?? DEFAULT_TEAM_SPEAK_PORT).trim();
+  return splitTeamSpeakTarget(host, port || DEFAULT_TEAM_SPEAK_PORT);
 }
 
 function getInitialLanguage(): Language {
@@ -992,7 +996,7 @@ watch(() => voiceState.connected, (connected) => {
     return;
   }
   playNotification("connected");
-  const address = serverAddress.value.trim();
+  const address = currentServerTarget();
   if (!address) return;
   const recent: RecentServer = {
     id: serverKey(address),
@@ -1059,10 +1063,11 @@ function doConnect() {
   localStorage.setItem("webspeak:nickname", nickname.value);
   void saveLocalPreferences({ schemaVersion: 1, lastNickname: nickname.value });
   if (accessMode.value === "open") {
-    serverAddress.value = serverAddress.value.trim();
+    serverHost.value = serverHost.value.trim();
+    serverPort.value = serverPort.value.trim();
   }
   selectedChannelId.value = "";
-  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "", rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken);
+  connect(currentServerTarget(), channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "", rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken);
 }
 
 function doDisconnect() {
@@ -1095,7 +1100,7 @@ function doShare() {
   invite.searchParams.delete("tsHost");
   invite.searchParams.delete("tsPort");
   invite.searchParams.delete("server");
-  if (accessMode.value === "open" && serverAddress.value.trim()) invite.searchParams.set("server", serverAddress.value.trim());
+  if (accessMode.value === "open" && serverHost.value.trim()) invite.searchParams.set("server", currentServerTarget());
   if (channel.value) invite.searchParams.set("channel", channel.value);
   navigator.clipboard?.writeText(invite.toString()).then(() => showToast(t("copiedToast")), () => showToast(t("copyFailedToast")));
 }
@@ -1103,21 +1108,27 @@ function doShare() {
 const canJoin = computed(() => Boolean(
   initialized.value
   && nickname.value.trim()
-  && (accessMode.value === "fixed" || serverAddress.value.trim()),
+  && (accessMode.value === "fixed" || (serverHost.value.trim() && isValidTeamSpeakPort(serverPort.value))),
 ));
-const isFavorite = computed(() => favoriteServers.value.some((favorite) => favorite.id === serverKey(serverAddress.value)));
+const isFavorite = computed(() => favoriteServers.value.some((favorite) => favorite.id === serverKey(currentServerTarget())));
+
+function currentServerTarget(): string {
+  return combineTeamSpeakTarget(serverHost.value, serverPort.value);
+}
 
 function serverKey(address: string): string {
   return address.trim().toLocaleLowerCase();
 }
 
 function selectLocalServer(address: string, savedNickname?: string): void {
-  serverAddress.value = address;
+  const target = splitTeamSpeakTarget(address);
+  serverHost.value = target.address;
+  serverPort.value = target.port;
   if (savedNickname && !nickname.value.trim()) nickname.value = savedNickname;
 }
 
 async function toggleFavorite(): Promise<void> {
-  const address = serverAddress.value.trim();
+  const address = currentServerTarget();
   if (!address) return;
   const id = serverKey(address);
   const existing = favoriteServers.value.find((favorite) => favorite.id === id);
@@ -1190,7 +1201,11 @@ async function loadPublicConfig() {
     if (typeof config.welcomeText === "string") welcomeText.value = config.welcomeText;
     accessMode.value = config.accessMode === "open" ? "open" : "fixed";
     const hasInviteTarget = query.has("server") || query.has("target") || query.has("tsHost") || query.has("tsPort");
-    if (!hasInviteTarget && typeof config.target === "string" && config.target.trim()) serverAddress.value = config.target.trim();
+    if (!hasInviteTarget && typeof config.target === "string" && config.target.trim()) {
+      const target = splitTeamSpeakTarget(config.target);
+      serverHost.value = target.address;
+      serverPort.value = target.port;
+    }
   } catch {
     // Keep joining disabled until the gateway can confirm its initialized policy.
   } finally {
@@ -1474,6 +1489,7 @@ function stopWhisperTalk(): void {
 .join-form { display: grid; gap: 8px; }
 .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 12px; }
 .field-grid .field-label { display: block; }
+.field-grid .field-label:not(:first-child) { margin-top: 0; }
 .field-hint { margin: 1px 0 5px; color: #879590; font-size: 10px; line-height: 1.5; }
 .field-label, .settings-label { color: #43514d; font-size: 11px; font-weight: 600; }
 .field-label:not(:first-child) { margin-top: 10px; }

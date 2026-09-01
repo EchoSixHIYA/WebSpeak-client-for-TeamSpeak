@@ -30,6 +30,14 @@ describe("legacy config migration", () => {
     });
   });
 
+  it("accepts the address#port form during migration", () => {
+    assert.deepEqual(migrateConfig({ tsHost: "voice.example.com#9988" }), {
+      tsHost: "voice.example.com",
+      tsPort: 9988,
+      tsServerPassword: "",
+    });
+  });
+
   it("falls back safely for malformed legacy targets", () => {
     assert.deepEqual(migrateConfig({ tsHost: "bad host", tsPort: 0 }), {
       tsHost: "127.0.0.1",

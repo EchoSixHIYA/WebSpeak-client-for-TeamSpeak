@@ -12,10 +12,20 @@ export class InvalidTeamSpeakTargetError extends Error {
   }
 }
 
-/** Parse a user-facing TeamSpeak target such as example.com:9988. */
+/** Parse a user-facing TeamSpeak target such as example.com:9988 or example.com#9988. */
 export function parseTeamSpeakTarget(value: string, fallbackPort = DEFAULT_TEAM_SPEAK_PORT): TeamSpeakTarget {
   const input = value.trim();
   if (!input) throw new InvalidTeamSpeakTargetError("TeamSpeak server address is required");
+
+  const hash = input.indexOf("#");
+  if (hash >= 0) {
+    if (input.indexOf("#", hash + 1) >= 0) {
+      throw new InvalidTeamSpeakTargetError("TeamSpeak target has too many port separators");
+    }
+    const hashHost = input.slice(0, hash);
+    const host = hashHost.startsWith("[") && hashHost.endsWith("]") ? hashHost.slice(1, -1) : hashHost;
+    return createTarget(host, input.slice(hash + 1));
+  }
 
   if (input.startsWith("[")) {
     const closingBracket = input.indexOf("]");

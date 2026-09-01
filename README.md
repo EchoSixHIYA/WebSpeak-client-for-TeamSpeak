@@ -94,7 +94,7 @@ WebSpeak 内部端口固定为 `3040`。首次启动会自动创建默认管理�
 http://127.0.0.1:3040/admin
 ```
 
-首次登录后必须设置一个至少 12 个字符的新密码。改密完成后，在“服务器设置”中填写 TeamSpeak 目标并执行连接测试，再保存访问模式和站点信息。
+首次登录后必须设置一个至少 12 个字符的新密码。改密完成后，在“服务器设置”中分别填写 TeamSpeak 服务器地址和语音端口（例如 `127.0.0.1` 与 `9987`），再执行连接测试并保存访问模式和站点信息。
 
 后续管理入口仍为 `/admin`。管理员账号名固定为 `admin`，当前版本不提供用户列表或角色系统。
 
@@ -102,7 +102,7 @@ http://127.0.0.1:3040/admin
 
 `fixed` 是默认模式。访客页只显示昵称和频道，TeamSpeak 目标与服务器密码由服务端管理。
 
-欢迎页没有邀请链接目标参数时，地址和端口输入框会预填管理控制台中配置的“默认 TeamSpeak 目标”；邀请链接中的目标参数优先使用。
+欢迎页没有邀请链接目标参数时，服务器地址和 `#` 图标对应的语音端口输入框会预填管理控制台中配置的“默认 TeamSpeak 目标”；邀请链接中的目标参数优先使用。旧的 `地址:端口` 与 `地址#端口` 目标文本仍可被兼容解析。
 
 `open` 模式允许访客输入其他公网 TeamSpeak 地址和本次 Session 使用的密码。WebSpeak 会解析 DNS，并阻止 loopback、私网、链路本地、组播、广播及保留地址；实际连接使用已经验证过的 IP，避免 DNS rebinding。
 
@@ -218,7 +218,7 @@ src/
   admin/                         管理服务、API、Session、邀请与运维接口
   persistence/database.ts        SQLite schema、repository 和迁移边界
   security/                      主密钥、秘密加密、scrypt 与网络策略
-  domain/teamspeak-target.ts     host[:port] 规范化解析
+  domain/teamspeak-target.ts     地址、端口与兼容目标文本解析
   server/teamspeak-adapter.ts    TeamSpeak 协议边界与 endpoint 协议缓存
   server/teamspeak-probe.ts      可清理的短连接测试
   server/join-ticket.ts          一次性访客连接票据
@@ -301,7 +301,7 @@ WebSpeak always listens on internal port `3040`. On first boot it creates the de
 http://127.0.0.1:3040/admin
 ```
 
-The first login is forced to a password-change screen. Set a password of at least 12 characters, then configure and test the TeamSpeak target from Server settings. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
+The first login is forced to a password-change screen. Set a password of at least 12 characters, then enter the TeamSpeak server address and voice port separately (for example, `127.0.0.1` and `9987`) in Server settings, test the connection, and save. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
 
 ### Security and persistence
 
@@ -311,7 +311,7 @@ A normal user's identity is used only in memory for the current Join Ticket/Sess
 
 In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
 
-When the welcome page has no target parameters from an invite link, its address and port field is prefilled from the admin-configured default TeamSpeak target. Invite-link target parameters take precedence.
+When the welcome page has no target parameters from an invite link, its server address and `#`-icon voice-port fields are prefilled from the admin-configured default TeamSpeak target. Invite-link target parameters take precedence. Legacy `address:port` and `address#port` target text remains accepted for compatibility.
 
 Administrators can create managed invite links from `/admin/operations`. An invite stores only a token hash and encrypted connection secret, can expire or be limited to a number of uses, and can be revoked. The raw token is returned only at creation time and is passed as an `invite` URL parameter; no TeamSpeak password is placed in that URL. The database backup and diagnostic report are separate: the report is sanitized for issue sharing, while the database backup is for local recovery and must be protected.
 

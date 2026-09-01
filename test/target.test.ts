@@ -17,6 +17,11 @@ describe("TeamSpeak target parser", () => {
     assert.deepEqual(parseTeamSpeakTarget("ts.example.com:9988"), { host: "ts.example.com", port: 9988 });
   });
 
+  it("parses the address#port form used by the web fields", () => {
+    assert.deepEqual(parseTeamSpeakTarget("ts.example.com#9988"), { host: "ts.example.com", port: 9988 });
+    assert.deepEqual(parseTeamSpeakTarget("[2001:DB8::1]#9988"), { host: "2001:db8::1", port: 9988 });
+  });
+
   it("supports bracketed IPv6", () => {
     const target = parseTeamSpeakTarget("[2001:DB8::1]:9987");
     assert.deepEqual(target, { host: "2001:db8::1", port: 9987 });
