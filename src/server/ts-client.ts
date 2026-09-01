@@ -2,6 +2,8 @@ import { EventEmitter } from "node:events";
 import {
   Client as TS3FullClient,
   clientMove as tsClientMove,
+  poke as tsPoke,
+  sendTextMessage as tsSendTextMessage,
   generateIdentity,
   type Identity,
   type VoiceData,
@@ -29,8 +31,18 @@ export interface TSVoiceData {
 
 export interface TSDirectorySnapshot {
   channels: ChannelInfo[];
-  clients: ClientInfo[];
+  clients: TSDirectoryClient[];
 }
+
+export interface TSDirectoryClient extends ClientInfo {
+  away?: boolean;
+  awayMessage?: string;
+  inputMuted?: boolean;
+  outputMuted?: boolean;
+  channelCommander?: boolean;
+}
+
+export type TSChatScope = "channel" | "server" | "private";
 
 export class TSClient extends EventEmitter {
   private client: TS3FullClient | null = null;
@@ -134,6 +146,10 @@ export class TSClient extends EventEmitter {
       });
     });
 
+    client.on("poked", (event) => {
+      this.emit("poked", event);
+    });
+
     client.on("disconnected", (err) => {
       this.logger.warn({ err: err?.message }, "Disconnected from TS");
       this.connected = false;
@@ -160,15 +176,21 @@ export class TSClient extends EventEmitter {
     this.client.sendVoice(data, codec);
   }
 
-  sendTextMessage(message: string): void {
-    // We use execCommand for simplicity — the client API has higher-level wrappers
-    if (!this.client || !this.connected) return;
-    const escaped = message
-      .replace(/\\/g, "\\\\")
-      .replace(/ /g, "\\s")
-      .replace(/\//g, "\\/");
-    this.client.execCommand(`sendtextmessage targetmode=2 target=0 msg=${escaped}`)
-      .catch((err: Error) => this.logger.error({ err }, "sendTextMessage failed"));
+  async sendTextMessage(scope: TSChatScope, message: string, targetId = 0n): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const targetMode = scope === "private" ? 1 : scope === "server" ? 3 : 2;
+    await tsSendTextMessage(this.client, targetMode, targetId, message);
+  }
+
+  async poke(clientId: number, message: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    await tsPoke(this.client, clientId, message);
+  }
+
+  async setAway(away: boolean, message = ""): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const escaped = escapeTeamSpeakValue(message);
+    await this.client.execCommand(`clientupdate client_away=${away ? 1 : 0} client_away_message=${escaped}`);
   }
 
   async switchChannel(channelId: bigint, password?: string): Promise<void> {
@@ -209,4 +231,14 @@ export class TSClient extends EventEmitter {
     this.client = null;
     this.clientId = 0;
   }
+}
+
+function escapeTeamSpeakValue(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/ /g, "\\s")
+    .replace(/\//g, "\\/")
+    .replace(/\|/g, "\\p")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
 }

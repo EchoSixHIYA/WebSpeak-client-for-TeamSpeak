@@ -28,6 +28,18 @@ interface ChannelMember {
   id: number;
   nickname: string;
   uid: string;
+  away?: boolean;
+  awayMessage?: string;
+  inputMuted?: boolean;
+  outputMuted?: boolean;
+  channelCommander?: boolean;
+}
+
+interface ServerEvent {
+  id: string;
+  kind: "joined" | "left" | "moved" | "poke" | "connection";
+  message: string;
+  timestamp: number;
 }
 
 interface WebClientEntry {
@@ -40,6 +52,7 @@ interface WebClientEntry {
   target: TeamSpeakTarget;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
+  eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
   isAlive: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
@@ -111,6 +124,7 @@ export class VoiceBridge {
         target,
         channelTree: [],
         members: new Map(),
+        eventLog: [],
         opusEncoder: null,
         isAlive: true,
         reconnectTimer: null,
@@ -138,6 +152,17 @@ export class VoiceBridge {
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
       };
+      const addServerEvent = (kind: ServerEvent["kind"], message: string) => {
+        const event: ServerEvent = {
+          id: `event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          kind,
+          message,
+          timestamp: Date.now(),
+        };
+        entry!.eventLog.push(event);
+        if (entry!.eventLog.length > 200) entry!.eventLog.splice(0, entry!.eventLog.length - 200);
+        if (initialStateSent) sendJson({ type: "serverEvent", event });
+      };
       const refreshDirectory = () => {
         const snapshot = directory.getSnapshot();
         if (!snapshot) return;
@@ -148,8 +173,27 @@ export class VoiceBridge {
         entry!.channelTree = mapChannelTree(normalizedSnapshot);
         entry!.members.clear();
         for (const client of normalizedSnapshot.clients) {
-          entry!.members.set(client.id, { id: client.id, nickname: client.nickname, uid: client.uid });
+          entry!.members.set(client.id, {
+            id: client.id,
+            nickname: client.nickname,
+            uid: client.uid,
+            away: client.away,
+            awayMessage: client.awayMessage,
+            inputMuted: client.inputMuted,
+            outputMuted: client.outputMuted,
+            channelCommander: client.channelCommander,
+          });
         }
+      };
+      const trackChannelEvents = (previous: unknown[], next: unknown[]) => {
+        if (!initialStateSent) return;
+        const before = new Map(previous.filter(isChannelRecord).map((channel) => [channel.id, channel]));
+        const after = new Map(next.filter(isChannelRecord).map((channel) => [channel.id, channel]));
+        for (const channel of after.values()) {
+          if (!before.has(channel.id)) addServerEvent("joined", `频道「${channel.name}」已创建`);
+          else if (before.get(channel.id)?.name !== channel.name) addServerEvent("moved", `频道已重命名为「${channel.name}」`);
+        }
+        for (const channel of before.values()) if (!after.has(channel.id)) addServerEvent("left", `频道「${channel.name}」已删除`);
       };
       const sendInitialState = () => {
         if (initialStateSent || !tsReady || !directory.ready || !realtimeReady || !audioReady || session.state !== "syncing") return;
@@ -158,11 +202,15 @@ export class VoiceBridge {
         hasConnectedOnce = true;
         reconnectAttempt = 0;
         reconnectStartedAt = 0;
+        if (!wasReconnecting) {
+          entry!.eventLog.push({ id: `event-${Date.now().toString(36)}-connected`, kind: "connection", message: "已连接到服务器", timestamp: Date.now() });
+        }
         session.transition("connected");
         sendJson({
           type: "connected",
           tsClientId: selfId,
           members: Array.from(entry!.members.values()),
+          serverEventLog: entry!.eventLog,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -266,8 +314,10 @@ export class VoiceBridge {
       // snapshot establishes the baseline.
       realtimeReady = true;
       tsClient.on("directorySnapshot", (snapshot: TSDirectorySnapshot) => {
+        const previousChannels = entry!.channelTree;
         directory.applySnapshot(snapshot);
         refreshDirectory();
+        trackChannelEvents(previousChannels, entry!.channelTree);
         sendInitialState();
         if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
       });
@@ -284,25 +334,32 @@ export class VoiceBridge {
         if (tsReady && initialStateSent) {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
+          if (!wasKnown && info.id !== selfId) addServerEvent("joined", `${info.nickname || "未知用户"} 加入了服务器`);
         }
       });
 
       tsClient.on("clientLeave", (info) => {
         const wasKnown = entry!.members.has(info.id);
+        const leavingMember = entry!.members.get(info.id);
         directory.applyClientLeave(info.id);
         refreshDirectory();
         if (tsReady && initialStateSent && wasKnown) {
           sendJson({ type: "memberLeave", id: info.id });
           sendJson({ type: "channelList", channels: entry!.channelTree });
+          if (info.id !== selfId) addServerEvent("left", `${leavingMember?.nickname || "用户"} 离开了服务器`);
         }
       });
 
       tsClient.on("clientMoved", (info) => {
         if (info.targetChannelID === undefined || info.targetChannelID === 0n) return;
+        const movedMember = entry!.members.get(info.id);
         if (info.id === selfId) selfChannelId = info.targetChannelID;
         directory.applyClientMoved(info.id, info.targetChannelID);
         refreshDirectory();
-        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
+        if (tsReady && initialStateSent) {
+          sendJson({ type: "channelList", channels: entry!.channelTree });
+          if (info.id !== selfId) addServerEvent("moved", `${movedMember?.nickname || "用户"} 移动到了其他频道`);
+        }
       });
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
@@ -315,12 +372,22 @@ export class VoiceBridge {
       });
 
       tsClient.on("textMessage", (message) => {
+        const scope = message.targetMode === 1 ? "private" : message.targetMode === 3 ? "server" : message.targetMode === 2 ? "channel" : "server";
         sendJson({
           type: "chatMessage",
+          scope,
+          targetId: message.targetID.toString(),
+          senderUid: message.invokerUID,
+          timestamp: Date.now(),
           invokerName: message.invokerName,
           invokerId: message.invokerId,
           message: message.message,
         });
+      });
+
+      tsClient.on("poked", (event) => {
+        sendJson({ type: "pokeReceived", invokerId: event.invokerID, invokerUid: event.invokerUID, invokerName: event.invokerName, message: event.message, timestamp: Date.now() });
+        addServerEvent("poke", `${event.invokerName || "用户"} 戳了你一下`);
       });
 
       tsClient.on("disconnected", (error?: Error) => {
@@ -466,26 +533,73 @@ async function handleCommand(
 ): Promise<void> {
   if (command.type === "switchChannel") {
     const rawId = command.payload.channelId as string;
+    const channelPassword = typeof command.payload.password === "string" ? command.payload.password : "";
     try {
-      await entry.tsClient.switchChannel(BigInt(rawId));
+      await entry.tsClient.switchChannel(BigInt(rawId), channelPassword || undefined);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes("already member")) {
-        sendJson({ type: "error", requestId: command.requestId, error: { code: "CHANNEL_SWITCH_FAILED", message: "频道切换失败", recoverable: false } });
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      if (/already member/i.test(rawMessage)) {
+        sendJson({ type: "channelSwitched", requestId: command.requestId, channelId: rawId });
         return;
       }
+      const operation = classifyOperationError(error, "CHANNEL_SWITCH_FAILED", "频道切换失败");
+      sendJson({ type: "error", requestId: command.requestId, error: { code: operation.code, message: operation.message, recoverable: false } });
+      return;
     }
     sendJson({ type: "channelSwitched", requestId: command.requestId, channelId: rawId });
     sendJson({ type: "channelList", channels: entry.channelTree });
     return;
   }
 
-  const message = (command.payload.message as string).trim();
-  if (message) entry.tsClient.sendTextMessage(message);
+  try {
+    if (command.type === "sendTextMessage") {
+      const message = (command.payload.message as string).trim();
+      if (message) await entry.tsClient.sendTextMessage("channel", message, entry.tsClient.getChannelId());
+    } else if (command.type === "sendServerMessage") {
+      const message = (command.payload.message as string).trim();
+      if (message) await entry.tsClient.sendTextMessage("server", message);
+    } else if (command.type === "sendPrivateMessage") {
+      const clientId = command.payload.clientId as number;
+      if (!entry.members.has(clientId)) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CLIENT_NOT_FOUND", message: "成员已离线", recoverable: false } });
+        return;
+      }
+      const message = (command.payload.message as string).trim();
+      if (message) await entry.tsClient.sendTextMessage("private", message, BigInt(clientId));
+    } else if (command.type === "poke") {
+      const clientId = command.payload.clientId as number;
+      if (!entry.members.has(clientId)) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CLIENT_NOT_FOUND", message: "成员已离线", recoverable: false } });
+        return;
+      }
+      await entry.tsClient.poke(clientId, (command.payload.message as string).trim());
+    } else if (command.type === "setAway") {
+      await entry.tsClient.setAway(command.payload.away as boolean, typeof command.payload.message === "string" ? command.payload.message.trim() : "");
+    }
+    if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
+  } catch (error: unknown) {
+    const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
+    sendJson({ type: "error", requestId: command.requestId, error: { code: operation.code, message: operation.message, recoverable: false } });
+  }
+}
+
+function classifyOperationError(error: unknown, fallbackCode: string, fallbackMessage: string): { code: string; message: string } {
+  const text = error instanceof Error ? error.message : String(error);
+  const normalized = text.toLocaleLowerCase();
+  if (/permission|not permitted|insufficient|i_permission|2568/.test(normalized)) return { code: "PERMISSION_DENIED", message: "你没有执行此操作的权限" };
+  if (/channel.*(password|password.*required)|invalid.*(channel|password)|i_channel_password|1794/.test(normalized)) return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
+  if (/already member/.test(normalized)) return { code: "ALREADY_IN_CHANNEL", message: "你已经在该频道中" };
+  if (/full|maximum.*clients/.test(normalized)) return { code: "CHANNEL_FULL", message: "该频道已满" };
+  if (/not found|unknown client|invalid client/.test(normalized)) return { code: "CLIENT_NOT_FOUND", message: "成员已离线" };
+  return { code: fallbackCode, message: fallbackMessage };
 }
 
 function sendProtocolError(sendJson: (message: Record<string, unknown>) => void, code: string, message: string): void {
   sendJson({ type: "error", error: { code, message, recoverable: false } });
+}
+
+function isChannelRecord(value: unknown): value is { id: string; name: string } {
+  return Boolean(value) && typeof value === "object" && typeof (value as { id?: unknown }).id === "string" && typeof (value as { name?: unknown }).name === "string";
 }
 
 function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
@@ -496,7 +610,16 @@ function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
     description: channel.description || "",
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
-      .map((client) => ({ id: client.id, nickname: client.nickname || "未知用户", uid: client.uid })),
+      .map((client) => ({
+        id: client.id,
+        nickname: client.nickname || "未知用户",
+        uid: client.uid,
+        away: client.away,
+        awayMessage: client.awayMessage,
+        inputMuted: client.inputMuted,
+        outputMuted: client.outputMuted,
+        channelCommander: client.channelCommander,
+      })),
   }));
 }
 

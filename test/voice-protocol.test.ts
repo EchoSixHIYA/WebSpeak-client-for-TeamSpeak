@@ -27,3 +27,31 @@ test("voice protocol rejects malformed and unsupported commands", () => {
     error: { code: "INVALID_TEXT_MESSAGE", message: "文字消息无效" },
   });
 });
+
+test("voice protocol keeps chat scopes and status actions explicit", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "sendPrivateMessage", requestId: "pm-1", payload: { clientId: 7, message: "hello" } })), {
+    type: "sendPrivateMessage",
+    requestId: "pm-1",
+    payload: { clientId: 7, message: "hello" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setAway", payload: { away: true, message: "back soon" } })), {
+    type: "setAway",
+    payload: { away: true, message: "back soon" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "switchChannel", payload: { channelId: "42", password: "secret" } })), {
+    type: "switchChannel",
+    payload: { channelId: "42", password: "secret" },
+  });
+});
+
+test("voice protocol rejects unsafe client and away payloads", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "poke", payload: { clientId: 0, message: "hi" } })), {
+    error: { code: "INVALID_CLIENT_ID", message: "成员标识无效" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setAway", payload: { away: "yes" } })), {
+    error: { code: "INVALID_AWAY_STATUS", message: "离开状态无效" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "switchChannel", payload: { channelId: "42", password: "x".repeat(513) } })), {
+    error: { code: "INVALID_CHANNEL_PASSWORD", message: "频道密码无效" },
+  });
+});

@@ -9,6 +9,7 @@ export interface VoiceState {
   reconnectFailed: boolean;
   tsClientId: number;
   error: string;
+  errorCode: string;
 }
 
 export interface ChannelMember {
@@ -16,6 +17,11 @@ export interface ChannelMember {
   nickname: string;
   uid?: string;
   isSelf?: boolean;
+  away?: boolean;
+  awayMessage?: string;
+  inputMuted?: boolean;
+  outputMuted?: boolean;
+  channelCommander?: boolean;
 }
 
 export interface AudioInputDevice {
@@ -29,23 +35,37 @@ export interface ChannelInfo {
   parentID: string;
   name: string;
   description?: string;
-  members?: { id: number; nickname: string; uid?: string }[];
+  members?: { id: number; nickname: string; uid?: string; away?: boolean; awayMessage?: string; inputMuted?: boolean; outputMuted?: boolean; channelCommander?: boolean }[];
 }
 
 export interface ChatMessage {
   id: string;
+  scope: "channel" | "server" | "private" | "system";
+  targetId?: string;
+  conversationId?: string;
+  senderId?: number;
+  senderUid?: string;
   invokerName: string;
   message: string;
   timestamp: number;
   isSelf?: boolean;
 }
 
+export interface ServerEvent {
+  id: string;
+  kind: string;
+  message: string;
+  timestamp: number;
+}
+
 export function useVoiceWebSocket() {
   const ws = ref<WebSocket | null>(null);
-  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "" });
+  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "" });
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
+  const serverEvents = reactive<ServerEvent[]>([]);
+  const pokeNotifications = reactive<{ id: string; invokerId: number; invokerUid: string; invokerName: string; message: string; timestamp: number }[]>([]);
   let connectionSequence = 0;
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
   const identityMaterial = ref("");
@@ -368,6 +388,7 @@ export function useVoiceWebSocket() {
     identityMaterial.value = identity;
     const sequence = ++connectionSequence;
     state.error = "";
+    state.errorCode = "";
     state.connecting = true;
     state.reconnecting = false;
     state.reconnectAttempt = 0;
@@ -461,6 +482,7 @@ export function useVoiceWebSocket() {
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
     state.tsClientId = 0;
+    state.errorCode = "";
     identityMaterial.value = "";
     members.length = 0;
     channels.length = 0;
@@ -485,6 +507,7 @@ export function useVoiceWebSocket() {
         state.reconnectAttempt = 0;
         state.reconnectFailed = false;
         state.error = "";
+        state.errorCode = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
         if (Array.isArray(msg.members)) {
           members.length = 0;
@@ -493,6 +516,8 @@ export function useVoiceWebSocket() {
           }
           syncKnownMemberVolumes();
         }
+        serverEvents.length = 0;
+        if (Array.isArray(msg.serverEventLog)) serverEvents.push(...msg.serverEventLog);
         if (typeof msg.identity === "string" && msg.identity.length <= 8192) {
           identityMaterial.value = msg.identity;
           if (lastConnection) lastConnection.identity = msg.identity;
@@ -524,11 +549,30 @@ export function useVoiceWebSocket() {
         break;
       case "chatMessage":
         if (Number(msg.invokerId) === state.tsClientId) break;
+        const incomingScope = msg.scope === "private" || msg.scope === "server" || msg.scope === "channel" ? msg.scope : "system";
         chatMessages.push({
           id: `remote-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          scope: incomingScope,
+          targetId: typeof msg.targetId === "string" ? msg.targetId : undefined,
+          ...(incomingScope === "private" ? { conversationId: String(Number(msg.invokerId) || 0) } : {}),
+          senderId: Number(msg.invokerId) || undefined,
+          senderUid: typeof msg.senderUid === "string" ? msg.senderUid : undefined,
           invokerName: String(msg.invokerName || "Unknown"),
           message: String(msg.message || ""),
-          timestamp: Date.now(),
+          timestamp: typeof msg.timestamp === "number" ? msg.timestamp : Date.now(),
+        });
+        break;
+      case "serverEvent":
+        if (msg.event && typeof msg.event.id === "string") serverEvents.push(msg.event as ServerEvent);
+        break;
+      case "pokeReceived":
+        pokeNotifications.push({
+          id: `poke-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          invokerId: Number(msg.invokerId) || 0,
+          invokerUid: typeof msg.invokerUid === "string" ? msg.invokerUid : "",
+          invokerName: String(msg.invokerName || "Unknown"),
+          message: String(msg.message || ""),
+          timestamp: typeof msg.timestamp === "number" ? msg.timestamp : Date.now(),
         });
         break;
       case "channelSwitched":
@@ -561,7 +605,8 @@ export function useVoiceWebSocket() {
         state.error = "连接已中断，无法自动恢复";
         break;
       case "error":
-        state.error = protocolErrorMessage(String(msg.error?.code || ""), String(msg.error?.message || msg.message || "操作失败"));
+        state.errorCode = String(msg.error?.code || "");
+        state.error = protocolErrorMessage(state.errorCode, String(msg.error?.message || msg.message || "操作失败"));
         break;
     }
   }
@@ -578,21 +623,48 @@ export function useVoiceWebSocket() {
     if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify({ type, payload }));
   }
 
-  function switchChannel(channelId: string): void {
-    sendCmd("switchChannel", { channelId });
+  function switchChannel(channelId: string, password = ""): void {
+    state.error = "";
+    state.errorCode = "";
+    sendCmd("switchChannel", { channelId, ...(password ? { password } : {}) });
   }
 
-  function sendTextMessage(message: string): void {
+  function sendTextMessage(message: string, targetId = ""): void {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 500) return;
     sendCmd("sendTextMessage", { message: trimmed });
     chatMessages.push({
       id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      scope: "channel",
+      ...(targetId ? { targetId } : {}),
+      senderId: state.tsClientId,
       invokerName: "你",
       message: trimmed,
       timestamp: Date.now(),
       isSelf: true,
     });
+  }
+
+  function sendServerMessage(message: string): void {
+    const trimmed = message.trim();
+    if (!trimmed || trimmed.length > 500) return;
+    sendCmd("sendServerMessage", { message: trimmed });
+    chatMessages.push({ id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, scope: "server", senderId: state.tsClientId, invokerName: "你", message: trimmed, timestamp: Date.now(), isSelf: true });
+  }
+
+  function sendPrivateMessage(clientId: number, message: string, targetId = ""): void {
+    const trimmed = message.trim();
+    if (!trimmed || trimmed.length > 500) return;
+    sendCmd("sendPrivateMessage", { clientId, message: trimmed });
+    chatMessages.push({ id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, scope: "private", targetId, conversationId: String(clientId), senderId: state.tsClientId, invokerName: "你", message: trimmed, timestamp: Date.now(), isSelf: true });
+  }
+
+  function sendPoke(clientId: number, message = ""): void {
+    sendCmd("poke", { clientId, message: message.trim().slice(0, 200) });
+  }
+
+  function setAway(away: boolean, message = ""): void {
+    sendCmd("setAway", { away, message: message.trim().slice(0, 200) });
   }
 
   function reconnectNow(): void {
@@ -612,6 +684,7 @@ export function useVoiceWebSocket() {
 
   function clearError(): void {
     state.error = "";
+    state.errorCode = "";
   }
 
   function protocolErrorMessage(code: string, fallback: string): string {
@@ -622,10 +695,19 @@ export function useVoiceWebSocket() {
       UNKNOWN_MESSAGE_TYPE: "不支持的操作",
       INVALID_PAYLOAD: "操作参数无效",
       INVALID_CHANNEL_ID: "频道标识无效",
+      INVALID_CHANNEL_PASSWORD: "频道密码无效",
+      INVALID_CLIENT_ID: "成员标识无效",
       INVALID_TEXT_MESSAGE: "文字消息无效",
+      INVALID_POKE_MESSAGE: "戳一戳消息无效",
+      INVALID_AWAY_STATUS: "离开状态无效",
       INVALID_AUDIO_FRAME: "音频帧格式无效",
       SESSION_NOT_READY: "TeamSpeak 会话尚未就绪",
       CHANNEL_SWITCH_FAILED: "频道切换失败",
+      CHANNEL_PASSWORD_REQUIRED: "该频道需要密码",
+      CHANNEL_FULL: "该频道已满",
+      PERMISSION_DENIED: "你没有执行此操作的权限",
+      CLIENT_NOT_FOUND: "成员已离线",
+      OPERATION_FAILED: "操作失败",
     };
     return messages[code] || fallback;
   }
@@ -660,6 +742,8 @@ export function useVoiceWebSocket() {
     members,
     channels,
     chatMessages,
+    serverEvents,
+    pokeNotifications,
     micMode,
     inputVolume,
     outputVolume,
@@ -682,6 +766,10 @@ export function useVoiceWebSocket() {
     disconnect,
     switchChannel,
     sendTextMessage,
+    sendServerMessage,
+    sendPrivateMessage,
+    sendPoke,
+    setAway,
     setMicMode,
     setPTT,
     checkSupport,

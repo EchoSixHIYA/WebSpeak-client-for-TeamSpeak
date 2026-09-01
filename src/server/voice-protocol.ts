@@ -1,5 +1,5 @@
 export interface ClientCommand {
-  type: "switchChannel" | "sendTextMessage";
+  type: "switchChannel" | "sendTextMessage" | "sendServerMessage" | "sendPrivateMessage" | "poke" | "setAway";
   requestId?: string;
   payload: Record<string, unknown>;
 }
@@ -19,7 +19,8 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   if (value.requestId !== undefined && (typeof value.requestId !== "string" || value.requestId.length > 64)) {
     return { error: { code: "INVALID_REQUEST_ID", message: "请求标识无效" } };
   }
-  if (value.type !== "switchChannel" && value.type !== "sendTextMessage") {
+  const supportedTypes = new Set(["switchChannel", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway"]);
+  if (!supportedTypes.has(value.type)) {
     return { error: { code: "UNKNOWN_MESSAGE_TYPE", message: "不支持的消息类型" } };
   }
   if (!isRecord(value.payload)) {
@@ -28,11 +29,26 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   if (value.type === "switchChannel" && (typeof value.payload.channelId !== "string" || !/^\d{1,20}$/.test(value.payload.channelId))) {
     return { error: { code: "INVALID_CHANNEL_ID", message: "频道标识无效" } };
   }
+  if (value.type === "switchChannel" && value.payload.password !== undefined && (typeof value.payload.password !== "string" || value.payload.password.length > 512)) {
+    return { error: { code: "INVALID_CHANNEL_PASSWORD", message: "频道密码无效" } };
+  }
   if (value.type === "sendTextMessage" && (typeof value.payload.message !== "string" || value.payload.message.length > 500)) {
     return { error: { code: "INVALID_TEXT_MESSAGE", message: "文字消息无效" } };
   }
+  if ((value.type === "sendServerMessage" || value.type === "sendPrivateMessage") && (typeof value.payload.message !== "string" || value.payload.message.length > 500)) {
+    return { error: { code: "INVALID_TEXT_MESSAGE", message: "文字消息无效" } };
+  }
+  if ((value.type === "sendPrivateMessage" || value.type === "poke") && (typeof value.payload.clientId !== "number" || !Number.isInteger(value.payload.clientId) || value.payload.clientId <= 0 || value.payload.clientId > 65535)) {
+    return { error: { code: "INVALID_CLIENT_ID", message: "成员标识无效" } };
+  }
+  if (value.type === "poke" && (typeof value.payload.message !== "string" || value.payload.message.length > 200)) {
+    return { error: { code: "INVALID_POKE_MESSAGE", message: "戳一戳消息无效" } };
+  }
+  if (value.type === "setAway" && (typeof value.payload.away !== "boolean" || (value.payload.message !== undefined && (typeof value.payload.message !== "string" || value.payload.message.length > 200)))) {
+    return { error: { code: "INVALID_AWAY_STATUS", message: "离开状态无效" } };
+  }
   return {
-    type: value.type,
+    type: value.type as ClientCommand["type"],
     ...(typeof value.requestId === "string" ? { requestId: value.requestId } : {}),
     payload: value.payload,
   };

@@ -87,7 +87,7 @@
     </section>
 
     <!-- Connected application shell -->
-    <div v-else class="app-shell">
+    <div v-else class="app-shell" @click="memberMenu = null">
       <main class="workspace">
         <header class="workspace-header">
           <div class="breadcrumbs"><span class="mobile-brand">TeamSpeak <em>Web</em></span><span class="crumb-muted">{{ t('serverBreadcrumb') }}</span><Icon name="chevron-right" :size="14" /><strong>{{ currentChannelName }}</strong></div>
@@ -109,6 +109,7 @@
           <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
           <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectNow">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="doDisconnect">{{ t('back') }}</button></div>
         </div>
+        <div v-for="poke in visiblePokes" :key="poke.id" class="poke-banner" role="status"><Icon name="bell" :size="17" /><span><strong>{{ poke.invokerName }}</strong> {{ t('pokedYou') }}<small v-if="poke.message">：{{ poke.message }}</small></span><button type="button" @click="dismissPoke(poke.id)"><Icon name="close" :size="15" /></button></div>
 
         <div class="workspace-scroll">
           <div class="workspace-content">
@@ -136,16 +137,28 @@
             </section>
 
             <section class="chat-panel">
-              <div class="section-heading chat-heading"><div><span class="section-kicker">{{ t('textChannel') }}</span><h2><Icon name="hash" :size="20" /> {{ t('channelChat', { channel: currentChannelName }) }}</h2></div><span class="section-counter">{{ t('messageCount', { count: chatMessages.length }) }}</span></div>
+              <div class="chat-tabs" role="tablist" :aria-label="t('chatTabs')">
+                <button type="button" :class="{ active: chatTab === 'channel' }" @click="chatTab = 'channel'"><Icon name="hash" :size="15" /> {{ currentChannelName }}</button>
+                <button type="button" :class="{ active: chatTab === 'server' }" @click="chatTab = 'server'"><Icon name="server" :size="15" /> {{ t('serverChat') }}</button>
+                <button v-for="conversation in privateConversations" :key="conversation.id" type="button" :class="{ active: chatTab === 'private' && privateClientId === conversation.id }" @click="openPrivateChat(conversation.id)"><Icon name="message" :size="15" /> {{ conversation.name }}</button>
+                <button type="button" :class="{ active: chatTab === 'events' }" @click="chatTab = 'events'"><Icon name="bell" :size="15" /> {{ t('eventLog') }}</button>
+              </div>
+              <div class="section-heading chat-heading"><div><span class="section-kicker">{{ chatTabLabel }}</span><h2><Icon :name="chatTab === 'server' ? 'server' : chatTab === 'events' ? 'bell' : chatTab === 'private' ? 'message' : 'hash'" :size="20" /> {{ chatTitle }}</h2></div><span class="section-counter">{{ chatTab === 'events' ? t('eventCount', { count: serverEvents.length }) : t('messageCount', { count: visibleChatMessages.length }) }}</span></div>
               <div ref="chatListEl" class="message-list">
-                <div v-if="!chatMessages.length" class="chat-empty"><div class="chat-empty-icon"><Icon name="message" :size="24" /></div><strong>{{ t('chatStart') }}</strong><span>{{ t('chatStartLead') }}</span></div>
-                <article v-for="message in chatMessages" :key="message.id" :class="['message-row', { mine: message.isSelf }]">
+                <div v-if="chatTab === 'events'">
+                  <article v-for="event in serverEvents" :key="event.id" class="event-row"><time>{{ formatTime(event.timestamp) }}</time><span>{{ event.message }}</span></article>
+                  <div v-if="!serverEvents.length" class="chat-empty"><div class="chat-empty-icon"><Icon name="bell" :size="24" /></div><strong>{{ t('noEvents') }}</strong><span>{{ t('noEventsLead') }}</span></div>
+                </div>
+                <div v-else-if="!visibleChatMessages.length" class="chat-empty"><div class="chat-empty-icon"><Icon name="message" :size="24" /></div><strong>{{ chatTab === 'private' ? t('privateChatStart') : t('chatStart') }}</strong><span>{{ chatTab === 'private' ? t('privateChatStartLead') : t('chatStartLead') }}</span></div>
+                <template v-for="message in visibleChatMessages" :key="message.id">
+                  <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]">
                   <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf)">{{ avatarInitial(message.invokerName) }}</div>
                   <div class="message-body"><div class="message-meta"><strong>{{ message.isSelf ? (language === 'zh' ? '你' : 'You') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
-                </article>
+                  </article>
+                </template>
               </div>
-              <form class="message-composer" @submit.prevent="submitMessage">
-                <input v-model="messageDraft" maxlength="500" :placeholder="t('sendMessagePlaceholder')" :aria-label="t('send')" />
+              <form v-if="chatTab !== 'events'" class="message-composer" @submit.prevent="submitMessage">
+                <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
                 <button class="send-button" type="submit" :disabled="!messageDraft.trim()" :title="t('send')"><Icon name="send" :size="18" /></button>
               </form>
             </section>
@@ -155,7 +168,7 @@
       </main>
 
       <aside class="member-panel">
-        <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div></div>
+        <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div><button type="button" class="status-button" :class="{ active: away }" @click="toggleAway"><span class="status-dot"></span>{{ away ? t('away') : t('available') }}</button></div>
         <div class="member-search"><Icon name="search" :size="15" /><input v-model="memberQuery" :placeholder="t('searchMembers')" :aria-label="t('searchMembers')" /></div>
         <div class="member-tree">
           <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id }]" :style="{ marginLeft: `${channelItem.depth * 10}px` }">
@@ -165,10 +178,12 @@
               <small>{{ channelItem.members.length }}</small>
             </button>
             <div v-if="channelItem.members.length" class="member-list">
-              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" class="member-row">
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" class="member-row" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
-                <div class="member-copy"><strong>{{ member.isSelf ? `${member.nickname}${language === 'zh' ? '（你）' : ' (You)'}` : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
+                <div class="member-copy"><strong>{{ member.isSelf ? `${member.nickname}${language === 'zh' ? '（你）' : ' (You)'}` : member.nickname }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
+                <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
+                <button v-if="!member.isSelf" type="button" class="member-more" :aria-label="t('moreMemberOptions')" :title="t('moreMemberOptions')" @click.stop="openMemberMenu(member, $event)"><Icon name="more" :size="17" /></button>
               </div>
             </div>
             <div v-else class="channel-no-members">{{ t('noMembersInChannel') }}</div>
@@ -177,6 +192,13 @@
         <div v-if="!filteredMemberChannels.length" class="member-empty">{{ t('noMatchingMembers') }}</div>
         <div class="member-panel-tip"><Icon name="volume" :size="16" /><span>{{ t('volumeTip') }}</span></div>
       </aside>
+    </div>
+
+    <div v-if="memberMenu" class="member-context-menu" :style="memberMenuStyle" @click.stop>
+      <strong>{{ memberMenu.member.nickname }}</strong>
+      <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
+      <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
+      <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
     </div>
 
     <!-- Audio settings modal -->
@@ -209,6 +231,8 @@ const {
   members,
   channels,
   chatMessages,
+  serverEvents,
+  pokeNotifications,
   micMode,
   inputVolume,
   outputVolume,
@@ -231,6 +255,10 @@ const {
   disconnect,
   switchChannel,
   sendTextMessage,
+  sendServerMessage,
+  sendPrivateMessage,
+  sendPoke,
+  setAway,
   setMicMode,
   setPTT,
   checkSupport,
@@ -262,6 +290,11 @@ const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
 const identityFileInput = ref<HTMLInputElement | null>(null);
 const localPersistenceAvailable = isLocalPersistenceAvailable();
+const chatTab = ref<"channel" | "server" | "private" | "events">("channel");
+const privateClientId = ref(0);
+const away = ref(false);
+const awayMessage = ref("");
+const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 type Language = "zh" | "en";
@@ -366,6 +399,27 @@ const translations: Record<Language, Record<string, string>> = {
     messageCount: "{{count}} 条消息",
     chatStart: "这是聊天的开始",
     chatStartLead: "发送一条消息，和频道里的朋友打个招呼吧。",
+    chatTabs: "聊天标签",
+    serverChat: "服务器",
+    privateMessage: "私聊",
+    privateMessagePlaceholder: "发送私聊消息…",
+    serverMessagePlaceholder: "发送服务器消息…",
+    channelPasswordPrompt: "请输入频道密码",
+    privateChatStart: "这是私聊的开始",
+    privateChatStartLead: "发送一条私聊消息。",
+    eventLog: "事件日志",
+    eventCount: "{{count}} 条事件",
+    noEvents: "暂无服务器事件",
+    noEventsLead: "频道和成员变化会显示在这里。",
+    available: "在线",
+    away: "离开",
+    awayPrompt: "离开状态说明（可选）",
+    poke: "戳一戳",
+    pokedYou: "戳了你一下",
+    pokeMessagePrompt: "戳一戳消息（可选）",
+    pokeSent: "已发送戳一戳",
+    copyNickname: "复制昵称",
+    copiedNickname: "昵称已复制",
     attachmentUnavailable: "附件暂不可用",
     emojiUnavailable: "表情暂不可用",
     sendMessagePlaceholder: "发送消息给频道成员…",
@@ -381,6 +435,10 @@ const translations: Record<Language, Record<string, string>> = {
     onlineGroup: "在线 — {{count}}",
     yourDevice: "你的设备",
     memberOnline: "在线",
+    memberStates: "成员状态",
+    inputMuted: "已禁用麦克风",
+    outputMuted: "已禁用扬声器",
+    channelCommander: "频道指挥官",
     noMatchingMembers: "没有找到匹配的成员",
     noMembersInChannel: "此频道暂无成员",
     volumeTip: "拖动成员右侧滑杆，单独调整听到的音量。",
@@ -525,6 +583,27 @@ const translations: Record<Language, Record<string, string>> = {
     messageCount: "{{count}} messages",
     chatStart: "This is the beginning of the chat",
     chatStartLead: "Send a message and say hello to your channel friends.",
+    chatTabs: "Chat tabs",
+    serverChat: "Server",
+    privateMessage: "Private message",
+    privateMessagePlaceholder: "Message privately…",
+    serverMessagePlaceholder: "Message the server…",
+    channelPasswordPrompt: "Enter the channel password",
+    privateChatStart: "This is the beginning of the private chat",
+    privateChatStartLead: "Send a private message.",
+    eventLog: "Event log",
+    eventCount: "{{count}} events",
+    noEvents: "No server events yet",
+    noEventsLead: "Channel and member changes will appear here.",
+    available: "Available",
+    away: "Away",
+    awayPrompt: "Away message (optional)",
+    poke: "Poke",
+    pokedYou: "poked you",
+    pokeMessagePrompt: "Poke message (optional)",
+    pokeSent: "Poke sent",
+    copyNickname: "Copy nickname",
+    copiedNickname: "Nickname copied",
     attachmentUnavailable: "Attachments unavailable",
     emojiUnavailable: "Emoji unavailable",
     sendMessagePlaceholder: "Message the channel…",
@@ -540,6 +619,10 @@ const translations: Record<Language, Record<string, string>> = {
     onlineGroup: "ONLINE — {{count}}",
     yourDevice: "Your device",
     memberOnline: "Online",
+    memberStates: "Member states",
+    inputMuted: "Microphone muted",
+    outputMuted: "Output muted",
+    channelCommander: "Channel commander",
     noMatchingMembers: "No matching members",
     noMembersInChannel: "No members in this channel",
     volumeTip: "Drag a member slider to adjust their volume just for you.",
@@ -632,10 +715,19 @@ function localizedMessage(message: string) {
     "不支持的操作": "This operation is not supported",
     "操作参数无效": "The operation payload is invalid",
     "频道标识无效": "The channel id is invalid",
+    "成员标识无效": "The member id is invalid",
+    "频道密码无效": "The channel password is invalid",
     "文字消息无效": "The text message is invalid",
+    "戳一戳消息无效": "The poke message is invalid",
+    "离开状态无效": "The away status is invalid",
     "音频帧格式无效": "The audio frame is invalid",
     "TeamSpeak 会话尚未就绪": "The TeamSpeak session is not ready",
     "频道切换失败": "Channel switch failed",
+    "该频道需要密码": "This channel requires a password",
+    "该频道已满": "This channel is full",
+    "你没有执行此操作的权限": "You do not have permission to perform this action",
+    "成员已离线": "This member is offline",
+    "操作失败": "The operation failed",
   };
   if (exact[message]) return exact[message];
   if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
@@ -698,6 +790,33 @@ const filteredMemberChannels = computed(() => {
   return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
 });
 
+const privateConversations = computed(() => {
+  const conversations = new Map<string, { id: number; name: string; lastMessage: number }>();
+  for (const message of chatMessages) {
+    if (message.scope !== "private" || !message.conversationId) continue;
+    const id = Number(message.conversationId);
+    if (!id) continue;
+    const member = members.find((candidate) => candidate.id === id);
+    const existing = conversations.get(message.conversationId);
+    conversations.set(message.conversationId, { id, name: member?.nickname ?? existing?.name ?? message.invokerName, lastMessage: Math.max(existing?.lastMessage ?? 0, message.timestamp) });
+  }
+  return [...conversations.values()].sort((a, b) => b.lastMessage - a.lastMessage);
+});
+
+const visibleChatMessages = computed(() => {
+  if (chatTab.value === "server") return chatMessages.filter((message) => message.scope === "server");
+  if (chatTab.value === "private") return chatMessages.filter((message) => message.scope === "private" && message.conversationId === String(privateClientId.value));
+  if (chatTab.value !== "channel") return [];
+  const channelId = currentChannel.value?.id;
+  return chatMessages.filter((message) => message.scope === "channel" && (!message.targetId || !channelId || message.targetId === channelId));
+});
+
+const chatTabLabel = computed(() => chatTab.value === "channel" ? t("textChannel") : chatTab.value === "server" ? t("serverChat") : chatTab.value === "private" ? t("privateMessage") : t("eventLog"));
+const chatTitle = computed(() => chatTab.value === "channel" ? t("channelChat", { channel: currentChannelName.value }) : chatTab.value === "server" ? t("serverChat") : chatTab.value === "events" ? t("eventLog") : privateConversations.value.find((conversation) => conversation.id === privateClientId.value)?.name ?? t("privateMessage"));
+const chatPlaceholder = computed(() => chatTab.value === "private" ? t("privateMessagePlaceholder") : chatTab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
+const visiblePokes = computed(() => pokeNotifications.slice(-3));
+const memberMenuStyle = computed(() => memberMenu.value ? { left: `${memberMenu.value.x}px`, top: `${memberMenu.value.y}px` } : {});
+
 watch(channelTree, (list) => {
   if (!selectedChannelId.value && list[0]) {
     selectedChannelId.value = list.find((item) => item.name === channel.value)?.id
@@ -705,7 +824,18 @@ watch(channelTree, (list) => {
       ?? "";
   }
 }, { deep: true });
-watch(() => chatMessages.length, () => nextTick(scrollChatToEnd));
+watch([() => chatMessages.length, chatTab, privateClientId], () => nextTick(scrollChatToEnd));
+watch(() => voiceState.errorCode, (code) => {
+  if (code !== "CHANNEL_PASSWORD_REQUIRED" || !selectedChannelId.value) return;
+  const password = window.prompt(t("channelPasswordPrompt"), "");
+  if (password !== null) switchChannel(selectedChannelId.value, password);
+});
+watch(() => pokeNotifications.length, (length, previousLength) => {
+  const latest = pokeNotifications[length - 1];
+  if (!latest || length <= previousLength) return;
+  showToast(`${latest.invokerName} ${t("pokedYou")}${latest.message ? `：${latest.message}` : ""}`);
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(t("poke"), { body: `${latest.invokerName}: ${latest.message || t("pokedYou")}` });
+});
 watch(settingsOpen, (open) => {
   if (open) {
     audioSettingsError.value = "";
@@ -786,6 +916,7 @@ function doDisconnect() {
 function selectChannel(item: TreeChannel) {
   selectedChannelId.value = item.id;
   channel.value = item.name;
+  chatTab.value = "channel";
   switchChannel(item.id);
 }
 
@@ -908,8 +1039,44 @@ async function loadPublicConfig() {
 
 function submitMessage() {
   if (!messageDraft.value.trim()) return;
-  sendTextMessage(messageDraft.value);
+  if (chatTab.value === "channel") sendTextMessage(messageDraft.value, currentChannel.value?.id ?? selectedChannelId.value);
+  else if (chatTab.value === "server") sendServerMessage(messageDraft.value);
+  else if (chatTab.value === "private" && privateClientId.value) sendPrivateMessage(privateClientId.value, messageDraft.value, String(privateClientId.value));
   messageDraft.value = "";
+}
+
+function openPrivateChat(clientId: number): void {
+  if (!clientId || clientId === voiceState.tsClientId) return;
+  privateClientId.value = clientId;
+  chatTab.value = "private";
+  memberMenu.value = null;
+  nextTick(scrollChatToEnd);
+}
+
+function openMemberMenu(member: ChannelMember, event: Event): void {
+  if (member.isSelf) return;
+  const point = event instanceof MouseEvent ? event : undefined;
+  memberMenu.value = { member, x: Math.min((point?.clientX ?? 20), Math.max(12, window.innerWidth - 210)), y: Math.min((point?.clientY ?? 20), Math.max(12, window.innerHeight - 170)) };
+}
+
+function pokeMember(member: ChannelMember): void {
+  sendPoke(member.id, window.prompt(t("pokeMessagePrompt"), "") ?? "");
+  showToast(t("pokeSent"));
+}
+
+function copyMemberName(member: ChannelMember): void {
+  navigator.clipboard?.writeText(member.nickname).then(() => showToast(t("copiedNickname")), () => showToast(t("copyFailedToast")));
+}
+
+function toggleAway(): void {
+  away.value = !away.value;
+  awayMessage.value = away.value ? (window.prompt(t("awayPrompt"), awayMessage.value) ?? "") : "";
+  setAway(away.value, awayMessage.value);
+}
+
+function dismissPoke(id: string): void {
+  const index = pokeNotifications.findIndex((poke) => poke.id === id);
+  if (index >= 0) pokeNotifications.splice(index, 1);
 }
 
 function scrollChatToEnd() {
@@ -1288,4 +1455,30 @@ function stopPointerTalk() {
   .header-note, .guide-button span { display: none; }
   .guide-button { width: 32px; justify-content: center; padding: 0; }
 }
+.chat-tabs { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 18px; overflow-x: auto; padding-bottom: 3px; }
+.chat-tabs button { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 7px 10px; color: #74837e; background: #f3f7f5; border: 1px solid transparent; border-radius: 7px; font-size: 11px; cursor: pointer; }
+.chat-tabs button:hover { color: #006a64; background: #e8f4f1; }
+.chat-tabs button.active { color: #006a64; background: #dff1ed; border-color: #c9e5df; font-weight: 700; }
+.event-row { display: flex; align-items: baseline; gap: 12px; padding: 9px 10px; color: #65746e; border-bottom: 1px solid #edf2f0; font-size: 12px; line-height: 1.45; }
+.event-row time { flex: 0 0 auto; color: #99a6a1; font-size: 10px; }
+.member-panel-heading { align-items: flex-end; }
+.status-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; color: #5f746c; background: #f2f7f5; border: 1px solid #e0ebe7; border-radius: 7px; font-size: 11px; cursor: pointer; }
+.status-button:hover, .status-button.active { color: #8c653a; background: #fcf3e7; border-color: #f0dcc0; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #66d27a; }
+.status-button.active .status-dot { background: #e0a34d; }
+.member-row { position: relative; }
+.member-more { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; color: #91a09b; background: transparent; border-radius: 6px; cursor: pointer; opacity: 0; }
+.member-row:hover .member-more, .member-more:focus-visible { opacity: 1; }
+.member-more:hover { color: #006a64; background: #e6f2ef; }
+.member-context-menu { position: fixed; z-index: 40; display: grid; min-width: 188px; gap: 3px; padding: 8px; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
+.member-context-menu strong { padding: 4px 8px 7px; color: #2a3934; font-size: 12px; }
+.member-context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; color: #52625c; background: transparent; border-radius: 6px; font-size: 11px; text-align: left; cursor: pointer; }
+.member-context-menu button:hover { color: #006a64; background: #edf6f3; }
+.poke-banner { position: fixed; z-index: 35; top: 82px; right: 24px; display: flex; align-items: center; gap: 9px; max-width: min(380px, calc(100% - 48px)); padding: 10px 11px; color: #52645c; background: #fffdf6; border: 1px solid #f0dfbd; border-radius: 9px; box-shadow: 0 8px 22px rgba(88, 65, 28, .12); font-size: 12px; }
+.poke-banner > .ui-icon { color: #d2973d; }
+.poke-banner span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poke-banner strong { color: #8f6532; }
+.poke-banner small { font-size: inherit; }
+.poke-banner button { display: grid; place-items: center; padding: 3px; color: #9b8a6e; background: transparent; border-radius: 5px; cursor: pointer; }
+.poke-banner button:hover { color: #735020; background: #f9eed9; }
 </style>

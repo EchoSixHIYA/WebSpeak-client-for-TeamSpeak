@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageRoot = path.join(root, "node_modules", "@honeybbq", "teamspeak-client");
-const marker = "webspeak-directory-snapshot";
+const marker = "webspeak-directory-snapshot-v2";
 
 const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
 if (packageJson.version !== "0.2.2") {
@@ -26,12 +26,12 @@ await Promise.all([
 ]);
 
 function patchCjs(source) {
-  if (source.includes(marker)) return source;
+  if (source.includes(marker) || source.includes("webspeak-directory-snapshot")) return source;
 
   const helper = `/* ${marker} */
 function webSpeakDirectoryBigInt(value){try{return BigInt(value??"0")}catch{return 0n}}
 function webSpeakDirectoryChannel(params,decode){const id=webSpeakDirectoryBigInt(params.cid);if(id===0n)return null;return{id,parentID:webSpeakDirectoryBigInt(params.pid??params.cpid??"0"),name:decode(params.channel_name??""),description:decode(params.channel_topic??params.channel_description??"")}}
-function webSpeakDirectoryClient(params,decode){const id=parseInt(params.clid??"0",10);if(!Number.isInteger(id)||id<=0)return null;const groups=params.client_servergroups??"";return{id,nickname:decode(params.client_nickname??""),uid:params.client_unique_identifier??"",channelID:webSpeakDirectoryBigInt(params.cid),type:parseInt(params.client_type??"0",10),serverGroups:groups?groups.split(","):[]}}
+function webSpeakDirectoryClient(params,decode){const id=parseInt(params.clid??"0",10);if(!Number.isInteger(id)||id<=0)return null;const groups=params.client_servergroups??"";return{id,nickname:decode(params.client_nickname??""),uid:params.client_unique_identifier??"",channelID:webSpeakDirectoryBigInt(params.cid),type:parseInt(params.client_type??"0",10),serverGroups:groups?groups.split(","):[],away:params.client_away==="1",awayMessage:decode(params.client_away_message??""),inputMuted:params.client_input_muted==="1",outputMuted:params.client_output_muted==="1",channelCommander:params.client_is_channel_commander==="1"}}
 function webSpeakDirectoryChannelNotification(name,params,decode,channels){const id=webSpeakDirectoryBigInt(params.cid);if(id===0n)return false;switch(name){case"notifychannelcreated":{const channel=webSpeakDirectoryChannel(params,decode);if(!channel)return false;channels.set(id,channel);return true}case"notifychanneledited":{const current=channels.get(id);if(!current)return false;const next={...current};if(params.channel_name!==undefined)next.name=decode(params.channel_name);if(params.channel_topic!==undefined)next.description=decode(params.channel_topic);if(params.cpid!==undefined||params.pid!==undefined)next.parentID=webSpeakDirectoryBigInt(params.cpid??params.pid);channels.set(id,next);return true}case"notifychannelmoved":{const current=channels.get(id);if(!current)return false;channels.set(id,{...current,parentID:webSpeakDirectoryBigInt(params.cpid??params.pid)});return true}case"notifychanneldeleted":return channels.delete(id);default:return false}}
 `;
   source = source.replace("var K=class", `${helper}var K=class`);
@@ -86,12 +86,12 @@ function webSpeakDirectoryChannelNotification(name,params,decode,channels){const
 }
 
 function patchMjs(source) {
-  if (source.includes(marker)) return source;
+  if (source.includes(marker) || source.includes("webspeak-directory-snapshot")) return source;
 
   const helper = `/* ${marker} */
 function webSpeakDirectoryBigInt(value){try{return BigInt(value??"0")}catch{return 0n}}
 function webSpeakDirectoryChannel(params,decode){const id=webSpeakDirectoryBigInt(params.cid);if(id===0n)return null;return{id,parentID:webSpeakDirectoryBigInt(params.pid??params.cpid??"0"),name:decode(params.channel_name??""),description:decode(params.channel_topic??params.channel_description??"")}}
-function webSpeakDirectoryClient(params,decode){const id=parseInt(params.clid??"0",10);if(!Number.isInteger(id)||id<=0)return null;const groups=params.client_servergroups??"";return{id,nickname:decode(params.client_nickname??""),uid:params.client_unique_identifier??"",channelID:webSpeakDirectoryBigInt(params.cid),type:parseInt(params.client_type??"0",10),serverGroups:groups?groups.split(","):[]}}
+function webSpeakDirectoryClient(params,decode){const id=parseInt(params.clid??"0",10);if(!Number.isInteger(id)||id<=0)return null;const groups=params.client_servergroups??"";return{id,nickname:decode(params.client_nickname??""),uid:params.client_unique_identifier??"",channelID:webSpeakDirectoryBigInt(params.cid),type:parseInt(params.client_type??"0",10),serverGroups:groups?groups.split(","):[],away:params.client_away==="1",awayMessage:decode(params.client_away_message??""),inputMuted:params.client_input_muted==="1",outputMuted:params.client_output_muted==="1",channelCommander:params.client_is_channel_commander==="1"}}
 function webSpeakDirectoryChannelNotification(name,params,decode,channels){const id=webSpeakDirectoryBigInt(params.cid);if(id===0n)return false;switch(name){case"notifychannelcreated":{const channel=webSpeakDirectoryChannel(params,decode);if(!channel)return false;channels.set(id,channel);return true}case"notifychanneledited":{const current=channels.get(id);if(!current)return false;const next={...current};if(params.channel_name!==undefined)next.name=decode(params.channel_name);if(params.channel_topic!==undefined)next.description=decode(params.channel_topic);if(params.cpid!==undefined||params.pid!==undefined)next.parentID=webSpeakDirectoryBigInt(params.cpid??params.pid);channels.set(id,next);return true}case"notifychannelmoved":{const current=channels.get(id);if(!current)return false;channels.set(id,{...current,parentID:webSpeakDirectoryBigInt(params.cpid??params.pid)});return true}case"notifychanneldeleted":return channels.delete(id);default:return false}}
 `;
   source = source.replace("var k = class", `${helper}var k = class`);

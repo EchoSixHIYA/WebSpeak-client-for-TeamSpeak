@@ -15,6 +15,8 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - 完整频道/成员树、频道切换、频道文字聊天和成员实时移动。
 - PCM/Opus 语音桥接、自由麦、按键说话、麦克风选择与音量控制。
 - 发言成员头像显示绿色动态边框。
+- 频道、服务器和私聊独立标签；成员菜单支持私聊、Poke、复制昵称，频道密码按次输入且不持久化。
+- Away、成员状态图标、Session 内服务器事件日志和人类可读的 TeamSpeak 权限错误。
 - 中英文访客页面和中英文管理控制台。
 - Web 管理闭环：默认账号首次登录强制改密、单管理员登录、概览、服务器设置和真实连接测试。
 - `fixed` 与 `open` 两种访问模式。
@@ -227,6 +229,8 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Temporary TeamSpeak failures recover with bounded jittered backoff for up to five minutes; authentication failures are not retried forever, and the previous channel is restored when possible.
 - Channel/member directory, channel switching, channel text chat, and live member movement.
 - PCM/Opus voice bridge, VOX, push-to-talk, microphone selection, and volume controls.
+- Independent channel, server, and private chat tabs; member actions for private message, poke, and nickname copy; channel passwords are entered per session only.
+- Away, member status icons, a session-local server event log, and readable TeamSpeak permission errors.
 - Bilingual guest UI and bilingual admin console.
 - Browser-based admin login, mandatory first-login password change, Overview, server settings, and a real short-lived connection test.
 - Fixed and open guest access modes.
