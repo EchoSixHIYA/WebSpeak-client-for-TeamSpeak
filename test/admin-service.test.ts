@@ -87,11 +87,26 @@ test("managed invites are opaque, bounded, revocable, and included in database b
   assert.equal(service.consumeManagedInvite(created.token), null);
   assert.equal(service.listManagedInvites()[0]?.status, "exhausted");
 
+  database.createManagedInvite({
+    id: "invite-expired-test",
+    tokenHash: "expired-token-hash",
+    targetHost: "127.0.0.1",
+    targetPort: 9987,
+    serverPasswordEncrypted: null,
+    channel: "Expired",
+    expiresAt: new Date(Date.now() - 1).toISOString(),
+    maxUses: 0,
+  });
+  assert.equal(database.consumeManagedInvite("expired-token-hash"), null);
+  const revocable = service.createManagedInvite({ channel: "Revocable", expiresInHours: 2, maxUses: 0 });
+  assert.equal(service.revokeManagedInvite(revocable.invite.id), true);
+  assert.equal(service.listManagedInvites().find((invite) => invite.id === revocable.invite.id)?.status, "revoked");
+
   const backup = database.exportBackup();
   assert.ok(backup.length > 100);
   database.close();
   const reopened = new WebSpeakDatabase(path.join(directory, "webspeak.db"));
   assert.equal(reopened.schemaVersion, 2);
-  assert.equal(reopened.listManagedInvites().length, 1);
+  assert.equal(reopened.listManagedInvites().length, 3);
   reopened.close();
 });

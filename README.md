@@ -22,6 +22,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - Away、成员状态图标、Session 内服务器事件日志和人类可读的 TeamSpeak 权限错误。
 - 中英文访客页面和中英文管理控制台。
 - Web 管理闭环：默认账号首次登录强制改密、单管理员登录、概览、服务器设置和真实连接测试。
+- 运维控制台：受控邀请创建/撤销/过期/限次、活动会话列表与单会话断开、审计事件、结构化日志查看、脱敏诊断报告和 SQLite 备份导出。
 - `fixed` 与 `open` 两种访问模式。
 - 可选的持久 TeamSpeak identity：身份私钥仅保存在浏览器 IndexedDB，可导入/导出；访客也可继续使用临时身份。
 - 浏览器本地收藏、最近服务器、昵称、语言、音频设备/模式/音量和按 TeamSpeak UID 保存的成员音量。
@@ -29,6 +30,7 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
 - 旧 `config.json` 一次性导入，导入后不再作为实时配置源。
 - `/demo` 提供不连接真实 TeamSpeak 的交互式模拟页面，可用于产品预览和录屏。
+- 当前实现按 `webspeak-spec` 的 M000–M010 顺序推进；M010 的真实 TS3/TS6、Android 麦克风和 24 小时长稳测试必须在对应环境完成，不能用本地模拟替代。
 
 ### 环境要求
 
@@ -117,6 +119,8 @@ data/
   logs/         本地日志
 ```
 
+日志文件单个最多 10 MiB，服务会保留 3 个轮转文件。管理控制台中的“导出数据库备份”只导出 SQLite 数据库，不导出 `master.key`；数据库内的 TeamSpeak 密码仍是加密密文，完整恢复需要同时保管数据目录和主密钥。
+
 - 管理员密码使用 Node.js `crypto.scrypt`、随机 salt 和 constant-time compare。
 - 新部署首次使用 `admin/admin` 登录后必须立即修改密码；修改完成后默认密码失效。
 - TeamSpeak 服务器密码使用 AES-256-GCM 加密。
@@ -194,7 +198,7 @@ npm run web:dev
 # 浏览器打开演示页（不会连接真实 TeamSpeak）
 # http://localhost:5173/demo
 
-# 自动测试（覆盖 M000–M007 已实现的后端协议与安全边界）
+# 自动测试（覆盖 M000–M010 已实现的后端协议与安全边界）
 npm test
 
 # 后端类型检查与构建
@@ -211,16 +215,17 @@ npm audit
 
 ```text
 src/
-  admin/                         管理服务、API、Session 与登录限速
+  admin/                         管理服务、API、Session、邀请与运维接口
   persistence/database.ts        SQLite schema、repository 和迁移边界
   security/                      主密钥、秘密加密、scrypt 与网络策略
   domain/teamspeak-target.ts     host[:port] 规范化解析
   server/teamspeak-adapter.ts    TeamSpeak 协议边界与 endpoint 协议缓存
   server/teamspeak-probe.ts      可清理的短连接测试
   server/join-ticket.ts          一次性访客连接票据
+  server/join-rate-limit.ts      访客票据创建限速
   server/voice-bridge.ts         每用户语音 WebSocket 桥接
 web/src/views/
-  AdminView.vue                  双语 Login/Password change/Overview/Server UI
+  AdminView.vue                  双语登录、设置、概览与运维控制台
   WebClient.vue                  双语访客与语音工作台
 ```
 
@@ -243,6 +248,7 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Away, member status icons, a session-local server event log, and readable TeamSpeak permission errors.
 - Bilingual guest UI and bilingual admin console.
 - Browser-based admin login, mandatory first-login password change, Overview, server settings, and a real short-lived connection test.
+- Operations dashboard for managed invites, session termination, audit events, logs, sanitized diagnostic reports, and SQLite backup export.
 - Fixed and open guest access modes.
 - Optional persistent TeamSpeak identity stored only in browser IndexedDB, with local import/export; guests can still join ephemerally.
 - Browser-local favorites, recent servers, nickname/language/audio preferences, and per-TeamSpeak-UID member volume.
@@ -250,6 +256,7 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Encrypted TeamSpeak server password and one-time legacy config import.
 - No ServerQuery, WebQuery, admin token, or maintenance bot.
 - `/demo` is a clearly labeled interactive simulation and never opens a real TeamSpeak connection.
+- Join-ticket creation is rate-limited per peer; runtime logs rotate at a bounded size.
 
 ### Requirements and startup
 
@@ -306,6 +313,8 @@ In fixed mode, guests cannot override the configured target. In open mode, arbit
 
 When the welcome page has no target parameters from an invite link, its address and port field is prefilled from the admin-configured default TeamSpeak target. Invite-link target parameters take precedence.
 
+Administrators can create managed invite links from `/admin/operations`. An invite stores only a token hash and encrypted connection secret, can expire or be limited to a number of uses, and can be revoked. The raw token is returned only at creation time and is passed as an `invite` URL parameter; no TeamSpeak password is placed in that URL. The database backup and diagnostic report are separate: the report is sanitized for issue sharing, while the database backup is for local recovery and must be protected.
+
 If a legacy `config.json` exists on the first upgraded start, only `tsHost`, `tsPort`, and `tsServerPassword` are imported. The original file is preserved, and SQLite becomes the sole live settings source.
 
 ### Development
@@ -318,6 +327,8 @@ npm run build
 npm --prefix web run build
 npm audit
 ```
+
+The Windows development environment may need the native build toolchain required by `@discordjs/opus`. The browser UI can still be verified locally with `npm run web:dev` and `/demo`; that route is deliberately simulated and does not prove a real TeamSpeak connection.
 
 ### License
 

@@ -200,6 +200,7 @@ const copy = {
     endSession: "断开",
     terminating: "断开中…",
     sessionTerminated: "会话已断开。",
+    confirmTerminate: "确定断开「{{nickname}}」吗？",
     invites: "受控邀请",
     invitesLead: "创建可过期、可限次的邀请链接；链接中不包含服务器密码。",
     inviteChannel: "目标频道",
@@ -215,6 +216,7 @@ const copy = {
     defaultChannel: "默认频道",
     revoke: "撤销",
     inviteRevoked: "邀请链接已撤销。",
+    confirmRevoke: "确定撤销这个邀请链接吗？",
     active: "有效",
     expired: "已过期",
     exhausted: "已用尽",
@@ -332,6 +334,7 @@ const copy = {
     endSession: "Terminate",
     terminating: "Terminating…",
     sessionTerminated: "Session terminated.",
+    confirmTerminate: "Terminate “{{nickname}}”?",
     invites: "Managed invites",
     invitesLead: "Create expiring, usage-limited invite links without putting the server password in the URL.",
     inviteChannel: "Target channel",
@@ -347,6 +350,7 @@ const copy = {
     defaultChannel: "Default channel",
     revoke: "Revoke",
     inviteRevoked: "Invite link revoked.",
+    confirmRevoke: "Revoke this invite link?",
     active: "Active",
     expired: "Expired",
     exhausted: "Exhausted",
@@ -384,9 +388,9 @@ async function logout() { try { await sendJson("/api/admin/logout", "POST", {});
 async function loadOverview() { Object.assign(overview, await getJson("/api/admin/overview")); }
 async function loadServerSettings() { const value = await getJson("/api/admin/server"); Object.assign(serverForm, value, { serverPassword: "", passwordAction: "keep" }); }
 async function loadOperations() { operationsLoading.value = true; try { const [sessions, invites, diagnostics, logs] = await Promise.all([getJson("/api/admin/sessions"), getJson("/api/admin/invites"), getJson("/api/admin/diagnostics"), getJson("/api/admin/logs?limit=100")]); operations.sessions = Array.isArray(sessions.sessions) ? sessions.sessions : []; operations.invites = Array.isArray(invites.invites) ? invites.invites : []; operations.diagnostics = { node: String(diagnostics.gateway?.node || ""), platform: String(diagnostics.gateway?.platform || ""), arch: String(diagnostics.gateway?.arch || ""), schemaVersion: Number(diagnostics.database?.schemaVersion || 0), createdSessions: Number(diagnostics.sessions?.created || 0) }; operations.logs = { available: Boolean(logs.available), entries: Array.isArray(logs.entries) ? logs.entries : [] }; } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { operationsLoading.value = false; } }
-async function terminateSession(session: AdminSession) { if (!window.confirm(`${tr('endSession')}「${session.nickname}」？`)) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
+async function terminateSession(session: AdminSession) { if (!window.confirm(tr('confirmTerminate', { nickname: session.nickname }))) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
 async function createInvite() { submitting.value = true; errorMessage.value = ""; createdInvite.value = null; try { const result = await sendJson("/api/admin/invites", "POST", { channel: inviteForm.channel, expiresInHours: inviteForm.expiresInHours, maxUses: inviteForm.maxUses }); if (typeof result.token !== "string") throw new Error("INVITE_CREATE_FAILED"); createdInvite.value = { token: result.token, link: `${location.origin}/?invite=${encodeURIComponent(result.token)}` }; inviteForm.channel = ""; await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
-async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(`${tr('revoke')}「${invite.channel || tr('defaultChannel')}」？`)) return; try { await sendJson(`/api/admin/invites/${encodeURIComponent(invite.id)}/revoke`, "POST", {}); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
+async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(tr('confirmRevoke'))) return; try { await sendJson(`/api/admin/invites/${encodeURIComponent(invite.id)}/revoke`, "POST", {}); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
 async function copyInviteLink() { if (!createdInvite.value) return; try { await navigator.clipboard.writeText(createdInvite.value.link); showOperationNotice(tr('copiedLink')); } catch { errorMessage.value = tr('operationFailed'); } }
 function showOperationNotice(message: string) { errorMessage.value = message; window.setTimeout(() => { if (errorMessage.value === message) errorMessage.value = ""; }, 2200); }
 async function downloadBackup() { try { const response = await fetch("/api/admin/backup", { headers: { accept: "application/octet-stream" } }); if (!response.ok) throw new Error("BACKUP_FAILED"); const blob = await response.blob(); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `webspeak-backup-${new Date().toISOString().slice(0, 10)}.db`; anchor.click(); URL.revokeObjectURL(url); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }

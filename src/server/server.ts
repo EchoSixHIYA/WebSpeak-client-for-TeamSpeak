@@ -11,6 +11,7 @@ import type { AdminService } from "../admin/admin-service.js";
 import { AdminSessionStore } from "../admin/admin-session.js";
 import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
 import { identityFromString } from "@honeybbq/teamspeak-client";
+import { JoinRateLimiter } from "./join-rate-limit.js";
 
 export interface WebServerOptions {
   port: number;
@@ -47,6 +48,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
 
   const voiceBridge = new VoiceBridge(options.voiceBridgeOptions, logger);
   const adminSessions = new AdminSessionStore();
+  const joinRateLimiter = new JoinRateLimiter();
   const startedAt = Date.now();
 
   const healthHandler: express.RequestHandler = (_request, response) => {
@@ -68,6 +70,10 @@ export function createWebServer(options: WebServerOptions): WebServer {
     }
     if (!options.adminService.isInitialized()) {
       response.status(503).json({ ok: false, code: "NOT_INITIALIZED" });
+      return;
+    }
+    if (!joinRateLimiter.allow(request.socket.remoteAddress ?? "unknown")) {
+      response.status(429).json({ ok: false, code: "RATE_LIMITED" });
       return;
     }
     const body = isRecord(request.body) ? request.body : {};

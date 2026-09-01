@@ -50,6 +50,7 @@ export class AdminService {
     private readonly logger: Logger,
     private readonly legacyConfigPath: string,
     private readonly probe: ProbeFunction = probeTeamSpeak,
+    private readonly version = "0.1.0",
   ) {}
 
   async initialize(): Promise<void> {
@@ -166,7 +167,7 @@ export class AdminService {
     return {
       gateway: {
         status: "running",
-        version: "0.1.0",
+        version: this.version,
         uptimeSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
       },
       teamSpeak: {

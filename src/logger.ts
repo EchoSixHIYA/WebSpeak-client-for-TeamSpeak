@@ -1,5 +1,9 @@
 import pino from "pino";
-import { mkdirSync } from "node:fs";
+import { appendFile, existsSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { Writable } from "node:stream";
+
+const MAX_LOG_BYTES = 10 * 1024 * 1024;
+const MAX_ROTATED_LOGS = 3;
 
 export interface Logger {
   debug(obj: Record<string, unknown>, msg: string): void;
@@ -14,23 +18,17 @@ export interface Logger {
 }
 
 export function createLogger(logDir?: string): Logger {
-  const targets: pino.TransportTargetOptions[] = [
-    { target: "pino/file", options: { destination: 1 }, level: "info" },
-  ];
-  if (logDir) {
-    mkdirSync(logDir, { recursive: true });
-    targets.push({
-      target: "pino/file",
-      options: { destination: `${logDir}/webspeak.log` },
-      level: "debug",
-    });
-  }
-
-  const baseLogger = pino({
+  const loggerOptions = {
     level: "debug",
     timestamp: pino.stdTimeFunctions.isoTime,
-    ...(targets.length > 1 ? { transport: { targets } } : {}),
-  });
+    redact: {
+      paths: ["password", "*.password", "serverPassword", "*.serverPassword", "token", "*.token", "identity", "*.identity"],
+      censor: "[Redacted]",
+    },
+  };
+  const baseLogger = logDir
+    ? createFileLogger(loggerOptions, `${logDir}/webspeak.log`)
+    : pino(loggerOptions, pino.destination(1));
 
   function wrap(l: pino.Logger): Logger {
     function doLog(
@@ -59,4 +57,45 @@ export function createLogger(logDir?: string): Logger {
   }
 
   return wrap(baseLogger);
+}
+
+function createFileLogger(options: { level: string; timestamp: typeof pino.stdTimeFunctions.isoTime }, logPath: string): pino.Logger {
+  mkdirSync(logPath.replace(/[\\/][^\\/]+$/, ""), { recursive: true });
+  return pino(options, pino.multistream([
+    { level: "info", stream: process.stdout },
+    { level: "debug", stream: new RotatingFileStream(logPath) },
+  ]));
+}
+
+class RotatingFileStream extends Writable {
+  private bytes: number;
+
+  constructor(private readonly filePath: string) {
+    super();
+    this.bytes = existsSync(filePath) ? statSync(filePath).size : 0;
+    if (this.bytes >= MAX_LOG_BYTES) this.rotate();
+  }
+
+  override _write(chunk: unknown, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), encoding);
+    try {
+      if (this.bytes + buffer.length > MAX_LOG_BYTES) this.rotate();
+      appendFile(this.filePath, buffer, (error) => {
+        if (!error) this.bytes += buffer.length;
+        callback(error);
+      });
+    } catch (error: unknown) {
+      callback(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private rotate(): void {
+    for (let index = MAX_ROTATED_LOGS - 1; index >= 1; index--) {
+      const source = `${this.filePath}.${index}`;
+      const destination = `${this.filePath}.${index + 1}`;
+      if (existsSync(source)) renameSync(source, destination);
+    }
+    if (existsSync(this.filePath)) renameSync(this.filePath, `${this.filePath}.1`);
+    this.bytes = 0;
+  }
 }
