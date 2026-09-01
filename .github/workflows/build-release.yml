@@ -9,7 +9,7 @@ on:
       version:
         description: Release version without the v prefix
         required: true
-        default: 0.1.2
+        default: 0.1.3
         type: string
 
 permissions:
@@ -38,8 +38,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm version --no-git-tag-version $releaseVersion
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $currentVersion = node -p "require('./package.json').version"
+          if ($currentVersion -ne $releaseVersion) {
+            npm version --no-git-tag-version $releaseVersion
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           npm --prefix web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run build
@@ -129,7 +132,10 @@ jobs:
           release_version="${RELEASE_REF#v}"
           npm ci --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
-          npm version --no-git-tag-version "$release_version"
+          current_version="$(node -p "require('./package.json').version")"
+          if [ "$current_version" != "$release_version" ]; then
+            npm version --no-git-tag-version "$release_version"
+          fi
           npm --prefix web run build
           npm run build
           npm prune --omit=dev --no-audit --no-fund

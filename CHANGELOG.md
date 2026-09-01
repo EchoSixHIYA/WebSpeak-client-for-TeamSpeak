@@ -2,6 +2,12 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
+## [0.1.3] — 2026-09-02
+
+### Fixed
+
+- Release builds now skip `npm version` when the project version already matches the requested version, preventing Windows/Linux package builds from failing with `Version not changed`.
+
 ## [0.1.2] — 2026-09-02
 
 ### Changed
