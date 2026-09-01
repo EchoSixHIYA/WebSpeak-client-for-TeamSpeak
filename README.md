@@ -6,17 +6,39 @@
 
 自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音接入网关。无需安装桌面客户端，打开浏览器即可进入你的语音空间。
 
+A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your voice space from a modern browser without installing a desktop client.
+
 [![License](https://img.shields.io/badge/License-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5.0-0f766e?style=flat-square)](https://nodejs.org/)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
-[中文](#中文) · [English](#english) · [快速开始](#快速开始) · [Quick Start](#quick-start) · [更新日志](#更新日志--changelog) · [安全边界](#安全边界)
+**[中文](#中文)**<br />
+[更新日志](#更新日志) · [为什么是 WebSpeak](#为什么是-webspeak) · [核心能力](#核心能力) · [架构](#架构) · [快速开始](#快速开始) · [首次登录与默认目标](#首次登录与默认目标) · [访问模式与邀请](#访问模式与邀请) · [音频与设备](#音频与设备) · [数据与安全边界](#数据与安全边界) · [旧版本升级](#旧版本升级) · [健康检查](#健康检查开发与验证) · [项目结构](#项目结构) · [已知边界](#已知边界)
+
+**[English](#english)**<br />
+[Changelog](#changelog) · [Why WebSpeak](#why-webspeak) · [Core capabilities](#core-capabilities) · [Architecture](#architecture) · [Quick Start](#quick-start) · [First login](#first-login-and-default-target) · [Access modes](#access-modes-and-invites) · [Audio](#audio-and-devices) · [Security](#data-and-security-boundary) · [Upgrade](#upgrading-from-a-legacy-version) · [Health](#health-development-and-verification) · [Project layout](#project-layout) · [Known boundaries](#known-boundaries) · [License](#license) · [Community](#community)
 
 </div>
 
 > WebSpeak 是一个面向浏览器的 TeamSpeak 客户端，让频道、成员、文字与语音协作在网页中自然完成。
 
+> WebSpeak is a browser-based TeamSpeak client that brings channels, members, text chat, and voice collaboration into one web experience.
+
 ## 中文
+
+### 更新日志
+
+#### 2026-09-01 · Unreleased
+
+- 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
+- 修复私聊消息到达后网页端断开连接的问题。
+- 优化成员右键菜单、悬停高亮和语音活动状态展示。
+- 完成管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
+- 完成中英文界面、默认 TeamSpeak 目标、配置迁移和首次登录改密流程。
+
+#### 2026-08-31 · v0.1.0
+
+- 首个规范化版本，提供浏览器客户端、TeamSpeak 3 / 6 网关、浏览器音频控制、访问模式、管理员运维能力和 AGPL-3.0-only 许可证。
 
 ### 为什么是 WebSpeak
 
@@ -212,6 +234,20 @@ web/src/
 ## English
 
 WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6: open a link, choose a nickname, and join from a modern browser without installing a desktop client.
+
+### Changelog
+
+#### 2026-09-01 · Unreleased
+
+- Fixed late WebSpeak browser sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
+- Fixed browser sessions disconnecting after receiving a private message.
+- Improved member context menus, hover highlighting, and speaking-state presentation.
+- Added the administrator console, managed invites, session operations, audit records, diagnostics, and SQLite backup support.
+- Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
+
+#### 2026-08-31 · v0.1.0
+
+- First normalized release with the browser client, TeamSpeak 3 / 6 gateway, browser audio controls, access modes, administrator operations, and AGPL-3.0-only licensing.
 
 ### Why WebSpeak
 
@@ -415,27 +451,3 @@ WebSpeak is licensed under the [GNU Affero General Public License v3.0 only](LIC
 QQ group: `869500475`
 
 ![WebSpeak group QR code](group-chat.png)
-
-## 更新日志 / Changelog
-
-### [Unreleased]
-
-#### 中文
-
-- 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
-- 修复私聊消息到达后网页端断开连接的问题。
-- 优化成员右键菜单、悬停高亮和语音活动状态展示。
-- 完成管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
-- 完成中英文界面、默认 TeamSpeak 目标、配置迁移和首次登录改密流程。
-
-#### English
-
-- Fixed late WebSpeak sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
-- Fixed browser sessions disconnecting after receiving a private message.
-- Improved member context menus, hover highlighting, and speaking-state presentation.
-- Added the administrator console, managed invites, session operations, audit records, diagnostics, and SQLite backup support.
-- Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
-
-### v0.1.0
-
-The first normalized WebSpeak release provides the browser client, TeamSpeak 3 / 6 gateway, browser audio controls, configurable access modes, administrator operations, and AGPL-3.0-only licensing.

@@ -2,7 +2,7 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
-## [Unreleased]
+## [Unreleased] — 2026-09-01
 
 ### Added
 
@@ -34,3 +34,7 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - Local `/demo` browser checks passed at the documented narrow and desktop widths; `/demo` does not connect to TeamSpeak.
 
 Real TS3/TS6 interoperability, Android microphone behavior, multi-client smoke, and the 24-hour long-run gate require their respective test environments and are not claimed by this local release check.
+
+## [0.1.0] — 2026-08-31
+
+- First normalized release with the browser client, TeamSpeak 3 / 6 gateway, browser audio controls, access modes, administrator operations, and AGPL-3.0-only licensing.
