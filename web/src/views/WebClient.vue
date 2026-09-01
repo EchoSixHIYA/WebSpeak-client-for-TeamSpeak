@@ -83,7 +83,7 @@
     </section>
 
     <!-- Connected application shell -->
-    <div v-else class="app-shell" @click="memberMenu = null">
+    <div v-else :class="['app-shell', `mobile-view-${mobileSection}`]" @click="memberMenu = null">
       <main class="workspace">
         <header class="workspace-header">
           <div class="breadcrumbs"><span class="mobile-brand">TeamSpeak <em>Web</em></span><span class="crumb-muted">{{ t('serverBreadcrumb') }}</span><Icon name="chevron-right" :size="14" /><strong>{{ currentChannelName }}</strong></div>
@@ -110,7 +110,7 @@
 
         <div class="workspace-scroll">
           <div class="workspace-content">
-            <section class="room-hero">
+            <section :class="['room-hero', { 'mobile-section-hidden': mobileSection !== 'channels' && mobileSection !== 'voice' }]">
               <div class="hero-decoration one"></div><div class="hero-decoration two"></div>
               <div class="room-hero-content">
                 <div class="room-eyebrow"><span class="live-pill"><i></i> {{ t('live') }}</span><span>{{ t('voiceSpace') }}</span></div>
@@ -121,7 +121,7 @@
               <div class="hero-visual" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="hero-wave"><i v-for="bar in heroBars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
             </section>
 
-            <section class="voice-section">
+            <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]">
               <div class="section-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2>{{ t('speakingNow') }}</h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
               <div v-if="currentMembers.length" class="voice-grid">
                 <article v-for="member in roomMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]">
@@ -131,9 +131,14 @@
                 <article v-if="currentMembers.length > roomMembers.length" class="voice-card more-card"><div class="more-count">+{{ currentMembers.length - roomMembers.length }}</div><strong>{{ t('moreMembers') }}</strong><span>{{ t('viewLeft') }}</span></article>
               </div>
               <div v-else class="voice-empty"><span class="empty-icon"><Icon name="users" :size="20" /></span><strong>{{ t('waitingForMembers') }}</strong><span>{{ t('prepareMicrophone') }}</span></div>
+              <div v-if="whisperTargetIds.size" class="whisper-strip">
+                <div class="whisper-strip-copy"><strong><Icon name="users" :size="15" /> {{ t('whisperTargets') }}</strong><span>{{ whisperTargets.map((member) => member.nickname).join('、') }}</span></div>
+                <button type="button" class="text-button" @click="clearWhisperTargets">{{ t('clearWhisperTargets') }}</button>
+                <button type="button" class="whisper-ptt-button" :class="{ active: whisperPttActive || whisperActive }" :aria-pressed="whisperPttActive || whisperActive" @pointerdown.prevent="onWhisperPttDown" @pointerup.prevent="onWhisperPttUp" @pointercancel.prevent="onWhisperPttUp" @lostpointercapture="onWhisperPttUp"><Icon name="mic" :size="18" /> {{ whisperPttActive || whisperActive ? t('releaseWhisper') : t('whisperHoldToTalk') }}</button>
+              </div>
             </section>
 
-            <section class="chat-panel">
+            <section :class="['chat-panel', { 'mobile-section-hidden': mobileSection !== 'chat' }]">
               <div class="chat-tabs" role="tablist" :aria-label="t('chatTabs')">
                 <button type="button" :class="{ active: chatTab === 'channel' }" @click="chatTab = 'channel'"><Icon name="hash" :size="15" /> {{ currentChannelName }}</button>
                 <button type="button" :class="{ active: chatTab === 'server' }" @click="chatTab = 'server'"><Icon name="server" :size="15" /> {{ t('serverChat') }}</button>
@@ -165,7 +170,7 @@
 
       </main>
 
-      <aside class="member-panel">
+      <aside :class="['member-panel', { 'mobile-section-visible': mobileSection === 'channels' }]">
         <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div><button type="button" class="status-button" :class="{ active: away }" @click="toggleAway"><span class="status-dot"></span>{{ away ? t('away') : t('available') }}</button></div>
         <div class="member-search"><Icon name="search" :size="15" /><input v-model="memberQuery" :placeholder="t('searchMembers')" :aria-label="t('searchMembers')" /></div>
         <div class="member-tree">
@@ -190,6 +195,22 @@
         <div v-if="!filteredMemberChannels.length" class="member-empty">{{ t('noMatchingMembers') }}</div>
         <div class="member-panel-tip"><Icon name="volume" :size="16" /><span>{{ t('volumeTip') }}</span></div>
       </aside>
+
+      <section v-if="mobileSection === 'more'" class="mobile-more-panel">
+        <span class="section-kicker">{{ t('mobileMore') }}</span>
+        <h2>{{ t('mobileMore') }}</h2>
+        <button type="button" @click="settingsOpen = true"><Icon name="settings" :size="18" /> {{ t('audioSettings') }}</button>
+        <button type="button" @click="cycleTheme"><Icon name="monitor" :size="18" /> {{ themeLabel }}</button>
+        <button type="button" @click="toggleLanguage"><Icon name="globe" :size="18" /> {{ t('langSwitch') }}</button>
+        <button type="button" class="danger" @click="doDisconnect"><Icon name="door" :size="18" /> {{ t('exit') }}</button>
+      </section>
+
+      <nav class="mobile-nav" :aria-label="t('mobileNavigation')">
+        <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
+        <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
+        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
+        <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
+      </nav>
     </div>
 
     <div v-if="memberMenu" class="member-context-menu" :style="memberMenuStyle" @click.stop>
@@ -197,6 +218,7 @@
       <label class="menu-volume"><span>{{ t('memberVolume') }}</span><input type="range" min="0" max="400" :value="(volumes[memberMenu.member.id] ?? 1) * 100" :style="rangeStyle((volumes[memberMenu.member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(memberMenu.member.id, $event)" /></label>
       <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
+      <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
     </div>
 
@@ -251,6 +273,8 @@ const {
   testAudioUrl,
   speakingIds,
   volumes,
+  whisperTargetIds,
+  whisperActive,
   setVolume,
   setInputVolume,
   setOutputVolume,
@@ -272,6 +296,8 @@ const {
   sendPrivateMessage,
   sendPoke,
   setAway,
+  setWhisperTargets,
+  setWhisperActive,
   setMicMode,
   setPTT,
   checkSupport,
@@ -308,6 +334,8 @@ const privateClientId = ref(0);
 const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
+const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
+const whisperPttActive = ref(false);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 type Language = "zh" | "en";
@@ -517,6 +545,17 @@ const translations: Record<Language, Record<string, string>> = {
     audioSuspended: "音频被浏览器暂停",
     audioUnknown: "尚未初始化",
     audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
+    mobileNavigation: "移动端导航",
+    mobileChannels: "频道",
+    mobileChat: "聊天",
+    mobileVoice: "语音",
+    mobileMore: "更多",
+    whisperTargets: "私语目标",
+    setWhisperTarget: "设为私语目标",
+    removeWhisperTarget: "移除私语目标",
+    clearWhisperTargets: "清除目标",
+    whisperHoldToTalk: "按住私语",
+    releaseWhisper: "松开结束私语",
     cancel: "取消",
     saveChanges: "保存更改",
     close: "关闭",
@@ -725,6 +764,17 @@ const translations: Record<Language, Record<string, string>> = {
     audioSuspended: "Audio paused by the browser",
     audioUnknown: "Not initialized",
     audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
+    mobileNavigation: "Mobile navigation",
+    mobileChannels: "Channels",
+    mobileChat: "Chat",
+    mobileVoice: "Voice",
+    mobileMore: "More",
+    whisperTargets: "Whisper targets",
+    setWhisperTarget: "Set as whisper target",
+    removeWhisperTarget: "Remove whisper target",
+    clearWhisperTargets: "Clear targets",
+    whisperHoldToTalk: "Hold to whisper",
+    releaseWhisper: "Release to stop whispering",
     cancel: "Cancel",
     saveChanges: "Save changes",
     close: "Close",
@@ -786,6 +836,10 @@ function localizedMessage(message: string) {
     "戳一戳消息无效": "The poke message is invalid",
     "离开状态无效": "The away status is invalid",
     "音频帧格式无效": "The audio frame is invalid",
+    "私语目标无效": "The whisper targets are invalid",
+    "私语状态无效": "The whisper state is invalid",
+    "请先选择私语目标": "Choose a whisper target first",
+    "私语目标已离线": "A whisper target is offline",
     "TeamSpeak 会话尚未就绪": "The TeamSpeak session is not ready",
     "频道切换失败": "Channel switch failed",
     "该频道需要密码": "This channel requires a password",
@@ -860,6 +914,7 @@ const filteredMemberChannels = computed(() => {
   if (!search) return memberChannels.value;
   return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
 });
+const whisperTargets = computed(() => [...whisperTargetIds].map((id) => members.find((member) => member.id === id)).filter((member): member is ChannelMember => Boolean(member)));
 
 const privateConversations = computed(() => {
   const conversations = new Map<string, { id: number; name: string; lastMessage: number }>();
@@ -1164,6 +1219,20 @@ function openMemberMenu(member: ChannelMember, event: Event): void {
   memberMenu.value = { member, x: Math.min((point?.clientX ?? 20), Math.max(12, window.innerWidth - 210)), y: Math.min((point?.clientY ?? 20), Math.max(12, window.innerHeight - 170)) };
 }
 
+function toggleWhisperTarget(member: ChannelMember): void {
+  if (member.isSelf) return;
+  const targets = new Set(whisperTargetIds);
+  if (targets.has(member.id)) targets.delete(member.id);
+  else if (targets.size < 8) targets.add(member.id);
+  setWhisperTargets([...targets]);
+  showToast(targets.has(member.id) ? t("setWhisperTarget") : t("removeWhisperTarget"));
+}
+
+function clearWhisperTargets(): void {
+  stopWhisperTalk();
+  setWhisperTargets([]);
+}
+
 function pokeMember(member: ChannelMember): void {
   sendPoke(member.id, window.prompt(t("pokeMessagePrompt"), "") ?? "");
   showToast(t("pokeSent"));
@@ -1314,9 +1383,11 @@ function startPointerTalk() {
 }
 
 function stopPointerTalk() {
-  if (!pttActive.value) return;
-  pttActive.value = false;
-  setPTT(false);
+  if (pttActive.value) {
+    pttActive.value = false;
+    setPTT(false);
+  }
+  stopWhisperTalk();
 }
 
 function onMobilePttDown(event: PointerEvent) {
@@ -1330,6 +1401,26 @@ function onMobilePttUp(event: PointerEvent) {
   const target = event.currentTarget as HTMLElement | null;
   if (target?.releasePointerCapture && target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
   stopPointerTalk();
+}
+
+function onWhisperPttDown(event: PointerEvent): void {
+  if (!whisperTargetIds.size) return;
+  const target = event.currentTarget as HTMLElement | null;
+  if (target?.setPointerCapture && !target.hasPointerCapture(event.pointerId)) target.setPointerCapture(event.pointerId);
+  whisperPttActive.value = true;
+  setWhisperActive(true);
+}
+
+function onWhisperPttUp(event: PointerEvent): void {
+  const target = event.currentTarget as HTMLElement | null;
+  if (target?.releasePointerCapture && target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+  stopWhisperTalk();
+}
+
+function stopWhisperTalk(): void {
+  if (!whisperPttActive.value) return;
+  whisperPttActive.value = false;
+  setWhisperActive(false);
 }
 </script>
 
@@ -1669,4 +1760,42 @@ function onMobilePttUp(event: PointerEvent) {
 .message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
 @media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; }.mobile-ptt-button { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; } }
 @media (max-width: 740px) { .member-context-menu { left: 12px !important; right: 12px; top: auto !important; bottom: env(safe-area-inset-bottom, 0px); min-width: 0; border-radius: 16px 16px 0 0; padding: 14px; } .member-context-menu button { min-height: 42px; font-size: 13px; } .member-context-menu strong { padding: 4px 8px 11px; font-size: 14px; } .menu-volume { font-size: 12px; } }
+
+/* M007 whisper target controls and M008 mobile navigation. */
+.whisper-strip { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 14px; color: #52645e; border: 1px solid #d6ebe5; border-radius: 10px; background: #eef8f5; }
+.whisper-strip-copy { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.whisper-strip-copy strong { display: inline-flex; align-items: center; gap: 6px; color: #006a64; font-size: 12px; white-space: nowrap; }
+.whisper-strip-copy span { overflow: hidden; color: #71837d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.whisper-ptt-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; color: #fff; background: #006a64; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
+.whisper-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
+.mobile-nav, .mobile-more-panel { display: none; }
+.mobile-section-hidden { display: block; }
+
+@media (min-width: 741px) {
+  .app-shell .mobile-section-hidden { display: block; }
+}
+
+@media (max-width: 740px) {
+  .app-shell { display: flex; flex-direction: column; height: auto; min-height: 100dvh; max-height: none; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); overflow: visible; }
+  .app-shell .workspace { display: flex; flex: 1 1 auto; height: calc(100dvh - 61px); min-height: 0; }
+  .app-shell .workspace-scroll { flex: 1; height: 100%; min-height: 0; overflow-y: auto; }
+  .app-shell .mobile-section-hidden { display: none; }
+  .app-shell.mobile-view-more .workspace { display: none; }
+  .app-shell .member-panel { display: none !important; order: 2; width: 100%; max-height: calc(100dvh - 142px); min-height: 235px; padding: 18px 15px 24px; border-top: 1px solid var(--border); border-right: 0; overflow: hidden; }
+  .app-shell .member-panel.mobile-section-visible { display: flex !important; }
+  .app-shell .member-panel .member-tree { max-height: none; }
+  .mobile-more-panel { display: grid; gap: 10px; width: min(100% - 30px, 650px); margin: 26px auto 0; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
+  .mobile-more-panel h2 { margin: 0 0 8px; color: var(--text-primary); font-size: 24px; }
+  .mobile-more-panel button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; color: var(--text-primary); background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; text-align: left; cursor: pointer; }
+  .mobile-more-panel button:hover { color: var(--accent); border-color: var(--accent); }
+  .mobile-more-panel button.danger { color: var(--danger); }
+  .mobile-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; min-height: 68px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-top: 1px solid var(--border); box-shadow: 0 -7px 20px color-mix(in srgb, var(--text-primary) 8%, transparent); backdrop-filter: blur(14px); }
+  .mobile-nav button { display: grid; place-items: center; gap: 3px; min-width: 0; color: var(--text-muted); background: transparent; border-radius: 8px; font-size: 11px; cursor: pointer; }
+  .mobile-nav button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 700; }
+  .mobile-nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .whisper-strip { align-items: stretch; flex-wrap: wrap; gap: 8px; }
+  .whisper-strip-copy { width: 100%; flex: 1 0 100%; }
+  .whisper-ptt-button { flex: 1; min-height: 46px; }
+  .whisper-strip > .text-button { min-height: 38px; }
+}
 </style>

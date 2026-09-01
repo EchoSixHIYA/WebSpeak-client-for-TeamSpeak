@@ -127,6 +127,8 @@ export function useVoiceWebSocket() {
   const remoteDecodeTimestamps = new Map<number, number>();
   const volumes = reactive<Record<number, number>>({});
   const speakingIds = reactive(new Set<number>());
+  const whisperTargetIds = reactive(new Set<number>());
+  const whisperActive = ref(false);
   const speakingTimers = new Map<number, ReturnType<typeof setTimeout>>();
   const SPEAKING_HOLD_MS = 360;
   const MAX_AUDIO_BUFFERED_BYTES = 192_000;
@@ -616,6 +618,8 @@ export function useVoiceWebSocket() {
       state.reconnecting = false;
       if (event.code !== 1000 && !state.error && !state.reconnectFailed) state.error = closeReason(event.code);
       stopMicrophone();
+      whisperTargetIds.clear();
+      whisperActive.value = false;
     };
     socket.onerror = () => {
       if (sequence !== connectionSequence) return;
@@ -662,6 +666,8 @@ export function useVoiceWebSocket() {
     for (const gain of remoteGains.values()) gain.disconnect();
     remoteGains.clear();
     clearSpeakingState();
+    whisperTargetIds.clear();
+    whisperActive.value = false;
     for (const key of Object.keys(volumes)) delete volumes[Number(key)];
   }
 
@@ -677,6 +683,7 @@ export function useVoiceWebSocket() {
         state.error = "";
         state.errorCode = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
+        applyWhisperState(msg.whisperTargetIds, msg.whisperActive);
         if (Array.isArray(msg.members)) {
           members.length = 0;
           for (const member of msg.members) {
@@ -752,6 +759,8 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = false;
         if (!state.reconnecting) state.error = "TeamSpeak 连接已断开";
         stopMicrophone();
+        whisperTargetIds.clear();
+        whisperActive.value = false;
         break;
       case "reconnecting":
         state.connected = false;
@@ -760,6 +769,8 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = false;
         state.reconnectAttempt = Number(msg.attempt) || state.reconnectAttempt + 1;
         stopMicrophone();
+        whisperTargetIds.clear();
+        whisperActive.value = false;
         break;
       case "reconnected":
         state.reconnecting = false;
@@ -771,6 +782,11 @@ export function useVoiceWebSocket() {
         state.reconnecting = false;
         state.reconnectFailed = true;
         state.error = "连接已中断，无法自动恢复";
+        whisperTargetIds.clear();
+        whisperActive.value = false;
+        break;
+      case "whisperTargets":
+        applyWhisperState(msg.targetIds, msg.active);
         break;
       case "error":
         state.errorCode = String(msg.error?.code || "");
@@ -835,6 +851,30 @@ export function useVoiceWebSocket() {
     sendCmd("setAway", { away, message: message.trim().slice(0, 200) });
   }
 
+  function setWhisperTargets(clientIds: number[]): void {
+    const targets = [...new Set(clientIds)].filter((clientId) => Number.isInteger(clientId) && clientId > 0 && clientId <= 65535 && clientId !== state.tsClientId).slice(0, 8);
+    whisperTargetIds.clear();
+    for (const clientId of targets) whisperTargetIds.add(clientId);
+    if (!targets.length) whisperActive.value = false;
+    sendCmd("setWhisperTargets", { targetIds: targets });
+  }
+
+  function setWhisperActive(active: boolean): void {
+    if (active && !whisperTargetIds.size) return;
+    whisperActive.value = active;
+    sendCmd("setWhisperActive", { active });
+  }
+
+  function applyWhisperState(targetIds: unknown, active: unknown): void {
+    whisperTargetIds.clear();
+    if (Array.isArray(targetIds)) {
+      for (const clientId of targetIds) {
+        if (typeof clientId === "number" && Number.isInteger(clientId) && clientId > 0 && clientId <= 65535 && clientId !== state.tsClientId) whisperTargetIds.add(clientId);
+      }
+    }
+    whisperActive.value = active === true && whisperTargetIds.size > 0;
+  }
+
   function reconnectNow(): void {
     if (!lastConnection || state.connecting) return;
     connect(lastConnection.target, lastConnection.channel, lastConnection.nickname, lastConnection.serverPassword, lastConnection.rememberIdentity ? identityMaterial.value || lastConnection.identity : "", lastConnection.rememberIdentity);
@@ -869,6 +909,9 @@ export function useVoiceWebSocket() {
       INVALID_POKE_MESSAGE: "戳一戳消息无效",
       INVALID_AWAY_STATUS: "离开状态无效",
       INVALID_AUDIO_FRAME: "音频帧格式无效",
+      INVALID_WHISPER_TARGETS: "私语目标无效",
+      INVALID_WHISPER_STATE: "私语状态无效",
+      NO_WHISPER_TARGETS: "请先选择私语目标",
       SESSION_NOT_READY: "TeamSpeak 会话尚未就绪",
       CHANNEL_SWITCH_FAILED: "频道切换失败",
       CHANNEL_PASSWORD_REQUIRED: "该频道需要密码",
@@ -939,6 +982,8 @@ export function useVoiceWebSocket() {
     microphoneTestActive,
     testAudioUrl,
     speakingIds,
+    whisperTargetIds,
+    whisperActive,
     volumes,
     setVolume,
     setInputVolume,
@@ -961,6 +1006,8 @@ export function useVoiceWebSocket() {
     sendPrivateMessage,
     sendPoke,
     setAway,
+    setWhisperTargets,
+    setWhisperActive,
     setMicMode,
     setPTT,
     checkSupport,

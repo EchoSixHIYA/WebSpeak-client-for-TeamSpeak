@@ -55,3 +55,21 @@ test("voice protocol rejects unsafe client and away payloads", () => {
     error: { code: "INVALID_CHANNEL_PASSWORD", message: "频道密码无效" },
   });
 });
+
+test("voice protocol validates whisper targets and its independent push state", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setWhisperTargets", requestId: "whisper-1", payload: { targetIds: [7, 9] } })), {
+    type: "setWhisperTargets",
+    requestId: "whisper-1",
+    payload: { targetIds: [7, 9] },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setWhisperActive", payload: { active: true } })), {
+    type: "setWhisperActive",
+    payload: { active: true },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setWhisperTargets", payload: { targetIds: [7, 7] } })), {
+    error: { code: "INVALID_WHISPER_TARGETS", message: "私语目标无效" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setWhisperActive", payload: { active: "yes" } })), {
+    error: { code: "INVALID_WHISPER_STATE", message: "私语状态无效" },
+  });
+});

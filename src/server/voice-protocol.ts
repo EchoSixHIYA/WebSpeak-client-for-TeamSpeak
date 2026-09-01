@@ -1,5 +1,5 @@
 export interface ClientCommand {
-  type: "switchChannel" | "sendTextMessage" | "sendServerMessage" | "sendPrivateMessage" | "poke" | "setAway";
+  type: "switchChannel" | "sendTextMessage" | "sendServerMessage" | "sendPrivateMessage" | "poke" | "setAway" | "setWhisperTargets" | "setWhisperActive";
   requestId?: string;
   payload: Record<string, unknown>;
 }
@@ -19,7 +19,7 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   if (value.requestId !== undefined && (typeof value.requestId !== "string" || value.requestId.length > 64)) {
     return { error: { code: "INVALID_REQUEST_ID", message: "请求标识无效" } };
   }
-  const supportedTypes = new Set(["switchChannel", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway"]);
+  const supportedTypes = new Set(["switchChannel", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway", "setWhisperTargets", "setWhisperActive"]);
   if (!supportedTypes.has(value.type)) {
     return { error: { code: "UNKNOWN_MESSAGE_TYPE", message: "不支持的消息类型" } };
   }
@@ -46,6 +46,15 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   }
   if (value.type === "setAway" && (typeof value.payload.away !== "boolean" || (value.payload.message !== undefined && (typeof value.payload.message !== "string" || value.payload.message.length > 200)))) {
     return { error: { code: "INVALID_AWAY_STATUS", message: "离开状态无效" } };
+  }
+  if (value.type === "setWhisperTargets") {
+    const targetIds = value.payload.targetIds;
+    if (!Array.isArray(targetIds) || targetIds.length > 8 || targetIds.some((clientId) => typeof clientId !== "number" || !Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) || new Set(targetIds).size !== targetIds.length) {
+      return { error: { code: "INVALID_WHISPER_TARGETS", message: "私语目标无效" } };
+    }
+  }
+  if (value.type === "setWhisperActive" && typeof value.payload.active !== "boolean") {
+    return { error: { code: "INVALID_WHISPER_STATE", message: "私语状态无效" } };
   }
   return {
     type: value.type as ClientCommand["type"],

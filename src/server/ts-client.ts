@@ -176,6 +176,19 @@ export class TSClient extends EventEmitter {
     this.client.sendVoice(data, codec);
   }
 
+  sendWhisper(data: Buffer, clientIds: number[], codec: number = 4): void {
+    if (!this.client || !this.connected) return;
+    const targets = [...new Set(clientIds)].filter((clientId) => Number.isInteger(clientId) && clientId > 0 && clientId <= 65535 && clientId !== this.getClientId());
+    if (!targets.length) throw new Error("Whisper requires at least one valid target");
+    const whisperClient = this.client as unknown as {
+      sendWhisper?: (voiceData: Uint8Array, targetClientIds: number[], voiceCodec: number) => void;
+    };
+    if (typeof whisperClient.sendWhisper !== "function") {
+      throw new Error("TeamSpeak SDK whisper support is unavailable");
+    }
+    whisperClient.sendWhisper(data, targets, codec);
+  }
+
   async sendTextMessage(scope: TSChatScope, message: string, targetId = 0n): Promise<void> {
     if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
     const targetMode = scope === "private" ? 1 : scope === "server" ? 3 : 2;

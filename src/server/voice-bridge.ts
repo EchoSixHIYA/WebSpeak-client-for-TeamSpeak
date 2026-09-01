@@ -54,6 +54,8 @@ interface WebClientEntry {
   members: Map<number, ChannelMember>;
   eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
+  whisperTargetIds: Set<number>;
+  whisperActive: boolean;
   isAlive: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -126,6 +128,8 @@ export class VoiceBridge {
         members: new Map(),
         eventLog: [],
         opusEncoder: null,
+        whisperTargetIds: new Set(),
+        whisperActive: false,
         isAlive: true,
         reconnectTimer: null,
       };
@@ -166,6 +170,7 @@ export class VoiceBridge {
       const refreshDirectory = () => {
         const snapshot = directory.getSnapshot();
         if (!snapshot) return;
+        const previousWhisperTargets = [...entry!.whisperTargetIds].sort((a, b) => a - b);
         const effectiveSelfId = selfId || tsClient.getClientId();
         const sdkChannelId = tsClient.getChannelId();
         if (selfChannelId === 0n && sdkChannelId !== 0n) selfChannelId = sdkChannelId;
@@ -183,6 +188,14 @@ export class VoiceBridge {
             outputMuted: client.outputMuted,
             channelCommander: client.channelCommander,
           });
+        }
+        for (const clientId of entry!.whisperTargetIds) {
+          if (!entry!.members.has(clientId) || clientId === effectiveSelfId) entry!.whisperTargetIds.delete(clientId);
+        }
+        if (!entry!.whisperTargetIds.size) entry!.whisperActive = false;
+        const nextWhisperTargets = [...entry!.whisperTargetIds].sort((a, b) => a - b);
+        if (initialStateSent && (previousWhisperTargets.length !== nextWhisperTargets.length || previousWhisperTargets.some((clientId, index) => clientId !== nextWhisperTargets[index]))) {
+          sendJson({ type: "whisperTargets", targetIds: nextWhisperTargets, active: entry!.whisperActive });
         }
       };
       const trackChannelEvents = (previous: unknown[], next: unknown[]) => {
@@ -211,6 +224,8 @@ export class VoiceBridge {
           tsClientId: selfId,
           members: Array.from(entry!.members.values()),
           serverEventLog: entry!.eventLog,
+          whisperTargetIds: [...entry!.whisperTargetIds],
+          whisperActive: entry!.whisperActive,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -225,6 +240,8 @@ export class VoiceBridge {
         directory.clear();
         entry!.channelTree = [];
         entry!.members.clear();
+        entry!.whisperTargetIds.clear();
+        entry!.whisperActive = false;
       };
 
       const failReconnect = (normalized: ReturnType<typeof normalizeTeamSpeakError>) => {
@@ -407,7 +424,11 @@ export class VoiceBridge {
             return;
           }
           try {
-            if (entry!.opusEncoder) tsClient.sendVoice(entry!.opusEncoder.encode(frame), 4);
+            if (entry!.opusEncoder) {
+              const encoded = entry!.opusEncoder.encode(frame);
+              if (entry!.whisperActive && entry!.whisperTargetIds.size) tsClient.sendWhisper(encoded, [...entry!.whisperTargetIds], 4);
+              else tsClient.sendVoice(encoded, 4);
+            }
           } catch {
             // A frame arriving during shutdown is safe to discard.
           }
@@ -491,6 +512,8 @@ export class VoiceBridge {
       entry.reconnectTimer = null;
     }
     entry.opusEncoder = null;
+    entry.whisperTargetIds.clear();
+    entry.whisperActive = false;
     entry.channelTree = [];
     entry.members.clear();
     entry.tsClient.removeAllListeners();
@@ -575,6 +598,24 @@ async function handleCommand(
       await entry.tsClient.poke(clientId, (command.payload.message as string).trim());
     } else if (command.type === "setAway") {
       await entry.tsClient.setAway(command.payload.away as boolean, typeof command.payload.message === "string" ? command.payload.message.trim() : "");
+    } else if (command.type === "setWhisperTargets") {
+      const targetIds = command.payload.targetIds as number[];
+      const selfId = entry.tsClient.getClientId();
+      if (targetIds.some((clientId) => clientId === selfId || !entry.members.has(clientId))) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CLIENT_NOT_FOUND", message: "私语目标已离线", recoverable: false } });
+        return;
+      }
+      entry.whisperTargetIds = new Set(targetIds);
+      if (!entry.whisperTargetIds.size) entry.whisperActive = false;
+      sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
+    } else if (command.type === "setWhisperActive") {
+      const active = command.payload.active as boolean;
+      if (active && !entry.whisperTargetIds.size) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "NO_WHISPER_TARGETS", message: "请先选择私语目标", recoverable: false } });
+        return;
+      }
+      entry.whisperActive = active;
+      sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
     }
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {

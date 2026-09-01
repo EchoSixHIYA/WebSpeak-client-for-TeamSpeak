@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageRoot = path.join(root, "node_modules", "@honeybbq", "teamspeak-client");
 const marker = "webspeak-directory-snapshot-v2";
+const whisperMarker = "webspeak-team-whisper-v1";
 
 const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
 if (packageJson.version !== "0.2.2") {
@@ -13,17 +14,51 @@ if (packageJson.version !== "0.2.2") {
 
 const cjsPath = path.join(packageRoot, "dist", "index.cjs");
 const mjsPath = path.join(packageRoot, "dist", "index.mjs");
-const [cjs, mjs] = await Promise.all([
+const handlerCjsPath = path.join(packageRoot, "dist", "handler-CqCD93f0.cjs");
+const handlerMjsPath = path.join(packageRoot, "dist", "handler-C_JhqGTd.js");
+const [cjs, mjs, handlerCjs, handlerMjs] = await Promise.all([
   readFile(cjsPath, "utf8"),
   readFile(mjsPath, "utf8"),
+  readFile(handlerCjsPath, "utf8"),
+  readFile(handlerMjsPath, "utf8"),
 ]);
 
-const patchedCjs = patchCjs(cjs);
-const patchedMjs = patchMjs(mjs);
+const patchedCjs = patchWhisperClient(patchCjs(cjs), "cjs");
+const patchedMjs = patchWhisperClient(patchMjs(mjs), "mjs");
+const patchedHandlerCjs = patchWhisperHandler(handlerCjs, "cjs");
+const patchedHandlerMjs = patchWhisperHandler(handlerMjs, "mjs");
 await Promise.all([
   writeFile(cjsPath, patchedCjs, "utf8"),
   writeFile(mjsPath, patchedMjs, "utf8"),
+  writeFile(handlerCjsPath, patchedHandlerCjs, "utf8"),
+  writeFile(handlerMjsPath, patchedHandlerMjs, "utf8"),
 ]);
+
+function patchWhisperClient(source, format) {
+  if (source.includes(whisperMarker)) return source;
+  if (format === "cjs") {
+    const needle = "sendVoice(e,t){this.handler.sendVoicePacket(e,t)}";
+    if (!source.includes(needle)) throw new Error("Could not patch CJS SDK client whisper method");
+    return source.replace(needle, `${needle}sendWhisper(e,t,n){this.handler.sendWhisperPacket(e,t,n)}`) + `/* ${whisperMarker} */`;
+  }
+  const needle = "\tsendVoice(e, t) {\n\t\tthis.handler.sendVoicePacket(e, t);\n\t}\n";
+  if (!source.includes(needle)) throw new Error("Could not patch MJS SDK client whisper method");
+  return source.replace(needle, `${needle}\tsendWhisper(e, t, n) {\n\t\tthis.handler.sendWhisperPacket(e, t, n);\n\t}\n`) + `/* ${whisperMarker} */`;
+}
+
+function patchWhisperHandler(source, format) {
+  if (source.includes(whisperMarker)) return source;
+  if (format === "cjs") {
+    const needle = "this.#b(u)}close(){";
+    if (!source.includes(needle)) throw new Error("Could not patch CJS SDK whisper packet handler");
+    const method = `/* ${whisperMarker} */sendWhisperPacket(e,t,n){if(t.length>32)throw new Error(\`too many whisper targets\`);let a=this.#c[r.VoiceWhisper],o=this.#l[r.VoiceWhisper];this.#c[r.VoiceWhisper]=a+1&65535,this.#c[r.VoiceWhisper]===0&&this.#l[r.VoiceWhisper]++;let s=5+2*t.length+e.length,l=new Uint8Array(s),u=new DataView(l.buffer);u.setUint16(0,a,!1),l[2]=n,l[3]=0,l[4]=t.length;for(let n=0;n<t.length;n++)u.setUint16(5+2*n,t[n],!1);l.set(e,5+2*t.length);let c0=c({typeFlagged:r.VoiceWhisper|i.Unencrypted,id:a,clientID:this.#r,generationID:o,data:l,receivedAt:0}),d=new Uint8Array(x+b+s);d.set(this.#e.fakeSignature,0),d.set(c0,x),d.set(l,x+b),this.#b(d)}`;
+    return source.replace(needle, `this.#b(u)}${method}close(){`);
+  }
+  const needle = "this.#b(u);\n\t}\n\tclose() {";
+  if (!source.includes(needle)) throw new Error("Could not patch MJS SDK whisper packet handler");
+  const method = `\t/* ${whisperMarker} */\n\tsendWhisperPacket(e, t, n) {\n\t\tif (t.length > 32) throw new Error("too many whisper targets");\n\t\tlet a = this.#c[r.VoiceWhisper], o = this.#l[r.VoiceWhisper];\n\t\tthis.#c[r.VoiceWhisper] = a + 1 & 65535;\n\t\tif (this.#c[r.VoiceWhisper] === 0) this.#l[r.VoiceWhisper]++;\n\t\tconst s = 5 + 2 * t.length + e.length, l = new Uint8Array(s), u = new DataView(l.buffer);\n\t\tu.setUint16(0, a, false);\n\t\tl[2] = n;\n\t\tl[3] = 0;\n\t\tl[4] = t.length;\n\t\tfor (let n = 0; n < t.length; n++) u.setUint16(5 + 2 * n, t[n], false);\n\t\tl.set(e, 5 + 2 * t.length);\n\t\tconst c0 = c({ typeFlagged: r.VoiceWhisper | i.Unencrypted, id: a, clientID: this.#r, generationID: o, data: l, receivedAt: 0 });\n\t\tconst d = new Uint8Array(x + b + s);\n\t\td.set(this.#e.fakeSignature, 0);\n\t\td.set(c0, x);\n\t\td.set(l, x + b);\n\t\tthis.#b(d);\n\t}\n\tclose() {`;
+  return source.replace(needle, `this.#b(u);\n\t}\n${method}`);
+}
 
 function patchCjs(source) {
   if (source.includes(marker) || source.includes("webspeak-directory-snapshot")) return source;
