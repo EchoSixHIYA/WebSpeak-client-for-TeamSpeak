@@ -30,6 +30,18 @@ export interface AudioInputDevice {
   groupId: string;
 }
 
+export interface AudioOutputDevice {
+  deviceId: string;
+  label: string;
+  groupId: string;
+}
+
+export type AudioPermission = "unknown" | "granted" | "denied";
+
+type SinkAudioContext = AudioContext & {
+  setSinkId?: (sinkId: string) => Promise<void>;
+};
+
 export interface ChannelInfo {
   id: string;
   parentID: string;
@@ -75,23 +87,34 @@ export function useVoiceWebSocket() {
   // Audio capture. The ScriptProcessor path remains the most compatible option
   // for the current browser support matrix, but the graph now has an explicit
   // input gain and a silent output to avoid monitoring the microphone locally.
-  let audioCtx: AudioContext | null = null;
+  let audioCtx: SinkAudioContext | null = null;
   let micStream: MediaStream | null = null;
   let scriptNode: ScriptProcessorNode | null = null;
   let micSource: MediaStreamAudioSourceNode | null = null;
   let micGain: GainNode | null = null;
   let silentGain: GainNode | null = null;
   const inputDevices = reactive<AudioInputDevice[]>([]);
+  const outputDevices = reactive<AudioOutputDevice[]>([]);
   const selectedInputDeviceId = ref(typeof localStorage !== "undefined" ? localStorage.getItem("webspeak:input-device") ?? "" : "");
+  const selectedOutputDeviceId = ref(typeof localStorage !== "undefined" ? localStorage.getItem("webspeak:output-device") ?? "" : "");
+  const outputDeviceSupported = ref(false);
+  const audioPermission = ref<AudioPermission>("unknown");
+  const audioContextState = ref<AudioContextState | "unknown">("unknown");
   const micLevel = ref(0);
   const microphoneTestActive = ref(false);
+  const testAudioUrl = ref("");
+  let testRecorder: MediaRecorder | null = null;
+  let testRecorderTimer: ReturnType<typeof setTimeout> | null = null;
   let pttPressed = false;
   const micMode = ref<"vox" | "ptt">("vox");
   const inputVolume = ref(1);
   const outputVolume = ref(1);
-  let voxHold = 0;
+  const notificationVolume = ref(0.5);
+  const voxThreshold = ref(0.008);
+  let voxAttack = 0;
+  let voxRelease = 0;
   const VOX_HOLD = 15;
-  const VOX_THRESHOLD = 0.008;
+  const VOX_ATTACK_FRAMES = 2;
   let convBuf = new Int16Array(1024);
   let accumBuf = new Int16Array(2048);
   let accumLen = 0;
@@ -106,6 +129,8 @@ export function useVoiceWebSocket() {
   const speakingIds = reactive(new Set<number>());
   const speakingTimers = new Map<number, ReturnType<typeof setTimeout>>();
   const SPEAKING_HOLD_MS = 360;
+  const MAX_AUDIO_BUFFERED_BYTES = 192_000;
+  let droppedAudioFrames = 0;
 
   async function saveAudioPreferences(): Promise<void> {
     await saveLocalPreferences({
@@ -113,8 +138,11 @@ export function useVoiceWebSocket() {
       preferredInputDeviceId: selectedInputDeviceId.value,
       inputDeviceId: selectedInputDeviceId.value,
       voiceMode: micMode.value,
+      voxThreshold: voxThreshold.value,
       inputGain: inputVolume.value,
       outputVolume: outputVolume.value,
+      notificationVolume: notificationVolume.value,
+      preferredOutputDeviceId: selectedOutputDeviceId.value,
       volumesByUid: { ...storedVolumesByUid },
     });
   }
@@ -130,8 +158,11 @@ export function useVoiceWebSocket() {
   void loadLocalPreferences().then((preferences) => {
     if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
     if (preferences.voiceMode === "vox" || preferences.voiceMode === "ptt") micMode.value = preferences.voiceMode;
+    if (typeof preferences.voxThreshold === "number") voxThreshold.value = clamp(preferences.voxThreshold, 0.001, 0.08);
     if (typeof preferences.inputGain === "number") inputVolume.value = Math.max(0, Math.min(1, preferences.inputGain));
     if (typeof preferences.outputVolume === "number") outputVolume.value = Math.max(0, Math.min(1, preferences.outputVolume));
+    if (!selectedOutputDeviceId.value) selectedOutputDeviceId.value = preferences.preferredOutputDeviceId ?? "";
+    if (typeof preferences.notificationVolume === "number") notificationVolume.value = clamp(preferences.notificationVolume, 0, 1);
     Object.assign(storedVolumesByUid, preferences.volumesByUid ?? {});
     syncKnownMemberVolumes();
   });
@@ -161,15 +192,40 @@ export function useVoiceWebSocket() {
     speakingIds.clear();
   }
 
-  function getAudioCtx(): AudioContext {
-    if (!audioCtx) audioCtx = new AudioContext({ sampleRate: 48000 });
+  function getAudioCtx(): SinkAudioContext {
+    if (!audioCtx) {
+      audioCtx = new AudioContext({ sampleRate: 48000 }) as SinkAudioContext;
+      audioContextState.value = audioCtx.state;
+      audioCtx.addEventListener("statechange", () => {
+        if (audioCtx) audioContextState.value = audioCtx.state;
+      });
+      outputDeviceSupported.value = typeof audioCtx.setSinkId === "function";
+      if (selectedOutputDeviceId.value && outputDeviceSupported.value) {
+        void setAudioSink(audioCtx, selectedOutputDeviceId.value).catch(() => undefined);
+      }
+    }
     return audioCtx;
+  }
+
+  function clamp(value: number, minimum: number, maximum: number): number {
+    return Math.max(minimum, Math.min(maximum, value));
+  }
+
+  async function setAudioSink(ctx: SinkAudioContext, deviceId: string): Promise<void> {
+    if (!ctx.setSinkId) {
+      outputDeviceSupported.value = false;
+      if (deviceId) throw new Error("当前浏览器不支持扬声器设备选择，将使用默认输出设备");
+      return;
+    }
+    outputDeviceSupported.value = true;
+    await ctx.setSinkId(deviceId || "default");
   }
 
   function checkSupport(): string | null {
     if (typeof window === "undefined") return null;
     if (!window.isSecureContext) return "语音功能需要 HTTPS 安全连接";
     if (!navigator.mediaDevices?.getUserMedia) return "当前浏览器不支持麦克风访问";
+    if (typeof AudioContext === "undefined") return "当前浏览器不支持 Web Audio 音频处理";
     if (typeof AudioDecoder === "undefined") return "当前浏览器不支持音频解码，请使用最新版 Chrome 或 Edge";
     return null;
   }
@@ -186,21 +242,37 @@ export function useVoiceWebSocket() {
     return constraints;
   }
 
-  async function refreshInputDevices(): Promise<void> {
+  async function refreshAudioDevices(): Promise<void> {
     if (!navigator.mediaDevices?.enumerateDevices) {
       inputDevices.length = 0;
+      outputDevices.length = 0;
       return;
     }
     const devices = await navigator.mediaDevices.enumerateDevices();
     const microphones = devices
       .filter((device) => device.kind === "audioinput")
       .map((device) => ({ deviceId: device.deviceId, label: device.label, groupId: device.groupId }));
+    const speakers = devices
+      .filter((device) => device.kind === "audiooutput")
+      .map((device) => ({ deviceId: device.deviceId, label: device.label, groupId: device.groupId }));
     inputDevices.splice(0, inputDevices.length, ...microphones);
+    outputDevices.splice(0, outputDevices.length, ...speakers);
     if (selectedInputDeviceId.value && !microphones.some((device) => device.deviceId === selectedInputDeviceId.value)) {
-      selectedInputDeviceId.value = microphones[0]?.deviceId ?? "";
+      selectedInputDeviceId.value = "";
       localStorage.setItem("webspeak:input-device", selectedInputDeviceId.value);
       void saveAudioPreferences();
+      if (micStream) void startMicrophone().catch(() => undefined);
     }
+    if (selectedOutputDeviceId.value && !speakers.some((device) => device.deviceId === selectedOutputDeviceId.value)) {
+      selectedOutputDeviceId.value = "";
+      localStorage.setItem("webspeak:output-device", "");
+      void saveAudioPreferences();
+      if (audioCtx && outputDeviceSupported.value) void setAudioSink(audioCtx, "").catch(() => undefined);
+    }
+  }
+
+  async function refreshInputDevices(): Promise<void> {
+    await refreshAudioDevices();
   }
 
   async function startMicrophone(): Promise<void> {
@@ -208,7 +280,14 @@ export function useVoiceWebSocket() {
     if (ctx.state === "suspended") await ctx.resume();
     // Acquire the replacement stream before tearing down the current graph so
     // changing devices does not interrupt an active microphone on failure.
-    const nextStream = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints() });
+    let nextStream: MediaStream;
+    try {
+      nextStream = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints() });
+      audioPermission.value = "granted";
+    } catch (error) {
+      if (error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name)) audioPermission.value = "denied";
+      throw error;
+    }
     stopMicrophone(false);
     micStream = nextStream;
 
@@ -224,12 +303,24 @@ export function useVoiceWebSocket() {
       let sum = 0;
       for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       micLevel.value = Math.min(1, Math.sqrt(sum / Math.max(1, input.length)) * 6);
-      const shouldSend = micMode.value === "ptt" ? pttPressed : voxGate(input);
+      const socket = ws.value;
+      const shouldSend = !microphoneTestActive.value
+        && socket?.readyState === WebSocket.OPEN
+        && (micMode.value === "ptt" ? pttPressed : voxGate(input));
       if (!shouldSend) {
         accumLen = 0;
         return;
       }
-      if (ws.value?.readyState === WebSocket.OPEN) markSpeaking(state.tsClientId);
+      if (!socket) {
+        accumLen = 0;
+        return;
+      }
+      if (socket.bufferedAmount > MAX_AUDIO_BUFFERED_BYTES) {
+        accumLen = 0;
+        droppedAudioFrames++;
+        return;
+      }
+      markSpeaking(state.tsClientId);
 
       if (convBuf.length < input.length) convBuf = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
@@ -243,8 +334,8 @@ export function useVoiceWebSocket() {
       accumLen = need;
 
       let offset = 0;
-      while (offset + 960 <= accumLen && ws.value?.readyState === WebSocket.OPEN) {
-        ws.value.send(accumBuf.slice(offset, offset + 960).buffer);
+      while (offset + 960 <= accumLen && socket.readyState === WebSocket.OPEN && socket.bufferedAmount <= MAX_AUDIO_BUFFERED_BYTES) {
+        socket.send(accumBuf.slice(offset, offset + 960).buffer);
         offset += 960;
       }
       accumLen -= offset;
@@ -255,7 +346,7 @@ export function useVoiceWebSocket() {
     micGain.connect(scriptNode);
     scriptNode.connect(silentGain);
     silentGain.connect(ctx.destination);
-    await refreshInputDevices();
+    await refreshAudioDevices();
   }
 
   async function ensureMicrophone(): Promise<void> {
@@ -273,12 +364,14 @@ export function useVoiceWebSocket() {
     const count = Math.min(256, samples.length);
     for (let i = 0; i < count; i++) sum += samples[i] * samples[i];
     const rms = Math.sqrt(sum / count);
-    if (rms > VOX_THRESHOLD) {
-      voxHold = VOX_HOLD;
-      return true;
+    if (rms >= voxThreshold.value) {
+      voxAttack = Math.min(VOX_ATTACK_FRAMES, voxAttack + 1);
+      voxRelease = VOX_HOLD;
+      return voxAttack >= VOX_ATTACK_FRAMES;
     }
-    if (voxHold > 0) {
-      voxHold--;
+    voxAttack = 0;
+    if (voxRelease > 0) {
+      voxRelease--;
       return true;
     }
     return false;
@@ -286,7 +379,8 @@ export function useVoiceWebSocket() {
 
   function stopMicrophone(closeContext = true): void {
     accumLen = 0;
-    voxHold = 0;
+    voxAttack = 0;
+    voxRelease = 0;
     micLevel.value = 0;
     scriptNode?.disconnect();
     micGain?.disconnect();
@@ -306,7 +400,7 @@ export function useVoiceWebSocket() {
 
   async function prepareInputDevices(): Promise<void> {
     if (!micStream) await startMicrophone();
-    else await refreshInputDevices();
+    else await refreshAudioDevices();
   }
 
   async function setInputDevice(deviceId: string): Promise<void> {
@@ -316,7 +410,7 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
     try {
       if (micStream) await startMicrophone();
-      await refreshInputDevices();
+      await refreshAudioDevices();
     } catch (error) {
       selectedInputDeviceId.value = previousDeviceId;
       localStorage.setItem("webspeak:input-device", previousDeviceId);
@@ -325,13 +419,87 @@ export function useVoiceWebSocket() {
   }
 
   async function startMicrophoneTest(): Promise<void> {
-    await prepareInputDevices();
     microphoneTestActive.value = true;
+    if (testAudioUrl.value) {
+      URL.revokeObjectURL(testAudioUrl.value);
+      testAudioUrl.value = "";
+    }
+    try {
+      await prepareInputDevices();
+      if (typeof MediaRecorder !== "undefined" && micStream) {
+        const chunks: Blob[] = [];
+        const recorder = new MediaRecorder(micStream);
+        testRecorder = recorder;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size) chunks.push(event.data);
+        };
+        recorder.onstop = () => {
+          if (chunks.length) {
+            testAudioUrl.value = URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+          }
+          if (testRecorder === recorder) testRecorder = null;
+        };
+        recorder.start();
+        testRecorderTimer = setTimeout(() => stopMicrophoneTest(), 5_000);
+      }
+    } catch (error) {
+      microphoneTestActive.value = false;
+      throw error;
+    }
   }
 
   function stopMicrophoneTest(): void {
     microphoneTestActive.value = false;
+    if (testRecorderTimer) clearTimeout(testRecorderTimer);
+    testRecorderTimer = null;
+    if (testRecorder && testRecorder.state !== "inactive") testRecorder.stop();
     if (!state.connected) stopMicrophone();
+  }
+
+  async function setOutputDevice(deviceId: string): Promise<void> {
+    const previousDeviceId = selectedOutputDeviceId.value;
+    if (deviceId && !outputDevices.some((device) => device.deviceId === deviceId)) {
+      throw new Error("所选扬声器当前不可用");
+    }
+    selectedOutputDeviceId.value = deviceId;
+    localStorage.setItem("webspeak:output-device", deviceId);
+    try {
+      await setAudioSink(getAudioCtx(), deviceId);
+      await saveAudioPreferences();
+    } catch (error) {
+      selectedOutputDeviceId.value = previousDeviceId;
+      localStorage.setItem("webspeak:output-device", previousDeviceId);
+      throw error;
+    }
+  }
+
+  function playNotification(kind: "connected" | "disconnected" | "poke" | "private" | "reconnectFailed"): void {
+    if (notificationVolume.value <= 0 || typeof window === "undefined") return;
+    try {
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") return;
+      const frequencies: Record<typeof kind, number[]> = {
+        connected: [660, 880],
+        disconnected: [440, 330],
+        poke: [740, 980],
+        private: [600, 760],
+        reconnectFailed: [300, 220],
+      };
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime;
+      oscillator.frequency.setValueAtTime(frequencies[kind][0], now);
+      oscillator.frequency.setValueAtTime(frequencies[kind][1], now + 0.08);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, notificationVolume.value * 0.12), now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.2);
+    } catch {
+      // Notification sounds are best effort and must never affect the session.
+    }
   }
 
   function playAudioFrame(clientId: number, opusData: Uint8Array): void {
@@ -736,6 +904,16 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
+  function setVoxThreshold(threshold: number): void {
+    voxThreshold.value = clamp(threshold, 0.001, 0.08);
+    void saveAudioPreferences();
+  }
+
+  function setNotificationVolume(volume: number): void {
+    notificationVolume.value = clamp(volume, 0, 1);
+    void saveAudioPreferences();
+  }
+
   return {
     ws,
     state,
@@ -747,20 +925,33 @@ export function useVoiceWebSocket() {
     micMode,
     inputVolume,
     outputVolume,
+    notificationVolume,
+    voxThreshold,
     inputDevices,
+    outputDevices,
     selectedInputDeviceId,
+    selectedOutputDeviceId,
+    outputDeviceSupported,
+    audioPermission,
+    audioContextState,
     identityMaterial,
     micLevel,
     microphoneTestActive,
+    testAudioUrl,
     speakingIds,
     volumes,
     setVolume,
     setInputVolume,
     setOutputVolume,
+    setVoxThreshold,
+    setNotificationVolume,
     prepareInputDevices,
+    refreshAudioDevices,
     setInputDevice,
+    setOutputDevice,
     startMicrophoneTest,
     stopMicrophoneTest,
+    playNotification,
     connect,
     reconnectNow,
     disconnect,

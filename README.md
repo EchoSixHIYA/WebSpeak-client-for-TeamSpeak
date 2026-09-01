@@ -13,7 +13,10 @@ WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关
 - Session 生命周期统一管理：连接状态机、WebSocket 心跳、幂等清理和优雅关闭。
 - TeamSpeak 临时断线自动重连，固定退避策略最长持续 5 分钟；认证失败不会无限重试，并尽量恢复原频道。
 - 完整频道/成员树、频道切换、频道文字聊天和成员实时移动。
-- PCM/Opus 语音桥接、自由麦、按键说话、麦克风选择与音量控制。
+- PCM/Opus 语音桥接、自由麦、按键说话、麦克风与扬声器设备选择、输入/输出音量控制。
+- 音频设置显示权限、实时麦克风音量和 VOX 阈值；VOX 带 attack/hold/release，设备热插拔时自动回退默认设备。
+- 移动端提供不会因触控取消而卡住的“按住说话”；麦克风测试最多录制 5 秒并只在本地播放，不发送到 TeamSpeak。
+- 支持连接、断开、Poke、私聊和重连失败提示音；浏览器不支持输出设备选择时明确降级到默认输出。
 - 发言成员头像显示绿色动态边框。
 - 频道、服务器和私聊独立标签；成员菜单支持私聊、Poke、复制昵称，频道密码按次输入且不持久化。
 - Away、成员状态图标、Session 内服务器事件日志和人类可读的 TeamSpeak 权限错误。
@@ -187,7 +190,7 @@ npm run dev
 # 前端开发服务；/api 和 /ws 代理到 3040
 npm run web:dev
 
-# 自动测试（覆盖 M000–M005）
+# 自动测试（覆盖 M000–M007 已实现的后端协议与安全边界）
 npm test
 
 # 后端类型检查与构建
@@ -228,7 +231,10 @@ WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser 
 - Managed session lifecycle with a connection state machine, WebSocket heartbeat, idempotent teardown, and graceful shutdown.
 - Temporary TeamSpeak failures recover with bounded jittered backoff for up to five minutes; authentication failures are not retried forever, and the previous channel is restored when possible.
 - Channel/member directory, channel switching, channel text chat, and live member movement.
-- PCM/Opus voice bridge, VOX, push-to-talk, microphone selection, and volume controls.
+- PCM/Opus voice bridge, VOX, push-to-talk, input/output device selection, and clamped volume controls.
+- Audio diagnostics expose permission, live mic level, VOX threshold, and audio context state; device hotplug falls back to the default input/output.
+- Mobile push-to-talk handles pointer cancellation and focus loss; local microphone tests record at most five seconds and never send to TeamSpeak.
+- Built-in sounds cover connection, disconnection, poke, private messages, and failed reconnects, with a clear default-output fallback when the browser lacks output selection.
 - Independent channel, server, and private chat tabs; member actions for private message, poke, and nickname copy; channel passwords are entered per session only.
 - Away, member status icons, a session-local server event log, and readable TeamSpeak permission errors.
 - Bilingual guest UI and bilingual admin console.

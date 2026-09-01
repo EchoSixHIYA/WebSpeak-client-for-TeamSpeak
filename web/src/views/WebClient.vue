@@ -157,11 +157,12 @@
                   </article>
                 </template>
               </div>
-              <form v-if="chatTab !== 'events'" class="message-composer" @submit.prevent="submitMessage">
-                <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
-                <button class="send-button" type="submit" :disabled="!messageDraft.trim()" :title="t('send')"><Icon name="send" :size="18" /></button>
-              </form>
-            </section>
+               <form v-if="chatTab !== 'events'" class="message-composer" @submit.prevent="submitMessage">
+                 <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
+                 <button class="send-button" type="submit" :disabled="!messageDraft.trim()" :title="t('send')"><Icon name="send" :size="18" /></button>
+               </form>
+               <button v-if="micMode === 'ptt'" type="button" class="mobile-ptt-button" :class="{ active: pttActive }" @pointerdown.prevent="onMobilePttDown" @pointerup.prevent="onMobilePttUp" @pointercancel.prevent="onMobilePttUp" @lostpointercapture="onMobilePttUp"><Icon name="mic" :size="20" /> {{ pttActive ? t('releaseToTalk') : t('holdToTalk') }}</button>
+             </section>
           </div>
         </div>
 
@@ -205,8 +206,8 @@
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
-          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><label class="settings-label">{{ t('microphoneMode') }}</label><div class="mic-mode-switch settings-mode-switch" role="group" :aria-label="t('microphoneMode')"><button type="button" :class="{ active: micMode === 'vox' }" @click="setMicMode('vox')"><Icon name="mic" :size="15" /> {{ t('freeMic') }}</button><button type="button" :class="{ active: micMode === 'ptt' }" @click="setMicMode('ptt')"><Icon name="lock" :size="14" /> {{ t('pushToTalk') }}</button></div><p class="settings-hint">{{ micMode === 'ptt' ? t('pushToTalkHint') : t('micReady') }}</p><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div></div></section>
-          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
+          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><label class="settings-label">{{ t('microphoneMode') }}</label><div class="mic-mode-switch settings-mode-switch" role="group" :aria-label="t('microphoneMode')"><button type="button" :class="{ active: micMode === 'vox' }" @click="setMicMode('vox')"><Icon name="mic" :size="15" /> {{ t('freeMic') }}</button><button type="button" :class="{ active: micMode === 'ptt' }" @click="setMicMode('ptt')"><Icon name="lock" :size="14" /> {{ t('pushToTalk') }}</button></div><p class="settings-hint">{{ micMode === 'ptt' ? t('pushToTalkHint') : t('micReady') }}</p><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div v-if="micMode === 'vox'" class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input v-if="micMode === 'vox'" class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? t('audioReady') : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
     </div>
@@ -236,20 +237,33 @@ const {
   micMode,
   inputVolume,
   outputVolume,
+  notificationVolume,
+  voxThreshold,
   inputDevices,
+  outputDevices,
   selectedInputDeviceId,
+  selectedOutputDeviceId,
+  outputDeviceSupported,
+  audioPermission,
+  audioContextState,
   identityMaterial,
   micLevel,
   microphoneTestActive,
+  testAudioUrl,
   speakingIds,
   volumes,
   setVolume,
   setInputVolume,
   setOutputVolume,
+  setVoxThreshold,
+  setNotificationVolume,
   prepareInputDevices,
+  refreshAudioDevices,
   setInputDevice,
+  setOutputDevice,
   startMicrophoneTest,
   stopMicrophoneTest,
+  playNotification,
   connect,
   reconnectNow,
   disconnect,
@@ -427,6 +441,8 @@ const translations: Record<Language, Record<string, string>> = {
     freeMic: "自由麦",
     pushToTalk: "按键说话",
     pushToTalkHint: "按住空格说话",
+    holdToTalk: "按住说话",
+    releaseToTalk: "松开结束",
     sending: "正在发送",
     micReady: "麦克风已就绪",
     exitVoice: "退出语音",
@@ -465,10 +481,18 @@ const translations: Record<Language, Record<string, string>> = {
     microphoneMode: "麦克风模式",
     defaultMicrophone: "默认浏览器麦克风",
     microphoneNumber: "麦克风 {{index}}",
+    speakerNumber: "扬声器 {{index}}",
+    permission: "权限",
+    permissionUnknown: "尚未请求",
+    permissionGranted: "已允许",
+    permissionDenied: "已拒绝",
     inputVolume: "输入音量",
+    voxThreshold: "语音激活阈值",
+    micLevel: "麦克风音量",
     microphoneTest: "麦克风测试",
     stopTest: "停止测试",
     startTest: "开始测试",
+    localMicTestHint: "本地测试：录音只在浏览器中播放，不会发送到 TeamSpeak。",
     silence: "安静",
     optimal: "最佳",
     loud: "较响",
@@ -476,6 +500,12 @@ const translations: Record<Language, Record<string, string>> = {
     speakers: "扬声器 / 耳机",
     defaultOutput: "默认浏览器输出",
     outputVolume: "输出音量",
+    outputDeviceUnsupported: "当前浏览器不支持扬声器设备选择，将使用默认输出设备。",
+    notificationVolume: "通知音量",
+    audioStatus: "音频状态",
+    audioReady: "音频已就绪",
+    audioSuspended: "音频被浏览器暂停",
+    audioUnknown: "尚未初始化",
     audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
     cancel: "取消",
     saveChanges: "保存更改",
@@ -611,6 +641,8 @@ const translations: Record<Language, Record<string, string>> = {
     freeMic: "Open mic",
     pushToTalk: "Push to talk",
     pushToTalkHint: "Hold Space to talk",
+    holdToTalk: "Hold to talk",
+    releaseToTalk: "Release to stop",
     sending: "Sending",
     micReady: "Microphone ready",
     exitVoice: "Leave voice",
@@ -649,10 +681,18 @@ const translations: Record<Language, Record<string, string>> = {
     microphoneMode: "Microphone mode",
     defaultMicrophone: "Default browser microphone",
     microphoneNumber: "Microphone {{index}}",
+    speakerNumber: "Speaker {{index}}",
+    permission: "Permission",
+    permissionUnknown: "Not requested",
+    permissionGranted: "Granted",
+    permissionDenied: "Denied",
     inputVolume: "Input volume",
+    voxThreshold: "Voice activation threshold",
+    micLevel: "Mic level",
     microphoneTest: "Microphone test",
     stopTest: "Stop test",
     startTest: "Start test",
+    localMicTestHint: "Local test: the recording is played in this browser and never sent to TeamSpeak.",
     silence: "Silence",
     optimal: "Optimal",
     loud: "Loud",
@@ -660,6 +700,12 @@ const translations: Record<Language, Record<string, string>> = {
     speakers: "Speakers / headphones",
     defaultOutput: "Default browser output",
     outputVolume: "Output volume",
+    outputDeviceUnsupported: "Output device selection is not supported by this browser. Using the default output device.",
+    notificationVolume: "Notification volume",
+    audioStatus: "Audio status",
+    audioReady: "Audio ready",
+    audioSuspended: "Audio paused by the browser",
+    audioUnknown: "Not initialized",
     audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
     cancel: "Cancel",
     saveChanges: "Save changes",
@@ -700,7 +746,10 @@ function localizedMessage(message: string) {
   const exact: Record<string, string> = {
     "语音功能需要 HTTPS 安全连接": "Voice requires a secure HTTPS connection",
     "当前浏览器不支持麦克风访问": "This browser does not support microphone access",
+    "当前浏览器不支持 Web Audio 音频处理": "This browser does not support Web Audio processing",
     "当前浏览器不支持音频解码，请使用最新版 Chrome 或 Edge": "Audio decoding is unavailable. Use the latest Chrome or Edge",
+    "当前浏览器不支持扬声器设备选择，将使用默认输出设备": "Output device selection is not supported by this browser. Using the default output device",
+    "所选扬声器当前不可用": "The selected speaker is not available",
     "连接服务器失败，请检查邀请链接或服务器状态": "Could not connect. Check the invite link or server status",
     "TeamSpeak 连接已断开": "The TeamSpeak connection was closed",
     "连接已断开": "The connection was closed",
@@ -825,6 +874,10 @@ watch(channelTree, (list) => {
   }
 }, { deep: true });
 watch([() => chatMessages.length, chatTab, privateClientId], () => nextTick(scrollChatToEnd));
+watch(() => chatMessages.length, (length, previousLength) => {
+  const latest = chatMessages[length - 1];
+  if (latest && length > previousLength && latest.scope === "private" && !latest.isSelf) playNotification("private");
+});
 watch(() => voiceState.errorCode, (code) => {
   if (code !== "CHANNEL_PASSWORD_REQUIRED" || !selectedChannelId.value) return;
   const password = window.prompt(t("channelPasswordPrompt"), "");
@@ -834,6 +887,7 @@ watch(() => pokeNotifications.length, (length, previousLength) => {
   const latest = pokeNotifications[length - 1];
   if (!latest || length <= previousLength) return;
   showToast(`${latest.invokerName} ${t("pokedYou")}${latest.message ? `：${latest.message}` : ""}`);
+  playNotification("poke");
   if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(t("poke"), { body: `${latest.invokerName}: ${latest.message || t("pokedYou")}` });
 });
 watch(settingsOpen, (open) => {
@@ -855,7 +909,11 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
   if (!remember && material) identityMaterial.value = "";
 });
 watch(() => voiceState.connected, (connected) => {
-  if (!connected) return;
+  if (!connected) {
+    stopPointerTalk();
+    return;
+  }
+  playNotification("connected");
   const address = serverAddress.value.trim();
   if (!address) return;
   const recent: RecentServer = {
@@ -868,8 +926,18 @@ watch(() => voiceState.connected, (connected) => {
   };
   void recordRecentServer(recent).then(() => listRecentServers().then((items) => { recentServers.value = items; }));
 });
+watch(() => voiceState.reconnecting, (reconnecting, wasReconnecting) => {
+  if (reconnecting && !wasReconnecting) {
+    stopPointerTalk();
+    playNotification("disconnected");
+  }
+});
+watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
+  if (failed && !wasFailed) playNotification("reconnectFailed");
+});
 
 let deviceChangeHandler: (() => void) | undefined;
+let releasePttHandler: (() => void) | undefined;
 
 onMounted(() => {
   browserError.value = checkSupport() ?? "";
@@ -885,12 +953,20 @@ onMounted(() => {
   });
   void listFavorites().then((items) => { favoriteServers.value = items; });
   void listRecentServers().then((items) => { recentServers.value = items; });
-  deviceChangeHandler = () => { void prepareInputDevices().catch(() => undefined); };
+  deviceChangeHandler = () => { void refreshAudioDevices().catch(() => undefined); };
   navigator.mediaDevices?.addEventListener("devicechange", deviceChangeHandler);
+  releasePttHandler = () => stopPointerTalk();
+  window.addEventListener("blur", releasePttHandler);
+  document.addEventListener("visibilitychange", releasePttHandler);
 });
 onUnmounted(() => {
+  stopPointerTalk();
   disconnect();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
+  if (releasePttHandler) {
+    window.removeEventListener("blur", releasePttHandler);
+    document.removeEventListener("visibilitychange", releasePttHandler);
+  }
   if (toastTimer) clearTimeout(toastTimer);
 });
 
@@ -908,6 +984,7 @@ function doConnect() {
 }
 
 function doDisconnect() {
+  stopPointerTalk();
   disconnect();
   selectedChannelId.value = "";
   showToast(t("leftToast"));
@@ -1127,12 +1204,29 @@ function onOutputVolume(event: Event) {
   setOutputVolume(Number((event.target as HTMLInputElement).value) / 100);
 }
 
+function onVoxThreshold(event: Event) {
+  setVoxThreshold(Number((event.target as HTMLInputElement).value) / 1000);
+}
+
+function onNotificationVolume(event: Event) {
+  setNotificationVolume(Number((event.target as HTMLInputElement).value) / 100);
+}
+
 async function onInputDeviceChange(event: Event) {
   audioSettingsError.value = "";
   try {
     await setInputDevice((event.target as HTMLSelectElement).value);
   } catch (error: unknown) {
     audioSettingsError.value = microphoneErrorMessage(error, "无法切换麦克风");
+  }
+}
+
+async function onOutputDeviceChange(event: Event) {
+  audioSettingsError.value = "";
+  try {
+    await setOutputDevice((event.target as HTMLSelectElement).value);
+  } catch (error: unknown) {
+    audioSettingsError.value = localizedMessage(error instanceof Error ? error.message : "无法切换扬声器");
   }
 }
 
@@ -1191,6 +1285,19 @@ function stopPointerTalk() {
   if (!pttActive.value) return;
   pttActive.value = false;
   setPTT(false);
+}
+
+function onMobilePttDown(event: PointerEvent) {
+  if (micMode.value !== "ptt") return;
+  const target = event.currentTarget as HTMLElement | null;
+  if (target?.setPointerCapture && !target.hasPointerCapture(event.pointerId)) target.setPointerCapture(event.pointerId);
+  startPointerTalk();
+}
+
+function onMobilePttUp(event: PointerEvent) {
+  const target = event.currentTarget as HTMLElement | null;
+  if (target?.releasePointerCapture && target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+  stopPointerTalk();
 }
 </script>
 
@@ -1481,4 +1588,14 @@ function stopPointerTalk() {
 .poke-banner small { font-size: inherit; }
 .poke-banner button { display: grid; place-items: center; padding: 3px; color: #9b8a6e; background: transparent; border-radius: 5px; cursor: pointer; }
 .poke-banner button:hover { color: #735020; background: #f9eed9; }
+.audio-diagnostic, .audio-level-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: #7b8a85; font-size: 11px; }
+.audio-diagnostic strong, .audio-level-row strong { color: #3c625b; font-size: 11px; }
+.permission-denied { color: #b3514b !important; }
+.permission-granted { color: #2d8547 !important; }
+.audio-level-track { height: 7px; margin: 7px 0 17px; overflow: hidden; background: #e8efec; border-radius: 999px; }
+.audio-level-track i { display: block; height: 100%; min-width: 0; background: linear-gradient(90deg, #69c8bb, #58d675); border-radius: inherit; transition: width .08s linear; }
+.test-audio { display: block; width: 100%; height: 34px; margin-top: 11px; }
+.mobile-ptt-button { display: none; align-items: center; justify-content: center; gap: 9px; min-height: 54px; margin-top: 12px; color: #fff; background: #006a64; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
+.mobile-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
+@media (max-width: 740px) { .mobile-ptt-button { display: flex; } }
 </style>
