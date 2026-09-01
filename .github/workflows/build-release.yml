@@ -1,6 +1,9 @@
 name: Build release assets
 
 on:
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
@@ -27,14 +30,15 @@ jobs:
       - name: Build application
         shell: pwsh
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ inputs.version || github.ref_name }}
         run: |
           $ErrorActionPreference = "Stop"
+          $releaseVersion = $env:RELEASE_REF -replace '^v', ''
           npm ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm version --no-git-tag-version $env:RELEASE_VERSION
+          npm version --no-git-tag-version $releaseVersion
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -45,10 +49,11 @@ jobs:
       - name: Package and smoke-test Windows x64
         shell: pwsh
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ inputs.version || github.ref_name }}
         run: |
           $ErrorActionPreference = "Stop"
-          $packageName = "webspeak-webclient-v$env:RELEASE_VERSION-windows-x64"
+          $releaseVersion = $env:RELEASE_REF -replace '^v', ''
+          $packageName = "webspeak-webclient-v$releaseVersion-windows-x64"
           $packageRoot = Join-Path $env:RUNNER_TEMP $packageName
           $runtimeRoot = Split-Path -Parent (Get-Command node).Source
           New-Item -ItemType Directory -Path $packageRoot | Out-Null
@@ -91,7 +96,7 @@ jobs:
               Start-Sleep -Milliseconds 500
               try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:3040/api/health" -TimeoutSec 2 } catch {}
             }
-            if (-not $health -or $health.status -ne "ok" -or $health.version -ne $env:RELEASE_VERSION) {
+            if (-not $health -or $health.status -ne "ok" -or $health.version -ne $releaseVersion) {
               throw "Windows release health check failed"
             }
           } finally {
@@ -101,7 +106,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: webspeak-webclient-v${{ inputs.version }}-windows-x64.zip
+          path: webspeak-webclient-v*-windows-x64.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -118,21 +123,23 @@ jobs:
             web/package-lock.json
       - name: Build application
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ inputs.version || github.ref_name }}
         run: |
           set -euo pipefail
+          release_version="${RELEASE_REF#v}"
           npm ci --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
-          npm version --no-git-tag-version "$RELEASE_VERSION"
+          npm version --no-git-tag-version "$release_version"
           npm --prefix web run build
           npm run build
           npm prune --omit=dev --no-audit --no-fund
       - name: Package and smoke-test Linux x64
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ inputs.version || github.ref_name }}
         run: |
           set -euo pipefail
-          package_name="webspeak-webclient-v${RELEASE_VERSION}-linux-x64"
+          release_version="${RELEASE_REF#v}"
+          package_name="webspeak-webclient-v${release_version}-linux-x64"
           package_root="$RUNNER_TEMP/$package_name"
           runtime_root="$(dirname "$(dirname "$(command -v node)")")"
           mkdir -p "$package_root/web" "$package_root/runtime"
@@ -172,16 +179,37 @@ jobs:
             health=""
             for _ in $(seq 1 30); do
               health="$(curl -fsS --max-time 2 http://127.0.0.1:3040/api/health 2>/dev/null || true)"
-              if grep -q '"status":"ok"' <<<"$health" && grep -q "\"version\":\"$RELEASE_VERSION\"" <<<"$health"; then break; fi
+              if grep -q '"status":"ok"' <<<"$health" && grep -q "\"version\":\"$release_version\"" <<<"$health"; then break; fi
               sleep 0.5
             done
             grep -q '"status":"ok"' <<<"$health"
-            grep -q "\"version\":\"$RELEASE_VERSION\"" <<<"$health"
+            grep -q "\"version\":\"$release_version\"" <<<"$health"
           )
           tar -czf "$GITHUB_WORKSPACE/${package_name}.tar.gz" -C "$RUNNER_TEMP" "$package_name"
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: webspeak-webclient-v${{ inputs.version }}-linux-x64.tar.gz
+          path: webspeak-webclient-v*-linux-x64.tar.gz
           if-no-files-found: error
           compression-level: 0
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-x64, linux-x64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download deployment packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-x64'
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: WebSpeak ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/*

@@ -231,6 +231,14 @@ web/src/
 - 浏览器麦克风权限、HTTPS 与浏览器对音频输出设备的支持会影响最终体验。
 - TeamSpeak 服务端自身的版本、协议兼容性和网络可达性不由 WebSpeak 代替管理。
 
+### 社区
+
+QQ群：`869500475`
+
+加入 QQ 群获取使用帮助、版本更新和交流支持：
+
+![WebSpeak 群聊二维码](group-chat.png)
+
 ## English
 
 WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6: open a link, choose a nickname, and join from a modern browser without installing a desktop client.
