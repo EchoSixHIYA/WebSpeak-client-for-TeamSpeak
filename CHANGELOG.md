@@ -2,7 +2,17 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
-## [Unreleased] — 2026-09-01
+## [0.1.2] — 2026-09-02
+
+### Changed
+
+- Version tags now publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
+
+### Fixed
+
+- Docker builds now copy the root `postinstall` patch script before running `npm ci`.
+
+## [0.1.1] — 2026-09-01
 
 ### Added
 

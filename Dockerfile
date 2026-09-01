@@ -7,6 +7,8 @@ RUN apt-get update \
 
 COPY package.json package-lock.json ./
 COPY web/package.json web/package-lock.json ./web/
+# The root postinstall hook patches the TeamSpeak SDK during npm ci.
+COPY scripts ./scripts
 RUN npm ci
 RUN npm --prefix web ci
 

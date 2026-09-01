@@ -28,7 +28,12 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 ### 更新日志
 
-#### 2026-09-01 · Unreleased
+#### 2026-09-02 · v0.1.2
+
+- 修复 Docker 构建阶段未复制 `postinstall` 脚本导致依赖安装失败的问题。
+- 版本标签现在会自动发布 Windows/Linux 部署包到 GitHub Release，并同步发布 Docker 镜像。
+
+#### 2026-09-01 · v0.1.1
 
 - 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
 - 修复私聊消息到达后网页端断开连接的问题。
@@ -245,7 +250,12 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 ### Changelog
 
-#### 2026-09-01 · Unreleased
+#### 2026-09-02 · v0.1.2
+
+- Fixed the Docker build failing during dependency installation because the `postinstall` patch script was not copied into the build stage.
+- Version tags now publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
+
+#### 2026-09-01 · v0.1.1
 
 - Fixed late WebSpeak browser sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
 - Fixed browser sessions disconnecting after receiving a private message.
