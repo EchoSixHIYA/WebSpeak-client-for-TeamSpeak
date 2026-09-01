@@ -125,6 +125,7 @@
               <div class="section-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2>{{ t('speakingNow') }}</h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
               <div v-if="currentMembers.length" class="voice-grid">
                 <article v-for="member in roomMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]">
+                  <button v-if="isMobileViewport && !member.isSelf" type="button" class="voice-member-action" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="17" /></button>
                   <div class="voice-avatar-wrap"><div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}</div></div>
                   <strong>{{ member.isSelf ? t('you') : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
                 </article>
@@ -136,6 +137,14 @@
                 <button type="button" class="text-button" @click="clearWhisperTargets">{{ t('clearWhisperTargets') }}</button>
                 <button type="button" class="whisper-ptt-button" :class="{ active: whisperPttActive || whisperActive }" :aria-pressed="whisperPttActive || whisperActive" @pointerdown.prevent="onWhisperPttDown" @pointerup.prevent="onWhisperPttUp" @pointercancel.prevent="onWhisperPttUp" @lostpointercapture="onWhisperPttUp"><Icon name="mic" :size="18" /> {{ whisperPttActive || whisperActive ? t('releaseWhisper') : t('whisperHoldToTalk') }}</button>
               </div>
+              <div class="mobile-voice-controls">
+                <div class="mobile-voice-mode" role="group" :aria-label="t('microphoneMode')">
+                  <button type="button" :class="{ active: micMode === 'vox' }" @click="setMicMode('vox')"><Icon name="mic" :size="17" /> {{ t('freeMic') }}</button>
+                  <button type="button" :class="{ active: micMode === 'ptt' }" @click="setMicMode('ptt')"><Icon name="lock" :size="16" /> {{ t('pushToTalk') }}</button>
+                </div>
+                <button type="button" class="mobile-voice-settings" @click="settingsOpen = true"><Icon name="settings" :size="17" /><span>{{ t('audioSettings') }}</span></button>
+              </div>
+              <button v-if="micMode === 'ptt'" type="button" class="mobile-ptt-button" :class="{ active: pttActive }" @pointerdown.prevent="onMobilePttDown" @pointerup.prevent="onMobilePttUp" @pointercancel.prevent="onMobilePttUp" @lostpointercapture="onMobilePttUp"><Icon name="mic" :size="20" /> {{ pttActive ? t('releaseToTalk') : t('holdToTalk') }}</button>
             </section>
 
             <section :class="['chat-panel', { 'mobile-section-hidden': mobileSection !== 'chat' }]">
@@ -163,7 +172,6 @@
                  <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
                  <button class="send-button" type="submit" :disabled="!messageDraft.trim()" :title="t('send')"><Icon name="send" :size="18" /></button>
                </form>
-               <button v-if="micMode === 'ptt'" type="button" class="mobile-ptt-button" :class="{ active: pttActive }" @pointerdown.prevent="onMobilePttDown" @pointerup.prevent="onMobilePttUp" @pointercancel.prevent="onMobilePttUp" @lostpointercapture="onMobilePttUp"><Icon name="mic" :size="20" /> {{ pttActive ? t('releaseToTalk') : t('holdToTalk') }}</button>
              </section>
           </div>
         </div>
@@ -186,6 +194,7 @@
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
+                <button v-if="isMobileViewport && !member.isSelf" type="button" class="member-action-button" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="18" /></button>
               </div>
             </div>
             <div v-else class="channel-no-members">{{ t('noMembersInChannel') }}</div>
@@ -212,8 +221,9 @@
       </nav>
     </div>
 
+    <div v-if="memberMenu && isMobileViewport" class="member-menu-backdrop" @click="memberMenu = null"></div>
     <div v-if="memberMenu" class="member-context-menu" :style="memberMenuStyle" @click.stop>
-      <strong>{{ memberMenu.member.nickname }}</strong>
+      <div class="member-menu-header"><strong>{{ memberMenu.member.nickname }}</strong><button type="button" class="member-menu-close" :aria-label="t('close')" @click="memberMenu = null"><Icon name="close" :size="17" /></button></div>
       <label class="menu-volume"><span>{{ t('memberVolume') }}</span><input type="range" min="0" max="400" :value="(volumes[memberMenu.member.id] ?? 1) * 100" :style="rangeStyle((volumes[memberMenu.member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(memberMenu.member.id, $event)" /></label>
       <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
@@ -337,6 +347,7 @@ const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
+const isMobileViewport = ref(false);
 const whisperPttActive = ref(false);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -1006,6 +1017,8 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 
 let deviceChangeHandler: (() => void) | undefined;
 let releasePttHandler: (() => void) | undefined;
+let viewportMediaQuery: MediaQueryList | undefined;
+let viewportChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   browserError.value = checkSupport() ?? "";
@@ -1027,6 +1040,13 @@ onMounted(() => {
   void listRecentServers().then((items) => { recentServers.value = items; });
   deviceChangeHandler = () => { void refreshAudioDevices().catch(() => undefined); };
   navigator.mediaDevices?.addEventListener("devicechange", deviceChangeHandler);
+  viewportMediaQuery = window.matchMedia("(max-width: 740px)");
+  viewportChangeHandler = () => {
+    isMobileViewport.value = viewportMediaQuery?.matches ?? false;
+    if (!isMobileViewport.value) memberMenu.value = null;
+  };
+  viewportChangeHandler();
+  viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
   releasePttHandler = () => stopPointerTalk();
   window.addEventListener("blur", releasePttHandler);
   document.addEventListener("visibilitychange", releasePttHandler);
@@ -1035,6 +1055,7 @@ onUnmounted(() => {
   stopPointerTalk();
   disconnect();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
+  if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
   if (releasePttHandler) {
     window.removeEventListener("blur", releasePttHandler);
     document.removeEventListener("visibilitychange", releasePttHandler);
@@ -1177,6 +1198,7 @@ function openPrivateChat(clientId: number): void {
   if (!clientId || clientId === voiceState.tsClientId) return;
   privateClientId.value = clientId;
   chatTab.value = "private";
+  if (isMobileViewport.value) mobileSection.value = "chat";
   memberMenu.value = null;
   nextTick(scrollChatToEnd);
 }
@@ -1185,6 +1207,11 @@ function openMemberMenu(member: ChannelMember, event: Event): void {
   if (member.isSelf) return;
   const point = event instanceof MouseEvent ? event : undefined;
   memberMenu.value = { member, x: Math.min((point?.clientX ?? 20), Math.max(12, window.innerWidth - 210)), y: Math.min((point?.clientY ?? 20), Math.max(12, window.innerHeight - 170)) };
+}
+
+function openMemberActions(member: ChannelMember): void {
+  if (member.isSelf) return;
+  memberMenu.value = { member, x: 0, y: 0 };
 }
 
 function toggleWhisperTarget(member: ChannelMember): void {
@@ -1800,4 +1827,138 @@ function stopWhisperTalk(): void {
 :global(:root[data-theme="dark"] *) { scrollbar-color: #438f88 transparent; }
 :global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb) { background: #438f88; border-color: transparent; }
 :global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover) { background: #69c7bc; }
+
+/* Mobile interaction pass: keep the browser viewport fixed and give each
+   mobile surface its own touch-friendly scroll area. */
+.mobile-voice-controls, .voice-member-action, .member-action-button, .member-menu-backdrop { display: none; }
+.member-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.member-menu-close { display: none; }
+
+@media (max-width: 740px) {
+  :global(html), :global(body), :global(#app) { height: 100%; min-height: 100%; max-height: none; }
+  .web-client { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
+  .app-shell { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell .workspace { height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell .workspace-scroll { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .workspace-header { min-height: calc(60px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 14px 0; box-sizing: border-box; position: sticky; top: 0; z-index: 6; background: color-mix(in srgb, var(--surface-1) 94%, transparent); backdrop-filter: blur(14px); }
+  .breadcrumbs { flex: 1 1 auto; min-width: 0; gap: 6px; font-size: 13px; }
+  .breadcrumbs .crumb-muted, .breadcrumbs > .ui-icon { display: none; }
+  .mobile-brand { display: inline; font-size: 18px; }
+  .workspace-actions { flex: 0 0 auto; gap: 3px; }
+  .workspace-actions .header-action { width: 36px; height: 36px; flex-basis: 36px; }
+  .workspace-actions .theme-toggle, .workspace-actions .workspace-language { display: none; }
+  .channel-switcher { max-width: 132px; min-height: 36px; padding-inline: 9px; }
+  .channel-switcher select { max-width: 92px; font-size: 12px; }
+  .disconnect-button { width: 36px; height: 36px; min-height: 36px; margin-left: 0; padding: 0; justify-content: center; }
+  .disconnect-button .ui-icon { display: block; margin: 0; }
+  .disconnect-button span { display: none; }
+  .workspace-content { display: block; width: 100%; max-width: none; min-height: 100%; margin: 0; padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+  .room-hero { min-height: 152px; padding: 22px 20px; border-radius: 18px; }
+  .room-hero h1 { margin-top: 14px; font-size: 25px; }
+  .room-hero p { max-width: 72%; font-size: 12px; }
+  .room-stats { margin-top: 15px; font-size: 11px; }
+  .hero-visual { right: -28px; bottom: -2px; transform: scale(.72); transform-origin: right bottom; }
+  .voice-section { margin-top: 21px; }
+  .section-heading { gap: 10px; }
+  .section-heading h2 { font-size: 22px; }
+  .voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .voice-card { position: relative; min-height: 136px; padding: 18px 8px 14px; border-radius: 16px; }
+  .voice-avatar-wrap, .voice-avatar { width: 60px; height: 60px; }
+  .voice-avatar-wrap { margin-bottom: 10px; }
+  .voice-avatar { font-size: 18px; }
+  .voice-status { width: 21px; height: 21px; }
+  .app-shell .voice-card > strong { max-width: 100%; font-size: 14px; }
+  .app-shell .voice-card > span { margin-top: 4px; font-size: 11px; }
+  .voice-member-action { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-muted); background: color-mix(in srgb, var(--surface-2) 78%, transparent); border-radius: 10px; cursor: pointer; }
+  .voice-member-action:hover, .voice-member-action:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
+  .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
+  .mobile-voice-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1 1 auto; gap: 4px; min-width: 0; }
+  .mobile-voice-mode button, .mobile-voice-settings { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 0; padding: 0 9px; color: var(--text-muted); background: transparent; border-radius: 10px; font-size: 12px; cursor: pointer; }
+  .mobile-voice-mode button.active { color: var(--accent); background: var(--surface-1); box-shadow: 0 3px 9px color-mix(in srgb, var(--text-primary) 10%, transparent); font-weight: 700; }
+  .mobile-voice-settings { flex: 0 0 auto; width: 82px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); }
+  .mobile-voice-settings span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-ptt-button { position: static; min-height: 56px; margin-top: 10px; border-radius: 14px; font-size: 15px; }
+
+  .app-shell .member-panel.mobile-section-visible { display: flex !important; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; max-height: none; padding: 18px 14px 16px; border-top: 0; border-right: 0; overflow: hidden; }
+  .member-panel-heading { flex: 0 0 auto; }
+  .member-panel-heading h2 { font-size: 23px; }
+  .status-button { min-height: 34px; padding-inline: 10px; font-size: 12px; }
+  .member-search { flex: 0 0 auto; min-height: 44px; margin-top: 14px; padding: 0 12px; border-radius: 11px; }
+  .member-search input { font-size: 15px; }
+  .app-shell .member-panel .member-tree { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 12px; padding: 0 2px 4px 0; overflow-y: auto; scrollbar-gutter: stable; }
+  .member-channel-group { padding: 7px 0 12px; }
+  .member-channel-heading { min-height: 44px; padding: 0 9px; border-radius: 11px; font-size: 14px; }
+  .member-channel-heading small { font-size: 12px; }
+  .member-list { gap: 3px; margin-top: 5px; }
+  .member-row { min-height: 58px; margin: 0; padding: 7px 7px; gap: 9px; border-radius: 12px; }
+  .member-avatar { width: 40px; height: 40px; border-radius: 12px; font-size: 12px; }
+  .member-presence { width: 10px; height: 10px; }
+  .member-copy strong { font-size: 14px; }
+  .member-copy span { margin-top: 3px; font-size: 12px; }
+  .member-flags, .member-volume, .member-panel-tip { display: none; }
+  .member-action-button { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; color: var(--text-muted); background: transparent; border-radius: 10px; cursor: pointer; }
+  .member-action-button:hover, .member-action-button:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
+
+  .app-shell.mobile-view-chat .workspace-scroll { overflow: hidden; }
+  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .app-shell.mobile-view-chat .chat-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 0; padding: 0; border-top: 0; }
+  .app-shell.mobile-view-chat .chat-tabs { flex: 0 0 auto; margin-top: 0; padding: 10px 0 9px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+  .app-shell.mobile-view-chat .chat-tabs::-webkit-scrollbar { display: none; }
+  .app-shell.mobile-view-chat .chat-heading { flex: 0 0 auto; padding: 13px 0 9px; }
+  .app-shell.mobile-view-chat .chat-heading h2 { font-size: 21px; }
+  .app-shell.mobile-view-chat .message-list { flex: 1 1 auto; min-height: 0; max-height: none; padding: 10px 2px 16px; overflow-y: auto; overscroll-behavior: contain; }
+  .app-shell.mobile-view-chat .message-row { max-width: 94%; gap: 9px; }
+  .app-shell.mobile-view-chat .message-avatar { width: 36px; height: 36px; }
+  .app-shell.mobile-view-chat .message-meta strong { font-size: 12px; }
+  .app-shell.mobile-view-chat .message-bubble { padding: 10px 12px; font-size: 14px; }
+  .app-shell.mobile-view-chat .message-composer { position: relative; flex: 0 0 auto; min-height: 54px; margin: 0 0 4px; padding: 7px 8px 7px 13px; border: 1px solid var(--border); }
+  .app-shell.mobile-view-chat .message-composer input { font-size: 14px; }
+
+  .mobile-more-panel { width: calc(100% - 28px); max-height: none; margin: 16px auto 0; padding: 18px; border-radius: 18px; overflow-y: auto; }
+  .mobile-more-panel h2 { font-size: 25px; }
+  .mobile-more-panel button { min-height: 52px; font-size: 14px; }
+  .mobile-nav { min-height: 74px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .mobile-nav button { min-height: 52px; font-size: 12px; }
+
+  .member-menu-backdrop { position: fixed; z-index: 39; inset: 0; display: block; background: rgba(13, 29, 26, .38); backdrop-filter: blur(2px); }
+  .member-context-menu { z-index: 40; left: 10px !important; right: 10px; top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; min-width: 0; max-height: calc(100svh - 100px); padding: 12px; border-radius: 18px; box-shadow: 0 18px 42px rgba(13, 38, 33, .25); }
+  .member-menu-header strong { padding: 4px 8px 11px; font-size: 16px; }
+  .member-menu-close { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; padding: 0 !important; color: var(--text-muted); background: var(--surface-2); border-radius: 10px; }
+  .member-context-menu button { min-height: 50px; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
+  .member-context-menu .member-menu-close { min-height: 36px; }
+  .menu-volume { padding: 5px 8px 11px; font-size: 12px; }
+  .menu-volume input { height: 7px; }
+
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .settings-modal { width: 100%; max-height: calc(100svh - env(safe-area-inset-top, 0px)); border-radius: 22px 22px 0 0; }
+  .settings-main { min-height: 0; overflow: hidden; }
+  .settings-header { min-height: 64px; padding-inline: 18px; }
+  .settings-content { min-height: 0; padding: 20px 18px; overflow-y: auto; }
+  .settings-footer { min-height: 68px; padding: 8px 18px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .settings-footer .save-button { min-height: 48px; }
+
+  .join-page { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
+  .join-header { min-height: calc(62px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); box-sizing: border-box; }
+  .join-content { align-items: stretch; justify-content: flex-start; gap: 24px; width: min(100% - 28px, 560px); padding: 24px 0 28px; overflow-y: auto; }
+  .join-copy h1 { margin: 14px 0 14px; font-size: clamp(40px, 12vw, 58px); }
+  .join-description { font-size: 15px; line-height: 1.65; }
+  .promise-list { margin-top: 23px; }
+  .join-card { padding: 22px 18px; border-radius: 18px; }
+  .join-card h2 { font-size: 25px; }
+  .field-grid { grid-template-columns: minmax(0, 1fr) 112px; }
+  .join-footer { width: min(100% - 28px, 560px); }
+}
+
+@media (max-width: 390px) {
+  .workspace-header { padding-inline: 10px; }
+  .channel-switcher { max-width: 112px; }
+  .channel-switcher select { max-width: 72px; }
+  .workspace-actions .header-action { width: 32px; height: 32px; flex-basis: 32px; }
+  .disconnect-button { width: 32px; height: 32px; }
+  .room-hero { padding-inline: 16px; }
+  .mobile-voice-settings { width: 56px; padding-inline: 4px; }
+  .mobile-voice-settings span { display: none; }
+  .join-content { gap: 18px; }
+  .join-card { padding-inline: 15px; }
+}
 </style>
