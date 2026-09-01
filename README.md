@@ -4,7 +4,7 @@
 
 **让 TeamSpeak 真正进入浏览器。**
 
-自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音接入网关。无需安装桌面客户端，无需 ServerQuery，无需维护机器人；打开浏览器，即可进入你的语音空间。
+自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音接入网关。无需安装桌面客户端，打开浏览器即可进入你的语音空间。
 
 [![License](https://img.shields.io/github/license/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&color=0f766e)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-0f766e?style=flat-square)](https://nodejs.org/)
@@ -15,7 +15,7 @@
 
 </div>
 
-> WebSpeak 是一个连接层，而不是 TeamSpeak 服务端替代品。它为每一个浏览器会话建立独立的普通 TeamSpeak Client 连接，并把频道、成员、文字与语音能力安全地带到 Web 端。
+> WebSpeak 是一个面向浏览器的 TeamSpeak 客户端，让频道、成员、文字与语音协作在网页中自然完成。
 
 ## 中文
 
@@ -24,8 +24,7 @@
 | 体验 | WebSpeak 的答案 |
 | --- | --- |
 | 加入方式 | 浏览器打开链接即可加入，不安装桌面客户端 |
-| 数据来源 | 每个浏览器 Session 的独立 TeamSpeak Client 连接 |
-| 服务端依赖 | TeamSpeak 3 / TeamSpeak 6；不依赖 ServerQuery、WebQuery 或维护账号 |
+| 兼容性 | 支持 TeamSpeak 3 / TeamSpeak 6，并自动识别协议 |
 | 连接模型 | HTTPS / WSS 连接 WebSpeak，WebSpeak 连接目标 TeamSpeak |
 | 入口控制 | 固定目标、开放目标、一次性受控邀请三种路径 |
 | 语言与主题 | 访客端和管理控制台均支持中英文与主题切换 |
@@ -40,7 +39,7 @@
 | 成员 | 在线成员、发言绿色头像边框、Away 状态、私聊、Poke、昵称复制、成员音量 |
 | 管理 | 默认账号首次登录强制改密、默认 TeamSpeak 目标、站点信息、真实连接测试 |
 | 运维 | 活动 Session、邀请创建与撤销、审计事件、结构化日志、诊断报告、SQLite 备份 |
-| 浏览器体验 | 响应式布局、移动端按住说话、内部滚动容器、浏览器本地收藏与最近连接 |
+| 浏览器体验 | 响应式布局、移动端按住说话、紧凑滚动布局、浏览器本地收藏与最近连接 |
 
 ### 架构
 
@@ -48,11 +47,9 @@
 flowchart LR
     B[浏览器会话] -->|HTTPS / WSS| G[WebSpeak 网关]
     A[管理控制台] -->|HTTPS| G
-    G -->|每个 Session 一个普通 Client| T[TeamSpeak 3 / 6]
+    G -->|语音与数据连接| T[TeamSpeak 3 / 6]
     T -->|频道 / 成员 / 文字 / 语音| G
 ```
-
-这套模型的关键点是：成员与频道信息来自对应浏览器会话本身。WebSpeak 不需要额外占用一个“维护系统数据”的 TeamSpeak 用户，也不通过 Query 接口拼装一份旁路目录。
 
 ### 快速开始
 
@@ -210,14 +207,14 @@ web/src/
 
 ### 已知边界
 
-- 每个浏览器 Session 都会建立独立的 TeamSpeak Client 连接；服务端固定限制最多 100 个活动 Session。
+- 服务端固定限制最多 100 个活动连接。
 - 管理员模型目前是单管理员，不提供用户列表、角色或权限管理后台。
 - 浏览器麦克风权限、HTTPS 与浏览器对音频输出设备的支持会影响最终体验。
 - TeamSpeak 服务端自身的版本、协议兼容性和网络可达性不由 WebSpeak 代替管理。
 
 ## English
 
-WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6. Each browser session owns an independent normal TeamSpeak client connection, so channel and member state comes from the session itself—there is no ServerQuery, WebQuery, admin token, or maintenance bot.
+WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6. Open a link, choose a nickname, and join from a modern browser.
 
 ### Highlights
 
