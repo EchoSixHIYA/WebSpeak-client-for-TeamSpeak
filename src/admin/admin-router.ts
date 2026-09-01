@@ -1,9 +1,11 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
+import { existsSync, readFileSync } from "node:fs";
 import type { Logger } from "../logger.js";
 import { AdminInputError, AdminService, type AdminSettingsInput } from "./admin-service.js";
 import { AdminSessionStore, isSecureRequest } from "./admin-session.js";
 import { AdminLoginRateLimiter, waitFor } from "./login-rate-limit.js";
 import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
+import type { AdminSessionSummary } from "../server/voice-bridge.js";
 
 export interface AdminRouterOptions {
   service: AdminService;
@@ -11,6 +13,11 @@ export interface AdminRouterOptions {
   logger: Logger;
   getActiveSessions(): number;
   getPeakSessions(): number;
+  getCreatedSessions?: () => number;
+  getSessionSummaries?: () => AdminSessionSummary[];
+  terminateSession?: (id: string) => Promise<boolean>;
+  version?: string;
+  logFile?: string;
   startedAt: number;
 }
 
@@ -95,6 +102,135 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
 
   router.get("/server", (_request, response) => {
     response.json(options.service.getAdminSettings());
+  });
+
+  router.get("/sessions", (_request, response) => {
+    response.json({ sessions: options.getSessionSummaries?.() ?? [] });
+  });
+
+  router.post("/sessions/:id/terminate", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    const id = typeof request.params.id === "string" ? request.params.id : "";
+    if (!options.terminateSession || !id || !(await options.terminateSession(id))) {
+      response.status(404).json({ ok: false, code: "SESSION_NOT_FOUND" });
+      return;
+    }
+    options.service.database.addAudit("ADMIN_SESSION_TERMINATED", { id });
+    response.json({ ok: true });
+  });
+
+  router.get("/invites", (_request, response) => {
+    response.json({ invites: options.service.listManagedInvites() });
+  });
+
+  router.post("/invites", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
+    try {
+      const body = asRecord(request.body);
+      const created = options.service.createManagedInvite({
+        channel: readOptionalString(body, "channel", 100),
+        expiresInHours: readOptionalNumber(body, "expiresInHours", 1),
+        maxUses: readOptionalNumber(body, "maxUses", 0),
+      });
+      response.status(201).json({ ok: true, ...created });
+    } catch (error: unknown) {
+      sendAdminError(response, error);
+    }
+  });
+
+  router.post("/invites/:id/revoke", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
+    try {
+      const id = typeof request.params.id === "string" ? request.params.id : "";
+      if (!id) throw new AdminInputError("INVALID_INVITE_ID", "Invite id is invalid");
+      if (!options.service.revokeManagedInvite(id)) {
+        response.status(404).json({ ok: false, code: "INVITE_NOT_FOUND" });
+        return;
+      }
+      response.json({ ok: true });
+    } catch (error: unknown) {
+      sendAdminError(response, error);
+    }
+  });
+
+  router.get("/audit", (request, response) => {
+    response.json({ events: options.service.database.recentAudit(readLimit(request.query.limit, 50)) });
+  });
+
+  router.get("/logs", (request, response) => {
+    response.json({ available: Boolean(options.logFile && existsSync(options.logFile)), entries: readRecentLogs(options.logFile, readLimit(request.query.limit, 100)) });
+  });
+
+  router.get("/diagnostics", (_request, response) => {
+    const overview = options.service.getOverview(
+      options.getActiveSessions(),
+      options.getPeakSessions(),
+      options.startedAt,
+    ) as unknown as AdminOverview;
+    response.json({
+      generatedAt: new Date().toISOString(),
+      gateway: {
+        version: options.version ?? "0.1.0",
+        uptimeSeconds: overview.gateway.uptimeSeconds,
+        node: process.version,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      sessions: {
+        active: options.getActiveSessions(),
+        peak: options.getPeakSessions(),
+        created: options.getCreatedSessions?.() ?? 0,
+        limit: 100,
+      },
+      teamSpeak: overview.teamSpeak,
+      database: { schemaVersion: options.service.database.schemaVersion },
+      logs: { available: Boolean(options.logFile && existsSync(options.logFile)) },
+    });
+  });
+
+  router.get("/diagnostics/report", (_request, response) => {
+    const overview = options.service.getOverview(
+      options.getActiveSessions(),
+      options.getPeakSessions(),
+      options.startedAt,
+    ) as unknown as AdminOverview;
+    const report = {
+      generatedAt: new Date().toISOString(),
+      gateway: {
+        version: options.version ?? "0.1.0",
+        uptimeSeconds: overview.gateway.uptimeSeconds,
+        node: process.version,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      sessions: {
+        active: options.getActiveSessions(),
+        peak: options.getPeakSessions(),
+        created: options.getCreatedSessions?.() ?? 0,
+        limit: 100,
+      },
+      teamSpeak: {
+        status: overview.teamSpeak.status,
+        protocol: overview.teamSpeak.protocol,
+        lastTestAt: overview.teamSpeak.lastTestAt,
+        latencyMs: overview.teamSpeak.latencyMs,
+        lastError: overview.teamSpeak.lastError,
+      },
+      database: { schemaVersion: options.service.database.schemaVersion },
+      audit: options.service.database.recentAudit(50),
+    };
+    response.setHeader("Content-Type", "application/json; charset=utf-8");
+    response.setHeader("Content-Disposition", `attachment; filename="webspeak-diagnostic-report.json"`);
+    response.send(JSON.stringify(report, null, 2));
+  });
+
+  router.get("/backup", (_request, response) => {
+    try {
+      const backup = options.service.database.exportBackup();
+      options.service.database.addAudit("ADMIN_BACKUP_EXPORTED");
+      response.setHeader("Content-Type", "application/octet-stream");
+      response.setHeader("Content-Disposition", `attachment; filename="webspeak-backup-${new Date().toISOString().slice(0, 10)}.db"`);
+      response.send(backup);
+    } catch {
+      response.status(500).json({ ok: false, code: "BACKUP_FAILED" });
+    }
   });
 
   router.put("/server", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
@@ -216,6 +352,70 @@ function readString(body: Record<string, unknown>, key: string, max: number): st
 
 function readOptionalString(body: Record<string, unknown>, key: string, max: number): string {
   return typeof body[key] === "string" ? body[key].slice(0, max) : "";
+}
+
+function readOptionalNumber(body: Record<string, unknown>, key: string, fallback: number): number {
+  return body[key] === undefined ? fallback : typeof body[key] === "number" ? body[key] : Number.NaN;
+}
+
+function readLimit(value: unknown, fallback: number): number {
+  const limit = typeof value === "string" ? Number(value) : fallback;
+  return Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.floor(limit))) : fallback;
+}
+
+interface AdminLogEntry {
+  timestamp: string | null;
+  level: string;
+  message: string;
+  context: Record<string, string | number | boolean>;
+}
+
+function readRecentLogs(logFile: string | undefined, limit: number): AdminLogEntry[] {
+  if (!logFile) return [];
+  try {
+    const lines = readFileSync(logFile, "utf8").split(/\r?\n/).filter(Boolean).slice(-limit);
+    return lines.map((line) => {
+      try {
+        const raw = JSON.parse(line) as Record<string, unknown>;
+        const context: Record<string, string | number | boolean> = {};
+        for (const key of ["component", "entryId", "code", "reason", "attempt", "target", "nickname", "channel", "reconnect", "port"]) {
+          const value = raw[key];
+          if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") context[key] = value;
+        }
+        return {
+          timestamp: typeof raw.time === "string" ? raw.time : null,
+          level: logLevelName(raw.level),
+          message: typeof raw.msg === "string" ? raw.msg : "",
+          context,
+        };
+      } catch {
+        return { timestamp: null, level: "INFO", message: line.slice(0, 1000), context: {} };
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+
+interface AdminOverview {
+  gateway: { uptimeSeconds: number };
+  teamSpeak: {
+    target: string;
+    status: string;
+    protocol: string | null;
+    lastTestAt: string | null;
+    latencyMs: number | null;
+    lastError: string | null;
+  };
+}
+
+function logLevelName(level: unknown): string {
+  if (level === 10) return "DEBUG";
+  if (level === 30) return "INFO";
+  if (level === 40) return "WARN";
+  if (level === 50) return "ERROR";
+  if (level === 60) return "FATAL";
+  return typeof level === "string" ? level.toUpperCase() : "INFO";
 }
 
 function sendAdminError(response: Response, error: unknown): void {

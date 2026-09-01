@@ -41,6 +41,7 @@ async function main() {
   const webServer = createWebServer({
     port: APP_PORT,
     version: APP_VERSION,
+    logFile: path.join(LOG_DIR, "webspeak.log"),
     staticDir: STATIC_DIR,
     certDir: hasCert ? CERT_DIR : undefined,
     voiceBridgeOptions: {

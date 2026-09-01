@@ -24,6 +24,18 @@ export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
 }
 
+export interface AdminSessionSummary {
+  id: string;
+  nickname: string;
+  target: string;
+  state: string;
+  createdAt: string;
+  ageSeconds: number;
+  tsClientId: number | null;
+  channelId: string | null;
+  memberCount: number;
+}
+
 interface ChannelMember {
   id: number;
   nickname: string;
@@ -499,6 +511,38 @@ export class VoiceBridge {
 
   getCreatedCount(): number {
     return this.sessionManager.createdCount;
+  }
+
+  getSessionSummaries(): AdminSessionSummary[] {
+    const now = Date.now();
+    return [...this.entries.values()]
+      .sort((left, right) => left.session.createdAt - right.session.createdAt)
+      .map((entry) => {
+        let tsClientId: number | null = null;
+        let channelId: string | null = null;
+        try { tsClientId = entry.tsClient.getClientId() || null; } catch { /* still connecting */ }
+        try {
+          const id = entry.tsClient.getChannelId();
+          channelId = id === 0n ? null : id.toString();
+        } catch { /* still connecting */ }
+        return {
+          id: entry.id,
+          nickname: entry.nickname,
+          target: formatTeamSpeakTarget(entry.target),
+          state: entry.session.state,
+          createdAt: new Date(entry.session.createdAt).toISOString(),
+          ageSeconds: Math.max(0, Math.floor((now - entry.session.createdAt) / 1000)),
+          tsClientId,
+          channelId,
+          memberCount: entry.members.size,
+        };
+      });
+  }
+
+  async terminateSession(entryId: string): Promise<boolean> {
+    if (!this.entries.has(entryId)) return false;
+    await this.sessionManager.teardown(entryId, "admin-terminated");
+    return true;
   }
 
   private async teardown(entryId: string, reason: SessionTeardownReason): Promise<void> {

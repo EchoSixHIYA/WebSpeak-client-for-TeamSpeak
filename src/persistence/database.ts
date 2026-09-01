@@ -1,10 +1,11 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 
-export const DATABASE_SCHEMA_VERSION = 1;
+export const DATABASE_SCHEMA_VERSION = 2;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
@@ -28,6 +29,34 @@ export interface SettingsUpdate {
   tsHost: string;
   tsPort: number;
   tsPasswordEncrypted: string | null;
+}
+
+export interface ManagedInviteRecord {
+  id: string;
+  tokenHash: string;
+  targetHost: string;
+  targetPort: number;
+  serverPasswordEncrypted: string | null;
+  channel: string;
+  expiresAt: string;
+  maxUses: number;
+  useCount: number;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+interface ManagedInviteRow extends Record<string, unknown> {
+  id: string;
+  token_hash: string;
+  target_host: string;
+  target_port: number;
+  server_password_encrypted: string | null;
+  channel: string;
+  expires_at: string;
+  max_uses: number;
+  use_count: number;
+  created_at: string;
+  revoked_at: string | null;
 }
 
 interface SettingsRow extends Record<string, unknown> {
@@ -141,6 +170,87 @@ export class WebSpeakDatabase {
     );
   }
 
+  createManagedInvite(record: Omit<ManagedInviteRecord, "createdAt" | "revokedAt" | "useCount">): ManagedInviteRecord {
+    const now = new Date().toISOString();
+    this.transaction(() => {
+      this.database.prepare(
+        `INSERT INTO managed_invites (
+           id, token_hash, target_host, target_port, server_password_encrypted,
+           channel, expires_at, max_uses, use_count, created_at, revoked_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL)`,
+      ).run(
+        record.id,
+        record.tokenHash,
+        record.targetHost,
+        record.targetPort,
+        record.serverPasswordEncrypted,
+        record.channel,
+        record.expiresAt,
+        record.maxUses,
+        now,
+      );
+    });
+    return { ...record, useCount: 0, createdAt: now, revokedAt: null };
+  }
+
+  listManagedInvites(): ManagedInviteRecord[] {
+    const rows = this.database.prepare(
+      "SELECT * FROM managed_invites ORDER BY created_at DESC",
+    ).all() as ManagedInviteRow[];
+    return rows.map(mapManagedInviteRow);
+  }
+
+  revokeManagedInvite(id: string): boolean {
+    const result = this.database.prepare(
+      "UPDATE managed_invites SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+    ).run(new Date().toISOString(), id) as { changes?: number | bigint };
+    return Number(result.changes ?? 0) === 1;
+  }
+
+  consumeManagedInvite(tokenHash: string, now = Date.now()): ManagedInviteRecord | null {
+    const nowIso = new Date(now).toISOString();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const row = this.database.prepare(
+        `SELECT * FROM managed_invites
+         WHERE token_hash = ?
+           AND revoked_at IS NULL
+           AND expires_at > ?
+           AND (max_uses = 0 OR use_count < max_uses)`,
+      ).get(tokenHash, nowIso) as ManagedInviteRow | undefined;
+      if (!row) {
+        this.database.exec("COMMIT");
+        return null;
+      }
+      const result = this.database.prepare(
+        `UPDATE managed_invites
+         SET use_count = use_count + 1
+         WHERE id = ? AND revoked_at IS NULL AND expires_at > ?
+           AND (max_uses = 0 OR use_count < max_uses)`,
+      ).run(row.id, nowIso) as { changes?: number | bigint };
+      if (Number(result.changes ?? 0) !== 1) {
+        this.database.exec("COMMIT");
+        return null;
+      }
+      this.database.exec("COMMIT");
+      return { ...mapManagedInviteRow(row), useCount: row.use_count + 1 };
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  exportBackup(): Buffer {
+    const exportPath = `${this.path}.export-${randomBytes(8).toString("hex")}.db`;
+    try {
+      const escapedPath = exportPath.replaceAll("'", "''");
+      this.database.exec(`VACUUM INTO '${escapedPath}'`);
+      return readFileSync(exportPath);
+    } finally {
+      try { unlinkSync(exportPath); } catch { /* best effort cleanup */ }
+    }
+  }
+
   getMeta(key: string): string | null {
     const row = this.database.prepare("SELECT value FROM metadata WHERE key = ?").get(key) as { value?: string } | undefined;
     return row?.value ?? null;
@@ -165,16 +275,15 @@ export class WebSpeakDatabase {
   }
 
   private migrate(existed: boolean): void {
-    const version = this.schemaVersion;
+    let version = this.schemaVersion;
     if (version > DATABASE_SCHEMA_VERSION) {
       throw new Error(`Database schema ${version} is newer than this WebSpeak build`);
     }
-    if (version === DATABASE_SCHEMA_VERSION) return;
     if (existed && version > 0) {
       copyFileSync(this.path, `${this.path}.schema-${version}.bak`);
     }
-    this.transaction(() => {
-      if (version === 0) {
+    if (version === 0) {
+      this.transaction(() => {
         this.database.exec(`
           CREATE TABLE metadata (
             key TEXT PRIMARY KEY,
@@ -215,9 +324,32 @@ export class WebSpeakDatabase {
              last_test_latency_ms, last_test_error, updated_at
            ) VALUES (1, 'WebSpeak', '', 'fixed', '127.0.0.1', 9987, NULL, NULL, NULL, NULL, NULL, ?)`,
         ).run(now);
-        this.database.exec(`PRAGMA user_version = ${DATABASE_SCHEMA_VERSION}`);
-      }
-    });
+        this.database.exec("PRAGMA user_version = 1");
+      });
+      version = 1;
+    }
+    if (version === 1) {
+      this.transaction(() => {
+        this.database.exec(`
+          CREATE TABLE managed_invites (
+            id TEXT PRIMARY KEY,
+            token_hash TEXT NOT NULL UNIQUE,
+            target_host TEXT NOT NULL,
+            target_port INTEGER NOT NULL CHECK (target_port BETWEEN 1 AND 65535),
+            server_password_encrypted TEXT,
+            channel TEXT NOT NULL DEFAULT '',
+            expires_at TEXT NOT NULL,
+            max_uses INTEGER NOT NULL CHECK (max_uses >= 0),
+            use_count INTEGER NOT NULL DEFAULT 0 CHECK (use_count >= 0),
+            created_at TEXT NOT NULL,
+            revoked_at TEXT
+          );
+          CREATE INDEX managed_invites_token_idx ON managed_invites(token_hash);
+          CREATE INDEX managed_invites_expiry_idx ON managed_invites(expires_at);
+        `);
+        this.database.exec("PRAGMA user_version = 2");
+      });
+    }
   }
 
   private writeSettings(settings: SettingsUpdate, now: string): void {
@@ -253,4 +385,20 @@ export class WebSpeakDatabase {
       throw error;
     }
   }
+}
+
+function mapManagedInviteRow(row: ManagedInviteRow): ManagedInviteRecord {
+  return {
+    id: row.id,
+    tokenHash: row.token_hash,
+    targetHost: row.target_host,
+    targetPort: row.target_port,
+    serverPasswordEncrypted: row.server_password_encrypted,
+    channel: row.channel,
+    expiresAt: row.expires_at,
+    maxUses: row.max_uses,
+    useCount: row.use_count,
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at,
+  };
 }

@@ -15,6 +15,7 @@ import { identityFromString } from "@honeybbq/teamspeak-client";
 export interface WebServerOptions {
   port: number;
   version?: string;
+  logFile?: string;
   staticDir?: string;
   certDir?: string; // path to cert.pem + key.pem for HTTPS
   voiceBridgeOptions: VoiceBridgeOptions;
@@ -71,7 +72,8 @@ export function createWebServer(options: WebServerOptions): WebServer {
     }
     const body = isRecord(request.body) ? request.body : {};
     const nickname = typeof body.nickname === "string" ? body.nickname.trim().slice(0, 30) : "";
-    const channel = typeof body.channel === "string" ? body.channel.trim().slice(0, 100) : "";
+    const requestedChannel = typeof body.channel === "string" ? body.channel.trim().slice(0, 100) : "";
+    const inviteToken = typeof body.invite === "string" ? body.invite.trim().slice(0, 128) : "";
     const requestedIdentity = typeof body.identity === "string" && body.identity.length <= 8192 ? body.identity : "";
     let identity: string | undefined;
     if (requestedIdentity) {
@@ -88,20 +90,28 @@ export function createWebServer(options: WebServerOptions): WebServer {
     }
 
     const policy = options.adminService.getConnectionPolicy();
-    let target = policy.defaultTarget;
-    let serverPassword = policy.serverPassword;
-    try {
-      if (policy.accessMode === "open" && typeof body.target === "string" && body.target.trim()) {
-        target = parseTeamSpeakTarget(body.target);
-        const isDefault = teamSpeakTargetKey(target) === teamSpeakTargetKey(policy.defaultTarget);
-        if (!isDefault) {
-          target = await resolveSafeOpenTarget(target);
-          serverPassword = typeof body.serverPassword === "string" ? body.serverPassword.slice(0, 512) : "";
-        }
-      }
-    } catch {
-      response.status(400).json({ ok: false, code: "TARGET_NOT_ALLOWED" });
+    const managedInvite = inviteToken ? options.adminService.consumeManagedInvite(inviteToken) : null;
+    if (inviteToken && !managedInvite) {
+      response.status(400).json({ ok: false, code: "INVITE_INVALID" });
       return;
+    }
+    let target = managedInvite?.target ?? policy.defaultTarget;
+    let serverPassword = managedInvite?.serverPassword ?? policy.serverPassword;
+    const channel = requestedChannel || managedInvite?.channel || "";
+    if (!managedInvite) {
+      try {
+        if (policy.accessMode === "open" && typeof body.target === "string" && body.target.trim()) {
+          target = parseTeamSpeakTarget(body.target);
+          const isDefault = teamSpeakTargetKey(target) === teamSpeakTargetKey(policy.defaultTarget);
+          if (!isDefault) {
+            target = await resolveSafeOpenTarget(target);
+            serverPassword = typeof body.serverPassword === "string" ? body.serverPassword.slice(0, 512) : "";
+          }
+        }
+      } catch {
+        response.status(400).json({ ok: false, code: "TARGET_NOT_ALLOWED" });
+        return;
+      }
     }
 
     const ticket = options.voiceBridgeOptions.joinTickets.create({
@@ -120,6 +130,11 @@ export function createWebServer(options: WebServerOptions): WebServer {
     logger,
     getActiveSessions: () => voiceBridge.getActiveCount(),
     getPeakSessions: () => voiceBridge.getPeakCount(),
+    getCreatedSessions: () => voiceBridge.getCreatedCount(),
+    getSessionSummaries: () => voiceBridge.getSessionSummaries(),
+    terminateSession: (id) => voiceBridge.terminateSession(id),
+    version: options.version,
+    logFile: options.logFile,
     startedAt,
   }));
 

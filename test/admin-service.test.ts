@@ -63,3 +63,35 @@ test("legacy config imports once, seeds the default admin, and allows password r
   assert.equal(service.getConnectionPolicy().serverPassword, "replacement-secret");
   database.close();
 });
+
+test("managed invites are opaque, bounded, revocable, and included in database backups", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "webspeak-invites-"));
+  const database = new WebSpeakDatabase(path.join(directory, "webspeak.db"));
+  const service = new AdminService(
+    database,
+    loadOrCreateMasterSecret(path.join(directory, "master.key")),
+    silentLogger,
+    path.join(directory, "missing-config.json"),
+  );
+  await service.initialize();
+
+  const created = service.createManagedInvite({ channel: "Lobby", expiresInHours: 2, maxUses: 1 });
+  assert.match(created.token, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(created.invite.channel, "Lobby");
+  assert.equal(created.invite.status, "active");
+  assert.equal("token" in created.invite, false);
+
+  const consumed = service.consumeManagedInvite(created.token);
+  assert.deepEqual(consumed?.target, { host: "127.0.0.1", port: 9987 });
+  assert.equal(consumed?.channel, "Lobby");
+  assert.equal(service.consumeManagedInvite(created.token), null);
+  assert.equal(service.listManagedInvites()[0]?.status, "exhausted");
+
+  const backup = database.exportBackup();
+  assert.ok(backup.length > 100);
+  database.close();
+  const reopened = new WebSpeakDatabase(path.join(directory, "webspeak.db"));
+  assert.equal(reopened.schemaVersion, 2);
+  assert.equal(reopened.listManagedInvites().length, 1);
+  reopened.close();
+});

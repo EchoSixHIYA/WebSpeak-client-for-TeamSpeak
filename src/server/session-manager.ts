@@ -19,6 +19,7 @@ export type SessionTeardownReason =
   | "teamSpeak-disconnect"
   | "teamSpeak-connect-failed"
   | "heartbeat-timeout"
+  | "admin-terminated"
   | "gateway-shutdown";
 
 const ALLOWED_TRANSITIONS: Record<ConnectionState, readonly ConnectionState[]> = {

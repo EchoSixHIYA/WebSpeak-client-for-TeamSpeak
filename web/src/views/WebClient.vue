@@ -306,6 +306,7 @@ const {
 
 const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
+const inviteToken = query.get("invite") ?? "";
 const nickname = ref(localStorage.getItem("webspeak:nickname") ?? "");
 const channel = ref(initialChannel);
 const serverAddress = ref(initialServerAddress());
@@ -1061,7 +1062,7 @@ function doConnect() {
     serverAddress.value = serverAddress.value.trim();
   }
   selectedChannelId.value = "";
-  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "", rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value);
+  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "", rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken);
 }
 
 function doDisconnect() {
