@@ -105,8 +105,7 @@ export function useVoiceWebSocket() {
   const testAudioUrl = ref("");
   let testRecorder: MediaRecorder | null = null;
   let testRecorderTimer: ReturnType<typeof setTimeout> | null = null;
-  let pttPressed = false;
-  const micMode = ref<"vox" | "ptt">("vox");
+  const microphoneMuted = ref(false);
   const inputVolume = ref(1);
   const outputVolume = ref(1);
   const notificationVolume = ref(0.5);
@@ -139,7 +138,7 @@ export function useVoiceWebSocket() {
       schemaVersion: 1,
       preferredInputDeviceId: selectedInputDeviceId.value,
       inputDeviceId: selectedInputDeviceId.value,
-      voiceMode: micMode.value,
+      microphoneMuted: microphoneMuted.value,
       voxThreshold: voxThreshold.value,
       inputGain: inputVolume.value,
       outputVolume: outputVolume.value,
@@ -159,7 +158,7 @@ export function useVoiceWebSocket() {
 
   void loadLocalPreferences().then((preferences) => {
     if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
-    if (preferences.voiceMode === "vox" || preferences.voiceMode === "ptt") micMode.value = preferences.voiceMode;
+    if (typeof preferences.microphoneMuted === "boolean") microphoneMuted.value = preferences.microphoneMuted;
     if (typeof preferences.voxThreshold === "number") voxThreshold.value = clamp(preferences.voxThreshold, 0.001, 0.08);
     if (typeof preferences.inputGain === "number") inputVolume.value = Math.max(0, Math.min(1, preferences.inputGain));
     if (typeof preferences.outputVolume === "number") outputVolume.value = Math.max(0, Math.min(1, preferences.outputVolume));
@@ -306,11 +305,16 @@ export function useVoiceWebSocket() {
       for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       micLevel.value = Math.min(1, Math.sqrt(sum / Math.max(1, input.length)) * 6);
       const socket = ws.value;
-      const shouldSend = !microphoneTestActive.value
+      const shouldSend = !microphoneMuted.value
+        && !microphoneTestActive.value
         && socket?.readyState === WebSocket.OPEN
-        && (micMode.value === "ptt" ? pttPressed : voxGate(input));
+        && voxGate(input);
       if (!shouldSend) {
         accumLen = 0;
+        if (microphoneMuted.value) {
+          voxAttack = 0;
+          voxRelease = 0;
+        }
         return;
       }
       if (!socket) {
@@ -881,14 +885,12 @@ export function useVoiceWebSocket() {
     connect(lastConnection.target, lastConnection.channel, lastConnection.nickname, lastConnection.serverPassword, lastConnection.rememberIdentity ? identityMaterial.value || lastConnection.identity : "", lastConnection.rememberIdentity);
   }
 
-  function setMicMode(mode: "vox" | "ptt"): void {
-    micMode.value = mode;
-    if (mode === "vox") pttPressed = false;
+  function setMicrophoneMuted(muted: boolean): void {
+    microphoneMuted.value = muted;
+    voxAttack = 0;
+    voxRelease = 0;
+    accumLen = 0;
     void saveAudioPreferences();
-  }
-
-  function setPTT(pressed: boolean): void {
-    pttPressed = pressed;
   }
 
   function clearError(): void {
@@ -966,7 +968,7 @@ export function useVoiceWebSocket() {
     chatMessages,
     serverEvents,
     pokeNotifications,
-    micMode,
+    microphoneMuted,
     inputVolume,
     outputVolume,
     notificationVolume,
@@ -1009,8 +1011,7 @@ export function useVoiceWebSocket() {
     setAway,
     setWhisperTargets,
     setWhisperActive,
-    setMicMode,
-    setPTT,
+    setMicrophoneMuted,
     checkSupport,
     clearError,
   };

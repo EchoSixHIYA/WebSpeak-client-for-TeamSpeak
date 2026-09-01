@@ -1,5 +1,5 @@
 <template>
-  <div class="web-client" @keydown="onKeyDown" @keyup="onKeyUp" tabindex="0">
+  <div class="web-client">
     <!-- Connection / welcome screen -->
     <section v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed" class="join-page">
       <header class="join-header">
@@ -95,6 +95,7 @@
               </select>
             </label>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
+            <button class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
             <button class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button>
             <button class="language-switch workspace-language" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button>
@@ -138,13 +139,9 @@
                 <button type="button" class="whisper-ptt-button" :class="{ active: whisperPttActive || whisperActive }" :aria-pressed="whisperPttActive || whisperActive" @pointerdown.prevent="onWhisperPttDown" @pointerup.prevent="onWhisperPttUp" @pointercancel.prevent="onWhisperPttUp" @lostpointercapture="onWhisperPttUp"><Icon name="mic" :size="18" /> {{ whisperPttActive || whisperActive ? t('releaseWhisper') : t('whisperHoldToTalk') }}</button>
               </div>
               <div class="mobile-voice-controls">
-                <div class="mobile-voice-mode" role="group" :aria-label="t('microphoneMode')">
-                  <button type="button" :class="{ active: micMode === 'vox' }" @click="setMicMode('vox')"><Icon name="mic" :size="17" /> {{ t('freeMic') }}</button>
-                  <button type="button" :class="{ active: micMode === 'ptt' }" @click="setMicMode('ptt')"><Icon name="lock" :size="16" /> {{ t('pushToTalk') }}</button>
-                </div>
+                <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
                 <button type="button" class="mobile-voice-settings" @click="settingsOpen = true"><Icon name="settings" :size="17" /><span>{{ t('audioSettings') }}</span></button>
               </div>
-              <button v-if="micMode === 'ptt'" type="button" class="mobile-ptt-button" :class="{ active: pttActive }" @pointerdown.prevent="onMobilePttDown" @pointerup.prevent="onMobilePttUp" @pointercancel.prevent="onMobilePttUp" @lostpointercapture="onMobilePttUp"><Icon name="mic" :size="20" /> {{ pttActive ? t('releaseToTalk') : t('holdToTalk') }}</button>
             </section>
 
             <section :class="['chat-panel', { 'mobile-section-hidden': mobileSection !== 'chat' }]">
@@ -207,6 +204,7 @@
       <section v-if="mobileSection === 'more'" class="mobile-more-panel">
         <span class="section-kicker">{{ t('mobileMore') }}</span>
         <h2>{{ t('mobileMore') }}</h2>
+        <button type="button" :class="{ muted: microphoneMuted }" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button>
         <button type="button" @click="settingsOpen = true"><Icon name="settings" :size="18" /> {{ t('audioSettings') }}</button>
         <button type="button" @click="cycleTheme"><Icon name="monitor" :size="18" /> {{ themeLabel }}</button>
         <button type="button" @click="toggleLanguage"><Icon name="globe" :size="18" /> {{ t('langSwitch') }}</button>
@@ -235,7 +233,7 @@
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
-          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><label class="settings-label">{{ t('microphoneMode') }}</label><div class="mic-mode-switch settings-mode-switch" role="group" :aria-label="t('microphoneMode')"><button type="button" :class="{ active: micMode === 'vox' }" @click="setMicMode('vox')"><Icon name="mic" :size="15" /> {{ t('freeMic') }}</button><button type="button" :class="{ active: micMode === 'ptt' }" @click="setMicMode('ptt')"><Icon name="lock" :size="14" /> {{ t('pushToTalk') }}</button></div><p class="settings-hint">{{ micMode === 'ptt' ? t('pushToTalkHint') : t('micReady') }}</p><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div v-if="micMode === 'vox'" class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input v-if="micMode === 'vox'" class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
           <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? t('audioReady') : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
@@ -265,7 +263,7 @@ const {
   chatMessages,
   serverEvents,
   pokeNotifications,
-  micMode,
+  microphoneMuted,
   inputVolume,
   outputVolume,
   notificationVolume,
@@ -308,8 +306,7 @@ const {
   setAway,
   setWhisperTargets,
   setWhisperActive,
-  setMicMode,
-  setPTT,
+  setMicrophoneMuted,
   checkSupport,
   clearError,
 } = useVoiceWebSocket();
@@ -337,7 +334,6 @@ const messageDraft = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
 const audioSettingsError = ref("");
-const pttActive = ref(false);
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
 const localPersistenceAvailable = isLocalPersistenceAvailable();
@@ -485,13 +481,13 @@ const translations: Record<Language, Record<string, string>> = {
     emojiUnavailable: "表情暂不可用",
     sendMessagePlaceholder: "发送消息给频道成员…",
     send: "发送",
-    freeMic: "自由麦",
-    pushToTalk: "按键说话",
-    pushToTalkHint: "按住空格说话",
-    holdToTalk: "按住说话",
-    releaseToTalk: "松开结束",
+    muteMic: "闭麦",
+    unmuteMic: "开麦",
+    microphoneActive: "麦克风已开启",
+    microphoneMuted: "麦克风已关闭",
+    microphoneActiveHint: "关闭麦克风后不会向服务器发送声音",
+    microphoneMutedHint: "麦克风已关闭，其他人听不到你的声音",
     sending: "正在发送",
-    micReady: "麦克风已就绪",
     exitVoice: "退出语音",
     people: "成员",
     searchMembers: "搜索成员",
@@ -525,7 +521,7 @@ const translations: Record<Language, Record<string, string>> = {
     audioConfiguration: "音频配置",
     inputDevice: "输入设备",
     microphone: "麦克风",
-    microphoneMode: "麦克风模式",
+    microphoneState: "麦克风状态",
     defaultMicrophone: "默认浏览器麦克风",
     microphoneNumber: "麦克风 {{index}}",
     speakerNumber: "扬声器 {{index}}",
@@ -700,13 +696,13 @@ const translations: Record<Language, Record<string, string>> = {
     emojiUnavailable: "Emoji unavailable",
     sendMessagePlaceholder: "Message the channel…",
     send: "Send",
-    freeMic: "Open mic",
-    pushToTalk: "Push to talk",
-    pushToTalkHint: "Hold Space to talk",
-    holdToTalk: "Hold to talk",
-    releaseToTalk: "Release to stop",
+    muteMic: "Mute mic",
+    unmuteMic: "Unmute mic",
+    microphoneActive: "Microphone on",
+    microphoneMuted: "Microphone off",
+    microphoneActiveHint: "When muted, no microphone audio is sent to the server",
+    microphoneMutedHint: "Your microphone is muted and other members cannot hear you",
     sending: "Sending",
-    micReady: "Microphone ready",
     exitVoice: "Leave voice",
     people: "People",
     searchMembers: "Search members",
@@ -740,7 +736,7 @@ const translations: Record<Language, Record<string, string>> = {
     audioConfiguration: "Audio configuration",
     inputDevice: "Input device",
     microphone: "Microphone",
-    microphoneMode: "Microphone mode",
+    microphoneState: "Microphone state",
     defaultMicrophone: "Default browser microphone",
     microphoneNumber: "Microphone {{index}}",
     speakerNumber: "Speaker {{index}}",
@@ -988,10 +984,7 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
   if (!remember && material) identityMaterial.value = "";
 });
 watch(() => voiceState.connected, (connected) => {
-  if (!connected) {
-    stopPointerTalk();
-    return;
-  }
+  if (!connected) return;
   playNotification("connected");
   const address = currentServerTarget();
   if (!address) return;
@@ -1007,7 +1000,6 @@ watch(() => voiceState.connected, (connected) => {
 });
 watch(() => voiceState.reconnecting, (reconnecting, wasReconnecting) => {
   if (reconnecting && !wasReconnecting) {
-    stopPointerTalk();
     playNotification("disconnected");
   }
 });
@@ -1016,7 +1008,6 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 });
 
 let deviceChangeHandler: (() => void) | undefined;
-let releasePttHandler: (() => void) | undefined;
 let viewportMediaQuery: MediaQueryList | undefined;
 let viewportChangeHandler: (() => void) | undefined;
 
@@ -1047,19 +1038,11 @@ onMounted(() => {
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
-  releasePttHandler = () => stopPointerTalk();
-  window.addEventListener("blur", releasePttHandler);
-  document.addEventListener("visibilitychange", releasePttHandler);
 });
 onUnmounted(() => {
-  stopPointerTalk();
   disconnect();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
-  if (releasePttHandler) {
-    window.removeEventListener("blur", releasePttHandler);
-    document.removeEventListener("visibilitychange", releasePttHandler);
-  }
   if (toastTimer) clearTimeout(toastTimer);
 });
 
@@ -1078,7 +1061,6 @@ function doConnect() {
 }
 
 function doDisconnect() {
-  stopPointerTalk();
   disconnect();
   selectedChannelId.value = "";
   showToast(t("leftToast"));
@@ -1272,7 +1254,7 @@ function avatarStyle(name: string, isSelf = false) {
 }
 
 function isSpeaking(member: ChannelMember) {
-  return speakingIds.has(member.id) || Boolean(member.isSelf && pttActive.value);
+  return speakingIds.has(member.id);
 }
 
 function memberDisplayName(member: ChannelMember): string {
@@ -1355,47 +1337,9 @@ function meterBarHeight(index: number) {
   return 5 + Math.round(intensity * 34);
 }
 
-function onKeyDown(event: KeyboardEvent) {
-  const target = event.target as HTMLElement | null;
-  if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
-  if (event.code === "Space" && micMode.value === "ptt" && !pttActive.value) {
-    event.preventDefault();
-    startPointerTalk();
-  }
-}
-
-function onKeyUp(event: KeyboardEvent) {
-  if (event.code === "Space" && micMode.value === "ptt") {
-    event.preventDefault();
-    stopPointerTalk();
-  }
-}
-
-function startPointerTalk() {
-  if (micMode.value !== "ptt") return;
-  pttActive.value = true;
-  setPTT(true);
-}
-
-function stopPointerTalk() {
-  if (pttActive.value) {
-    pttActive.value = false;
-    setPTT(false);
-  }
-  stopWhisperTalk();
-}
-
-function onMobilePttDown(event: PointerEvent) {
-  if (micMode.value !== "ptt") return;
-  const target = event.currentTarget as HTMLElement | null;
-  if (target?.setPointerCapture && !target.hasPointerCapture(event.pointerId)) target.setPointerCapture(event.pointerId);
-  startPointerTalk();
-}
-
-function onMobilePttUp(event: PointerEvent) {
-  const target = event.currentTarget as HTMLElement | null;
-  if (target?.releasePointerCapture && target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
-  stopPointerTalk();
+function toggleMicrophone(): void {
+  setMicrophoneMuted(!microphoneMuted.value);
+  showToast(microphoneMuted.value ? t("microphoneMuted") : t("microphoneActive"));
 }
 
 function onWhisperPttDown(event: PointerEvent): void {
@@ -1718,9 +1662,6 @@ function stopWhisperTalk(): void {
 .audio-level-track { height: 7px; margin: 7px 0 17px; overflow: hidden; background: #e8efec; border-radius: 999px; }
 .audio-level-track i { display: block; height: 100%; min-width: 0; background: linear-gradient(90deg, #69c8bb, #58d675); border-radius: inherit; transition: width .08s linear; }
 .test-audio { display: block; width: 100%; height: 34px; margin-top: 11px; }
-.mobile-ptt-button { display: none; align-items: center; justify-content: center; gap: 9px; min-height: 54px; margin-top: 12px; color: #fff; background: #006a64; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
-.mobile-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
-@media (max-width: 740px) { .mobile-ptt-button { display: flex; } }
 
 /* M008 semantic theme tokens and keyboard-safe surfaces. */
 :global(:root) { color-scheme: light; --surface-0: #f7f9f8; --surface-1: #fff; --surface-2: #f1f6f4; --text-primary: #192120; --text-muted: #71807c; --border: #e4ece9; --accent: #006a64; --success: #65d879; --warning: #c89143; --danger: #c95a54; }
@@ -1749,7 +1690,7 @@ function stopWhisperTalk(): void {
 .member-row:hover, .member-row:focus-within { background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)); box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 8%, transparent); }
 :global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible), :global(textarea:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
 .message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
-@media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; }.mobile-ptt-button { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; } }
+@media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; } }
 @media (max-width: 740px) { .member-context-menu { left: 12px !important; right: 12px; top: auto !important; bottom: env(safe-area-inset-bottom, 0px); min-width: 0; border-radius: 16px 16px 0 0; padding: 14px; } .member-context-menu button { min-height: 42px; font-size: 13px; } .member-context-menu strong { padding: 4px 8px 11px; font-size: 14px; } .menu-volume { font-size: 12px; } }
 
 /* M007 whisper target controls and M008 mobile navigation. */
@@ -1831,6 +1772,12 @@ function stopWhisperTalk(): void {
 /* Mobile interaction pass: keep the browser viewport fixed and give each
    mobile surface its own touch-friendly scroll area. */
 .mobile-voice-controls, .voice-member-action, .member-action-button, .member-menu-backdrop { display: none; }
+.microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.microphone-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
+.microphone-control .settings-label { margin-bottom: 4px; }
+.microphone-control .settings-hint { max-width: 390px; margin: 0; }
+.microphone-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; flex: 0 0 auto; padding: 0 12px; color: #fff; background: var(--accent); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.microphone-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, var(--surface-1)); }
 .member-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .member-menu-close { display: none; }
 
@@ -1872,12 +1819,11 @@ function stopWhisperTalk(): void {
   .voice-member-action { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-muted); background: color-mix(in srgb, var(--surface-2) 78%, transparent); border-radius: 10px; cursor: pointer; }
   .voice-member-action:hover, .voice-member-action:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
   .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
-  .mobile-voice-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1 1 auto; gap: 4px; min-width: 0; }
-  .mobile-voice-mode button, .mobile-voice-settings { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 0; padding: 0 9px; color: var(--text-muted); background: transparent; border-radius: 10px; font-size: 12px; cursor: pointer; }
-  .mobile-voice-mode button.active { color: var(--accent); background: var(--surface-1); box-shadow: 0 3px 9px color-mix(in srgb, var(--text-primary) 10%, transparent); font-weight: 700; }
-  .mobile-voice-settings { flex: 0 0 auto; width: 82px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); }
+  .mobile-voice-toggle, .mobile-voice-settings { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; min-width: 0; padding: 0 11px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .mobile-voice-toggle { flex: 1 1 auto; }
+  .mobile-voice-toggle.muted, .mobile-more-panel button.muted { color: var(--danger); }
+  .mobile-voice-settings { flex: 0 0 auto; width: 82px; }
   .mobile-voice-settings span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mobile-ptt-button { position: static; min-height: 56px; margin-top: 10px; border-radius: 14px; font-size: 15px; }
 
   .app-shell .member-panel.mobile-section-visible { display: flex !important; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; max-height: none; padding: 18px 14px 16px; border-top: 0; border-right: 0; overflow: hidden; }
   .member-panel-heading { flex: 0 0 auto; }
@@ -1936,6 +1882,9 @@ function stopWhisperTalk(): void {
   .settings-content { min-height: 0; padding: 20px 18px; overflow-y: auto; }
   .settings-footer { min-height: 68px; padding: 8px 18px calc(8px + env(safe-area-inset-bottom, 0px)); }
   .settings-footer .save-button { min-height: 48px; }
+  .microphone-control { align-items: stretch; flex-direction: column; gap: 10px; }
+  .microphone-control .settings-hint { max-width: none; }
+  .microphone-toggle { width: 100%; min-height: 44px; }
 
   .join-page { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .join-header { min-height: calc(62px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); box-sizing: border-box; }

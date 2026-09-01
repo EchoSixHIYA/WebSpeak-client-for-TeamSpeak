@@ -33,7 +33,7 @@ export interface LocalPreferences {
   schemaVersion: 1;
   locale?: "auto" | "zh-CN" | "en";
   theme?: "system" | "light" | "dark";
-  voiceMode?: "vox" | "ptt";
+  microphoneMuted?: boolean;
   voxThreshold?: number;
   language?: "zh" | "en";
   preferredInputDeviceId?: string;
