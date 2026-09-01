@@ -6,18 +6,18 @@
         <div class="brand-lockup">
           <div class="brand-mark"><Icon name="waveform" :size="22" /></div>
           <div>
-            <strong>TeamSpeak <span>Web</span></strong>
+            <strong>{{ siteName }}</strong>
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><button class="guide-button" type="button" :title="t('configGuide')" @click="configGuideOpen = true"><Icon name="help" :size="15" /> {{ t('configGuide') }}</button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
         <div class="join-copy">
           <div class="eyebrow"><span class="eyebrow-dot"></span> {{ t('privateAudio') }}</div>
           <h1>{{ t('joinLine1') }}<br /><em>{{ t('joinLine2') }}</em></h1>
-          <p class="join-description">{{ t('joinDescription') }}</p>
+          <p class="join-description">{{ welcomeText || t('joinDescription') }}</p>
           <div class="promise-list">
             <div class="promise-item"><span class="promise-icon"><Icon name="waveform" :size="16" /></span><span><b>{{ t('highQuality') }}</b><small>{{ t('opusAudio') }}</small></span></div>
             <div class="promise-item"><span class="promise-icon mint"><Icon name="shield" :size="16" /></span><span><b>{{ t('secureJoin') }}</b><small>{{ t('inviteProtected') }}</small></span></div>
@@ -32,19 +32,19 @@
 
           <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span>{{ localizedMessage(voiceState.error) }}</span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
+          <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin/setup">{{ t('configureNow') }}</a></span></div>
 
-          <form class="join-form" @submit.prevent="doConnect">
-            <div class="field-grid">
-              <div>
-                <label class="field-label" for="server-host">{{ t('serverAddress') }}</label>
-                <div class="field-wrap"><Icon name="server" :size="17" /><input id="server-host" v-model="serverHost" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div>
-              </div>
-              <div>
-                <label class="field-label" for="server-port">{{ t('serverPort') }}</label>
-                <div class="field-wrap"><Icon name="hash" :size="17" /><input id="server-port" v-model="serverPort" inputmode="numeric" type="number" min="1" max="65535" :placeholder="t('serverPortPlaceholder')" /></div>
-              </div>
+          <form v-if="initialized" class="join-form" @submit.prevent="doConnect">
+            <div v-if="accessMode === 'open'">
+              <label class="field-label" for="server-address">{{ t('serverAddress') }}</label>
+              <div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverAddress" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div>
             </div>
-            <p class="field-hint">{{ t('serverAddressHint') }}</p>
+            <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
+
+            <template v-if="accessMode === 'open'">
+              <label class="field-label" for="server-password">{{ t('serverPassword') }} <span>{{ t('optional') }}</span></label>
+              <div class="field-wrap"><Icon name="lock" :size="17" /><input id="server-password" v-model="serverPassword" type="password" autocomplete="off" :placeholder="t('optionalPassword')" /></div>
+            </template>
 
             <label class="field-label" for="nickname">{{ t('nickname') }}</label>
             <div class="field-wrap">
@@ -58,7 +58,7 @@
               <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
             </div>
 
-            <button class="primary-button connect-button" :disabled="!nickname.trim() || !validServerPort || !serverHost.trim() || serverConfigLoading || voiceState.connecting" type="submit">
+            <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
               <span>{{ voiceState.connecting ? t('connecting') : t('enterVoice') }}</span>
               <Icon v-if="!voiceState.connecting" name="chevron-right" :size="17" />
@@ -161,23 +161,6 @@
       </aside>
     </div>
 
-    <!-- Configuration guide modal -->
-    <div v-if="configGuideOpen" class="modal-backdrop config-guide-backdrop" @click.self="configGuideOpen = false">
-      <section class="config-guide-modal" role="dialog" aria-modal="true" :aria-labelledby="'config-guide-title'">
-        <header class="config-guide-header"><div><span class="card-kicker">{{ t('configGuideKicker') }}</span><h2 id="config-guide-title">{{ t('configGuideTitle') }}</h2><p>{{ t('configGuideLead') }}</p></div><button class="round-icon" type="button" :title="t('close')" @click="configGuideOpen = false"><Icon name="close" :size="19" /></button></header>
-        <div class="config-guide-content">
-          <div class="config-guide-steps">
-            <article><span>1</span><div><strong>{{ t('configStepCopyTitle') }}</strong><p>{{ t('configStepCopyLead') }}</p><code>cp config.example.json config.json</code></div></article>
-            <article><span>2</span><div><strong>{{ t('configStepEditTitle') }}</strong><p>{{ t('configStepEditLead') }}</p></div></article>
-            <article><span>3</span><div><strong>{{ t('configStepRestartTitle') }}</strong><p>{{ t('configStepRestartLead') }}</p><code>node dist/index.js</code></div></article>
-          </div>
-          <section class="config-editor"><div class="config-editor-heading"><div><span class="section-kicker">{{ t('configPreview') }}</span><strong>{{ t('configPreviewLead') }}</strong></div><button class="copy-config-button" type="button" @click="copyConfigTemplate"><Icon name="copy" :size="15" /> {{ t('copyConfig') }}</button></div><div class="config-guide-fields"><label class="config-guide-wide"><span>{{ t('serverPassword') }}</span><input v-model="guideServerPassword" type="password" :placeholder="t('optionalPassword')" /></label></div><pre>{{ configTemplate }}</pre></section>
-          <div class="config-guide-note"><Icon name="help" :size="16" /><span>{{ t('configGuideNote') }}</span></div>
-        </div>
-        <footer class="config-guide-footer"><button class="text-button" type="button" @click="configGuideOpen = false">{{ t('close') }}</button><button class="primary-button save-button" type="button" @click="copyConfigTemplate"><Icon name="copy" :size="16" /> {{ t('copyConfig') }}</button></footer>
-      </section>
-    </div>
-
     <!-- Audio settings modal -->
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
@@ -237,16 +220,18 @@ const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
 const nickname = ref(localStorage.getItem("webspeak:nickname") ?? "");
 const channel = ref(initialChannel);
-const serverHost = ref(query.get("tsHost") ?? localStorage.getItem("webspeak:ts-host") ?? location.hostname);
-const serverPort = ref(query.get("tsPort") ?? localStorage.getItem("webspeak:ts-port") ?? "9987");
+const serverAddress = ref(initialServerAddress());
+const serverPassword = ref("");
+const accessMode = ref<"fixed" | "open">("fixed");
+const initialized = ref(false);
+const siteName = ref("WebSpeak");
+const welcomeText = ref("");
 const browserError = ref("");
 const serverConfigLoading = ref(true);
 const memberQuery = ref("");
 const messageDraft = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
-const configGuideOpen = ref(false);
-const guideServerPassword = ref("");
 const audioSettingsError = ref("");
 const pttActive = ref(false);
 const toast = ref("");
@@ -259,6 +244,9 @@ const translations: Record<Language, Record<string, string>> = {
   zh: {
     browserWorkspace: "浏览器语音工作台",
     secureGateway: "安全语音网关",
+    adminConsole: "管理控制台",
+    notConfigured: "WebSpeak 尚未完成首次配置。",
+    configureNow: "立即配置",
     privateAudio: "私密社区语音",
     joinLine1: "连接服务器，",
     joinLine2: "马上开始交流。",
@@ -277,8 +265,6 @@ const translations: Record<Language, Record<string, string>> = {
     joinLead: "输入一个昵称，选择进入的频道。",
     serverAddress: "TeamSpeak 服务器地址",
     serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
-    serverPort: "语音端口",
-    serverPortPlaceholder: "9987",
     serverAddressHint: "这是网关服务器连接的 TeamSpeak 地址，不是浏览器直接连接地址。",
     nickname: "你的昵称",
     nicknamePlaceholder: "例如：Alex Rivera",
@@ -301,22 +287,6 @@ const translations: Record<Language, Record<string, string>> = {
     serverOptions: "更多服务器选项",
     online: "在线",
     audioSettings: "音频设置",
-    configGuide: "配置引导",
-    configGuideKicker: "首次部署",
-    configGuideTitle: "完成服务端配置",
-    configGuideLead: "按下面三步准备 config.json，网页客户端就能连接你指定的 TeamSpeak 服务器。",
-    configStepCopyTitle: "复制配置模板",
-    configStepCopyLead: "在项目根目录执行命令，创建服务端配置文件。",
-    configStepEditTitle: "确认连接参数",
-    configStepEditLead: "在下方预览中确认 TeamSpeak 服务器地址、语音端口和密码；应用端口固定为 3040，协议会自动检测。",
-    configStepRestartTitle: "保存并重启服务",
-    configStepRestartLead: "保存 config.json 后重新启动 WebSpeak 服务，新的默认配置才会生效。",
-    configPreview: "配置预览",
-    configPreviewLead: "复制下面的 JSON 到项目根目录的 config.json",
-    copyConfig: "复制配置",
-    configGuideNote: "浏览器不能直接写入服务器文件；复制后请在运行 WebSpeak 的服务器上保存 config.json。",
-    configCopiedToast: "配置 JSON 已复制",
-    configCopyFailedToast: "复制失败，请手动复制配置内容",
     serverPassword: "服务器密码",
     optionalPassword: "没有密码可留空",
     switchChannel: "切换频道",
@@ -410,6 +380,9 @@ const translations: Record<Language, Record<string, string>> = {
   en: {
     browserWorkspace: "Browser voice workspace",
     secureGateway: "Secure voice gateway",
+    adminConsole: "Admin console",
+    notConfigured: "WebSpeak setup has not been completed.",
+    configureNow: "Configure now",
     privateAudio: "Private community audio",
     joinLine1: "Connect to your server,",
     joinLine2: "start the conversation.",
@@ -428,8 +401,6 @@ const translations: Record<Language, Record<string, string>> = {
     joinLead: "Choose a nickname and the channel to enter.",
     serverAddress: "TeamSpeak server address",
     serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
-    serverPort: "Voice port",
-    serverPortPlaceholder: "9987",
     serverAddressHint: "This is the TeamSpeak address reached by the gateway, not a direct browser connection.",
     nickname: "Your nickname",
     nicknamePlaceholder: "e.g. Alex Rivera",
@@ -452,22 +423,6 @@ const translations: Record<Language, Record<string, string>> = {
     serverOptions: "More server options",
     online: "Online",
     audioSettings: "Audio settings",
-    configGuide: "Setup guide",
-    configGuideKicker: "FIRST DEPLOYMENT",
-    configGuideTitle: "Finish server configuration",
-    configGuideLead: "Follow these three steps to prepare config.json for the TeamSpeak server you want to use.",
-    configStepCopyTitle: "Copy the template",
-    configStepCopyLead: "Run the command in the project root to create the server configuration file.",
-    configStepEditTitle: "Confirm connection settings",
-    configStepEditLead: "Confirm the TeamSpeak address, voice port, and password below; WebSpeak listens on fixed port 3040 and detects the protocol automatically.",
-    configStepRestartTitle: "Save and restart",
-    configStepRestartLead: "Save config.json and restart WebSpeak for the new default settings to take effect.",
-    configPreview: "CONFIG PREVIEW",
-    configPreviewLead: "Copy this JSON into config.json in the project root",
-    copyConfig: "Copy config",
-    configGuideNote: "A browser cannot write files on the server. Copy this content, then save config.json on the machine running WebSpeak.",
-    configCopiedToast: "Config JSON copied",
-    configCopyFailedToast: "Copy failed. Copy the configuration manually",
     serverPassword: "Server password",
     optionalPassword: "Leave blank if not required",
     switchChannel: "Switch channel",
@@ -560,6 +515,17 @@ const translations: Record<Language, Record<string, string>> = {
   },
 };
 
+function initialServerAddress(): string {
+  const explicit = query.get("server") ?? query.get("target") ?? localStorage.getItem("webspeak:server-target");
+  if (explicit?.trim()) return explicit.trim();
+  const host = (query.get("tsHost") ?? localStorage.getItem("webspeak:ts-host") ?? location.hostname).trim();
+  const port = (query.get("tsPort") ?? localStorage.getItem("webspeak:ts-port") ?? "9987").trim();
+  if (!host) return `127.0.0.1:${port}`;
+  if (/^[^:]+:\d+$/.test(host) || /^\[[^\]]+\]:\d+$/.test(host)) return host;
+  if (host.startsWith("[") || !host.includes(":")) return `${host}:${port}`;
+  return `[${host}]:${port}`;
+}
+
 function getInitialLanguage(): Language {
   const stored = localStorage.getItem("webspeak:language");
   if (stored === "zh" || stored === "en") return stored;
@@ -586,6 +552,9 @@ function localizedMessage(message: string) {
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
     "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
+    "WebSpeak 尚未完成首次配置": "WebSpeak setup has not been completed",
+    "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
+    "请输入有效的昵称": "Enter a valid nickname",
   };
   if (exact[message]) return exact[message];
   if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
@@ -681,18 +650,16 @@ onUnmounted(() => {
 });
 
 function doConnect() {
-  const host = serverHost.value.trim();
-  const port = Number.parseInt(serverPort.value, 10);
-  if (!nickname.value.trim() || !host || !validServerPort.value || voiceState.connecting) return;
+  if (!canJoin.value || voiceState.connecting) return;
   clearError();
   nickname.value = nickname.value.trim();
-  serverHost.value = host;
-  serverPort.value = String(port);
   localStorage.setItem("webspeak:nickname", nickname.value);
-  localStorage.setItem("webspeak:ts-host", host);
-  localStorage.setItem("webspeak:ts-port", String(port));
+  if (accessMode.value === "open") {
+    serverAddress.value = serverAddress.value.trim();
+    localStorage.setItem("webspeak:server-target", serverAddress.value);
+  }
   selectedChannelId.value = "";
-  connect(host, port, channel.value.trim(), nickname.value);
+  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "");
 }
 
 function doDisconnect() {
@@ -719,50 +686,34 @@ function channelLabel(item: TreeChannel) {
 function doShare() {
   const invite = new URL(location.href);
   invite.searchParams.delete("token");
-  if (serverHost.value.trim()) invite.searchParams.set("tsHost", serverHost.value.trim());
-  if (validServerPort.value) invite.searchParams.set("tsPort", String(Number.parseInt(serverPort.value, 10)));
+  invite.searchParams.delete("target");
+  invite.searchParams.delete("tsHost");
+  invite.searchParams.delete("tsPort");
+  invite.searchParams.delete("server");
+  if (accessMode.value === "open" && serverAddress.value.trim()) invite.searchParams.set("server", serverAddress.value.trim());
   if (channel.value) invite.searchParams.set("channel", channel.value);
   navigator.clipboard?.writeText(invite.toString()).then(() => showToast(t("copiedToast")), () => showToast(t("copyFailedToast")));
 }
 
-const validServerPort = computed(() => {
-  const port = Number.parseInt(serverPort.value, 10);
-  return Number.isInteger(port) && port > 0 && port <= 65535;
-});
-
-const configTemplate = computed(() => {
-  const tsPort = Number.parseInt(serverPort.value, 10);
-  const config: Record<string, unknown> = {
-    tsHost: serverHost.value.trim() || "127.0.0.1",
-    tsPort: Number.isInteger(tsPort) && tsPort > 0 && tsPort <= 65535 ? tsPort : 9987,
-    tsServerPassword: guideServerPassword.value,
-  };
-  return JSON.stringify(config, null, 2);
-});
-
-async function copyConfigTemplate() {
-  try {
-    if (!navigator.clipboard) throw new Error("clipboard unavailable");
-    await navigator.clipboard.writeText(configTemplate.value);
-    showToast(t("configCopiedToast"));
-  } catch {
-    showToast(t("configCopyFailedToast"));
-  }
-}
+const canJoin = computed(() => Boolean(
+  initialized.value
+  && nickname.value.trim()
+  && (accessMode.value === "fixed" || serverAddress.value.trim()),
+));
 
 async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { tsHost?: unknown; tsPort?: unknown };
-    if (!query.has("tsHost") && !localStorage.getItem("webspeak:ts-host") && typeof config.tsHost === "string" && config.tsHost.trim()) {
-      serverHost.value = config.tsHost.trim();
-    }
-    if (!query.has("tsPort") && !localStorage.getItem("webspeak:ts-port") && Number.isInteger(config.tsPort)) {
-      serverPort.value = String(config.tsPort);
-    }
+    const config = await response.json() as { initialized?: unknown; siteName?: unknown; welcomeText?: unknown; accessMode?: unknown; target?: unknown };
+    initialized.value = config.initialized === true;
+    if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
+    if (typeof config.welcomeText === "string") welcomeText.value = config.welcomeText;
+    accessMode.value = config.accessMode === "open" ? "open" : "fixed";
+    const hasUserTarget = query.has("server") || query.has("target") || query.has("tsHost") || Boolean(localStorage.getItem("webspeak:server-target"));
+    if (!hasUserTarget && typeof config.target === "string" && config.target.trim()) serverAddress.value = config.target.trim();
   } catch {
-    // The sensible browser-host/9987 defaults remain usable when the API is unavailable.
+    // Keep joining disabled until the gateway can confirm its initialized policy.
   } finally {
     serverConfigLoading.value = false;
   }
@@ -1112,48 +1063,17 @@ function stopPointerTalk() {
 /* Keep connected controls in the header; the old bottom dock consumed the
    chat viewport and made the settings action appear detached from its icon. */
 .header-tools { align-items: center; }
-.guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .guide-button:hover { color: #fff; background: #006a64; border-color: #006a64; }
 .workspace-actions { align-items: center; flex-wrap: nowrap; }
 .workspace-actions .header-action { flex: 0 0 34px; padding: 0; line-height: 0; }
 .workspace-actions .header-action .ui-icon { margin: 0; }
 .settings-mode-switch { width: fit-content; margin: 0 0 7px; }
 .settings-hint { margin: -1px 0 19px; color: #8b9994; font-size: 11px; }
-.config-guide-modal { display: flex; width: min(900px, 100%); max-height: min(820px, calc(100dvh - 40px)); flex-direction: column; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(16,40,35,.24); }
-.config-guide-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 28px 32px 23px; border-bottom: 1px solid #edf1ef; }
-.config-guide-header h2 { margin: 8px 0 6px; color: #202c29; font-size: 27px; letter-spacing: -.045em; }
-.config-guide-header p { max-width: 650px; margin: 0; color: #71817b; font-size: 13px; line-height: 1.6; }
-.config-guide-content { display: grid; grid-template-columns: minmax(230px, .82fr) minmax(360px, 1.18fr); gap: 26px; min-height: 0; overflow-y: auto; padding: 27px 32px; }
-.config-guide-steps { display: flex; flex-direction: column; gap: 14px; }
-.config-guide-steps article { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid #e7efec; border-radius: 12px; background: #f9fbfa; }
-.config-guide-steps article > span { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 auto; color: #fff; background: #006a64; border-radius: 50%; font-size: 12px; font-weight: 800; }
-.config-guide-steps strong { display: block; color: #32413c; font-size: 13px; }
-.config-guide-steps p { margin: 5px 0 8px; color: #788882; font-size: 11px; line-height: 1.55; }
-.config-guide-steps code { display: block; padding: 7px 8px; overflow-x: auto; color: #286a63; background: #eaf5f2; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; white-space: nowrap; }
-.config-editor { min-width: 0; padding: 16px; border: 1px solid #e2ece8; border-radius: 13px; background: #fbfdfc; }
-.config-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 13px; margin-bottom: 15px; }
-.config-editor-heading strong { display: block; margin-top: 5px; color: #51615b; font-size: 12px; font-weight: 600; }
-.copy-config-button { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 31px; padding: 0 9px; color: #006a64; background: #e2f2ef; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; }
-.copy-config-button:hover { color: #fff; background: #006a64; }
-.config-guide-fields { display: grid; grid-template-columns: minmax(0, 1fr) 145px; gap: 11px; margin-bottom: 14px; }
-.config-guide-fields label { display: flex; flex-direction: column; gap: 6px; color: #5a6b64; font-size: 10px; font-weight: 600; }
-.config-guide-fields input, .config-guide-fields select { width: 100%; min-height: 36px; padding: 0 9px; color: #394742; border: 1px solid #dfebe6; border-radius: 7px; outline: none; background: #fff; font-size: 12px; }
-.config-guide-fields input:focus, .config-guide-fields select:focus { border-color: #81d8d0; box-shadow: 0 0 0 2px rgba(129,216,208,.2); }
-.config-guide-wide { grid-column: 1 / -1; }
-.config-editor pre { max-height: 255px; margin: 0; overflow: auto; padding: 14px; color: #48615a; background: #eef6f3; border-radius: 9px; font: 11px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
-.config-guide-note { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 8px; padding: 11px 13px; color: #66817a; background: #eef7f4; border-radius: 9px; font-size: 11px; line-height: 1.55; }
-.config-guide-note .ui-icon { flex: 0 0 auto; color: #4f9c91; }
-.config-guide-footer { display: flex; justify-content: flex-end; gap: 12px; min-height: 67px; padding: 14px 32px; border-top: 1px solid #edf1ef; }
 
 @media (max-width: 740px) {
   .header-tools { gap: 7px; }
   .header-note, .guide-button span { display: none; }
   .guide-button { width: 32px; justify-content: center; padding: 0; }
-  .config-guide-modal { max-height: calc(100dvh - 24px); }
-  .config-guide-header { padding: 22px 20px 18px; }
-  .config-guide-header h2 { font-size: 23px; }
-  .config-guide-content { display: block; padding: 20px; }
-  .config-editor { margin-top: 18px; }
-  .config-guide-footer { padding-inline: 20px; }
 }
 </style>

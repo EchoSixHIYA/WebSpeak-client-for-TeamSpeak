@@ -1,160 +1,129 @@
 # WebSpeak
 
-TeamSpeak 浏览器客户端：在服务器上运行 Node.js 服务，用户无需安装 TeamSpeak 客户端，即可通过浏览器加入语音频道。
+WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关。每个浏览器 Session 都拥有独立的普通 TeamSpeak Client 连接；频道、成员和权限来自该用户自己的可见数据，不依赖 ServerQuery、WebQuery 或维护机器人。
 
-[English](#english) · [中文](#中文) · [AGPL-3.0 License](LICENSE)
+[中文](#中文) · [English](#english) · [AGPL-3.0 License](LICENSE)
 
-## English
+## 中文
 
-WebSpeak is a self-hosted browser client and gateway for TeamSpeak 3 and TeamSpeak 6. Each browser session receives an independent TeamSpeak client that maintains its own visible channel/member directory and relays voice through WebSocket.
+### 当前能力
 
-### Highlights
+- TeamSpeak 3 / TeamSpeak 6 自动探测，无需选择协议。
+- 每个浏览器 Session 独立连接，硬上限固定为 100。
+- 完整频道/成员树、频道切换、频道文字聊天和成员实时移动。
+- PCM/Opus 语音桥接、自由麦、按键说话、麦克风选择与音量控制。
+- 发言成员头像显示绿色动态边框。
+- 中英文访客页面和中英文管理控制台。
+- Web 管理闭环：首次配置、单管理员登录、概览、服务器设置和真实连接测试。
+- `fixed` 与 `open` 两种访问模式。
+- TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
+- 旧 `config.json` 一次性导入，导入后不再作为实时配置源。
 
-- Low-latency PCM/Opus voice relay
-- VOX open microphone and Space-key push-to-talk modes
-- Browser microphone enumeration and device switching
-- Channel switching with a complete channel/member tree, including empty channels
-- Per-member playback volume controls
-- Speaking members are highlighted with a live green avatar border
-- Text chat, invite-link sharing, and persistent Chinese/English UI switching
-- No WebQuery/SSH Query dependency and no invite token
-- Editable TeamSpeak server address and voice port on the web join screen
-- No browser plugin or desktop TeamSpeak client required
+### 环境要求
 
-### Requirements
+- Node.js `22.5.0` 或更高版本。
+- Linux 推荐；Windows 也可用于开发和运行。
+- `@discordjs/opus` 所需的原生编译工具。
+- 可访问的 TeamSpeak 3 或 TeamSpeak 6 服务器。
+- 较新的 Chrome 或 Edge；生产环境应使用 HTTPS。
 
-- Linux server recommended; Windows is also supported
-- Node.js 22 or newer
-- A reachable TeamSpeak 3 or TeamSpeak 6 server
-- A recent Chrome or Edge browser
-- HTTPS in production: microphone access and WebCodecs require a secure context
-
-### How it works
-
-```text
-Browser                         WebSpeak                         TeamSpeak
-┌────────────────────┐         ┌──────────────────────┐         ┌──────────┐
-│ Microphone → PCM   │ ──────▶ │ Per-user voice client│ ──────▶ │          │
-│ AudioDecoder       │ ◀────── │ PCM ↔ Opus bridge    │ ◀────── │ Server   │
-│ Vue web client      │ ◀ JSON  │ Live directory      │ ◀────── │          │
-└────────────────────┘         │ welcome snapshot +  │         └──────────┘
-                               │ live events         │
-                               └──────────────────────┘
-```
-
-### Quick start
-
-#### 1. Install dependencies
+Ubuntu / Debian：
 
 ```bash
-# Native build tools are required by @discordjs/opus.
 sudo apt-get update
 sudo apt-get install -y build-essential python3
+```
 
+Windows 请安装 Visual Studio Build Tools，并勾选“使用 C++ 的桌面开发”。
+
+### 本地安装与启动
+
+```bash
 npm install
 npm --prefix web install
-```
-
-On Windows, install Visual Studio Build Tools with **Desktop development with C++** before running `npm install`.
-
-`npm install` runs the SDK patch automatically. It adds a `directorySnapshot` event to the installed protocol package so the gateway can use the same welcome data as a native client.
-
-#### 2. Build
-
-```bash
 npm --prefix web run build
 npm run build
-```
-
-The build output is written to `web/dist/` and `dist/`.
-
-#### 3. Configure `config.json`
-
-Copy `config.example.json` to `config.json` in the project root, then edit the values. Keep `config.json` private because it may contain TeamSpeak credentials.
-
-```json
-{
-  "tsHost": "127.0.0.1",
-  "tsPort": 9987,
-  "tsServerPassword": ""
-}
-```
-
-| Field | Description |
-| --- | --- |
-| `tsHost` | TeamSpeak server address. Use `127.0.0.1` when it runs on the same host. |
-| `tsPort` | TeamSpeak voice port, commonly `9987`. |
-| `tsServerPassword` | TeamSpeak server password, if required. |
-
-WebSpeak listens on the fixed internal port `3040` and accepts at most `100` active browser sessions; change the external port in Docker or the reverse proxy. TS3/TS6 is detected automatically by the TeamSpeak adapter. The join page includes a **Setup guide** button and generates a copyable `config.json` preview from the TeamSpeak address, voice port, and optional password. A browser cannot write files on the server, so save the copied JSON as `config.json` in the project root and restart WebSpeak after changing it.
-
-When an older `config.json` contains `port`, `tsServerProtocol`, `maxClients`, or `trustProxy`, WebSpeak reads the TeamSpeak target and password, ignores those implementation controls, and rewrites the file in the normalized three-field shape above.
-
-WebSpeak uses each user's regular TeamSpeak client connection for both voice and directory data. TeamSpeak sends the initial channel/member snapshot during the normal client welcome sequence; WebSpeak then subscribes that regular client to the complete channel tree, just as a native client does, and applies channel/member notifications immediately afterward. A member moving out of the current channel is retained and reassigned to the target channel instead of being mistaken for a server disconnect. WebSpeak does not start a maintenance client and does not call the permission-restricted `channellist` or `clientlist` commands. The visible result is the same view available to that TeamSpeak identity.
-
-The connected layout keeps the member/channel tree on the left. During the first connection, WebSpeak uses the current channel ID from TeamSpeak's welcome sequence to place the web client in the actual default channel instead of a placeholder group. The small speaking indicator is status-only: it is not a mute control. The avatar border turns green while a voice packet is active, then fades after the stream becomes quiet.
-
-#### 4. Enable HTTPS
-
-WebSpeak automatically serves HTTPS when `certs/cert.pem` and `certs/key.pem` exist:
-
-```bash
-mkdir -p certs
-openssl req -x509 -newkey rsa:2048 \
-  -keyout certs/key.pem \
-  -out certs/cert.pem \
-  -days 365 -nodes \
-  -subj "/CN=your-domain.example"
-```
-
-For public use, prefer a trusted certificate from Let's Encrypt or terminate TLS at Nginx. Do not commit private keys to Git.
-
-#### 5. Start WebSpeak
-
-```bash
 node dist/index.js
 ```
 
-Open:
+WebSpeak 内部端口固定为 `3040`。首次启动会输出一次初始化提示：
 
 ```text
-https://your-domain.example:3040/
+WebSpeak is not initialized.
+Open /admin/setup and enter bootstrap code: XXXX-XXXX-...
 ```
 
-Enter the TeamSpeak server address, voice port, and nickname on the page. The browser will request microphone permission. Open **Audio settings** to select a specific microphone, change input/output volume, or run the real microphone-level test.
+然后打开：
 
-The connected page keeps its controls in the header so the chat viewport remains unobstructed. Microphone mode selection (free microphone or push-to-talk) is available in **Audio settings**.
-
-### Production deployment
-
-Example systemd unit:
-
-```ini
-[Unit]
-Description=WebSpeak TeamSpeak browser gateway
-After=network.target
-
-[Service]
-Type=simple
-User=teamspeak
-WorkingDirectory=/opt/webspeak
-ExecStart=/usr/bin/node /opt/webspeak/dist/index.js
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
+```text
+http://127.0.0.1:3040/admin/setup
 ```
 
-Enable it with:
+三步完成配置：
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now webspeak.service
-sudo systemctl status webspeak.service
+1. 输入启动日志中的一次性初始化代码，创建至少 12 字符的管理员密码。
+2. 输入 `host[:port]` 形式的 TeamSpeak 地址和可选密码，执行真实短连接测试。
+3. 选择访问模式，并设置站点名称和欢迎文本。
+
+配置完成后初始化代码立即失效并从数据目录删除。后续管理入口为：
+
+```text
+http://127.0.0.1:3040/admin
 ```
 
-If Nginx terminates HTTPS, leave `certs/` absent so WebSpeak listens over local HTTP, then proxy both normal traffic and WebSocket upgrades:
+管理员只有密码，没有用户名、用户列表或角色系统。
+
+### 访问模式
+
+`fixed` 是默认模式。访客页只显示昵称和频道，TeamSpeak 目标与服务器密码由服务端管理。
+
+`open` 模式允许访客输入其他公网 TeamSpeak 地址和本次 Session 使用的密码。WebSpeak 会解析 DNS，并阻止 loopback、私网、链路本地、组播、广播及保留地址；实际连接使用已经验证过的 IP，避免 DNS rebinding。
+
+访客密码只存在于一次性 Join Ticket 中，不写入 URL、本地存储或数据库。普通分享链接也不会包含密码。
+
+### 持久化与安全
+
+运行数据位于项目的 `data/` 目录：
+
+```text
+data/
+  webspeak.db   SQLite 配置、管理员凭据和有限审计事件
+  master.key    32 字节安装级主密钥
+  bootstrap     仅在首次初始化完成前存在
+  logs/         本地日志
+```
+
+- 管理员密码使用 Node.js `crypto.scrypt`、随机 salt 和 constant-time compare。
+- TeamSpeak 服务器密码使用 AES-256-GCM 加密。
+- 管理 Session 是随机服务端 Session；Cookie 为 `HttpOnly`、`SameSite=Strict`，直接 HTTPS 下同时启用 `Secure`。
+- 管理 mutation 检查同源请求、JSON Content-Type、服务端 Session 与 CSRF token。
+- 管理登录具有固定窗口限速和连续失败延迟。
+- 日志、管理 API 和 Overview 不返回服务器密码、管理员密码或身份私钥。
+
+请备份整个 `data/` 目录。只有数据库而没有对应 `master.key` 时，已加密的 TeamSpeak 密码无法恢复。不要提交 `data/`、`config.json`、证书、私钥或日志。
+
+### 从旧版本升级
+
+首次使用新版启动时，如果项目根目录存在旧 `config.json`，WebSpeak 只导入：
+
+- `tsHost`
+- `tsPort`
+- `tsServerPassword`
+
+以下字段会被忽略并废弃：
+
+- `port`
+- `tsServerProtocol`
+- `maxClients`
+- `trustProxy`
+
+原文件不会被删除或改写。导入成功后，`data/webspeak.db` 成为唯一实时配置源，管理控制台会显示一次迁移提示。`config.example.json` 仅用于说明旧版迁移格式，新部署不需要复制它。
+
+### HTTPS 与反向代理
+
+如果项目根目录存在 `certs/cert.pem` 与 `certs/key.pem`，WebSpeak 会直接提供 HTTPS。公网部署建议由 Caddy 或 Nginx 终止 TLS，再代理到固定的 `127.0.0.1:3040`。
+
+Nginx 示例：
 
 ```nginx
 server {
@@ -170,187 +139,124 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-WebSpeak does not use forwarded headers as an authentication or authorization boundary. Keep the gateway behind a trusted reverse proxy and configure the proxy to forward WebSocket upgrades.
+WebSpeak 不使用 `X-Forwarded-*` 作为认证或授权边界。麦克风和 WebCodecs 在公网环境需要浏览器安全上下文。
 
-### Troubleshooting
+### 健康检查与开发命令
 
-| Symptom | Check |
-| --- | --- |
-| Microphone is unavailable | Use HTTPS, grant the browser microphone permission, and check the selected device in Audio settings. |
-| Only the default microphone appears | Reload after granting permission; browser device labels are hidden until permission is granted. Disconnect/reconnect if the device was plugged in later. |
-| Channel/member list is empty | Check the TeamSpeak address and voice port. The directory is populated from the normal client welcome sequence. |
-| The channel directory is still loading | Keep the page connected briefly while the welcome snapshot arrives. Later member and channel changes are pushed to the page automatically in real time. |
-| The current user is missing | Keep the connection open until the TeamSpeak welcome snapshot arrives. WebSpeak uses the current channel ID to place the user in the default channel, then updates the tree from realtime member notifications. |
-| Page loads without audio | Use a recent Chrome/Edge build, verify HTTPS, and check browser output volume. |
-| `Cannot find module '@discordjs/opus'` | Install the native build prerequisites and run `npm install` again. |
-| `EADDRINUSE` | Stop the process already listening on fixed port `3040`, or change the external proxy/container port. |
+无需认证的最小健康检查：
 
-### Project layout
+```text
+GET /health
+GET /api/health
+```
+
+开发命令：
+
+```bash
+# 后端开发服务（固定 3040）
+npm run dev
+
+# 前端开发服务；/api 和 /ws 代理到 3040
+npm run web:dev
+
+# M000/M001 自动测试
+npm test
+
+# 后端类型检查与构建
+npm run build
+
+# 前端类型检查与生产构建
+npm --prefix web run build
+
+# 依赖安全审计
+npm audit
+```
+
+### 项目结构
 
 ```text
 src/
-  domain/teamspeak-target.ts  Normalized host[:port] parsing and endpoint keys
-  server/teamspeak-adapter.ts TS3/TS6 negotiation boundary and protocol cache
-  errors.ts                    Normalized connection error model
-  server/voice-bridge.ts       WebSocket bridge and per-user voice clients
-  server/ts-client.ts          TeamSpeak protocol adapter and live directory adapter
-config.example.json            Safe starting configuration; copy to config.json
-scripts/
-  patch-teamspeak-sdk.mjs      Preserve TeamSpeak welcome directory data
-web/
-  src/views/WebClient.vue      Browser UI and bilingual presentation
-  src/composables/useVoiceWebSocket.ts
-                               Voice, chat, device and channel state
+  admin/                         管理服务、API、Session 与登录限速
+  persistence/database.ts        SQLite schema、repository 和迁移边界
+  security/                      主密钥、秘密加密、scrypt、Bootstrap 与网络策略
+  domain/teamspeak-target.ts     host[:port] 规范化解析
+  server/teamspeak-adapter.ts    TeamSpeak 协议边界与 endpoint 协议缓存
+  server/teamspeak-probe.ts      可清理的短连接测试
+  server/join-ticket.ts          一次性访客连接票据
+  server/voice-bridge.ts         每用户语音 WebSocket 桥接
+web/src/views/
+  AdminView.vue                  双语 Setup/Login/Overview/Server UI
+  WebClient.vue                  双语访客与语音工作台
 ```
+
+## English
+
+WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser session owns an independent normal TeamSpeak client connection, so its channel/member view comes from that identity rather than a Query or maintenance account.
+
+### Features
+
+- Automatic TeamSpeak 3 / TeamSpeak 6 detection.
+- Independent browser sessions with a fixed hard limit of 100.
+- Channel/member directory, channel switching, channel text chat, and live member movement.
+- PCM/Opus voice bridge, VOX, push-to-talk, microphone selection, and volume controls.
+- Bilingual guest UI and bilingual admin console.
+- Browser-based first setup, single-admin login, Overview, server settings, and a real short-lived connection test.
+- Fixed and open guest access modes.
+- Encrypted TeamSpeak server password and one-time legacy config import.
+- No ServerQuery, WebQuery, admin token, or maintenance bot.
+
+### Requirements and startup
+
+- Node.js `22.5.0` or newer.
+- Native build tools for `@discordjs/opus`.
+- A reachable TS3 or TS6 server.
+- A recent Chrome or Edge browser; use HTTPS in production.
+
+```bash
+npm install
+npm --prefix web install
+npm --prefix web run build
+npm run build
+node dist/index.js
+```
+
+WebSpeak always listens on internal port `3040`. On first boot, read the one-time bootstrap code from startup output and open:
+
+```text
+http://127.0.0.1:3040/admin/setup
+```
+
+Create the admin password, test the TeamSpeak target, choose the access mode, and finish setup. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
+
+### Security and persistence
+
+Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
+
+In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
+
+If a legacy `config.json` exists on the first upgraded start, only `tsHost`, `tsPort`, and `tsServerPassword` are imported. The original file is preserved, and SQLite becomes the sole live settings source.
 
 ### Development
 
 ```bash
-# Frontend hot reload
+npm run dev
 npm run web:dev
-
-# Type-check and production-build frontend
-npm --prefix web run build
-
-# Type-check backend
-npm run build
-
-# Run M000 unit tests
 npm test
+npm run build
+npm --prefix web run build
+npm audit
 ```
-
-Contributions and issue reports are welcome. Please do not include `config.json`, certificates, private keys, or server logs in issues or pull requests.
 
 ### License
 
-WebSpeak is released under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you run a modified version as a network service, you must offer its users the corresponding source code as required by the license.
+WebSpeak is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you run a modified version as a network service, you must offer its users the corresponding source code as required by the license.
 
-## 中文
+### 社区 / Community
 
-WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端。服务运行在服务器上，用户无需安装 TeamSpeak 客户端，打开网页即可加入语音频道。每个网页用户拥有独立的 TeamSpeak 连接，并使用自己的可见频道和成员信息。
-
-### 主要功能
-
-- 低延迟 PCM/Opus 语音转发
-- 自由麦（VOX）与空格键按键说话
-- 枚举并切换浏览器真实麦克风设备
-- 频道切换与完整频道/成员树，空频道也会显示
-- 为每个成员单独调整播放音量
-- 正在发言的成员头像实时显示绿色边框
-- 文字聊天、邀请链接分享、中英文界面切换
-- 不依赖 WebQuery/SSH Query，不使用邀请 token
-- 网页端直接设置 TeamSpeak 地址和语音端口
-- 不需要浏览器插件或桌面版 TeamSpeak 客户端
-
-### 环境要求
-
-- 推荐 Linux 服务器，也支持 Windows
-- Node.js 22 或更高版本
-- 可访问的 TeamSpeak 3 或 TeamSpeak 6 服务器
-- 较新的 Chrome 或 Edge 浏览器
-- 生产环境使用 HTTPS；浏览器麦克风和 WebCodecs 都要求安全上下文
-
-### 快速开始
-
-```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install -y build-essential python3
-
-# 安装服务端和前端依赖
-npm install
-npm --prefix web install
-
-# 构建前端和后端
-npm --prefix web run build
-npm run build
-```
-
-将项目根目录的 `config.example.json` 复制为 `config.json`，再按实际环境修改。`config.json` 可能包含服务器密码，请勿提交到 Git：
-
-```json
-{
-  "tsHost": "127.0.0.1",
-  "tsPort": 9987,
-  "tsServerPassword": ""
-}
-```
-
-关键配置：
-
-- `tsHost`：TeamSpeak 地址；同机部署使用 `127.0.0.1`。
-- `tsPort`：语音端口，通常为 `9987`。
-- `tsServerPassword`：TeamSpeak 服务器密码，没有密码时留空。
-
-WebSpeak 内部监听端口固定为 `3040`，最多接受 `100` 个活动网页 Session；外部端口请在 Docker 或反向代理层修改。TS3/TS6 由 TeamSpeak Adapter 自动检测，不需要在配置或网页中选择协议。加入页面提供“配置引导”按钮，可以根据页面中填写的服务器地址、语音端口和可选密码生成可复制的 `config.json` 预览。浏览器不能直接写入服务器文件，请将复制的内容保存到项目根目录的 `config.json`，再重启 WebSpeak。
-
-如果旧版 `config.json` 中仍有 `port`、`tsServerProtocol`、`maxClients` 或 `trustProxy`，WebSpeak 会读取其中的 TeamSpeak 地址和密码，忽略这些实现细节，并在启动时将文件改写为上面的三项配置。
-WebSpeak 使用每个网页用户自己的普通 TeamSpeak 客户端连接获取语音和目录数据，不连接 WebQuery/SSH Query，也不启动维护客户端。TeamSpeak 会在普通客户端登录握手阶段下发频道和成员快照；随后 WebSpeak 会像原生客户端一样订阅完整频道树，并实时应用频道/成员通知。成员切换到其他频道时会被移动到目标频道，不再被误判为退出服务器。不会主动调用受权限限制的 `channellist` 或 `clientlist` 命令，显示内容与该 TeamSpeak 身份实际可见的内容一致。
-
-进入后的成员/频道树位于页面左侧。首次进入时，WebSpeak 会使用 TeamSpeak 欢迎握手中返回的当前频道 ID，把自己放入实际所在的默认频道；不会把已进入默认频道的用户显示到错误的占位分组。“正在语音中”旁边不再使用没有功能的禁麦图标；它只是状态提示，真正发言时头像边框会实时变绿，停止发声后自动恢复。
-
-配置好证书后启动：
-
-```bash
-node dist/index.js
-```
-
-访问：
-
-```text
-https://你的域名或IP:3040/
-```
-
-在页面中填写 TeamSpeak 地址、语音端口和昵称。首次使用时允许浏览器访问麦克风。进入语音空间后，打开“音频设置”即可选择具体麦克风、调整输入/输出音量并进行真实麦克风电平测试。
-
-连接后的控制项统一放在顶部，不再遮挡聊天区域；“自由麦”和“按键说话”可以在“音频设置”中切换。
-
-### HTTPS 与反向代理
-
-如果项目根目录存在 `certs/cert.pem` 和 `certs/key.pem`，WebSpeak 会直接提供 HTTPS。公网部署建议使用 Let's Encrypt，或让 Nginx 终止 HTTPS 后反向代理到 `http://127.0.0.1:3040`，并转发 WebSocket 升级请求。WebSpeak 不使用转发头作为认证或授权边界，请确保网关只位于可信反向代理之后。
-
-### 常见问题
-
-- **无法使用麦克风**：确认使用 HTTPS、已经允许浏览器访问麦克风，并在“音频设置”中检查设备。
-- **只能看到默认麦克风**：授权前浏览器会隐藏设备名称；授权后刷新页面，或重新连接一次。
-- **频道/成员列表为空**：检查网页中的 TeamSpeak 地址和语音端口；协议会自动检测，目录来自普通客户端登录握手数据。
-- **频道/成员目录仍在加载**：保持页面连接，等待登录握手快照到达；之后成员和频道变化会自动实时推送到页面。
-- **首次进入看不到自己**：保持连接直到 TeamSpeak 欢迎握手完成；WebSpeak 会根据当前频道 ID 将自己归入默认频道，并在频道成员变化时实时更新。
-- **没有声音**：使用较新的 Chrome/Edge，通过 HTTPS 访问，并检查浏览器输出音量。
-- **原生 Opus 模块安装失败**：安装 `build-essential python3` 后重新执行 `npm install`。
-
-### 开发命令
-
-```bash
-# 前端热更新
-npm run web:dev
-
-# 前端类型检查并构建
-npm --prefix web run build
-
-# 后端 TypeScript 构建
-npm run build
-
-# 运行 M000 单元测试
-npm test
-```
-
-请不要在 Issue 或 Pull Request 中提交 `config.json`、API 密钥、证书、私钥或服务器日志。
-
-### 许可证
-
-本项目仅按 [GNU Affero General Public License v3.0](LICENSE)（`AGPL-3.0-only`）授权。如果你将修改版作为网络服务运行，必须按照许可证要求向服务用户提供对应源代码。
-
-如果 WebSpeak 对你有帮助，欢迎在 GitHub 点一个 Star。维护者：[EchoSixHIYA](https://github.com/EchoSixHIYA)。
-
-### 加入交流群
-
-扫描下方二维码加入群聊（群号：`869500475`）：
+群号 / Group ID: `869500475`
 
 ![WebSpeak 群聊二维码](group-chat.png)

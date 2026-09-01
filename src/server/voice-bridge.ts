@@ -8,10 +8,9 @@ import { canAcceptSession, MAX_ACTIVE_SESSIONS } from "../constants.js";
 import { normalizeTeamSpeakError } from "../errors.js";
 import {
   formatTeamSpeakTarget,
-  parseTeamSpeakTarget,
-  parseTeamSpeakTargetParts,
   type TeamSpeakTarget,
 } from "../domain/teamspeak-target.js";
+import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -19,8 +18,7 @@ const { OpusEncoder } = require("@discordjs/opus") as {
 };
 
 export interface VoiceBridgeOptions {
-  defaultTarget: TeamSpeakTarget;
-  tsServerPassword: string;
+  joinTickets: JoinTicketStore;
 }
 
 interface ChannelMember {
@@ -45,6 +43,7 @@ export class VoiceBridge {
   private clients = new Map<string, WebClientEntry>();
   private wss: WebSocketServer | null = null;
   private logger: LoggerType;
+  private peakClients = 0;
 
   constructor(
     private options: VoiceBridgeOptions,
@@ -54,28 +53,17 @@ export class VoiceBridge {
   }
 
   attach(server: Server): void {
-    this.wss = new WebSocketServer({ server, path: "/ws/voice" });
+    this.wss = new WebSocketServer({ server, path: "/ws/voice", maxPayload: 256 * 1024 });
 
     this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       const url = new URL(req.url ?? "/", `https://${req.headers.host ?? "localhost"}`);
-      const channelName = url.searchParams.get("channel") ?? undefined;
-      const nickname = (url.searchParams.get("nickname") ?? "WebUser").trim().slice(0, 30) || "WebUser";
-
-      let target: TeamSpeakTarget;
-      try {
-        const rawTarget = url.searchParams.get("target");
-        target = rawTarget?.trim()
-          ? parseTeamSpeakTarget(rawTarget)
-          : parseTeamSpeakTargetParts(
-            url.searchParams.get("tsHost") ?? this.options.defaultTarget.host,
-            url.searchParams.get("tsPort") ?? undefined,
-            this.options.defaultTarget.port,
-          );
-      } catch (error: unknown) {
-        this.logger.warn({ nickname, err: error instanceof Error ? error.message : String(error) }, "Invalid TeamSpeak target");
-        ws.close(4002, "Invalid TeamSpeak target");
+      const connection = this.resolveConnection(url);
+      if (!connection) {
+        ws.close(4001, "Join ticket required");
         return;
       }
+      const { target, serverPassword, nickname } = connection;
+      const channelName = connection.channel;
 
       if (!canAcceptSession(this.clients.size)) {
         this.logger.warn({ max: MAX_ACTIVE_SESSIONS }, "Max clients reached");
@@ -89,7 +77,7 @@ export class VoiceBridge {
       const tsClient = new TSClient({
         target,
         nickname,
-        serverPassword: this.options.tsServerPassword,
+        serverPassword,
         defaultChannel: channelName,
       }, this.logger);
 
@@ -104,6 +92,7 @@ export class VoiceBridge {
         opusEncoder: new OpusEncoder(48000, 1),
       };
       this.clients.set(entryId, entry);
+      this.peakClients = Math.max(this.peakClients, this.clients.size);
 
       let tsReady = false;
       let selfId = 0;
@@ -269,6 +258,10 @@ export class VoiceBridge {
     return this.clients.size;
   }
 
+  getPeakCount(): number {
+    return this.peakClients;
+  }
+
   shutdown(): void {
     for (const [id, entry] of this.clients) {
       this.clients.delete(id);
@@ -276,6 +269,11 @@ export class VoiceBridge {
       entry.tsClient.disconnect().catch(() => {});
     }
     this.wss?.close();
+  }
+
+  private resolveConnection(url: URL): JoinTicketPayload | null {
+    const token = url.searchParams.get("ticket");
+    return token ? this.options.joinTickets.consume(token) : null;
   }
 }
 

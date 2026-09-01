@@ -3,18 +3,20 @@ import { createServer as createHttpsServer } from "node:https";
 import { createServer as createHttpServer } from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { VoiceBridge, type VoiceBridgeOptions } from "./voice-bridge.js";
 import type { Logger } from "../logger.js";
-import { formatTeamSpeakTarget } from "../domain/teamspeak-target.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { parseTeamSpeakTarget, teamSpeakTargetKey } from "../domain/teamspeak-target.js";
+import { createAdminRouter } from "../admin/admin-router.js";
+import type { AdminService } from "../admin/admin-service.js";
+import { AdminSessionStore } from "../admin/admin-session.js";
+import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
 
 export interface WebServerOptions {
   port: number;
   staticDir?: string;
   certDir?: string; // path to cert.pem + key.pem for HTTPS
   voiceBridgeOptions: VoiceBridgeOptions;
+  adminService: AdminService;
   logger: Logger;
 }
 
@@ -40,19 +42,73 @@ export function createWebServer(options: WebServerOptions): WebServer {
 
   app.use(express.json({ limit: "100kb" }));
 
-  app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", version: "0.1.0" });
+  const voiceBridge = new VoiceBridge(options.voiceBridgeOptions, logger);
+  const adminSessions = new AdminSessionStore();
+  const startedAt = Date.now();
+
+  const healthHandler: express.RequestHandler = (_request, response) => {
+    response.json({ status: "ok", version: "0.1.0" });
+  };
+  app.get("/health", healthHandler);
+  app.get("/api/health", healthHandler);
+
+  app.get("/api/public-config", (_request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.json(options.adminService.getPublicConfig());
   });
 
-  // The browser needs the gateway's default target so a user can edit it in
-  // the join form. No credentials are exposed here.
-  app.get("/api/public-config", (_req, res) => {
-    res.json({
-      tsHost: options.voiceBridgeOptions.defaultTarget.host,
-      tsPort: options.voiceBridgeOptions.defaultTarget.port,
-      target: formatTeamSpeakTarget(options.voiceBridgeOptions.defaultTarget),
+  app.post("/api/join-ticket", async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    if (!request.is("application/json") || !isSameOrigin(request)) {
+      response.status(403).json({ ok: false, code: "ORIGIN_REJECTED" });
+      return;
+    }
+    if (!options.adminService.isInitialized()) {
+      response.status(503).json({ ok: false, code: "NOT_INITIALIZED" });
+      return;
+    }
+    const body = isRecord(request.body) ? request.body : {};
+    const nickname = typeof body.nickname === "string" ? body.nickname.trim().slice(0, 30) : "";
+    const channel = typeof body.channel === "string" ? body.channel.trim().slice(0, 100) : "";
+    if (!nickname) {
+      response.status(400).json({ ok: false, code: "INVALID_NICKNAME" });
+      return;
+    }
+
+    const policy = options.adminService.getConnectionPolicy();
+    let target = policy.defaultTarget;
+    let serverPassword = policy.serverPassword;
+    try {
+      if (policy.accessMode === "open" && typeof body.target === "string" && body.target.trim()) {
+        target = parseTeamSpeakTarget(body.target);
+        const isDefault = teamSpeakTargetKey(target) === teamSpeakTargetKey(policy.defaultTarget);
+        if (!isDefault) {
+          target = await resolveSafeOpenTarget(target);
+          serverPassword = typeof body.serverPassword === "string" ? body.serverPassword.slice(0, 512) : "";
+        }
+      }
+    } catch {
+      response.status(400).json({ ok: false, code: "TARGET_NOT_ALLOWED" });
+      return;
+    }
+
+    const ticket = options.voiceBridgeOptions.joinTickets.create({
+      target,
+      serverPassword,
+      nickname,
+      ...(channel ? { channel } : {}),
     });
+    response.status(201).json({ ok: true, ticket });
   });
+
+  app.use("/api/admin", createAdminRouter({
+    service: options.adminService,
+    sessions: adminSessions,
+    logger,
+    getActiveSessions: () => voiceBridge.getActiveCount(),
+    getPeakSessions: () => voiceBridge.getPeakCount(),
+    startedAt,
+  }));
 
   // Serve static frontend
   if (options.staticDir) {
@@ -62,8 +118,6 @@ export function createWebServer(options: WebServerOptions): WebServer {
     });
   }
 
-  // Voice bridge WebSocket at /ws/voice
-  const voiceBridge = new VoiceBridge(options.voiceBridgeOptions, logger);
   voiceBridge.attach(server);
 
   return {
@@ -77,9 +131,24 @@ export function createWebServer(options: WebServerOptions): WebServer {
     },
     async stop(): Promise<void> {
       voiceBridge.shutdown();
+      adminSessions.clear();
       return new Promise((resolve) => {
         server.close(() => resolve());
       });
     },
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSameOrigin(request: express.Request): boolean {
+  const origin = request.header("origin");
+  const host = request.header("host");
+  try {
+    return Boolean(origin && host && new URL(origin).host === host);
+  } catch {
+    return false;
+  }
 }

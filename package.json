@@ -5,6 +5,9 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "description": "Server-side browser gateway for TeamSpeak — deploy on your server, users join from any browser",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
@@ -27,5 +30,10 @@
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
+  },
+  "overrides": {
+    "body-parser": "^2.3.0",
+    "esbuild": "^0.28.2",
+    "tar": "^7.5.22"
   }
 }

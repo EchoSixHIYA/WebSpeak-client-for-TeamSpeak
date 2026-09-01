@@ -41,6 +41,7 @@ export function useVoiceWebSocket() {
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
+  let connectionSequence = 0;
 
   // Audio capture. The ScriptProcessor path remains the most compatible option
   // for the current browser support matrix, but the graph now has an explicit
@@ -311,17 +312,44 @@ export function useVoiceWebSocket() {
     }
   }
 
-  function connect(tsHost: string, tsPort: number, channel: string, nickname: string): void {
+  function connect(target: string, channel: string, nickname: string, serverPassword = ""): void {
     disconnect();
+    const sequence = ++connectionSequence;
     state.error = "";
     state.connecting = true;
+    void openTicketedConnection(sequence, target, channel, nickname, serverPassword);
+  }
+
+  async function openTicketedConnection(sequence: number, target: string, channel: string, nickname: string, serverPassword: string): Promise<void> {
+    try {
+      const response = await fetch("/api/join-ticket", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ target, nickname, channel, serverPassword }),
+      });
+      const result = await response.json().catch(() => ({})) as { ticket?: unknown; code?: unknown };
+      if (!response.ok || typeof result.ticket !== "string") {
+        throw new Error(joinTicketReason(typeof result.code === "string" ? result.code : ""));
+      }
+      if (sequence !== connectionSequence) return;
+      openVoiceSocket(sequence, result.ticket);
+    } catch (error: unknown) {
+      if (sequence !== connectionSequence) return;
+      state.connecting = false;
+      state.error = error instanceof Error ? error.message : "连接服务器失败，请检查邀请链接或服务器状态";
+    }
+  }
+
+  function openVoiceSocket(sequence: number, ticket: string): void {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const params = new URLSearchParams({ tsHost, tsPort: String(tsPort), nickname });
-    if (channel) params.set("channel", channel);
-    const socket = new WebSocket(`${proto}//${location.host}/ws/voice?${params.toString()}`);
+    const socket = new WebSocket(`${proto}//${location.host}/ws/voice?ticket=${encodeURIComponent(ticket)}`);
     socket.binaryType = "arraybuffer";
     ws.value = socket;
     socket.onopen = () => {
+      if (sequence !== connectionSequence) {
+        socket.close(1000);
+        return;
+      }
       startMicrophone().catch((error: unknown) => {
         state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
       });
@@ -338,14 +366,23 @@ export function useVoiceWebSocket() {
       }
     };
     socket.onclose = (event) => {
+      if (sequence !== connectionSequence) return;
       state.connected = false;
       state.connecting = false;
       if (event.code !== 1000 && !state.error) state.error = closeReason(event.code);
       stopMicrophone();
     };
     socket.onerror = () => {
+      if (sequence !== connectionSequence) return;
       state.error = "连接服务器失败，请检查邀请链接或服务器状态";
     };
+  }
+
+  function joinTicketReason(code: string): string {
+    if (code === "NOT_INITIALIZED") return "WebSpeak 尚未完成首次配置";
+    if (code === "TARGET_NOT_ALLOWED") return "此 TeamSpeak 服务器地址不允许连接";
+    if (code === "INVALID_NICKNAME") return "请输入有效的昵称";
+    return "连接服务器失败，请检查邀请链接或服务器状态";
   }
 
   function closeReason(code: number): string {
@@ -356,6 +393,7 @@ export function useVoiceWebSocket() {
   }
 
   function disconnect(): void {
+    connectionSequence++;
     stopMicrophone();
     const socket = ws.value;
     ws.value = null;
