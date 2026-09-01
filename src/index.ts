@@ -29,6 +29,8 @@ async function main() {
     masterSecret,
     logger,
     CONFIG_PATH,
+    undefined,
+    APP_VERSION,
   );
   await adminService.initialize();
   removeObsoleteBootstrapFile();
