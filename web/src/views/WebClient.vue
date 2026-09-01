@@ -186,7 +186,6 @@
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
-                <button v-if="!member.isSelf" type="button" class="member-more" :aria-label="t('moreMemberOptions')" :title="t('moreMemberOptions')" @click.stop="openMemberMenu(member, $event)"><Icon name="more" :size="17" /></button>
               </div>
             </div>
             <div v-else class="channel-no-members">{{ t('noMembersInChannel') }}</div>
@@ -1668,10 +1667,8 @@ function stopWhisperTalk(): void {
 .status-button:hover, .status-button.active { color: #8c653a; background: #fcf3e7; border-color: #f0dcc0; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #66d27a; }
 .status-button.active .status-dot { background: #e0a34d; }
-.member-row { position: relative; }
-.member-more { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; color: #91a09b; background: transparent; border-radius: 6px; cursor: pointer; opacity: 0; }
-.member-row:hover .member-more, .member-more:focus-visible { opacity: 1; }
-.member-more:hover { color: #006a64; background: #e6f2ef; }
+.member-row { position: relative; padding: 4px 6px; margin: -4px -6px; border-radius: 9px; transition: background .16s ease, box-shadow .16s ease; }
+.member-row:hover, .member-row:focus-within { background: #edf7f4; box-shadow: 0 4px 12px rgba(20, 58, 51, .07); }
 .member-context-menu { position: fixed; z-index: 40; display: grid; min-width: 188px; gap: 3px; padding: 8px; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
 .member-context-menu strong { padding: 4px 8px 7px; color: #2a3934; font-size: 12px; }
 .member-context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; color: #52625c; background: transparent; border-radius: 6px; font-size: 11px; text-align: left; cursor: pointer; }
@@ -1722,6 +1719,7 @@ function stopWhisperTalk(): void {
 .settings-select { background: var(--surface-2); border-color: var(--border); }
 .audio-level-track, .meter i { background: var(--border); }
 .member-presence { border-color: var(--surface-1); }
+.member-row:hover, .member-row:focus-within { background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)); box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 8%, transparent); }
 :global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible), :global(textarea:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
 .message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
 @media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; }.mobile-ptt-button { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; } }

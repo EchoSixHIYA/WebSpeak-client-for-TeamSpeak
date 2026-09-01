@@ -9,6 +9,7 @@ import {
   type VoiceData,
   type ChannelInfo,
   type ClientInfo,
+  type TextMessage,
 } from "@honeybbq/teamspeak-client";
 import type { Logger } from "../logger.js";
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
@@ -43,6 +44,31 @@ export interface TSDirectoryClient extends ClientInfo {
 }
 
 export type TSChatScope = "channel" | "server" | "private";
+
+export interface TSChatMessage {
+  invokerName: string;
+  invokerId: number;
+  invokerUid: string;
+  message: string;
+  targetMode: number;
+  targetId: bigint;
+}
+
+/**
+ * Keep the TeamSpeak target id when adapting SDK events for the gateway.
+ * Private-message events include a bigint targetID; dropping it makes the
+ * bridge dereference undefined while echoing the message to the browser.
+ */
+export function toTSChatMessage(msg: TextMessage): TSChatMessage {
+  return {
+    invokerName: msg.invokerName,
+    invokerId: msg.invokerID,
+    invokerUid: msg.invokerUID,
+    message: msg.message,
+    targetMode: msg.targetMode,
+    targetId: msg.targetID,
+  };
+}
 
 export class TSClient extends EventEmitter {
   private client: TS3FullClient | null = null;
@@ -137,13 +163,7 @@ export class TSClient extends EventEmitter {
     });
 
     client.on("textMessage", (msg) => {
-      this.emit("textMessage", {
-        invokerName: msg.invokerName,
-        invokerId: msg.invokerID,
-        invokerUid: msg.invokerUID,
-        message: msg.message,
-        targetMode: msg.targetMode,
-      });
+      this.emit("textMessage", toTSChatMessage(msg));
     });
 
     client.on("poked", (event) => {

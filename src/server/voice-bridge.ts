@@ -405,8 +405,10 @@ export class VoiceBridge {
         sendJson({
           type: "chatMessage",
           scope,
-          targetId: message.targetID.toString(),
-          senderUid: message.invokerUID,
+          // Keep event handling total: malformed/legacy SDK events must not
+          // throw from this callback and tear down the browser session.
+          targetId: String(message.targetId ?? 0n),
+          senderUid: message.invokerUid,
           timestamp: Date.now(),
           invokerName: message.invokerName,
           invokerId: message.invokerId,
