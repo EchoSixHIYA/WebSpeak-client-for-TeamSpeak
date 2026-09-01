@@ -6,6 +6,8 @@ export interface JoinTicketPayload {
   serverPassword: string;
   nickname: string;
   channel?: string;
+  identity?: string;
+  rememberIdentity?: boolean;
 }
 
 interface StoredTicket {

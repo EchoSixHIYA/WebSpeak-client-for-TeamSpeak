@@ -1,4 +1,5 @@
 import { reactive, ref } from "vue";
+import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
 export interface VoiceState {
   connected: boolean;
@@ -13,6 +14,7 @@ export interface VoiceState {
 export interface ChannelMember {
   id: number;
   nickname: string;
+  uid?: string;
   isSelf?: boolean;
 }
 
@@ -27,7 +29,7 @@ export interface ChannelInfo {
   parentID: string;
   name: string;
   description?: string;
-  members?: { id: number; nickname: string }[];
+  members?: { id: number; nickname: string; uid?: string }[];
 }
 
 export interface ChatMessage {
@@ -45,7 +47,9 @@ export function useVoiceWebSocket() {
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
   let connectionSequence = 0;
-  let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string } | null = null;
+  let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
+  const identityMaterial = ref("");
+  const storedVolumesByUid = reactive<Record<string, number>>({});
   let microphoneStartPromise: Promise<void> | null = null;
 
   // Audio capture. The ScriptProcessor path remains the most compatible option
@@ -82,6 +86,35 @@ export function useVoiceWebSocket() {
   const speakingIds = reactive(new Set<number>());
   const speakingTimers = new Map<number, ReturnType<typeof setTimeout>>();
   const SPEAKING_HOLD_MS = 360;
+
+  async function saveAudioPreferences(): Promise<void> {
+    await saveLocalPreferences({
+      schemaVersion: 1,
+      preferredInputDeviceId: selectedInputDeviceId.value,
+      inputDeviceId: selectedInputDeviceId.value,
+      voiceMode: micMode.value,
+      inputGain: inputVolume.value,
+      outputVolume: outputVolume.value,
+      volumesByUid: { ...storedVolumesByUid },
+    });
+  }
+
+  function syncKnownMemberVolumes(): void {
+    for (const member of members) {
+      if (!member.uid) continue;
+      const saved = storedVolumesByUid[member.uid];
+      if (saved !== undefined) volumes[member.id] = Math.max(0, Math.min(4, saved));
+    }
+  }
+
+  void loadLocalPreferences().then((preferences) => {
+    if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
+    if (preferences.voiceMode === "vox" || preferences.voiceMode === "ptt") micMode.value = preferences.voiceMode;
+    if (typeof preferences.inputGain === "number") inputVolume.value = Math.max(0, Math.min(1, preferences.inputGain));
+    if (typeof preferences.outputVolume === "number") outputVolume.value = Math.max(0, Math.min(1, preferences.outputVolume));
+    Object.assign(storedVolumesByUid, preferences.volumesByUid ?? {});
+    syncKnownMemberVolumes();
+  });
 
   function markSpeaking(clientId: number): void {
     if (!clientId) return;
@@ -146,6 +179,7 @@ export function useVoiceWebSocket() {
     if (selectedInputDeviceId.value && !microphones.some((device) => device.deviceId === selectedInputDeviceId.value)) {
       selectedInputDeviceId.value = microphones[0]?.deviceId ?? "";
       localStorage.setItem("webspeak:input-device", selectedInputDeviceId.value);
+      void saveAudioPreferences();
     }
   }
 
@@ -259,6 +293,7 @@ export function useVoiceWebSocket() {
     const previousDeviceId = selectedInputDeviceId.value;
     selectedInputDeviceId.value = deviceId;
     localStorage.setItem("webspeak:input-device", deviceId);
+    void saveAudioPreferences();
     try {
       if (micStream) await startMicrophone();
       await refreshInputDevices();
@@ -327,9 +362,10 @@ export function useVoiceWebSocket() {
     }
   }
 
-  function connect(target: string, channel: string, nickname: string, serverPassword = ""): void {
+  function connect(target: string, channel: string, nickname: string, serverPassword = "", identity = "", rememberIdentity = false): void {
     disconnect(true);
-    lastConnection = { target, channel, nickname, serverPassword };
+    lastConnection = { target, channel, nickname, serverPassword, ...(identity ? { identity } : {}), rememberIdentity };
+    identityMaterial.value = identity;
     const sequence = ++connectionSequence;
     state.error = "";
     state.connecting = true;
@@ -344,7 +380,7 @@ export function useVoiceWebSocket() {
       const response = await fetch("/api/join-ticket", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ target, nickname, channel, serverPassword }),
+        body: JSON.stringify({ target, nickname, channel, serverPassword, ...(lastConnection?.rememberIdentity && lastConnection.identity ? { identity: lastConnection.identity } : {}), ...(lastConnection?.rememberIdentity ? { rememberIdentity: true } : {}) }),
       });
       const result = await response.json().catch(() => ({})) as { ticket?: unknown; code?: unknown };
       if (!response.ok || typeof result.ticket !== "string") {
@@ -425,6 +461,7 @@ export function useVoiceWebSocket() {
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
     state.tsClientId = 0;
+    identityMaterial.value = "";
     members.length = 0;
     channels.length = 0;
     chatMessages.length = 0;
@@ -454,6 +491,11 @@ export function useVoiceWebSocket() {
           for (const member of msg.members) {
             members.push({ ...member, isSelf: Number(member.id) === state.tsClientId });
           }
+          syncKnownMemberVolumes();
+        }
+        if (typeof msg.identity === "string" && msg.identity.length <= 8192) {
+          identityMaterial.value = msg.identity;
+          if (lastConnection) lastConnection.identity = msg.identity;
         }
         if (wasReconnecting) {
           ensureMicrophone().catch((error: unknown) => {
@@ -463,7 +505,8 @@ export function useVoiceWebSocket() {
         break;
       case "memberEnter":
         if (!members.some((member) => member.id === msg.id)) {
-          members.push({ id: msg.id, nickname: msg.nickname, isSelf: Boolean(msg.isSelf) });
+          members.push({ id: msg.id, nickname: msg.nickname, uid: typeof msg.uid === "string" ? msg.uid : undefined, isSelf: Boolean(msg.isSelf) });
+          syncKnownMemberVolumes();
         }
         break;
       case "memberLeave": {
@@ -477,6 +520,7 @@ export function useVoiceWebSocket() {
         if (Array.isArray(msg.channels)) {
           for (const channel of msg.channels) channels.push(channel);
         }
+        syncKnownMemberVolumes();
         break;
       case "chatMessage":
         if (Number(msg.invokerId) === state.tsClientId) break;
@@ -553,12 +597,13 @@ export function useVoiceWebSocket() {
 
   function reconnectNow(): void {
     if (!lastConnection || state.connecting) return;
-    connect(lastConnection.target, lastConnection.channel, lastConnection.nickname, lastConnection.serverPassword);
+    connect(lastConnection.target, lastConnection.channel, lastConnection.nickname, lastConnection.serverPassword, lastConnection.rememberIdentity ? identityMaterial.value || lastConnection.identity : "", lastConnection.rememberIdentity);
   }
 
   function setMicMode(mode: "vox" | "ptt"): void {
     micMode.value = mode;
     if (mode === "vox") pttPressed = false;
+    void saveAudioPreferences();
   }
 
   function setPTT(pressed: boolean): void {
@@ -588,6 +633,11 @@ export function useVoiceWebSocket() {
   function setVolume(clientId: number, volume: number): void {
     const normalized = Math.max(0, Math.min(4, volume));
     volumes[clientId] = normalized;
+    const member = members.find((candidate) => candidate.id === clientId);
+    if (member?.uid) {
+      storedVolumesByUid[member.uid] = normalized;
+      void saveAudioPreferences();
+    }
     const gain = remoteGains.get(clientId);
     if (gain) gain.gain.value = normalized * outputVolume.value;
   }
@@ -595,11 +645,13 @@ export function useVoiceWebSocket() {
   function setInputVolume(volume: number): void {
     inputVolume.value = Math.max(0, Math.min(1, volume));
     if (micGain) micGain.gain.value = inputVolume.value;
+    void saveAudioPreferences();
   }
 
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     for (const [clientId, gain] of remoteGains) gain.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
+    void saveAudioPreferences();
   }
 
   return {
@@ -613,6 +665,7 @@ export function useVoiceWebSocket() {
     outputVolume,
     inputDevices,
     selectedInputDeviceId,
+    identityMaterial,
     micLevel,
     microphoneTestActive,
     speakingIds,

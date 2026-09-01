@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
 import { createRequire } from "node:module";
+import { identityFromString } from "@honeybbq/teamspeak-client";
 import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
@@ -26,6 +27,7 @@ export interface VoiceBridgeOptions {
 interface ChannelMember {
   id: number;
   nickname: string;
+  uid: string;
 }
 
 interface WebClientEntry {
@@ -34,6 +36,7 @@ interface WebClientEntry {
   tsClient: TSClient;
   ws: WebSocket;
   nickname: string;
+  rememberIdentity: boolean;
   target: TeamSpeakTarget;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
@@ -70,6 +73,13 @@ export class VoiceBridge {
 
       const { target, serverPassword, nickname } = connection;
       const channelName = connection.channel;
+      let identity;
+      try {
+        identity = connection.identity ? identityFromString(connection.identity) : undefined;
+      } catch {
+        ws.close(4003, "Invalid identity");
+        return;
+      }
       const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       let entry: WebClientEntry | null = null;
       const session = this.sessionManager.admit(entryId, async (reason) => {
@@ -84,7 +94,7 @@ export class VoiceBridge {
       this.logger.info({ entryId, nickname, channel: channelName, target: formatTeamSpeakTarget(target) }, "WebClient connecting");
       let tsClient: TSClient;
       try {
-        tsClient = new TSClient({ target, nickname, serverPassword, defaultChannel: channelName }, this.logger);
+        tsClient = new TSClient({ target, nickname, serverPassword, defaultChannel: channelName, identity }, this.logger);
       } catch (error: unknown) {
         this.logger.error({ err: error, entryId }, "Could not create TeamSpeak client");
         void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
@@ -97,6 +107,7 @@ export class VoiceBridge {
         tsClient,
         ws,
         nickname,
+        rememberIdentity: connection.rememberIdentity === true,
         target,
         channelTree: [],
         members: new Map(),
@@ -104,9 +115,9 @@ export class VoiceBridge {
         isAlive: true,
         reconnectTimer: null,
       };
-      this.entries.set(entryId, entry);
+      this.entries.set(entryId, entry!);
       try {
-        entry.opusEncoder = new OpusEncoder(48000, 1);
+        entry!.opusEncoder = new OpusEncoder(48000, 1);
       } catch (error: unknown) {
         this.logger.error({ err: error, entryId }, "Could not create Opus encoder");
         void this.teardown(entryId, "teamSpeak-connect-failed");
@@ -137,7 +148,7 @@ export class VoiceBridge {
         entry!.channelTree = mapChannelTree(normalizedSnapshot);
         entry!.members.clear();
         for (const client of normalizedSnapshot.clients) {
-          entry!.members.set(client.id, { id: client.id, nickname: client.nickname });
+          entry!.members.set(client.id, { id: client.id, nickname: client.nickname, uid: client.uid });
         }
       };
       const sendInitialState = () => {
@@ -148,7 +159,12 @@ export class VoiceBridge {
         reconnectAttempt = 0;
         reconnectStartedAt = 0;
         session.transition("connected");
-        sendJson({ type: "connected", tsClientId: selfId, members: Array.from(entry!.members.values()) });
+        sendJson({
+          type: "connected",
+          tsClientId: selfId,
+          members: Array.from(entry!.members.values()),
+          ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
+        });
         sendJson({ type: "channelList", channels: entry!.channelTree });
         if (wasReconnecting) sendJson({ type: "reconnected" });
       };
@@ -267,7 +283,7 @@ export class VoiceBridge {
         refreshDirectory();
         if (tsReady && initialStateSent) {
           sendJson({ type: "channelList", channels: entry!.channelTree });
-          if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, isSelf: info.id === selfId });
+          if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
         }
       });
 
@@ -480,7 +496,7 @@ function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
     description: channel.description || "",
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
-      .map((client) => ({ id: client.id, nickname: client.nickname || "未知用户" })),
+      .map((client) => ({ id: client.id, nickname: client.nickname || "未知用户", uid: client.uid })),
   }));
 }
 

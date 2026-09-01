@@ -33,6 +33,7 @@
           <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span>{{ localizedMessage(voiceState.error) }}</span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
           <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin">{{ t('configureNow') }}</a></span></div>
+          <div v-if="!localPersistenceAvailable" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('localPersistenceUnavailable') }}</span></div>
 
           <form v-if="initialized" class="join-form" @submit.prevent="doConnect">
             <div v-if="accessMode === 'open'">
@@ -40,6 +41,11 @@
               <div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverAddress" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div>
             </div>
             <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
+            <div v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)" class="local-servers">
+              <div v-if="favoriteServers.length" class="local-server-group"><span>{{ t('favoriteServers') }}</span><button v-for="favorite in favoriteServers" :key="favorite.id" type="button" @click="selectLocalServer(favorite.address, favorite.nickname)">{{ favorite.label }}</button></div>
+              <div v-if="recentServers.length" class="local-server-group"><span>{{ t('recentServers') }}</span><button v-for="recent in recentServers" :key="recent.id" type="button" @click="selectLocalServer(recent.address, recent.nickname)">{{ recent.address }}</button></div>
+            </div>
+            <button v-if="accessMode === 'open' && serverAddress.trim()" type="button" class="favorite-toggle" @click="toggleFavorite">{{ isFavorite ? t('removeFavorite') : t('saveFavorite') }}</button>
 
             <template v-if="accessMode === 'open'">
               <label class="field-label" for="server-password">{{ t('serverPassword') }} <span>{{ t('optional') }}</span></label>
@@ -58,6 +64,13 @@
               <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
             </div>
 
+            <label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label>
+            <div class="identity-tools">
+              <button type="button" class="identity-tool-button" @click="identityFileInput?.click()">{{ t('identityImport') }}</button>
+              <button v-if="identityMaterial" type="button" class="identity-tool-button" @click="exportIdentity">{{ t('identityExport') }}</button>
+              <input ref="identityFileInput" class="visually-hidden" type="file" accept=".json,.txt,application/json,text/plain" @change="importIdentity" />
+            </div>
+
             <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
               <span>{{ voiceState.connecting ? t('connecting') : t('enterVoice') }}</span>
@@ -69,7 +82,7 @@
       </main>
 
       <footer class="join-footer">
-        <span>WebSpeak</span><span class="footer-separator">·</span><span>{{ t('teamSpeakClient') }}</span><span class="footer-spacer"></span><a href="https://github.com/EchoSixHIYA/web-gateway-for-TeamSpeak" target="_blank" rel="noreferrer">{{ t('sourceCode') }}</a><span class="footer-separator">·</span><span>{{ t('browserSupport') }}</span>
+        <span>WebSpeak</span><span class="footer-separator">·</span><span>{{ t('teamSpeakClient') }}</span><span class="footer-spacer"></span><button type="button" class="clear-local-button" @click="clearBrowserData">{{ t('clearLocalData') }}</button><span class="footer-separator">·</span><a href="https://github.com/EchoSixHIYA/web-gateway-for-TeamSpeak" target="_blank" rel="noreferrer">{{ t('sourceCode') }}</a><span class="footer-separator">·</span><span>{{ t('browserSupport') }}</span>
       </footer>
     </section>
 
@@ -184,6 +197,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import { useVoiceWebSocket, type ChannelInfo, type ChannelMember } from "../composables/useVoiceWebSocket.js";
+import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 
 interface TreeChannel extends ChannelInfo {
   depth: number;
@@ -200,6 +214,7 @@ const {
   outputVolume,
   inputDevices,
   selectedInputDeviceId,
+  identityMaterial,
   micLevel,
   microphoneTestActive,
   speakingIds,
@@ -229,6 +244,9 @@ const channel = ref(initialChannel);
 const serverAddress = ref(initialServerAddress());
 const serverPassword = ref("");
 const accessMode = ref<"fixed" | "open">("fixed");
+const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") === "1");
+const favoriteServers = ref<FavoriteServer[]>([]);
+const recentServers = ref<RecentServer[]>([]);
 const initialized = ref(false);
 const siteName = ref("WebSpeak");
 const welcomeText = ref("");
@@ -242,6 +260,8 @@ const audioSettingsError = ref("");
 const pttActive = ref(false);
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
+const identityFileInput = ref<HTMLInputElement | null>(null);
+const localPersistenceAvailable = isLocalPersistenceAvailable();
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 type Language = "zh" | "en";
@@ -277,6 +297,24 @@ const translations: Record<Language, Record<string, string>> = {
     targetChannel: "目标频道",
     optional: "可选",
     emptyDefault: "留空进入默认频道",
+    rememberIdentity: "记住此设备的 TeamSpeak 身份",
+    rememberIdentityHint: "仅保存在本设备，用于下次连接时保持身份。",
+    localPersistenceUnavailable: "当前浏览器无法使用持久化存储，本次将使用临时身份。",
+    identityImport: "导入身份",
+    identityExport: "导出身份",
+    identityExportWarning: "身份文件包含私密凭据，任何拿到文件的人都可以冒充此身份。请妥善保管。",
+    identityExportedToast: "身份文件已下载，请妥善保管",
+    identityImportedToast: "身份已导入，将在下次连接时使用",
+    identityImportFailed: "身份文件无效，请选择 WebSpeak 身份文件",
+    favoriteServers: "常用服务器",
+    recentServers: "最近连接",
+    saveFavorite: "保存到常用",
+    removeFavorite: "移除常用",
+    savedFavoriteToast: "已保存到常用服务器",
+    removedFavoriteToast: "已从常用服务器移除",
+    clearLocalData: "清除本地数据",
+    clearLocalDataConfirm: "确定清除本设备保存的身份、收藏、最近连接和音频偏好吗？",
+    localDataCleared: "本地数据已清除",
     connecting: "正在连接…",
     enterVoice: "进入语音空间",
     connectionAuthorized: "连接信息仅用于本次语音会话",
@@ -418,6 +456,24 @@ const translations: Record<Language, Record<string, string>> = {
     targetChannel: "Target channel",
     optional: "Optional",
     emptyDefault: "Leave empty to use the default channel",
+    rememberIdentity: "Remember this TeamSpeak identity on this device",
+    rememberIdentityHint: "Stored only on this device and reused on the next connection.",
+    localPersistenceUnavailable: "Persistent browser storage is unavailable; this session will use an ephemeral identity.",
+    identityImport: "Import identity",
+    identityExport: "Export identity",
+    identityExportWarning: "Identity files contain private credentials. Anyone with the file can impersonate this identity. Keep it safe.",
+    identityExportedToast: "Identity file downloaded. Keep it safe.",
+    identityImportedToast: "Identity imported and will be used on the next connection.",
+    identityImportFailed: "Invalid identity file. Choose a WebSpeak identity file.",
+    favoriteServers: "Favorites",
+    recentServers: "Recent servers",
+    saveFavorite: "Save favorite",
+    removeFavorite: "Remove favorite",
+    savedFavoriteToast: "Saved to favorites",
+    removedFavoriteToast: "Removed from favorites",
+    clearLocalData: "Clear local data",
+    clearLocalDataConfirm: "Clear this device's identity, favorites, recent servers, and audio preferences?",
+    localDataCleared: "Local data cleared",
     connecting: "Connecting…",
     enterVoice: "Enter voice space",
     connectionAuthorized: "Connection details are used only for this voice session",
@@ -590,6 +646,7 @@ function localizedMessage(message: string) {
 function toggleLanguage() {
   language.value = language.value === "zh" ? "en" : "zh";
   localStorage.setItem("webspeak:language", language.value);
+  void saveLocalPreferences({ schemaVersion: 1, language: language.value });
 }
 
 const heroBars = [12, 24, 18, 35, 18, 28, 42, 23, 50, 34, 19, 28, 39, 22, 46, 25, 17, 31, 14];
@@ -659,12 +716,45 @@ watch(settingsOpen, (open) => {
     stopMicrophoneTest();
   }
 });
+watch(rememberIdentity, (remember) => {
+  localStorage.setItem("webspeak:remember-identity", remember ? "1" : "0");
+  if (!remember) identityMaterial.value = "";
+});
+watch([rememberIdentity, identityMaterial], ([remember, material]) => {
+  if (remember && material) void saveStoredIdentity(material);
+  if (!remember && material) identityMaterial.value = "";
+});
+watch(() => voiceState.connected, (connected) => {
+  if (!connected) return;
+  const address = serverAddress.value.trim();
+  if (!address) return;
+  const recent: RecentServer = {
+    id: serverKey(address),
+    address,
+    ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}),
+    ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
+    lastConnectedAt: Date.now(),
+    ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}),
+  };
+  void recordRecentServer(recent).then(() => listRecentServers().then((items) => { recentServers.value = items; }));
+});
 
 let deviceChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   browserError.value = checkSupport() ?? "";
   void loadPublicConfig();
+  void loadLocalPreferences().then((preferences) => {
+    if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en")) language.value = preferences.language;
+  });
+  void loadStoredIdentity().then((stored) => {
+    if (stored) {
+      identityMaterial.value = stored.privateMaterial;
+      rememberIdentity.value = true;
+    }
+  });
+  void listFavorites().then((items) => { favoriteServers.value = items; });
+  void listRecentServers().then((items) => { recentServers.value = items; });
   deviceChangeHandler = () => { void prepareInputDevices().catch(() => undefined); };
   navigator.mediaDevices?.addEventListener("devicechange", deviceChangeHandler);
 });
@@ -679,11 +769,12 @@ function doConnect() {
   clearError();
   nickname.value = nickname.value.trim();
   localStorage.setItem("webspeak:nickname", nickname.value);
+  void saveLocalPreferences({ schemaVersion: 1, lastNickname: nickname.value });
   if (accessMode.value === "open") {
     serverAddress.value = serverAddress.value.trim();
   }
   selectedChannelId.value = "";
-  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "");
+  connect(serverAddress.value, channel.value.trim(), nickname.value, accessMode.value === "open" ? serverPassword.value : "", rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value);
 }
 
 function doDisconnect() {
@@ -724,6 +815,78 @@ const canJoin = computed(() => Boolean(
   && nickname.value.trim()
   && (accessMode.value === "fixed" || serverAddress.value.trim()),
 ));
+const isFavorite = computed(() => favoriteServers.value.some((favorite) => favorite.id === serverKey(serverAddress.value)));
+
+function serverKey(address: string): string {
+  return address.trim().toLocaleLowerCase();
+}
+
+function selectLocalServer(address: string, savedNickname?: string): void {
+  serverAddress.value = address;
+  if (savedNickname && !nickname.value.trim()) nickname.value = savedNickname;
+}
+
+async function toggleFavorite(): Promise<void> {
+  const address = serverAddress.value.trim();
+  if (!address) return;
+  const id = serverKey(address);
+  const existing = favoriteServers.value.find((favorite) => favorite.id === id);
+  if (existing) {
+    await removeFavorite(id);
+    favoriteServers.value = favoriteServers.value.filter((favorite) => favorite.id !== id);
+    showToast(t("removedFavoriteToast"));
+    return;
+  }
+  const favorite: FavoriteServer = { id, label: address, address, ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}), ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}), ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}) };
+  await saveFavorite(favorite);
+  favoriteServers.value = [...favoriteServers.value, favorite].sort((a, b) => a.label.localeCompare(b.label));
+  showToast(t("savedFavoriteToast"));
+}
+
+async function clearBrowserData(): Promise<void> {
+  if (!window.confirm(t("clearLocalDataConfirm"))) return;
+  await clearStoredLocalData();
+  for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:input-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
+  identityMaterial.value = "";
+  rememberIdentity.value = false;
+  favoriteServers.value = [];
+  recentServers.value = [];
+  showToast(t("localDataCleared"));
+}
+
+function exportIdentity(): void {
+  if (!identityMaterial.value) return;
+  if (!window.confirm(t("identityExportWarning"))) return;
+  const contents = JSON.stringify({
+    format: "webspeak-identity",
+    version: 1,
+    privateMaterial: identityMaterial.value,
+    exportedAt: new Date().toISOString(),
+  }, null, 2);
+  const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "webspeak-identity.json";
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast(t("identityExportedToast"));
+}
+
+async function importIdentity(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text()) as { format?: unknown; version?: unknown; privateMaterial?: unknown };
+    if (parsed.format !== "webspeak-identity" || parsed.version !== 1 || typeof parsed.privateMaterial !== "string" || parsed.privateMaterial.length === 0 || parsed.privateMaterial.length > 8192) throw new Error("invalid identity");
+    identityMaterial.value = parsed.privateMaterial;
+    rememberIdentity.value = true;
+    showToast(t("identityImportedToast"));
+  } catch {
+    showToast(t("identityImportFailed"));
+  }
+}
 
 async function loadPublicConfig() {
   try {
@@ -975,6 +1138,10 @@ function stopPointerTalk() {
 .app-shell { grid-template-columns: minmax(0, 1fr) 318px; }
 .nav-rail, .channel-sidebar { display: none; }
 .workspace { min-width: 0; }
+.identity-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1px; }
+.identity-tool-button { padding: 5px 8px; color: #277970; background: #eef8f5; border: 1px solid #d7ebe6; border-radius: 6px; font-size: 10px; cursor: pointer; }
+.identity-tool-button:hover { background: #e0f3ee; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .channel-switcher { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; }
 .channel-switcher select { max-width: 165px; padding: 0 2px; color: #31514b; border: 0; outline: 0; background: transparent; font-size: 11px; cursor: pointer; }
 .member-panel { display: flex; flex-direction: column; min-height: 0; padding: 26px 18px 18px; overflow: hidden; }
@@ -1005,6 +1172,19 @@ function stopPointerTalk() {
 .reconnect-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .reconnect-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .reconnect-actions .secondary-button { min-height: 34px; padding-inline: 13px; }
+.remember-identity { display: flex; align-items: flex-start; gap: 9px; margin-top: 8px; color: #465650; cursor: pointer; }
+.remember-identity input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: #087d74; }
+.remember-identity strong, .remember-identity small { display: block; }
+.remember-identity strong { font-size: 11px; font-weight: 700; }
+.remember-identity small { margin-top: 3px; color: #8b9994; font-size: 10px; line-height: 1.4; }
+.local-servers { display: grid; gap: 8px; margin: 1px 0 5px; }
+.local-server-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.local-server-group > span { width: 100%; color: #87958f; font-size: 10px; font-weight: 700; }
+.local-server-group button, .favorite-toggle { padding: 5px 8px; color: #277970; background: #eef8f5; border: 1px solid #d7ebe6; border-radius: 6px; font-size: 10px; cursor: pointer; }
+.local-server-group button:hover, .favorite-toggle:hover { background: #e0f3ee; }
+.favorite-toggle { justify-self: start; margin: -1px 0 4px; }
+.clear-local-button { padding: 0; color: #85928d; background: transparent; border: 0; font-size: 10px; cursor: pointer; }
+.clear-local-button:hover { color: #b14e47; text-decoration: underline; }
 @media (max-width: 740px) { .reconnect-banner { align-items: flex-start; flex-direction: column; gap: 10px; width: calc(100% - 30px); }.reconnect-copy { align-items: flex-start; flex-direction: column; gap: 4px; }.reconnect-actions { width: 100%; justify-content: flex-end; } }
 .save-button { min-height: 38px; }
 

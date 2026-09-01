@@ -10,6 +10,7 @@ import { createAdminRouter } from "../admin/admin-router.js";
 import type { AdminService } from "../admin/admin-service.js";
 import { AdminSessionStore } from "../admin/admin-session.js";
 import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
+import { identityFromString } from "@honeybbq/teamspeak-client";
 
 export interface WebServerOptions {
   port: number;
@@ -71,6 +72,16 @@ export function createWebServer(options: WebServerOptions): WebServer {
     const body = isRecord(request.body) ? request.body : {};
     const nickname = typeof body.nickname === "string" ? body.nickname.trim().slice(0, 30) : "";
     const channel = typeof body.channel === "string" ? body.channel.trim().slice(0, 100) : "";
+    const requestedIdentity = typeof body.identity === "string" && body.identity.length <= 8192 ? body.identity : "";
+    let identity: string | undefined;
+    if (requestedIdentity) {
+      try {
+        identityFromString(requestedIdentity);
+        identity = requestedIdentity;
+      } catch {
+        // A stale/corrupt local identity must not block a normal ephemeral join.
+      }
+    }
     if (!nickname) {
       response.status(400).json({ ok: false, code: "INVALID_NICKNAME" });
       return;
@@ -98,6 +109,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       serverPassword,
       nickname,
       ...(channel ? { channel } : {}),
+      ...(identity ? { identity, rememberIdentity: true } : body.rememberIdentity === true ? { rememberIdentity: true } : {}),
     });
     response.status(201).json({ ok: true, ticket });
   });
