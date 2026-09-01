@@ -1,185 +1,166 @@
+<div align="center">
+
 # WebSpeak
 
-WebSpeak 是一个自托管的 TeamSpeak 浏览器客户端与访客接入网关。每个浏览器 Session 都拥有独立的普通 TeamSpeak Client 连接；频道、成员和权限来自该用户自己的可见数据，不依赖 ServerQuery、WebQuery 或维护机器人。
+**让 TeamSpeak 真正进入浏览器。**
 
-[中文](#中文) · [English](#english) · [AGPL-3.0 License](LICENSE)
+自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音接入网关。无需安装桌面客户端，无需 ServerQuery，无需维护机器人；打开浏览器，即可进入你的语音空间。
+
+[![License](https://img.shields.io/github/license/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&color=0f766e)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-0f766e?style=flat-square)](https://nodejs.org/)
+[![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
+[![AGPL](https://img.shields.io/badge/license-AGPL--3.0-only-0f766e?style=flat-square)](LICENSE)
+
+[中文](#中文) · [English](#english) · [快速开始](#快速开始) · [架构](#架构) · [安全边界](#安全边界)
+
+</div>
+
+> WebSpeak 是一个连接层，而不是 TeamSpeak 服务端替代品。它为每一个浏览器会话建立独立的普通 TeamSpeak Client 连接，并把频道、成员、文字与语音能力安全地带到 Web 端。
 
 ## 中文
 
-### 当前能力
+### 为什么是 WebSpeak
 
-- TeamSpeak 3 / TeamSpeak 6 自动探测，无需选择协议。
-- 每个浏览器 Session 独立连接，硬上限固定为 100。
-- Session 生命周期统一管理：连接状态机、WebSocket 心跳、幂等清理和优雅关闭。
-- TeamSpeak 临时断线自动重连，固定退避策略最长持续 5 分钟；认证失败不会无限重试，并尽量恢复原频道。
-- 完整频道/成员树、频道切换、频道文字聊天和成员实时移动。
-- PCM/Opus 语音桥接、自由麦、按键说话、麦克风与扬声器设备选择、输入/输出音量控制。
-- 音频设置显示权限、实时麦克风音量和 VOX 阈值；VOX 带 attack/hold/release，设备热插拔时自动回退默认设备。
-- 移动端提供不会因触控取消而卡住的“按住说话”；麦克风测试最多录制 5 秒并只在本地播放，不发送到 TeamSpeak。
-- 支持连接、断开、Poke、私聊和重连失败提示音；浏览器不支持输出设备选择时明确降级到默认输出。
-- 发言成员头像显示绿色动态边框。
-- 频道、服务器和私聊独立标签；成员菜单支持私聊、Poke、复制昵称，频道密码按次输入且不持久化。
-- Away、成员状态图标、Session 内服务器事件日志和人类可读的 TeamSpeak 权限错误。
-- 中英文访客页面和中英文管理控制台。
-- Web 管理闭环：默认账号首次登录强制改密、单管理员登录、概览、服务器设置和真实连接测试。
-- 运维控制台：受控邀请创建/撤销/过期/限次、活动会话列表与单会话断开、审计事件、结构化日志查看、脱敏诊断报告和 SQLite 备份导出。
-- `fixed` 与 `open` 两种访问模式。
-- 可选的持久 TeamSpeak identity：身份私钥仅保存在浏览器 IndexedDB，访客也可继续使用临时身份。
-- 浏览器本地收藏、最近服务器、昵称、语言、音频设备/模式/音量和按 TeamSpeak UID 保存的成员音量。
-- 可清除全部 WebSpeak 本地数据；不保存服务器密码。
-- TeamSpeak 密码使用安装级主密钥加密保存，不向管理 API 返回明文。
-- 旧 `config.json` 一次性导入，导入后不再作为实时配置源。
-- `/demo` 提供不连接真实 TeamSpeak 的交互式模拟页面，可用于产品预览和录屏。
-- 当前实现按 `webspeak-spec` 的 M000–M010 顺序推进；M010 的真实 TS3/TS6、Android 麦克风和 24 小时长稳测试必须在对应环境完成，不能用本地模拟替代。
+| 体验 | WebSpeak 的答案 |
+| --- | --- |
+| 加入方式 | 浏览器打开链接即可加入，不安装桌面客户端 |
+| 数据来源 | 每个浏览器 Session 的独立 TeamSpeak Client 连接 |
+| 服务端依赖 | TeamSpeak 3 / TeamSpeak 6；不依赖 ServerQuery、WebQuery 或维护账号 |
+| 连接模型 | HTTPS / WSS 连接 WebSpeak，WebSpeak 连接目标 TeamSpeak |
+| 入口控制 | 固定目标、开放目标、一次性受控邀请三种路径 |
+| 语言与主题 | 访客端和管理控制台均支持中英文与主题切换 |
 
-### 环境要求
+### 核心能力
 
-- Node.js `22.5.0` 或更高版本。
-- Linux 推荐；Windows 也可用于开发和运行。
-- `@discordjs/opus` 所需的原生编译工具。
-- 可访问的 TeamSpeak 3 或 TeamSpeak 6 服务器。
-- 较新的 Chrome 或 Edge；生产环境应使用 HTTPS。
+| 领域 | 已提供 |
+| --- | --- |
+| 语音 | Opus / PCM 桥接、自由麦、按键说话、VOX、连接状态与重连提示 |
+| 设备 | 浏览器麦克风与扬声器选择、音量调节、实时输入电平、本地麦克风测试 |
+| 频道 | 频道树、频道切换、成员移动、频道文字聊天、服务器事件与状态展示 |
+| 成员 | 在线成员、发言绿色头像边框、Away 状态、私聊、Poke、昵称复制、成员音量 |
+| 管理 | 默认账号首次登录强制改密、默认 TeamSpeak 目标、站点信息、真实连接测试 |
+| 运维 | 活动 Session、邀请创建与撤销、审计事件、结构化日志、诊断报告、SQLite 备份 |
+| 浏览器体验 | 响应式布局、移动端按住说话、内部滚动容器、浏览器本地收藏与最近连接 |
 
-### Docker 部署（推荐）
+### 架构
 
-全新 Linux 主机只需要 Docker：
+```mermaid
+flowchart LR
+    B[浏览器会话] -->|HTTPS / WSS| G[WebSpeak 网关]
+    A[管理控制台] -->|HTTPS| G
+    G -->|每个 Session 一个普通 Client| T[TeamSpeak 3 / 6]
+    T -->|频道 / 成员 / 文字 / 语音| G
+```
+
+这套模型的关键点是：成员与频道信息来自对应浏览器会话本身。WebSpeak 不需要额外占用一个“维护系统数据”的 TeamSpeak 用户，也不通过 Query 接口拼装一份旁路目录。
+
+### 快速开始
+
+#### 方式 A：从 Dockerfile 构建
 
 ```bash
+docker build -t webspeak:local .
+docker volume create webspeak-data
 docker run -d \
   --name webspeak \
   --restart unless-stopped \
   -p 3040:3040 \
   -v webspeak-data:/data \
-  ghcr.io/EchoSixHIYA/webspeak:latest
+  webspeak:local
 ```
 
-容器内部端口固定为 `3040`，SQLite 数据库、主密钥和日志持久化在 `/data`。启动后打开 `http://你的地址:3040/admin`，使用 `admin/admin` 登录并按页面要求修改密码。生产环境请在前面配置 HTTPS 反向代理。
+容器固定监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。公网部署时，请在前面配置 HTTPS 反向代理；麦克风和部分浏览器音频能力需要安全上下文。
 
-也可以使用仓库附带的 `docker-compose.yml`：
+#### 方式 B：源码运行
 
-```bash
-docker compose up -d
-docker logs webspeak
-```
+环境要求：
 
-Ubuntu / Debian：
-
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential python3
-```
-
-Windows 请安装 Visual Studio Build Tools，并勾选“使用 C++ 的桌面开发”。
-
-### 本地安装与启动
+- Node.js `22.5.0` 或更高版本。
+- `@discordjs/opus` 所需的原生编译工具；Linux 通常需要 `python3`、`make`、`g++`。
+- 一台可访问的 TeamSpeak 3 或 TeamSpeak 6 服务端。
+- 较新的 Chrome 或 Edge；生产环境建议使用 HTTPS。
 
 ```bash
-npm install
-npm --prefix web install
+npm ci
+npm --prefix web ci
 npm --prefix web run build
 npm run build
 node dist/index.js
 ```
 
-WebSpeak 内部端口固定为 `3040`。首次启动会自动创建默认管理员账号：
+随后打开：
 
 ```text
-账号：admin
-密码：admin
+http://127.0.0.1:3040/
 ```
 
-然后打开管理入口：
+### 首次登录与默认目标
 
-```text
-http://127.0.0.1:3040/admin
-```
+1. 打开 `/admin`。
+2. 使用默认账户 `admin / admin` 登录。
+3. 按页面要求设置一个至少 12 个字符的新管理员密码。
+4. 在“服务器”页面的“默认 TeamSpeak 目标”中填写服务器地址与语音端口。
+5. 执行连接测试并保存。
 
-首次登录后必须设置一个至少 12 个字符的新密码。改密完成后，在“服务器设置”中分别填写 TeamSpeak 服务器地址和语音端口（例如 `127.0.0.1` 与 `9987`），再执行连接测试并保存访问模式和站点信息。
+欢迎页没有邀请链接目标参数时，会使用管理员设置的默认 TeamSpeak 目标进行预填写。邀请链接参数优先；固定模式下访客只能进入管理员配置的目标，开放模式下访客可以输入经过安全校验的公网目标。
 
-后续管理入口仍为 `/admin`。管理员账号名固定为 `admin`，当前版本不提供用户列表或角色系统。
+WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987`。目标地址在界面中拆分为“地址”和“语音端口”两个字段；旧版 `地址:端口` 与 `地址#端口` 文本仍可兼容解析。
 
-### 访问模式
+### 访问模式与邀请
 
-`fixed` 是默认模式。访客页只显示昵称和频道，TeamSpeak 目标与服务器密码由服务端管理。
+| 模式 | 行为 | 适用场景 |
+| --- | --- | --- |
+| `fixed` | 访客不改变目标，服务端管理目标与服务器密码 | 私有社区、固定服务器 |
+| `open` | 访客可输入公网目标与本次会话密码 | 临时接入、多服务器入口 |
+| 受控邀请 | 管理员生成一次性、可过期、可限次、可撤销链接 | 活动、临时房间、定向分享 |
 
-欢迎页没有邀请链接目标参数时，服务器地址和 `#` 图标对应的语音端口输入框会预填管理控制台中配置的“默认 TeamSpeak 目标”；邀请链接中的目标参数优先使用。旧的 `地址:端口` 与 `地址#端口` 目标文本仍可被兼容解析。
+开放模式会在 DNS 解析后阻止 loopback、私网、链路本地、组播、广播和保留地址，并使用已验证的 IP 进行实际连接。服务器密码不会写入分享链接、浏览器本地存储或 WebSocket URL。
 
-`open` 模式允许访客输入其他公网 TeamSpeak 地址和本次 Session 使用的密码。WebSpeak 会解析 DNS，并阻止 loopback、私网、链路本地、组播、广播及保留地址；实际连接使用已经验证过的 IP，避免 DNS rebinding。
+### 音频与设备
 
-访客密码只存在于一次性 Join Ticket 中，不写入 URL、本地存储或数据库。普通分享链接也不会包含密码。
+进入语音空间后，在设置中可以：
 
-### 持久化与安全
+- 选择浏览器检测到的麦克风与扬声器；
+- 切换自由麦和按键说话；
+- 调整输入、输出、通知音量与 VOX 阈值；
+- 查看麦克风权限、实时输入电平和音频上下文状态；
+- 使用最多 5 秒的本地麦克风测试，录音只在浏览器本地播放，不发送到 TeamSpeak。
 
-运行数据位于项目的 `data/` 目录：
+设备标签由浏览器权限模型决定。首次选择设备前，浏览器可能要求授予麦克风权限；输出设备选择依赖浏览器支持，不支持时会明确回退到默认扬声器。
+
+### 数据与安全边界
+
+运行数据默认位于 `data/`，Docker 环境默认位于 `/data`：
 
 ```text
 data/
-  webspeak.db   SQLite 配置、管理员凭据和有限审计事件
-  master.key    32 字节安装级主密钥
-  logs/         本地日志
+├── webspeak.db   SQLite 配置、管理员凭据、邀请与有限审计事件
+├── master.key    32 字节安装级主密钥
+└── logs/         本地轮转日志
 ```
 
-日志文件单个最多 10 MiB，服务会保留 3 个轮转文件。管理控制台中的“导出数据库备份”只导出 SQLite 数据库，不导出 `master.key`；数据库内的 TeamSpeak 密码仍是加密密文，完整恢复需要同时保管数据目录和主密钥。
+- 管理员密码使用 Node.js `crypto.scrypt`、随机 salt 与 constant-time compare。
+- TeamSpeak 服务器密码使用 AES-256-GCM 加密保存，管理 API 不返回明文。
+- 管理 Session 使用服务端会话、HttpOnly / SameSite Strict Cookie、同源校验与 CSRF token。
+- 管理登录具有固定窗口限速与失败延迟。
+- 普通用户 identity 只在当前 Join Ticket / Session 中使用；启用“记住此设备”后，私钥只保存在浏览器 IndexedDB，不上传到网关，也不会进入日志、诊断或数据库。
+- WebSpeak 不提供身份文件导入/导出界面；清除浏览器本地数据会移除本机记住的身份与偏好。
+- 日志、诊断报告与 Overview 不返回服务器密码、管理员密码或身份私钥。
+- 请同时备份 `webspeak.db` 与 `master.key`；只有数据库而没有主密钥时，加密的服务器密码无法恢复。
 
-- 管理员密码使用 Node.js `crypto.scrypt`、随机 salt 和 constant-time compare。
-- 新部署首次使用 `admin/admin` 登录后必须立即修改密码；修改完成后默认密码失效。
-- TeamSpeak 服务器密码使用 AES-256-GCM 加密。
-- 管理 Session 是随机服务端 Session；Cookie 为 `HttpOnly`、`SameSite=Strict`，直接 HTTPS 下同时启用 `Secure`。
-- 管理 mutation 检查同源请求、JSON Content-Type、服务端 Session 与 CSRF token。
-- 管理登录具有固定窗口限速和连续失败延迟。
-- 日志、管理 API 和 Overview 不返回服务器密码、管理员密码或身份私钥。
-- 普通用户 identity 只通过当前 Join Ticket/Session 在内存中使用，不写入 Gateway 数据库、日志或诊断信息。
+### 旧版本升级
 
-浏览器保存的 TeamSpeak identity 私钥不会上传到 WebSpeak，也不会写入网关数据库、日志或诊断信息。
-
-请备份整个 `data/` 目录。只有数据库而没有对应 `master.key` 时，已加密的 TeamSpeak 密码无法恢复。不要提交 `data/`、`config.json`、证书、私钥或日志。
-
-### 从旧版本升级
-
-首次使用新版启动时，如果项目根目录存在旧 `config.json`，WebSpeak 只导入：
+如果升级启动时项目根目录仍有旧 `config.json`，WebSpeak 只做一次性导入：
 
 - `tsHost`
 - `tsPort`
 - `tsServerPassword`
 
-以下字段会被忽略并废弃：
+导入后 `data/webspeak.db` 成为唯一实时配置源；旧文件不会被删除或改写。旧版的 `port`、`tsServerProtocol`、`maxClients` 和 `trustProxy` 不再作为运行配置。
 
-- `port`
-- `tsServerProtocol`
-- `maxClients`
-- `trustProxy`
+### 健康检查、开发与验证
 
-原文件不会被删除或改写。导入成功后，`data/webspeak.db` 成为唯一实时配置源，管理控制台会显示一次迁移提示。`config.example.json` 仅用于说明旧版迁移格式，新部署不需要复制它。
-
-### HTTPS 与反向代理
-
-如果项目根目录存在 `certs/cert.pem` 与 `certs/key.pem`，WebSpeak 会直接提供 HTTPS。公网部署建议由 Caddy 或 Nginx 终止 TLS，再代理到固定的 `127.0.0.1:3040`。
-
-Nginx 示例：
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name ts.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/ts.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/ts.example.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:3040;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-    }
-}
-```
-
-WebSpeak 不使用 `X-Forwarded-*` 作为认证或授权边界。麦克风和 WebCodecs 在公网环境需要浏览器安全上下文。
-
-### 健康检查与开发命令
-
-无需认证的最小健康检查：
+无需认证的健康检查：
 
 ```text
 GET /health
@@ -189,153 +170,113 @@ GET /api/health
 开发命令：
 
 ```bash
-# 后端开发服务（固定 3040）
+# 后端：固定监听 3040
 npm run dev
 
-# 前端开发服务；/api 和 /ws 代理到 3040
+# 前端：Vite 监听 5173，并将 /api 与 /ws 代理到 3040
 npm run web:dev
 
-# 浏览器打开演示页（不会连接真实 TeamSpeak）
-# http://localhost:5173/demo
-
-# 自动测试（覆盖 M000–M010 已实现的后端协议与安全边界）
-npm test
+# 前端生产构建
+npm --prefix web run build
 
 # 后端类型检查与构建
 npm run build
 
-# 前端类型检查与生产构建
-npm --prefix web run build
+# 自动化测试
+npm test
 
-# 依赖安全审计
+# 依赖审计
 npm audit
 ```
+
+`/demo` 是不连接真实 TeamSpeak 的交互式演示页面，仅用于界面预览、录屏和前端回归，不能替代真实 TS3 / TS6 验证。
 
 ### 项目结构
 
 ```text
 src/
-  admin/                         管理服务、API、Session、邀请与运维接口
-  persistence/database.ts        SQLite schema、repository 和迁移边界
-  security/                      主密钥、秘密加密、scrypt 与网络策略
-  domain/teamspeak-target.ts     地址、端口与兼容目标文本解析
-  server/teamspeak-adapter.ts    TeamSpeak 协议边界与 endpoint 协议缓存
-  server/teamspeak-probe.ts      可清理的短连接测试
-  server/join-ticket.ts          一次性访客连接票据
-  server/join-rate-limit.ts      访客票据创建限速
-  server/voice-bridge.ts         每用户语音 WebSocket 桥接
-web/src/views/
-  AdminView.vue                  双语登录、设置、概览与运维控制台
-  WebClient.vue                  双语访客与语音工作台
+├── admin/                   管理服务、登录、Session、邀请与运维接口
+├── persistence/             SQLite schema、repository 与迁移边界
+├── security/                主密钥、秘密加密、密码与开放目标策略
+├── domain/                  TeamSpeak 目标地址与端口解析
+└── server/                  TeamSpeak 适配器、Session、票据与语音桥
+
+web/src/
+├── views/WebClient.vue      访客端、语音空间、聊天与音频设置
+├── views/AdminView.vue      管理登录、服务器、概览与运维控制台
+├── composables/             WebSocket 与语音状态
+└── services/                主题、本地持久化与目标解析
 ```
+
+### 已知边界
+
+- 每个浏览器 Session 都会建立独立的 TeamSpeak Client 连接；服务端固定限制最多 100 个活动 Session。
+- 管理员模型目前是单管理员，不提供用户列表、角色或权限管理后台。
+- 浏览器麦克风权限、HTTPS 与浏览器对音频输出设备的支持会影响最终体验。
+- TeamSpeak 服务端自身的版本、协议兼容性和网络可达性不由 WebSpeak 代替管理。
 
 ## English
 
-WebSpeak is a self-hosted TeamSpeak web client and guest gateway. Every browser session owns an independent normal TeamSpeak client connection, so its channel/member view comes from that identity rather than a Query or maintenance account.
+WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6. Each browser session owns an independent normal TeamSpeak client connection, so channel and member state comes from the session itself—there is no ServerQuery, WebQuery, admin token, or maintenance bot.
 
-### Features
+### Highlights
 
-- Automatic TeamSpeak 3 / TeamSpeak 6 detection.
-- Independent browser sessions with a fixed hard limit of 100.
-- Managed session lifecycle with a connection state machine, WebSocket heartbeat, idempotent teardown, and graceful shutdown.
-- Temporary TeamSpeak failures recover with bounded jittered backoff for up to five minutes; authentication failures are not retried forever, and the previous channel is restored when possible.
-- Channel/member directory, channel switching, channel text chat, and live member movement.
-- PCM/Opus voice bridge, VOX, push-to-talk, input/output device selection, and clamped volume controls.
-- Audio diagnostics expose permission, live mic level, VOX threshold, and audio context state; device hotplug falls back to the default input/output.
-- Mobile push-to-talk handles pointer cancellation and focus loss; local microphone tests record at most five seconds and never send to TeamSpeak.
-- Built-in sounds cover connection, disconnection, poke, private messages, and failed reconnects, with a clear default-output fallback when the browser lacks output selection.
-- Independent channel, server, and private chat tabs; member actions for private message, poke, and nickname copy; channel passwords are entered per session only.
-- Away, member status icons, a session-local server event log, and readable TeamSpeak permission errors.
-- Bilingual guest UI and bilingual admin console.
-- Browser-based admin login, mandatory first-login password change, Overview, server settings, and a real short-lived connection test.
-- Operations dashboard for managed invites, session termination, audit events, logs, sanitized diagnostic reports, and SQLite backup export.
-- Fixed and open guest access modes.
-- Optional persistent TeamSpeak identity stored only in browser IndexedDB, with local import/export; guests can still join ephemerally.
-- Browser-local favorites, recent servers, nickname/language/audio preferences, and per-TeamSpeak-UID member volume.
-- Clear all WebSpeak local data at any time; server passwords are never stored there.
-- Encrypted TeamSpeak server password and one-time legacy config import.
-- No ServerQuery, WebQuery, admin token, or maintenance bot.
-- `/demo` is a clearly labeled interactive simulation and never opens a real TeamSpeak connection.
-- Join-ticket creation is rate-limited per peer; runtime logs rotate at a bounded size.
+- Browser-native voice with Opus / PCM bridging, free mic, push-to-talk, VOX, reconnect feedback, and speaking indicators.
+- Real microphone and speaker selection, volume controls, live input level, and a local microphone test.
+- Live channel/member directory, channel switching, text chat, private messages, Poke, Away state, and member volume.
+- Bilingual guest UI and admin console with theme switching and responsive mobile layouts.
+- Admin console with mandatory first-login password rotation, default TeamSpeak target, connection testing, invites, sessions, audit events, logs, diagnostics, and SQLite backup export.
+- Fixed and open access modes plus opaque, expiring, bounded, revocable managed invites.
+- Optional remembered device identity stored only in browser IndexedDB. The web UI intentionally has no identity import/export controls.
 
-### Requirements and startup
-
-- Node.js `22.5.0` or newer.
-- Native build tools for `@discordjs/opus`.
-- A reachable TS3 or TS6 server.
-- A recent Chrome or Edge browser; use HTTPS in production.
-
-### Docker deployment (recommended)
-
-On a fresh Linux host, Docker is the only requirement:
+### Quick start
 
 ```bash
-docker run -d \
-  --name webspeak \
-  --restart unless-stopped \
-  -p 3040:3040 \
-  -v webspeak-data:/data \
-  ghcr.io/EchoSixHIYA/webspeak:latest
+docker build -t webspeak:local .
+docker volume create webspeak-data
+docker run -d --name webspeak --restart unless-stopped \
+  -p 3040:3040 -v webspeak-data:/data webspeak:local
 ```
 
-The container always listens on `3040`. SQLite, the installation master key, and logs persist under `/data`. Open `http://your-host:3040/admin`, sign in with `admin/admin`, and change the password when prompted. Put an HTTPS reverse proxy in front of the container for production microphone access.
-
-The repository also includes `docker-compose.yml`:
+Or run from source:
 
 ```bash
-docker compose up -d
-docker logs webspeak
-```
-
-```bash
-npm install
-npm --prefix web install
+npm ci
+npm --prefix web ci
 npm --prefix web run build
 npm run build
 node dist/index.js
 ```
 
-WebSpeak always listens on internal port `3040`. On first boot it creates the default administrator `admin` with password `admin`. Open the admin console:
+Open `/admin`, sign in with `admin/admin`, rotate the password, then configure and test the default TeamSpeak target. WebSpeak listens on `3040`; TeamSpeak targets use the address plus voice port, with `9987` as the default.
 
-```text
-http://127.0.0.1:3040/admin
-```
+### Access, storage, and security
 
-The first login is forced to a password-change screen. Set a password of at least 12 characters, then enter the TeamSpeak server address and voice port separately (for example, `127.0.0.1` and `9987`) in Server settings, test the connection, and save. Future administration is performed at `/admin`; no JSON editing or restart is needed for normal setting changes.
+`fixed` mode keeps guests on the configured target. `open` mode accepts public targets only after DNS and network-policy validation. Managed invites can be time-limited, usage-limited, and revoked. Passwords never appear in share links or WebSocket URLs.
 
-### Security and persistence
+Runtime state lives in `data/` (`/data` in Docker): SQLite, a 32-byte installation master key, and rotated logs. Admin passwords use `crypto.scrypt`; TeamSpeak passwords use AES-256-GCM; admin sessions use server-side cookies with same-origin and CSRF protection. Keep the database and master key together when backing up.
 
-Local state is stored under `data/` in SQLite plus a 32-byte `master.key`. Admin passwords use `crypto.scrypt`. A new instance starts with `admin/admin` and marks that credential for mandatory rotation on first login. TeamSpeak secrets use AES-256-GCM. Admin sessions are server-side with HttpOnly/SameSite Strict cookies, same-origin and CSRF checks, and fixed login throttling.
-
-A normal user's identity is used only in memory for the current Join Ticket/Session unless the user enables device remembering. When enabled, the private material stays in browser IndexedDB and is never written to the Gateway database, logs, or diagnostics; the web client does not provide identity file import/export.
-
-In fixed mode, guests cannot override the configured target. In open mode, arbitrary public targets are validated after DNS resolution; private, loopback, link-local, multicast, broadcast, and reserved addresses are rejected. Session passwords travel through an opaque one-time Join Ticket and are never placed in share or WebSocket URLs.
-
-When the welcome page has no target parameters from an invite link, its server address and `#`-icon voice-port fields are prefilled from the admin-configured default TeamSpeak target. Invite-link target parameters take precedence. Legacy `address:port` and `address#port` target text remains accepted for compatibility.
-
-Administrators can create managed invite links from `/admin/operations`. An invite stores only a token hash and encrypted connection secret, can expire or be limited to a number of uses, and can be revoked. The raw token is returned only at creation time and is passed as an `invite` URL parameter; no TeamSpeak password is placed in that URL. The database backup and diagnostic report are separate: the report is sanitized for issue sharing, while the database backup is for local recovery and must be protected.
-
-If a legacy `config.json` exists on the first upgraded start, only `tsHost`, `tsPort`, and `tsServerPassword` are imported. The original file is preserved, and SQLite becomes the sole live settings source.
+A remembered user identity stays in browser IndexedDB and is never uploaded to the gateway. The web UI has no identity file import/export controls. Legacy `config.json` is imported once for the TeamSpeak target and password, after which SQLite is the live source of configuration.
 
 ### Development
 
 ```bash
 npm run dev
 npm run web:dev
-npm test
-npm run build
 npm --prefix web run build
+npm run build
+npm test
 npm audit
 ```
 
-The Windows development environment may need the native build toolchain required by `@discordjs/opus`. The browser UI can still be verified locally with `npm run web:dev` and `/demo`; that route is deliberately simulated and does not prove a real TeamSpeak connection.
+`/demo` is a simulated UI route and never connects to a real TeamSpeak server. Production microphone access requires HTTPS and a browser with the required audio permissions.
 
 ### License
 
-WebSpeak is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you run a modified version as a network service, you must offer its users the corresponding source code as required by the license.
+WebSpeak is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you run a modified version as a network service, provide the corresponding source under the terms of the license.
 
-### 社区 / Community
+### Community
 
-群号 / Group ID: `869500475`
+QQ群 / QQ group: `869500475`
 
 ![WebSpeak 群聊二维码](group-chat.png)
