@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { WebSpeakDatabase, DATABASE_SCHEMA_VERSION } from "../src/persistence/database.js";
 import { hashAdminPassword } from "../src/security/admin-password.js";
@@ -45,4 +46,30 @@ test("SQLite persistence initializes schema and stores the single admin/settings
   assert.equal(reopened.hasAdmin(), true);
   assert.equal(reopened.getSettings().siteName, "Private Voice");
   reopened.close();
+});
+
+test("SQLite schema v1 upgrades to v2 with a migration copy", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "webspeak-db-migration-"));
+  const dbPath = path.join(directory, "webspeak.db");
+  const legacy = new DatabaseSync(dbPath);
+  legacy.exec(`
+    CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE admin_credentials (id INTEGER PRIMARY KEY CHECK (id = 1), credential_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1), site_name TEXT NOT NULL, welcome_text TEXT NOT NULL,
+      access_mode TEXT NOT NULL CHECK (access_mode IN ('fixed', 'open')), ts_host TEXT NOT NULL,
+      ts_port INTEGER NOT NULL, ts_password_encrypted TEXT, detected_protocol TEXT,
+      last_test_at TEXT, last_test_latency_ms INTEGER, last_test_error TEXT, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE audit_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, details_json TEXT NOT NULL, created_at TEXT NOT NULL);
+    INSERT INTO settings VALUES (1, 'Legacy', '', 'fixed', '127.0.0.1', 9987, NULL, NULL, NULL, NULL, NULL, '2026-01-01T00:00:00.000Z');
+    PRAGMA user_version = 1;
+  `);
+  legacy.close();
+
+  const upgraded = new WebSpeakDatabase(dbPath);
+  assert.equal(upgraded.schemaVersion, 2);
+  assert.equal(upgraded.listManagedInvites().length, 0);
+  assert.equal(existsSync(`${dbPath}.schema-1.bak`), true);
+  upgraded.close();
 });

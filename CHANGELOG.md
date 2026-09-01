@@ -18,7 +18,7 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
 ### Verification
 
-- `npm test` — 46 tests passed.
+- `npm test` — 47 tests passed.
 - `npm run build` — backend TypeScript build passed.
 - `npm run web:build` — frontend production build passed.
 - `npm audit --omit=dev --audit-level=high` — no high or critical vulnerabilities reported.
