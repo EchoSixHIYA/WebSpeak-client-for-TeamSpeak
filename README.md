@@ -46,7 +46,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 - 移除依赖页面焦点的普通空格键按键说话模式；改为桌面端和移动端均可用的一键闭麦/开麦，静音状态会保存在当前浏览器中。
 - 闭麦会在上行音频发送前直接阻断声音，同时保留 VOX 语音激活、输入设备选择、音量与阈值调节能力。
 - 发布流程稳定生成 Windows/Linux 部署包并同步发布 Docker 镜像；Docker 构建会正确处理依赖安装脚本。
-- 简化 Docker Compose 部署：默认从当前代码构建，自动创建并持久化数据卷，支持通过 `WEBSPEAK_PORT` 修改宿主机端口。
+- 简化 Docker Compose 部署：默认使用已发布镜像，自动创建并持久化数据卷，支持通过 `WEBSPEAK_PORT` 修改宿主机端口。
 
 #### 2026-08-31 · v0.1.0
 
@@ -86,12 +86,13 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 #### 方式 A：Docker Compose（推荐）
 
-Docker Compose 会直接使用当前目录的 Dockerfile 构建 WebSpeak，自动创建数据卷并启动服务，不需要手动创建镜像或数据卷。
+Docker Compose 默认从 GitHub Container Registry 拉取已经发布的 WebSpeak 镜像，自动创建数据卷并启动服务。普通部署不需要本地 Node.js、编译工具或 Dockerfile 构建环境。
 
 ```bash
 git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 查看状态和日志：
@@ -104,30 +105,30 @@ curl http://127.0.0.1:3040/health
 
 启动完成后打开 [http://127.0.0.1:3040/](http://127.0.0.1:3040/)。首次进入管理后台 `/admin` 使用 `admin / admin`，并按提示修改密码。
 
-默认数据保存在 Docker volume `webspeak-data` 中。升级代码后再次执行 `docker compose up -d --build` 即可；停止服务使用 `docker compose down`，不要添加 `-v`，否则会删除数据库、密钥和管理员配置。
+默认数据保存在 Docker volume `webspeak-data` 中。升级时先拉取新镜像，再重新创建应用容器；停止服务使用 `docker compose down`，不要添加 `-v`，否则会删除数据库、密钥和管理员配置。
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+如需固定到某个发布版本，可在启动前指定 GHCR 镜像标签；发布标签与 GitHub Release 一致：
+
+```bash
+export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.2
+docker compose pull
+docker compose up -d
+```
 
 WebSpeak 默认对外提供 `3040` 端口。如需修改宿主机端口，只需设置 `WEBSPEAK_PORT`，容器内部端口无需修改：
 
 ```bash
-WEBSPEAK_PORT=3041 docker compose up -d --build
+WEBSPEAK_PORT=3041 docker compose up -d
 ```
 
-#### 方式 B：Dockerfile 手动运行（可选）
+容器内部监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。Dockerfile 仅用于项目 CI、发布资产和开发者本地构建，不是普通用户的默认部署入口。
 
-```bash
-docker build -t webspeak:local .
-docker volume create webspeak-data
-docker run -d \
-  --name webspeak \
-  --restart unless-stopped \
-  -p 3040:3040 \
-  -v webspeak-data:/data \
-  webspeak:local
-```
-
-容器内部监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。手动运行时也请保留 `webspeak-data:/data` 数据卷。
-
-#### 方式 C：源码运行
+#### 方式 B：源码运行（开发者）
 
 环境要求：
 
@@ -303,7 +304,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - Removed the focus-dependent normal Space-key PTT mode and replaced it with a one-click microphone mute/unmute control on desktop and mobile; the mute state is persisted in the current browser.
 - Mute now suppresses upstream microphone audio before it is sent, while VOX activation, input-device selection, volume controls, and threshold tuning remain available.
 - Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now handle the dependency patch script correctly.
-- Simplified Docker Compose deployment: it builds from the current checkout, creates and persists the data volume automatically, and supports changing the host port with `WEBSPEAK_PORT`.
+- Simplified Docker Compose deployment: it uses the published image by default, creates and persists the data volume automatically, and supports changing the host port with `WEBSPEAK_PORT`.
 
 #### 2026-08-31 · v0.1.0
 
@@ -343,12 +344,13 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 #### Option A: Docker Compose (recommended)
 
-Docker Compose builds WebSpeak from the Dockerfile in the current checkout, creates the persistent data volume automatically, and starts the service without a separate image-pull or volume-creation step.
+Docker Compose pulls the published WebSpeak image from GitHub Container Registry by default, creates the persistent data volume automatically, and starts the service. A normal deployment does not require Node.js, native build tools, or a local Dockerfile build.
 
 ```bash
 git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 Check the service and health endpoint:
@@ -361,30 +363,30 @@ curl http://127.0.0.1:3040/health
 
 Then open [http://127.0.0.1:3040/](http://127.0.0.1:3040/). On the first admin login, use `admin / admin` and follow the prompt to change the password.
 
-Runtime data is kept in the `webspeak-data` Docker volume. After updating the checkout, run `docker compose up -d --build` again. Stop the service with `docker compose down`; do not add `-v`, because that removes the database, master key, and administrator settings.
+Runtime data is kept in the `webspeak-data` Docker volume. To upgrade, pull the new image and recreate the application container. Stop the service with `docker compose down`; do not add `-v`, because that removes the database, master key, and administrator settings.
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+To pin a specific release, set the GHCR image tag to match the GitHub Release tag:
+
+```bash
+export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.2
+docker compose pull
+docker compose up -d
+```
 
 The default host port is `3040`. To use another host port, set `WEBSPEAK_PORT`; the container port stays unchanged:
 
 ```bash
-WEBSPEAK_PORT=3041 docker compose up -d --build
+WEBSPEAK_PORT=3041 docker compose up -d
 ```
 
-#### Option B: Run the Dockerfile manually (optional)
+The container listens on `3040` internally. SQLite data, the installation master key, and logs are stored in `/data`. The Dockerfile is used by project CI, release assets, and developer builds; it is not the default deployment path for users.
 
-```bash
-docker build -t webspeak:local .
-docker volume create webspeak-data
-docker run -d \
-  --name webspeak \
-  --restart unless-stopped \
-  -p 3040:3040 \
-  -v webspeak-data:/data \
-  webspeak:local
-```
-
-The container listens on `3040` internally. SQLite data, the installation master key, and logs are stored in `/data`; keep the `webspeak-data:/data` volume when running the image manually.
-
-#### Option C: Run from source
+#### Option B: Run from source (developers)
 
 Requirements:
 

@@ -1,9 +1,7 @@
 services:
   webspeak:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: webspeak:local
+    image: ${WEBSPEAK_IMAGE:-ghcr.io/echosixhiya/webspeak:latest}
+    pull_policy: missing
     restart: unless-stopped
     ports:
       - "${WEBSPEAK_PORT:-3040}:3040"
