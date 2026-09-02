@@ -2,6 +2,24 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
+## [0.1.3] — 2026-09-03
+
+### Added
+
+- Optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency.
+- WebRTC configuration through environment variables, including the public host and a bounded UDP port range.
+
+### Changed
+
+- WebRTC audio uses negotiated Opus parameters and a bounded newest-frame mixer instead of allowing stale audio to accumulate.
+- The browser keeps the WebSocket path available for signaling, control, and compatibility fallback; the default deployment remains unchanged.
+
+### Fixed
+
+- Prevented duplicate playback when WebRTC and the WebSocket audio path overlap during negotiation or fallback.
+- Made WebRTC teardown and fallback explicit so a failed negotiation does not leave a server-side media session behind.
+- Corrected native Opus decoder usage and cleaned up negotiated payload handling for TeamSpeak-to-browser audio.
+
 ## [0.1.2] — 2026-09-02
 
 ### Added

@@ -9,6 +9,7 @@
 A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your voice space from a modern browser without installing a desktop client.
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.3-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5.0-0f766e?style=flat-square)](https://nodejs.org/)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
@@ -29,6 +30,14 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 ## 中文
 
 ### 更新日志
+
+#### 2026-09-03 · v0.1.3
+
+- 新增可选的 WebRTC 语音传输，为需要更低、更稳定实时语音延迟的部署提供实验性通道。
+- 增加 WebRTC 环境配置，可设置公网地址和受限的 UDP 端口范围；默认部署方式和默认语音链路保持不变。
+- WebRTC 语音按协商得到的 Opus 参数传输，并且每位发言者只保留最新音频帧，避免网络抖动时旧语音持续堆积。
+- 修复 WebRTC 与兼容性语音链路切换时的重复播放、残留会话和回退不完整问题。
+- 修复原生 Opus 解码调用和浏览器端协商负载类型处理，并整理连接关闭时的资源清理。
 
 #### 2026-09-02 · v0.1.2
 
@@ -66,7 +75,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 | 领域 | 已提供 |
 | --- | --- |
-| 语音 | Opus / PCM 桥接、VOX 语音激活、一键闭麦/开麦、连接状态与重连提示 |
+| 语音 | Opus / PCM 桥接、可选 WebRTC 低延迟通道、VOX 语音激活、一键闭麦/开麦、连接状态与重连提示 |
 | 设备 | 浏览器麦克风与扬声器选择、音量调节、实时输入电平、本地麦克风测试 |
 | 频道 | 频道树、频道切换、成员移动、频道文字聊天、服务器事件与状态展示 |
 | 成员 | 在线成员、发言绿色头像边框、Away 状态、私聊、Poke、昵称复制、成员音量 |
@@ -78,7 +87,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 | 层级 | 职责 | 连接 |
 | --- | --- | --- |
-| 浏览器会话 | 昵称、设备、频道、成员、文字和语音交互 | HTTPS / WSS → WebSpeak |
+| 浏览器会话 | 昵称、设备、频道、成员、文字和语音交互 | HTTPS / WSS → WebSpeak；可选 WebRTC 音频 |
 | WebSpeak 网关 | 会话管理、访问控制、语音桥接、目录同步、管理控制台 | TeamSpeak 客户端协议 |
 | TeamSpeak 3 / 6 | 提供频道、成员、文字和语音服务 | 目标地址与语音端口 |
 
@@ -115,7 +124,7 @@ docker compose up -d
 如需固定到某个发布版本，可在启动前指定 GHCR 镜像标签；发布标签与 GitHub Release 一致：
 
 ```bash
-export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.2
+export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.3
 docker compose pull
 docker compose up -d
 ```
@@ -184,6 +193,21 @@ WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987
 - 使用最多 5 秒的本地麦克风测试，录音只在浏览器本地播放，不发送到 TeamSpeak。
 
 设备标签由浏览器权限模型决定。首次选择设备前，浏览器可能要求授予麦克风权限；输出设备选择依赖浏览器支持，不支持时会明确回退到默认扬声器。
+
+#### 可选 WebRTC 语音传输
+
+`v0.1.3` 提供实验性的 WebRTC 语音通道，默认关闭。它适合已经能够为 WebSpeak 发布一段 UDP 端口范围的部署；普通 Docker 部署无需额外配置，继续使用默认语音链路即可。
+
+启用时设置：
+
+```bash
+WEBSPEAK_WEBRTC=true
+WEBSPEAK_WEBRTC_PUBLIC_HOST=<公网 IP 或可解析的公网主机名>
+WEBSPEAK_WEBRTC_UDP_START=40000
+WEBSPEAK_WEBRTC_UDP_END=40099
+```
+
+同时需要将 `40000-40099/udp` 发布到 WebSpeak 容器。若网络或浏览器不支持 WebRTC，客户端会自动回退到兼容性语音链路。
 
 ### 数据与安全边界
 
@@ -288,6 +312,14 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 ### Changelog
 
+#### 2026-09-03 · v0.1.3
+
+- Added an optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency.
+- Added WebRTC environment configuration for the public host and a bounded UDP port range; the default deployment and default voice path remain unchanged.
+- WebRTC audio now uses negotiated Opus parameters and keeps only the newest frame per speaker, preventing stale voice from accumulating during network jitter.
+- Fixed duplicate playback, incomplete fallback, and leftover server-side media sessions when switching between WebRTC and the compatibility voice path.
+- Fixed native Opus decoder usage and browser-side negotiated payload handling, and tightened cleanup when a connection closes.
+
 #### 2026-09-02 · v0.1.2
 
 - Improved the mobile browser experience across channel, member, chat, and voice surfaces; mobile member actions now use a three-dot menu while desktop keeps the context menu.
@@ -325,7 +357,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 | Area | Included |
 | --- | --- |
-| Voice | Opus / PCM bridging, VOX activation, one-click microphone mute/unmute, connection state, reconnect feedback, and speaking indicators |
+| Voice | Opus / PCM bridging, optional WebRTC low-latency transport, VOX activation, one-click microphone mute/unmute, connection state, reconnect feedback, and speaking indicators |
 | Devices | Browser microphone and speaker selection, volume controls, live input level, and a local microphone test |
 | Channels | Channel tree, channel switching, member movement, channel text chat, server events, and status display |
 | Members | Online members, green speaking borders, Away state, private messages, Poke, nickname copy, and per-member volume |
@@ -337,7 +369,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 | Layer | Responsibility | Connection |
 | --- | --- | --- |
-| Browser session | Nickname, device, channel, member, text, and voice interactions | HTTPS / WSS → WebSpeak |
+| Browser session | Nickname, device, channel, member, text, and voice interactions | HTTPS / WSS → WebSpeak; optional WebRTC audio |
 | WebSpeak gateway | Session management, access control, voice bridging, directory synchronization, and admin console | TeamSpeak client protocol |
 | TeamSpeak 3 / 6 | Channel, member, text, and voice services | Configured host and voice port |
 
@@ -374,7 +406,7 @@ docker compose up -d
 To pin a specific release, set the GHCR image tag to match the GitHub Release tag:
 
 ```bash
-export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.2
+export WEBSPEAK_IMAGE=ghcr.io/echosixhiya/webspeak:v0.1.3
 docker compose pull
 docker compose up -d
 ```
@@ -445,6 +477,21 @@ Inside a voice space, the settings panel lets users:
 - Run a local microphone test of up to five seconds; the recording is played in the browser and is not sent to TeamSpeak.
 
 Device labels are controlled by the browser permission model. The first device selection may request microphone permission. Output-device selection depends on browser support; unsupported browsers clearly fall back to the default speaker.
+
+#### Optional WebRTC audio transport
+
+`v0.1.3` includes an experimental WebRTC audio path that is disabled by default. It is intended for deployments that can publish a UDP port range for WebSpeak; a normal Docker deployment needs no extra configuration and continues to use the default voice path.
+
+Set these variables when enabling it:
+
+```bash
+WEBSPEAK_WEBRTC=true
+WEBSPEAK_WEBRTC_PUBLIC_HOST=<public IP or resolvable public hostname>
+WEBSPEAK_WEBRTC_UDP_START=40000
+WEBSPEAK_WEBRTC_UDP_END=40099
+```
+
+Publish `40000-40099/udp` to the WebSpeak container as well. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
 
 ### Data and Security Boundary
 
