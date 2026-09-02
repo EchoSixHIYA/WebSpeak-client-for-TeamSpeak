@@ -10,7 +10,7 @@ Browser (playback)    ← WebSocket ← Node.js server (Opus relay) ← TeamSpea
 ```
 
 - Each browser user = one independent TS3 virtual client via `@echosixhiya/teamspeak-client`
-- Frontend captures PCM via `ScriptProcessorNode`, sends as Int16 binary over WebSocket
+- Frontend captures PCM in an `AudioWorklet` when available (with a `ScriptProcessorNode` fallback), assembles fixed 960-sample frames, and sends Int16 binary over WebSocket
 - Server encodes PCM → Opus using `@discordjs/opus` (CJS, loaded via `createRequire`)
 - Server sends Opus to TS via `client.sendVoice(data, codec=4)`
 - Incoming TS voice → Opus frames → binary WebSocket → browser `AudioDecoder` → playback
@@ -36,9 +36,9 @@ src/
 ## Key Technical Details
 
 ### Audio Pipeline
-1. Browser mic → `getUserMedia` (48kHz mono) → `ScriptProcessorNode` (1024 samples)
+1. Browser mic → `getUserMedia` (48kHz mono) → `AudioWorklet` frame assembler (960 samples); older browsers use `ScriptProcessorNode` (1024-sample chunks) before the same assembler
 2. Float32 → Int16 conversion → PTT/VOX gate → WebSocket binary send
-3. Server accumulates PCM → every 1920 bytes (960 samples, 20ms) → `OpusEncoder.encode()` → `tsClient.sendVoice(opus, 4)`
+3. Server encodes each 1920-byte (960-sample, 20ms) PCM frame → `OpusEncoder.encode()` → `tsClient.sendVoice(opus, 4)`
 4. Incoming: TS → `voiceData` event → 3-byte header `[codec][clientId BE]` → WS binary → browser `AudioDecoder` → playback
 5. Browser uplink is capped at 10 PCM frames (about 200ms); gateway egress applies a bounded WebSocket byte guard; browser playback resets stale decoder/source queues above 120ms.
 

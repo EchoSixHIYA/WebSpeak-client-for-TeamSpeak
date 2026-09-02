@@ -21,6 +21,7 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - Replaced the visually off-center settings glyph and normalized icon alignment for settings-related controls across the client.
 - Fixed narrow-screen exit and microphone controls so their text-collapse rules apply correctly.
 - Bounded browser and gateway voice buffering, reset stale browser playback queues, and exposed low-overhead in-memory audio counters for diagnosing jitter without per-frame log writes.
+- Moved microphone frame assembly to an `AudioWorklet` with a compatibility fallback to `ScriptProcessorNode`; both paths emit fixed 960-sample frames.
 
 ## [0.1.1] — 2026-09-02
 

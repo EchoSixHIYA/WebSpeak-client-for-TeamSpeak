@@ -1,6 +1,8 @@
 import { reactive, ref } from "vue";
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
+const micCaptureWorkletUrl = "/mic-capture-worklet.js";
+
 export interface VoiceState {
   connected: boolean;
   connecting: boolean;
@@ -90,6 +92,9 @@ export function useVoiceWebSocket() {
   let audioCtx: SinkAudioContext | null = null;
   let micStream: MediaStream | null = null;
   let scriptNode: ScriptProcessorNode | null = null;
+  let workletNode: AudioWorkletNode | null = null;
+  let workletContext: AudioContext | null = null;
+  let workletModulePromise: Promise<void> | null = null;
   let micSource: MediaStreamAudioSourceNode | null = null;
   let micGain: GainNode | null = null;
   let silentGain: GainNode | null = null;
@@ -113,7 +118,7 @@ export function useVoiceWebSocket() {
   let voxAttack = 0;
   let voxRelease = 0;
   const VOX_HOLD = 15;
-  const VOX_ATTACK_FRAMES = 2;
+  const VOX_ATTACK_FRAMES = 1;
   let convBuf = new Int16Array(1024);
   let accumBuf = new Int16Array(2048);
   let accumLen = 0;
@@ -320,15 +325,12 @@ export function useVoiceWebSocket() {
     micSource = ctx.createMediaStreamSource(micStream);
     micGain = ctx.createGain();
     micGain.gain.value = inputVolume.value;
-    scriptNode = ctx.createScriptProcessor(1024, 1, 1);
     silentGain = ctx.createGain();
     silentGain.gain.value = 0;
 
-    scriptNode.onaudioprocess = (event) => {
-      const input = event.inputBuffer.getChannelData(0);
-      let sum = 0;
-      for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
-      micLevel.value = Math.min(1, Math.sqrt(sum / Math.max(1, input.length)) * 6);
+    const handleCaptureChunk = (input: Float32Array, rms?: number): void => {
+      if (!input.length) return;
+      micLevel.value = Math.min(1, (rms ?? Math.sqrt(input.reduce((sum, sample) => sum + sample * sample, 0) / input.length)) * 6);
       const socket = ws.value;
       const shouldSend = !microphoneMuted.value
         && !microphoneTestActive.value
@@ -354,11 +356,10 @@ export function useVoiceWebSocket() {
         publishAudioDiagnostics();
         return;
       }
-      markSpeaking(state.tsClientId);
 
       if (convBuf.length < input.length) convBuf = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
-        const sample = Math.max(-1, Math.min(1, input[i]));
+        const sample = Math.max(-1, Math.min(1, input[i]!));
         convBuf[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
       }
 
@@ -374,13 +375,44 @@ export function useVoiceWebSocket() {
         audioCounters.uplinkFrames++;
         publishAudioDiagnostics();
       }
+      if (offset > 0) markSpeaking(state.tsClientId);
       accumLen -= offset;
       if (offset > 0) accumBuf.set(accumBuf.subarray(offset, offset + accumLen), 0);
     };
 
+    if (typeof AudioWorkletNode !== "undefined" && ctx.audioWorklet) {
+      try {
+        if (workletContext !== ctx || !workletModulePromise) {
+          workletContext = ctx;
+          workletModulePromise = ctx.audioWorklet.addModule(micCaptureWorkletUrl);
+        }
+        await workletModulePromise;
+        workletNode = new AudioWorkletNode(ctx, "webspeak-mic-capture", {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1],
+        });
+        workletNode.port.onmessage = (event: MessageEvent<{ samples?: Float32Array; rms?: number }>) => {
+          const samples = event.data?.samples;
+          if (samples instanceof Float32Array) handleCaptureChunk(samples, event.data.rms);
+        };
+      } catch {
+        workletNode?.disconnect();
+        workletNode = null;
+        workletContext = null;
+        workletModulePromise = null;
+      }
+    }
+
+    if (!workletNode) {
+      scriptNode = ctx.createScriptProcessor(1024, 1, 1);
+      scriptNode.onaudioprocess = (event) => handleCaptureChunk(event.inputBuffer.getChannelData(0));
+    }
+
     micSource.connect(micGain);
-    micGain.connect(scriptNode);
-    scriptNode.connect(silentGain);
+    const captureNode = workletNode ?? scriptNode!;
+    micGain.connect(captureNode);
+    captureNode.connect(silentGain);
     silentGain.connect(ctx.destination);
     await refreshAudioDevices();
   }
@@ -419,10 +451,13 @@ export function useVoiceWebSocket() {
     voxRelease = 0;
     micLevel.value = 0;
     scriptNode?.disconnect();
+    workletNode?.port.close();
+    workletNode?.disconnect();
     micGain?.disconnect();
     micSource?.disconnect();
     silentGain?.disconnect();
     scriptNode = null;
+    workletNode = null;
     micGain = null;
     micSource = null;
     silentGain = null;
@@ -431,6 +466,8 @@ export function useVoiceWebSocket() {
     if (closeContext) {
       audioCtx?.close();
       audioCtx = null;
+      workletContext = null;
+      workletModulePromise = null;
     }
   }
 
