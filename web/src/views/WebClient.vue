@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -78,7 +78,7 @@
       </main>
 
       <footer class="join-footer">
-        <span>WebSpeak</span><span class="footer-separator">·</span><span>{{ t('teamSpeakClient') }}</span><span class="footer-spacer"></span><button type="button" class="clear-local-button" @click="clearBrowserData">{{ t('clearLocalData') }}</button><span class="footer-separator">·</span><a href="https://github.com/EchoSixHIYA/web-gateway-for-TeamSpeak" target="_blank" rel="noreferrer">{{ t('sourceCode') }}</a><span class="footer-separator">·</span><span>{{ t('browserSupport') }}</span>
+        <span>WebSpeak</span><span class="footer-separator">·</span><span>{{ t('teamSpeakClient') }}</span><span class="footer-spacer"></span><button type="button" class="clear-local-button" @click="clearBrowserData">{{ t('clearLocalData') }}</button><span class="footer-separator">·</span><span>{{ t('browserSupport') }}</span>
       </footer>
     </section>
 
@@ -404,7 +404,7 @@ const translations: Record<Language, Record<string, string>> = {
     connecting: "正在连接…",
     enterVoice: "进入语音空间",
     connectionAuthorized: "连接信息仅用于本次语音会话",
-    sourceCode: "获取源代码",
+    githubRepository: "GitHub 仓库",
     browserSupport: "Chrome / Edge 94+",
     teamSpeakClient: "TeamSpeak 浏览器客户端",
     home: "首页",
@@ -619,7 +619,7 @@ const translations: Record<Language, Record<string, string>> = {
     connecting: "Connecting…",
     enterVoice: "Enter voice space",
     connectionAuthorized: "Connection details are used only for this voice session",
-    sourceCode: "Source code",
+    githubRepository: "GitHub repository",
     browserSupport: "Chrome / Edge 94+",
     teamSpeakClient: "TeamSpeak browser client",
     home: "Home",
@@ -1380,6 +1380,9 @@ function stopWhisperTalk(): void {
 .brand-lockup strong span { color: #24312f; font-weight: 500; }
 .brand-lockup small { display: block; margin-top: 2px; color: #7b8885; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .header-tools { display: flex; align-items: center; gap: 17px; }
+.github-button { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 13px; color: #fff; background: #1f2d2b; border: 1px solid #1f2d2b; border-radius: 9px; box-shadow: 0 5px 12px rgba(31,45,43,.16); font-size: 12px; font-weight: 800; text-decoration: none; transition: .18s; }
+.github-button:hover { color: #fff; background: #006a64; border-color: #006a64; box-shadow: 0 7px 16px rgba(0,106,100,.2); transform: translateY(-1px); }
+.github-button .ui-icon { flex: 0 0 auto; }
 .header-note { display: flex; align-items: center; gap: 8px; color: #71807c; font-size: 12px; }
 .language-switch { min-width: 50px; min-height: 28px; padding: 0 9px; color: #006a64; background: #e2f2ef; border: 1px solid #c8e6e1; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; transition: .18s; }
 .language-switch:hover { color: #fff; background: #006a64; border-color: #006a64; }
@@ -1624,7 +1627,8 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 740px) {
   .header-tools { gap: 7px; }
-  .header-note, .guide-button span { display: none; }
+  .header-note, .github-button span, .guide-button span { display: none; }
+  .github-button { width: 34px; justify-content: center; padding: 0; }
   .guide-button { width: 32px; justify-content: center; padding: 0; }
 }
 .chat-tabs { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 18px; overflow-x: auto; padding-bottom: 3px; }
