@@ -88,6 +88,7 @@ export class AdminService {
   getPublicConfig(): Record<string, unknown> {
     const settings = this.database.getSettings();
     return {
+      version: this.version,
       initialized: this.isInitialized(),
       siteName: settings.siteName,
       welcomeText: settings.welcomeText,

@@ -30,6 +30,13 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 ### 更新日志
 
+#### 2026-09-02 · v0.1.2
+
+- 优化移动端浏览器体验：频道、成员、聊天和语音操作适配窄屏；移动端成员操作提供三个点菜单，桌面端继续使用右键菜单。
+- 将首页 GitHub 入口改为显眼按钮，并增加当前版本标识和更新日志入口；窄屏时自动收敛为图标，避免按钮文字互相挤占。
+- 修复设置齿轮图标和相关操作按钮的对齐问题，统一设置、退出、麦克风等控制的触控尺寸与视觉反馈。
+- 将上一个版本之后的移动端语音控制、闭麦替代按键说话、目标协议自动探测、Docker Compose 简化启动和在线 Demo 文档整理为本次版本内容。
+
 #### 2026-09-02 · v0.1.1
 
 - 汇总并正式发布浏览器客户端、管理员控制台、受控邀请、Session 运维、审计记录、诊断报告和 SQLite 备份能力。
@@ -279,6 +286,13 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 **Live demo:** [https://webspeak.online](https://webspeak.online)
 
 ### Changelog
+
+#### 2026-09-02 · v0.1.2
+
+- Improved the mobile browser experience across channel, member, chat, and voice surfaces; mobile member actions now use a three-dot menu while desktop keeps the context menu.
+- Promoted the GitHub entry on the welcome page and added a current-version badge plus a changelog link; narrow layouts collapse text controls into icons to prevent crowding.
+- Fixed alignment for the settings gear and related controls, with consistent touch sizing and visual treatment for settings, exit, and microphone actions.
+- Consolidated the post-0.1.1 mobile voice controls, microphone mute replacement for focus-dependent PTT, automatic protocol detection, simplified Docker Compose startup, and live-demo documentation into this release.
 
 #### 2026-09-02 · v0.1.1
 

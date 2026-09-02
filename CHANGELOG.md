@@ -2,6 +2,25 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
+## [0.1.2] — 2026-09-02
+
+### Added
+
+- Current-version badge and a direct changelog link on the welcome page, next to the prominent GitHub repository button.
+- Mobile member actions through a three-dot menu, while desktop member actions remain available through the context menu.
+
+### Changed
+
+- Mobile and narrow-screen header controls now collapse longer labels into icons to preserve usable spacing.
+- The welcome page and connected workspace now present the GitHub, version, changelog, admin, theme, language, exit, and microphone controls as a consistent responsive control group.
+- The version shown on the welcome page is read from the gateway's public configuration so it stays aligned with the running backend.
+- Consolidated the post-0.1.1 mobile voice controls, microphone mute replacement for focus-dependent PTT, automatic protocol detection, simplified Docker Compose startup, and live-demo documentation.
+
+### Fixed
+
+- Replaced the visually off-center settings glyph and normalized icon alignment for settings-related controls across the client.
+- Fixed narrow-screen exit and microphone controls so their text-collapse rules apply correctly.
+
 ## [0.1.1] — 2026-09-02
 
 ### Added

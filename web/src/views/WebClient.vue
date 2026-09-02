@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><span class="version-badge" :title="`${t('currentVersion')}: v${appVersion}`" :aria-label="`${t('currentVersion')}: v${appVersion}`">v{{ appVersion }}</span><a class="changelog-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md" target="_blank" rel="noreferrer" :title="t('viewChangelog')" :aria-label="t('viewChangelog')"><Icon name="clock" :size="16" /><span>{{ t('viewChangelog') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -327,6 +327,7 @@ const recentServers = ref<RecentServer[]>([]);
 const initialized = ref(false);
 const siteName = ref("WebSpeak");
 const welcomeText = ref("");
+const appVersion = ref("0.1.2");
 const browserError = ref("");
 const serverConfigLoading = ref(true);
 const memberQuery = ref("");
@@ -360,6 +361,8 @@ const translations: Record<Language, Record<string, string>> = {
     browserWorkspace: "浏览器语音工作台",
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
+    currentVersion: "当前版本",
+    viewChangelog: "查看更新日志",
     notConfigured: "WebSpeak 尚未配置 TeamSpeak 目标。",
     configureNow: "打开管理控制台",
     privateAudio: "私密社区语音",
@@ -575,6 +578,8 @@ const translations: Record<Language, Record<string, string>> = {
     browserWorkspace: "Browser voice workspace",
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",
+    currentVersion: "Current version",
+    viewChangelog: "View changelog",
     notConfigured: "The WebSpeak TeamSpeak target has not been configured.",
     configureNow: "Open admin console",
     privateAudio: "Private community audio",
@@ -1150,7 +1155,8 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { initialized?: unknown; siteName?: unknown; welcomeText?: unknown; accessMode?: unknown; target?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; accessMode?: unknown; target?: unknown };
+    if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeText.value = config.welcomeText;
@@ -1383,6 +1389,9 @@ function stopWhisperTalk(): void {
 .github-button { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 13px; color: #fff; background: #1f2d2b; border: 1px solid #1f2d2b; border-radius: 9px; box-shadow: 0 5px 12px rgba(31,45,43,.16); font-size: 12px; font-weight: 800; text-decoration: none; transition: .18s; }
 .github-button:hover { color: #fff; background: #006a64; border-color: #006a64; box-shadow: 0 7px 16px rgba(0,106,100,.2); transform: translateY(-1px); }
 .github-button .ui-icon { flex: 0 0 auto; }
+.version-badge { display: inline-flex; align-items: center; min-height: 30px; padding: 0 9px; color: #006a64; background: #e7f4f1; border: 1px solid #cfe9e4; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.changelog-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #f2f8f6; border: 1px solid #dcebe7; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none; transition: .18s; }
+.changelog-button:hover { color: #fff; background: #006a64; border-color: #006a64; }
 .header-note { display: flex; align-items: center; gap: 8px; color: #71807c; font-size: 12px; }
 .language-switch { min-width: 50px; min-height: 28px; padding: 0 9px; color: #006a64; background: #e2f2ef; border: 1px solid #c8e6e1; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; transition: .18s; }
 .language-switch:hover { color: #fff; background: #006a64; border-color: #006a64; }
@@ -1628,8 +1637,9 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 740px) {
   .header-tools { gap: 7px; }
-  .header-note, .github-button span, .guide-button span { display: none; }
+  .header-note, .github-button span, .changelog-button span, .guide-button span { display: none; }
   .github-button { width: 34px; justify-content: center; padding: 0; }
+  .changelog-button { width: 32px; min-width: 32px; min-height: 32px; padding: 0; }
   .guide-button { width: 32px; justify-content: center; padding: 0; }
 }
 .chat-tabs { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 18px; overflow-x: auto; padding-bottom: 3px; }
@@ -1905,7 +1915,8 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 390px) {
   .join-page .header-tools { gap: 4px; }
-  .join-page .github-button, .join-page .guide-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
+  .join-page .github-button, .join-page .changelog-button, .join-page .guide-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
+  .join-page .version-badge { min-height: 32px; padding-inline: 6px; font-size: 10px; }
   .join-page .language-switch { min-width: 44px; padding-inline: 6px; font-size: 11px; }
   .workspace-header { padding-inline: 10px; }
   .channel-switcher { max-width: 112px; }
