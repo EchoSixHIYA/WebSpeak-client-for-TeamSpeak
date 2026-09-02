@@ -11,6 +11,7 @@ import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { SessionManager, type ManagedSession, type SessionTeardownReason } from "./session-manager.js";
 import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
 import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnect-policy.js";
+import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcSessionDescription } from "./webrtc-audio.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -29,6 +30,7 @@ const MAX_SERVER_AUDIO_BUFFERED_BYTES = 4_096;
 
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
+  webRtc?: WebRtcAudioOptions;
 }
 
 export interface AdminSessionSummary {
@@ -94,6 +96,7 @@ interface WebClientEntry {
   isAlive: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   audio: AudioFlowStats;
+  webrtc: WebRtcAudioSession | null;
 }
 
 export class VoiceBridge {
@@ -169,6 +172,7 @@ export class VoiceBridge {
         isAlive: true,
         reconnectTimer: null,
         audio: createAudioFlowStats(),
+        webrtc: null,
       };
       this.entries.set(entryId, entry!);
       try {
@@ -263,6 +267,7 @@ export class VoiceBridge {
           serverEventLog: entry!.eventLog,
           whisperTargetIds: [...entry!.whisperTargetIds],
           whisperActive: entry!.whisperActive,
+          webrtcAvailable: this.options.webRtc?.enabled === true,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -418,12 +423,22 @@ export class VoiceBridge {
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
         if (ws.readyState !== WebSocket.OPEN || data.clientId === selfId) return;
+        const webRtc = entry!.webrtc;
+        webRtc?.pushTeamSpeakVoice(data);
         const now = Date.now();
         if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
         entry!.audio.egressFirstAt ??= now;
         entry!.audio.egressLastAt = now;
         const sourceKey = String(data.clientId);
         entry!.audio.egressFramesByClient[sourceKey] = (entry!.audio.egressFramesByClient[sourceKey] ?? 0) + 1;
+        // A negotiated WebRTC session owns the browser's realtime audio
+        // egress. Do not also send the same TeamSpeak packet over the
+        // reliable WebSocket, otherwise the browser plays two copies and
+        // the TCP path can still accumulate stale audio behind the peer.
+        if (webRtc) {
+          entry!.audio.egressFrames++;
+          return;
+        }
         const packet = Buffer.allocUnsafe(3 + data.data.length);
         packet[0] = data.codec;
         packet.writeUInt16BE(data.clientId, 1);
@@ -497,7 +512,27 @@ export class VoiceBridge {
           return;
         }
 
-        const command = parseClientCommand(typeof data === "string" ? data : data.toString("utf-8"));
+        const rawMessage = typeof data === "string" ? data : data.toString("utf-8");
+        const webRtcOffer = parseWebRtcOffer(rawMessage);
+        if (webRtcOffer) {
+          if (this.options.webRtc?.enabled !== true) {
+            sendProtocolError(sendJson, "WEBRTC_DISABLED", "WebRTC 音频传输未启用");
+            return;
+          }
+          if (!tsReady || session.state !== "connected") {
+            sendProtocolError(sendJson, "SESSION_NOT_READY", "TeamSpeak 会话尚未就绪");
+            return;
+          }
+          void this.handleWebRtcOffer(entry!, webRtcOffer, sendJson);
+          return;
+        }
+        if (isWebRtcStopMessage(rawMessage)) {
+          const webRtc = entry!.webrtc;
+          entry!.webrtc = null;
+          if (webRtc) void webRtc.close();
+          return;
+        }
+        const command = parseClientCommand(rawMessage);
         if ("error" in command) {
           sendProtocolError(sendJson, command.error.code, command.error.message);
           return;
@@ -607,6 +642,11 @@ export class VoiceBridge {
       entry.reconnectTimer = null;
     }
     entry.opusEncoder = null;
+    const webRtc = entry.webrtc;
+    entry.webrtc = null;
+    if (webRtc) {
+      try { await webRtc.close(); } catch { /* peer teardown is idempotent */ }
+    }
     entry.whisperTargetIds.clear();
     entry.whisperActive = false;
     entry.channelTree = [];
@@ -641,6 +681,53 @@ export class VoiceBridge {
   private resolveConnection(url: URL): JoinTicketPayload | null {
     const token = url.searchParams.get("ticket");
     return token ? this.options.joinTickets.consume(token) : null;
+  }
+
+  private async handleWebRtcOffer(
+    entry: WebClientEntry,
+    offer: WebRtcSessionDescription,
+    sendJson: (message: Record<string, unknown>) => void,
+  ): Promise<void> {
+    if (entry.webrtc) {
+      try { await entry.webrtc.close(); } catch { /* replace a retried offer */ }
+      entry.webrtc = null;
+    }
+    const config = this.options.webRtc;
+    if (!config?.enabled) return;
+    const peer = new WebRtcAudioSession({
+      connectionId: entry.id,
+      config,
+      logger: this.logger,
+      onVoiceFrame: (data) => {
+        const now = Date.now();
+        if (entry.audio.ingressLastAt !== null) entry.audio.ingressMaxGapMs = Math.max(entry.audio.ingressMaxGapMs, now - entry.audio.ingressLastAt);
+        entry.audio.ingressFirstAt ??= now;
+        entry.audio.ingressLastAt = now;
+        entry.audio.ingressFrames++;
+        try {
+          if (entry.whisperActive && entry.whisperTargetIds.size) entry.tsClient.sendWhisper(data, [...entry.whisperTargetIds], 4);
+          else entry.tsClient.sendVoice(data, 4);
+        } catch {
+          // A packet arriving while the TeamSpeak session is being replaced
+          // is discarded; the WebRTC peer remains independently closable.
+        }
+      },
+      onVoiceActivity: (clientIds) => {
+        if (entry.ws.readyState === WebSocket.OPEN) sendJson({ type: "voiceActivity", clientIds });
+      },
+    });
+    entry.webrtc = peer;
+    try {
+      const answer = await peer.createAnswer(offer);
+      if (entry.webrtc !== peer || entry.ws.readyState !== WebSocket.OPEN) return;
+      sendJson({ type: "webrtcAnswer", payload: { sdp: answer } });
+      this.logger.info({ entryId: entry.id }, "WebRTC audio negotiation completed");
+    } catch (error: unknown) {
+      if (entry.webrtc === peer) entry.webrtc = null;
+      try { await peer.close(); } catch { /* best effort */ }
+      this.logger.warn({ entryId: entry.id, err: error instanceof Error ? error.message : String(error) }, "WebRTC audio negotiation failed");
+      if (entry.ws.readyState === WebSocket.OPEN) sendJson({ type: "webrtcError", code: "WEBRTC_NEGOTIATION_FAILED" });
+    }
   }
 }
 
@@ -732,6 +819,28 @@ function classifyOperationError(error: unknown, fallbackCode: string, fallbackMe
 
 function sendProtocolError(sendJson: (message: Record<string, unknown>) => void, code: string, message: string): void {
   sendJson({ type: "error", error: { code, message, recoverable: false } });
+}
+
+function parseWebRtcOffer(raw: string): WebRtcSessionDescription | null {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return null; }
+  if (!isRecord(value) || value.type !== "webrtcOffer" || !isRecord(value.payload) || !isRecord(value.payload.sdp)) return null;
+  const description = value.payload.sdp;
+  if (description.type !== "offer" || typeof description.sdp !== "string" || description.sdp.length > 256 * 1024) return null;
+  return { type: "offer", sdp: description.sdp };
+}
+
+function isWebRtcStopMessage(raw: string): boolean {
+  try {
+    const value: unknown = JSON.parse(raw);
+    return isRecord(value) && value.type === "webrtcStop";
+  } catch {
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function isChannelRecord(value: unknown): value is { id: string; name: string } {
