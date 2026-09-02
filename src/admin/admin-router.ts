@@ -208,7 +208,6 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       },
       teamSpeak: {
         status: overview.teamSpeak.status,
-        protocol: overview.teamSpeak.protocol,
         lastTestAt: overview.teamSpeak.lastTestAt,
         latencyMs: overview.teamSpeak.latencyMs,
         lastError: overview.teamSpeak.lastError,
@@ -402,7 +401,6 @@ interface AdminOverview {
   teamSpeak: {
     target: string;
     status: string;
-    protocol: string | null;
     lastTestAt: string | null;
     latencyMs: number | null;
     lastError: string | null;

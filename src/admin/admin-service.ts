@@ -104,7 +104,6 @@ export class AdminService {
       accessMode: settings.accessMode,
       siteName: settings.siteName,
       welcomeText: settings.welcomeText,
-      detectedProtocol: settings.detectedProtocol,
       lastTestAt: settings.lastTestAt,
       lastTestLatencyMs: settings.lastTestLatencyMs,
       lastTestError: settings.lastTestError,
@@ -136,7 +135,7 @@ export class AdminService {
     };
   }
 
-  async testConnection(targetText: string, password: string, persistResult: boolean): Promise<TeamSpeakProbeResult> {
+  async testConnection(targetText: string, password: string, persistResult: boolean): Promise<Omit<TeamSpeakProbeResult, "protocol">> {
     let target: TeamSpeakTarget;
     try {
       target = parseTeamSpeakTarget(targetText);
@@ -149,7 +148,8 @@ export class AdminService {
         this.database.recordConnectionTest({ protocol: result.protocol, latencyMs: result.latencyMs, error: null });
         this.database.addAudit("CONNECTION_TEST_SUCCEEDED", { protocol: result.protocol, latencyMs: result.latencyMs });
       }
-      return result;
+      const { protocol: _protocol, ...publicResult } = result;
+      return publicResult;
     } catch (error: unknown) {
       const probeError = error instanceof TeamSpeakProbeError
         ? error
@@ -173,7 +173,6 @@ export class AdminService {
       teamSpeak: {
         target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
         status: settings.lastTestError ? "unreachable" : settings.lastTestAt ? "reachable" : "unknown",
-        protocol: settings.detectedProtocol,
         lastTestAt: settings.lastTestAt,
         latencyMs: settings.lastTestLatencyMs,
         lastError: settings.lastTestError,

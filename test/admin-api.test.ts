@@ -139,11 +139,13 @@ test("admin API requires the default password to be changed before administratio
   const diagnostics = await request(origin, "/api/admin/diagnostics", { cookie });
   assert.equal(diagnostics.body.database.schemaVersion, 2);
   assert.equal("target" in diagnostics.body.teamSpeak, true);
+  assert.equal("protocol" in diagnostics.body.teamSpeak, false);
 
   const report = await request(origin, "/api/admin/diagnostics/report", { cookie });
   assert.equal(report.response.status, 200);
   assert.match(report.response.headers.get("content-disposition") ?? "", /diagnostic-report\.json/);
   assert.equal("target" in report.body.teamSpeak, false);
+  assert.equal("protocol" in report.body.teamSpeak, false);
   assert.equal("serverPassword" in report.body, false);
 
   const revoked = await request(origin, `/api/admin/invites/${encodeURIComponent(invite.body.invite.id)}/revoke`, {
@@ -168,9 +170,9 @@ test("admin API requires the default password to be changed before administratio
     csrf: login.body.csrfToken,
     body: { target: "voice.example.com:9988", passwordAction: "remove" },
   });
-  assert.equal(probe.body.protocol, "ts6");
+  assert.equal("protocol" in probe.body, false);
   const settings = await request(origin, "/api/admin/server", { cookie });
-  assert.equal(settings.body.detectedProtocol, "ts6");
+  assert.equal("detectedProtocol" in settings.body, false);
   assert.equal(settings.body.lastTestLatencyMs, 7);
 
   const logout = await request(origin, "/api/admin/logout", { method: "POST", cookie, csrf: login.body.csrfToken, body: {} });
