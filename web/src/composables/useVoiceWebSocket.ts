@@ -121,7 +121,10 @@ export function useVoiceWebSocket() {
   // Playback is kept per client so frames from multiple speakers cannot
   // interleave into one decoder or one scheduling queue.
   const remoteDecoders = new Map<number, AudioDecoder>();
+  const remoteDecoderGenerations = new Map<number, number>();
+  let nextRemoteDecoderGeneration = 0;
   const remotePlayTimes = new Map<number, number>();
+  const remotePlaybackSources = new Map<number, Set<AudioBufferSourceNode>>();
   const remoteGains = new Map<number, GainNode>();
   const remoteDecodeTimestamps = new Map<number, number>();
   const volumes = reactive<Record<number, number>>({});
@@ -130,8 +133,30 @@ export function useVoiceWebSocket() {
   const whisperActive = ref(false);
   const speakingTimers = new Map<number, ReturnType<typeof setTimeout>>();
   const SPEAKING_HOLD_MS = 360;
-  const MAX_AUDIO_BUFFERED_BYTES = 192_000;
-  let droppedAudioFrames = 0;
+  const AUDIO_FRAME_SAMPLES = 960;
+  const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
+  const MAX_AUDIO_BUFFERED_FRAMES = 10;
+  const MAX_AUDIO_BUFFERED_BYTES = AUDIO_FRAME_BYTES * MAX_AUDIO_BUFFERED_FRAMES;
+  const MAX_REMOTE_PLAY_AHEAD_SECONDS = 0.12;
+  const MAX_REMOTE_DECODE_QUEUE_FRAMES = 6;
+  const audioDiagnostics = reactive({
+    uplinkFrames: 0,
+    uplinkDroppedFrames: 0,
+    downlinkFrames: 0,
+    playbackResets: 0,
+    peakBufferedBytes: 0,
+    peakPlayAheadMs: 0,
+    peakDecodeQueueFrames: 0,
+  });
+  const audioCounters = { ...audioDiagnostics };
+  let nextAudioDiagnosticsPublishAt = 0;
+
+  function publishAudioDiagnostics(force = false): void {
+    const now = Date.now();
+    if (!force && now < nextAudioDiagnosticsPublishAt) return;
+    nextAudioDiagnosticsPublishAt = now + 1_000;
+    Object.assign(audioDiagnostics, audioCounters);
+  }
 
   async function saveAudioPreferences(): Promise<void> {
     await saveLocalPreferences({
@@ -321,9 +346,12 @@ export function useVoiceWebSocket() {
         accumLen = 0;
         return;
       }
-      if (socket.bufferedAmount > MAX_AUDIO_BUFFERED_BYTES) {
+      const bufferedBytes = socket.bufferedAmount;
+      audioCounters.peakBufferedBytes = Math.max(audioCounters.peakBufferedBytes, bufferedBytes);
+      if (bufferedBytes > MAX_AUDIO_BUFFERED_BYTES) {
         accumLen = 0;
-        droppedAudioFrames++;
+        audioCounters.uplinkDroppedFrames++;
+        publishAudioDiagnostics();
         return;
       }
       markSpeaking(state.tsClientId);
@@ -340,9 +368,11 @@ export function useVoiceWebSocket() {
       accumLen = need;
 
       let offset = 0;
-      while (offset + 960 <= accumLen && socket.readyState === WebSocket.OPEN && socket.bufferedAmount <= MAX_AUDIO_BUFFERED_BYTES) {
-        socket.send(accumBuf.slice(offset, offset + 960).buffer);
-        offset += 960;
+      while (offset + AUDIO_FRAME_SAMPLES <= accumLen && socket.readyState === WebSocket.OPEN && socket.bufferedAmount <= MAX_AUDIO_BUFFERED_BYTES) {
+        socket.send(accumBuf.slice(offset, offset + AUDIO_FRAME_SAMPLES).buffer);
+        offset += AUDIO_FRAME_SAMPLES;
+        audioCounters.uplinkFrames++;
+        publishAudioDiagnostics();
       }
       accumLen -= offset;
       if (offset > 0) accumBuf.set(accumBuf.subarray(offset, offset + accumLen), 0);
@@ -511,14 +541,31 @@ export function useVoiceWebSocket() {
   function playAudioFrame(clientId: number, opusData: Uint8Array): void {
     if (opusData.length < 3) return;
     let decoder = remoteDecoders.get(clientId);
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    const scheduledUntil = remotePlayTimes.get(clientId) ?? now;
+    const decodeQueueSize = decoder?.decodeQueueSize ?? 0;
+    audioCounters.peakDecodeQueueFrames = Math.max(audioCounters.peakDecodeQueueFrames, decodeQueueSize);
+    if (
+      decoder &&
+      (scheduledUntil > now + MAX_REMOTE_PLAY_AHEAD_SECONDS || decodeQueueSize >= MAX_REMOTE_DECODE_QUEUE_FRAMES)
+    ) {
+      resetRemotePlayback(clientId);
+      decoder = undefined;
+    }
+
     if (!decoder) {
-      const ctx = getAudioCtx();
       const gainNode = ctx.createGain();
       gainNode.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
       gainNode.connect(ctx.destination);
       remoteGains.set(clientId, gainNode);
-      decoder = new AudioDecoder({
+      const generation = ++nextRemoteDecoderGeneration;
+      const nextDecoder = new AudioDecoder({
         output: (chunk: AudioData) => {
+          if (remoteDecoderGenerations.get(clientId) !== generation) {
+            chunk.close();
+            return;
+          }
           try {
             const { sampleRate, numberOfChannels, numberOfFrames } = chunk;
             const buffer = ctx.createBuffer(numberOfChannels, numberOfFrames, sampleRate);
@@ -530,20 +577,48 @@ export function useVoiceWebSocket() {
             const source = ctx.createBufferSource();
             source.buffer = buffer;
             source.connect(gainNode);
+            let sources = remotePlaybackSources.get(clientId);
+            if (!sources) {
+              sources = new Set<AudioBufferSourceNode>();
+              remotePlaybackSources.set(clientId, sources);
+            }
+            sources.add(source);
+            source.addEventListener("ended", () => {
+              source.disconnect();
+              sources?.delete(source);
+              if (sources?.size === 0) remotePlaybackSources.delete(clientId);
+            }, { once: true });
             let playTime = remotePlayTimes.get(clientId) ?? ctx.currentTime;
             if (playTime < ctx.currentTime) playTime = ctx.currentTime;
+            if (playTime + numberOfFrames / sampleRate > ctx.currentTime + MAX_REMOTE_PLAY_AHEAD_SECONDS) {
+              source.disconnect();
+              sources.delete(source);
+              if (sources.size === 0) remotePlaybackSources.delete(clientId);
+              chunk.close();
+              resetRemotePlayback(clientId);
+              return;
+            }
             source.start(playTime);
             remotePlayTimes.set(clientId, playTime + numberOfFrames / sampleRate);
+            audioCounters.peakPlayAheadMs = Math.max(
+              audioCounters.peakPlayAheadMs,
+              Math.round((playTime + numberOfFrames / sampleRate - ctx.currentTime) * 1_000),
+            );
           } catch {
             // A decoder can finish while the audio context is being torn down.
           }
           chunk.close();
         },
         error: () => {
-          remoteDecoders.delete(clientId);
+          if (remoteDecoderGenerations.get(clientId) === generation) {
+            remoteDecoderGenerations.delete(clientId);
+            remoteDecoders.delete(clientId);
+          }
         },
       });
-      decoder.configure({ codec: "opus", sampleRate: 48000, numberOfChannels: 1 });
+      nextDecoder.configure({ codec: "opus", sampleRate: 48000, numberOfChannels: 1 });
+      decoder = nextDecoder;
+      remoteDecoderGenerations.set(clientId, generation);
       remoteDecoders.set(clientId, decoder);
     }
 
@@ -551,9 +626,36 @@ export function useVoiceWebSocket() {
       const timestamp = remoteDecodeTimestamps.get(clientId) ?? 0;
       decoder.decode(new EncodedAudioChunk({ type: "key", timestamp, duration: 20_000, data: opusData }));
       remoteDecodeTimestamps.set(clientId, timestamp + 20_000);
+      audioCounters.downlinkFrames++;
+      publishAudioDiagnostics();
     } catch {
       // Ignore malformed frames; the next valid frame can still be decoded.
     }
+  }
+
+  function clearRemotePlayback(clientId: number): void {
+    const decoder = remoteDecoders.get(clientId);
+    if (decoder) {
+      try { decoder.close(); } catch { /* already closed */ }
+    }
+    remoteDecoders.delete(clientId);
+    remoteDecoderGenerations.delete(clientId);
+    remotePlayTimes.delete(clientId);
+    remoteDecodeTimestamps.delete(clientId);
+    const sources = remotePlaybackSources.get(clientId);
+    if (sources) {
+      for (const source of sources) {
+        try { source.stop(); } catch { /* already ended */ }
+        source.disconnect();
+      }
+      remotePlaybackSources.delete(clientId);
+    }
+  }
+
+  function resetRemotePlayback(clientId: number): void {
+    clearRemotePlayback(clientId);
+    audioCounters.playbackResets++;
+    publishAudioDiagnostics();
   }
 
   function connect(target: string, channel: string, nickname: string, serverPassword = "", identity = "", rememberIdentity = false, inviteToken = ""): void {
@@ -664,8 +766,8 @@ export function useVoiceWebSocket() {
     members.length = 0;
     channels.length = 0;
     chatMessages.length = 0;
-    for (const decoder of remoteDecoders.values()) decoder.close();
-    remoteDecoders.clear();
+    for (const clientId of new Set([...remoteDecoders.keys(), ...remotePlaybackSources.keys()])) clearRemotePlayback(clientId);
+    remoteDecoderGenerations.clear();
     remotePlayTimes.clear();
     remoteDecodeTimestamps.clear();
     for (const gain of remoteGains.values()) gain.disconnect();
@@ -715,8 +817,10 @@ export function useVoiceWebSocket() {
         }
         break;
       case "memberLeave": {
-        clearSpeaking(Number(msg.id));
-        const index = members.findIndex((member) => member.id === msg.id);
+        const clientId = Number(msg.id);
+        clearSpeaking(clientId);
+        clearRemotePlayback(clientId);
+        const index = members.findIndex((member) => member.id === clientId);
         if (index >= 0) members.splice(index, 1);
         break;
       }
@@ -980,6 +1084,7 @@ export function useVoiceWebSocket() {
     outputDeviceSupported,
     audioPermission,
     audioContextState,
+    audioDiagnostics,
     identityMaterial,
     micLevel,
     microphoneTestActive,

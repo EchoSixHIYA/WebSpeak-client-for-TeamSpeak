@@ -19,6 +19,12 @@ const { OpusEncoder } = require("@discordjs/opus") as {
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const AUDIO_FRAME_BYTES = 1_920;
+// A browser audio frame is 20 ms of mono 48 kHz PCM. Keep the server-side
+// WebSocket egress queue small enough that a slow browser cannot turn old
+// voice into seconds of latency. Opus frames are variable-sized, so this is
+// deliberately a byte backpressure guard; the browser also enforces a
+// time-based playback limit before scheduling decoded audio.
+const MAX_SERVER_AUDIO_BUFFERED_BYTES = 16_384;
 
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
@@ -34,6 +40,15 @@ export interface AdminSessionSummary {
   tsClientId: number | null;
   channelId: string | null;
   memberCount: number;
+  audio: AudioFlowStats;
+}
+
+export interface AudioFlowStats {
+  ingressFrames: number;
+  ingressDroppedFrames: number;
+  egressFrames: number;
+  egressDroppedFrames: number;
+  egressPeakBufferedBytes: number;
 }
 
 interface ChannelMember {
@@ -70,6 +85,7 @@ interface WebClientEntry {
   whisperActive: boolean;
   isAlive: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
+  audio: AudioFlowStats;
 }
 
 export class VoiceBridge {
@@ -144,6 +160,7 @@ export class VoiceBridge {
         whisperActive: false,
         isAlive: true,
         reconnectTimer: null,
+        audio: createAudioFlowStats(),
       };
       this.entries.set(entryId, entry!);
       try {
@@ -397,7 +414,18 @@ export class VoiceBridge {
         packet[0] = data.codec;
         packet.writeUInt16BE(data.clientId, 1);
         data.data.copy(packet, 3);
-        ws.send(packet);
+        const bufferedBytes = ws.bufferedAmount;
+        entry!.audio.egressPeakBufferedBytes = Math.max(entry!.audio.egressPeakBufferedBytes, bufferedBytes);
+        if (bufferedBytes > MAX_SERVER_AUDIO_BUFFERED_BYTES) {
+          entry!.audio.egressDroppedFrames++;
+          return;
+        }
+        try {
+          ws.send(packet);
+          entry!.audio.egressFrames++;
+        } catch {
+          entry!.audio.egressDroppedFrames++;
+        }
       });
 
       tsClient.on("textMessage", (message) => {
@@ -434,9 +462,11 @@ export class VoiceBridge {
         if (isBinary) {
           const frame = typeof data === "string" ? Buffer.from(data) : data;
           if (!tsReady || frame.length !== AUDIO_FRAME_BYTES) {
+            entry!.audio.ingressDroppedFrames++;
             sendProtocolError(sendJson, "INVALID_AUDIO_FRAME", "音频帧格式无效");
             return;
           }
+          entry!.audio.ingressFrames++;
           try {
             if (entry!.opusEncoder) {
               const encoded = entry!.opusEncoder.encode(frame);
@@ -537,6 +567,7 @@ export class VoiceBridge {
           tsClientId,
           channelId,
           memberCount: entry.members.size,
+          audio: { ...entry.audio },
         };
       });
   }
@@ -687,6 +718,16 @@ function sendProtocolError(sendJson: (message: Record<string, unknown>) => void,
 
 function isChannelRecord(value: unknown): value is { id: string; name: string } {
   return Boolean(value) && typeof value === "object" && typeof (value as { id?: unknown }).id === "string" && typeof (value as { name?: unknown }).name === "string";
+}
+
+function createAudioFlowStats(): AudioFlowStats {
+  return {
+    ingressFrames: 0,
+    ingressDroppedFrames: 0,
+    egressFrames: 0,
+    egressDroppedFrames: 0,
+    egressPeakBufferedBytes: 0,
+  };
 }
 
 function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {

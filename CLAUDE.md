@@ -40,6 +40,9 @@ src/
 2. Float32 → Int16 conversion → PTT/VOX gate → WebSocket binary send
 3. Server accumulates PCM → every 1920 bytes (960 samples, 20ms) → `OpusEncoder.encode()` → `tsClient.sendVoice(opus, 4)`
 4. Incoming: TS → `voiceData` event → 3-byte header `[codec][clientId BE]` → WS binary → browser `AudioDecoder` → playback
+5. Browser uplink is capped at 10 PCM frames (about 200ms); gateway egress applies a bounded WebSocket byte guard; browser playback resets stale decoder/source queues above 120ms.
+
+Audio flow counters are kept in memory and exposed in admin session summaries. Do not add per-frame persistent logging to the voice path.
 
 ### CJS Interop
 `@discordjs/opus` is CommonJS, loaded via:
