@@ -10,7 +10,7 @@ import { createAdminRouter } from "../admin/admin-router.js";
 import type { AdminService } from "../admin/admin-service.js";
 import { AdminSessionStore } from "../admin/admin-session.js";
 import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
-import { identityFromString } from "@honeybbq/teamspeak-client";
+import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 
 export interface WebServerOptions {

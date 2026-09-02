@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ChannelInfo, ClientInfo } from "@honeybbq/teamspeak-client";
+import type { ChannelInfo, ClientInfo } from "@echosixhiya/teamspeak-client";
 import { DirectorySynchronizer } from "../src/server/directory-sync.js";
 
 const root: ChannelInfo = { id: 1n, parentID: 0n, name: "Lobby", description: "", };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateIdentity } from "@honeybbq/teamspeak-client";
+import { generateIdentity } from "@echosixhiya/teamspeak-client";
 import { parseTeamSpeakTarget } from "../src/domain/teamspeak-target.js";
 import { TSClient, toTSChatMessage } from "../src/server/ts-client.js";
 import { silentLogger } from "./helpers/logger.js";

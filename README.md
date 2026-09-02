@@ -294,6 +294,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - Promoted the GitHub entry on the welcome page and added a current-version badge plus a changelog link; narrow layouts collapse text controls into icons to prevent crowding.
 - Fixed alignment for the settings gear and related controls, with consistent touch sizing and visual treatment for settings, exit, and microphone actions.
 - Consolidated the post-0.1.1 mobile voice controls, microphone mute replacement for focus-dependent PTT, automatic protocol detection, simplified Docker Compose startup, and live-demo documentation into this release.
+- Migrated TeamSpeak directory tracking and whisper packet support into the maintained WebSpeak SDK, removing the install-time compiled SDK patch step.
 
 #### 2026-09-02 · v0.1.1
 
@@ -303,7 +304,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
 - Removed the focus-dependent normal Space-key PTT mode and replaced it with a one-click microphone mute/unmute control on desktop and mobile; the mute state is persisted in the current browser.
 - Mute now suppresses upstream microphone audio before it is sent, while VOX activation, input-device selection, volume controls, and threshold tuning remain available.
-- Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now handle the dependency patch script correctly.
+- Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now build the pinned SDK dependency during installation.
 - Simplified Docker Compose deployment: it uses the published image by default, creates and persists the data volume automatically, and supports changing the host port with `WEBSPEAK_PORT`.
 
 #### 2026-08-31 · v0.1.0

@@ -9,10 +9,10 @@ import {
   generateIdentity,
   type Identity,
   type VoiceData,
-  type ChannelInfo,
-  type ClientInfo,
+  type DirectoryClientInfo,
+  type DirectorySnapshot,
   type TextMessage,
-} from "@honeybbq/teamspeak-client";
+} from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
@@ -32,18 +32,8 @@ export interface TSVoiceData {
   data: Buffer;
 }
 
-export interface TSDirectorySnapshot {
-  channels: ChannelInfo[];
-  clients: TSDirectoryClient[];
-}
-
-export interface TSDirectoryClient extends ClientInfo {
-  away?: boolean;
-  awayMessage?: string;
-  inputMuted?: boolean;
-  outputMuted?: boolean;
-  channelCommander?: boolean;
-}
+export type TSDirectorySnapshot = DirectorySnapshot;
+export type TSDirectoryClient = DirectoryClientInfo;
 
 export type TSChatScope = "channel" | "server" | "private";
 
@@ -172,12 +162,10 @@ export class TSClient extends EventEmitter {
       } as TSVoiceData);
     });
 
-    // The SDK patch exposes the directory that TeamSpeak sends during the
-    // normal client welcome sequence. The connect path also reconciles this
-    // event stream with a complete client-protocol snapshot.
-    (client as unknown as {
-      on(event: "directorySnapshot", handler: (snapshot: TSDirectorySnapshot) => void): unknown;
-    }).on("directorySnapshot", (snapshot) => {
+    // The SDK exposes the directory that TeamSpeak sends during the normal
+    // client welcome sequence. The connect path also reconciles this event
+    // stream with a complete client-protocol snapshot.
+    client.on("directorySnapshot", (snapshot) => {
       this.emit("directorySnapshot", {
         channels: snapshot.channels.slice(),
         clients: snapshot.clients.slice(),
@@ -222,13 +210,7 @@ export class TSClient extends EventEmitter {
     if (!this.client || !this.connected) return;
     const targets = [...new Set(clientIds)].filter((clientId) => Number.isInteger(clientId) && clientId > 0 && clientId <= 65535 && clientId !== this.getClientId());
     if (!targets.length) throw new Error("Whisper requires at least one valid target");
-    const whisperClient = this.client as unknown as {
-      sendWhisper?: (voiceData: Uint8Array, targetClientIds: number[], voiceCodec: number) => void;
-    };
-    if (typeof whisperClient.sendWhisper !== "function") {
-      throw new Error("TeamSpeak SDK whisper support is unavailable");
-    }
-    whisperClient.sendWhisper(data, targets, codec);
+    this.client.sendWhisper(data, targets, codec);
   }
 
   async sendTextMessage(scope: TSChatScope, message: string, targetId = 0n): Promise<void> {

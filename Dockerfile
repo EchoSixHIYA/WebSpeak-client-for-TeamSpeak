@@ -2,13 +2,11 @@ FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends git python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 COPY web/package.json web/package-lock.json ./web/
-# The root postinstall hook patches the TeamSpeak SDK during npm ci.
-COPY scripts ./scripts
 RUN npm ci
 RUN npm --prefix web ci
 

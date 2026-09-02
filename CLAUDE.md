@@ -9,7 +9,7 @@ Browser (PCM capture) → WebSocket → Node.js server (PCM→Opus) → TeamSpea
 Browser (playback)    ← WebSocket ← Node.js server (Opus relay) ← TeamSpeak server
 ```
 
-- Each browser user = one independent TS3 virtual client via `@honeybbq/teamspeak-client`
+- Each browser user = one independent TS3 virtual client via `@echosixhiya/teamspeak-client`
 - Frontend captures PCM via `ScriptProcessorNode`, sends as Int16 binary over WebSocket
 - Server encodes PCM → Opus using `@discordjs/opus` (CJS, loaded via `createRequire`)
 - Server sends Opus to TS via `client.sendVoice(data, codec=4)`
@@ -30,7 +30,7 @@ src/
   server/
     server.ts                 # Express + HTTPS + WS setup
     voice-bridge.ts           # /ws/voice endpoint, PCM→Opus encoding, WebQuery API
-    ts-client.ts              # TS3Client wrapper around @honeybbq/teamspeak-client
+    ts-client.ts              # TS3Client wrapper around @echosixhiya/teamspeak-client
 ```
 
 ## Key Technical Details

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateIdentity } from "@honeybbq/teamspeak-client";
+import { generateIdentity } from "@echosixhiya/teamspeak-client";
 import { JoinTicketStore } from "../src/server/join-ticket.js";
 
 test("join tickets are opaque, one-time, and expire", () => {

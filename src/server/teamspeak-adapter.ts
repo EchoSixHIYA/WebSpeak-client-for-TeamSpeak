@@ -3,7 +3,7 @@ import {
   generateIdentity,
   type ClientOptions,
   type Identity,
-} from "@honeybbq/teamspeak-client";
+} from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
 import { normalizeTeamSpeakError } from "../errors.js";
 import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";

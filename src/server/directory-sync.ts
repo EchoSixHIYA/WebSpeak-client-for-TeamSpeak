@@ -1,4 +1,4 @@
-import type { ClientInfo } from "@honeybbq/teamspeak-client";
+import type { ClientInfo } from "@echosixhiya/teamspeak-client";
 import type { TSDirectorySnapshot } from "./ts-client.js";
 
 type DirectoryDelta =
