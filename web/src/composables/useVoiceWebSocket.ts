@@ -538,6 +538,7 @@ export function useVoiceWebSocket() {
     if (sequence !== connectionSequence || webrtcFallbackStarted) return;
     webrtcFallbackStarted = true;
     webrtcActive.value = false;
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "webrtcStop" }));
     stopWebRtcTransport();
     if (socket.readyState === WebSocket.OPEN && state.connected) {
       try { await startMicrophone(); } catch (error: unknown) {
