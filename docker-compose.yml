@@ -1,10 +1,12 @@
 services:
   webspeak:
-    image: ghcr.io/EchoSixHIYA/webspeak:latest
-    container_name: webspeak
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: webspeak:local
     restart: unless-stopped
     ports:
-      - "3040:3040"
+      - "${WEBSPEAK_PORT:-3040}:3040"
     volumes:
       - webspeak-data:/data
 

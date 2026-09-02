@@ -12,6 +12,8 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5.0-0f766e?style=flat-square)](https://nodejs.org/)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
+**在线 Demo：** [https://webspeak.online](https://webspeak.online)
+
 **[中文](#中文)**<br />
 [更新日志](#更新日志) · [为什么是 WebSpeak](#为什么是-webspeak) · [核心能力](#核心能力) · [架构](#架构) · [快速开始](#快速开始) · [首次登录与默认目标](#首次登录与默认目标) · [访问模式与邀请](#访问模式与邀请) · [音频与设备](#音频与设备) · [数据与安全边界](#数据与安全边界) · [旧版本升级](#旧版本升级) · [健康检查](#健康检查开发与验证) · [项目结构](#项目结构) · [已知边界](#已知边界) · [社区](#社区)
 
@@ -37,6 +39,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 - 移除依赖页面焦点的普通空格键按键说话模式；改为桌面端和移动端均可用的一键闭麦/开麦，静音状态会保存在当前浏览器中。
 - 闭麦会在上行音频发送前直接阻断声音，同时保留 VOX 语音激活、输入设备选择、音量与阈值调节能力。
 - 发布流程稳定生成 Windows/Linux 部署包并同步发布 Docker 镜像；Docker 构建会正确处理依赖安装脚本。
+- 简化 Docker Compose 部署：默认从当前代码构建，自动创建并持久化数据卷，支持通过 `WEBSPEAK_PORT` 修改宿主机端口。
 
 #### 2026-08-31 · v0.1.0
 
@@ -74,7 +77,35 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 ### 快速开始
 
-#### 方式 A：从 Dockerfile 构建
+#### 方式 A：Docker Compose（推荐）
+
+Docker Compose 会直接使用当前目录的 Dockerfile 构建 WebSpeak，自动创建数据卷并启动服务，不需要手动创建镜像或数据卷。
+
+```bash
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+docker compose up -d --build
+```
+
+查看状态和日志：
+
+```bash
+docker compose ps
+docker compose logs -f webspeak
+curl http://127.0.0.1:3040/health
+```
+
+启动完成后打开 [http://127.0.0.1:3040/](http://127.0.0.1:3040/)。首次进入管理后台 `/admin` 使用 `admin / admin`，并按提示修改密码。
+
+默认数据保存在 Docker volume `webspeak-data` 中。升级代码后再次执行 `docker compose up -d --build` 即可；停止服务使用 `docker compose down`，不要添加 `-v`，否则会删除数据库、密钥和管理员配置。
+
+WebSpeak 默认对外提供 `3040` 端口。如需修改宿主机端口，只需设置 `WEBSPEAK_PORT`，容器内部端口无需修改：
+
+```bash
+WEBSPEAK_PORT=3041 docker compose up -d --build
+```
+
+#### 方式 B：Dockerfile 手动运行（可选）
 
 ```bash
 docker build -t webspeak:local .
@@ -87,9 +118,9 @@ docker run -d \
   webspeak:local
 ```
 
-容器固定监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。公网部署时，请在前面配置 HTTPS 反向代理；麦克风和部分浏览器音频能力需要安全上下文。
+容器内部监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。手动运行时也请保留 `webspeak-data:/data` 数据卷。
 
-#### 方式 B：源码运行
+#### 方式 C：源码运行
 
 环境要求：
 
@@ -245,6 +276,8 @@ QQ群：`869500475`
 
 WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gateway and web client for TeamSpeak 3 and TeamSpeak 6: open a link, choose a nickname, and join from a modern browser without installing a desktop client.
 
+**Live demo:** [https://webspeak.online](https://webspeak.online)
+
 ### Changelog
 
 #### 2026-09-02 · v0.1.1
@@ -256,6 +289,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - Removed the focus-dependent normal Space-key PTT mode and replaced it with a one-click microphone mute/unmute control on desktop and mobile; the mute state is persisted in the current browser.
 - Mute now suppresses upstream microphone audio before it is sent, while VOX activation, input-device selection, volume controls, and threshold tuning remain available.
 - Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now handle the dependency patch script correctly.
+- Simplified Docker Compose deployment: it builds from the current checkout, creates and persists the data volume automatically, and supports changing the host port with `WEBSPEAK_PORT`.
 
 #### 2026-08-31 · v0.1.0
 
@@ -293,7 +327,35 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 ### Quick Start
 
-#### Option A: Build with Docker
+#### Option A: Docker Compose (recommended)
+
+Docker Compose builds WebSpeak from the Dockerfile in the current checkout, creates the persistent data volume automatically, and starts the service without a separate image-pull or volume-creation step.
+
+```bash
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+docker compose up -d --build
+```
+
+Check the service and health endpoint:
+
+```bash
+docker compose ps
+docker compose logs -f webspeak
+curl http://127.0.0.1:3040/health
+```
+
+Then open [http://127.0.0.1:3040/](http://127.0.0.1:3040/). On the first admin login, use `admin / admin` and follow the prompt to change the password.
+
+Runtime data is kept in the `webspeak-data` Docker volume. After updating the checkout, run `docker compose up -d --build` again. Stop the service with `docker compose down`; do not add `-v`, because that removes the database, master key, and administrator settings.
+
+The default host port is `3040`. To use another host port, set `WEBSPEAK_PORT`; the container port stays unchanged:
+
+```bash
+WEBSPEAK_PORT=3041 docker compose up -d --build
+```
+
+#### Option B: Run the Dockerfile manually (optional)
 
 ```bash
 docker build -t webspeak:local .
@@ -306,9 +368,9 @@ docker run -d \
   webspeak:local
 ```
 
-The container listens on `3040`. SQLite data, the installation master key, and logs are stored in `/data`. If `certs/cert.pem` and `certs/key.pem` are present, the service enables HTTPS directly; for public deployments, an HTTPS reverse proxy is recommended. Microphone access and some browser audio features require a secure context.
+The container listens on `3040` internally. SQLite data, the installation master key, and logs are stored in `/data`; keep the `webspeak-data:/data` volume when running the image manually.
 
-#### Option B: Run from source
+#### Option C: Run from source
 
 Requirements:
 
