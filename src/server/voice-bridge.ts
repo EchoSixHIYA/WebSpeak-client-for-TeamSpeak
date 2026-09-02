@@ -425,17 +425,20 @@ export class VoiceBridge {
         if (ws.readyState !== WebSocket.OPEN || data.clientId === selfId) return;
         const webRtc = entry!.webrtc;
         webRtc?.pushTeamSpeakVoice(data);
-        // A negotiated WebRTC session owns the browser's realtime audio
-        // egress. Do not also send the same TeamSpeak packet over the
-        // reliable WebSocket, otherwise the browser plays two copies and
-        // the TCP path can still accumulate stale audio behind the peer.
-        if (webRtc) return;
         const now = Date.now();
         if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
         entry!.audio.egressFirstAt ??= now;
         entry!.audio.egressLastAt = now;
         const sourceKey = String(data.clientId);
         entry!.audio.egressFramesByClient[sourceKey] = (entry!.audio.egressFramesByClient[sourceKey] ?? 0) + 1;
+        // A negotiated WebRTC session owns the browser's realtime audio
+        // egress. Do not also send the same TeamSpeak packet over the
+        // reliable WebSocket, otherwise the browser plays two copies and
+        // the TCP path can still accumulate stale audio behind the peer.
+        if (webRtc) {
+          entry!.audio.egressFrames++;
+          return;
+        }
         const packet = Buffer.allocUnsafe(3 + data.data.length);
         packet[0] = data.codec;
         packet.writeUInt16BE(data.clientId, 1);
@@ -690,6 +693,11 @@ export class VoiceBridge {
       config,
       logger: this.logger,
       onVoiceFrame: (data) => {
+        const now = Date.now();
+        if (entry.audio.ingressLastAt !== null) entry.audio.ingressMaxGapMs = Math.max(entry.audio.ingressMaxGapMs, now - entry.audio.ingressLastAt);
+        entry.audio.ingressFirstAt ??= now;
+        entry.audio.ingressLastAt = now;
+        entry.audio.ingressFrames++;
         try {
           if (entry.whisperActive && entry.whisperTargetIds.size) entry.tsClient.sendWhisper(data, [...entry.whisperTargetIds], 4);
           else entry.tsClient.sendVoice(data, 4);

@@ -18,7 +18,7 @@ const { OpusDecoder, OpusEncoder } = require("@discordjs/opus") as {
 const AUDIO_SAMPLE_RATE = 48_000;
 const AUDIO_FRAME_SAMPLES = 960;
 const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
-const WEBRTC_OPUS_PAYLOAD_TYPE = 111;
+const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
 
@@ -59,12 +59,14 @@ export class WebRtcAudioSession {
   private readonly decoderByClient = new Map<number, { decode(data: Buffer): Buffer }>();
   private readonly pendingFrames = new Map<number, Buffer>();
   private readonly activeSpeakerIds = new Set<number>();
+  private readonly opusPayloadTypes = new Set<number>();
   private readonly audioTimer: ReturnType<typeof setInterval>;
   private readonly activityTimer: ReturnType<typeof setInterval>;
   private encoder: { encode(data: Buffer): Buffer } | null;
   private sequenceNumber = randomInt(0, 65_536);
   private timestamp = randomInt(0, 0x1_0000_0000) >>> 0;
   private readonly ssrc = randomInt(1, 0x1_0000_0000) >>> 0;
+  private outgoingPayloadType = DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE;
   private closed = false;
 
   constructor(options: WebRtcAudioSessionOptions) {
@@ -86,7 +88,7 @@ export class WebRtcAudioSession {
     const audio = this.peer.addTransceiver("audio", { direction: "sendrecv" });
     audio.onTrack.subscribe((track) => {
       track.onReceiveRtp.subscribe((rtp) => {
-        if (this.closed || rtp.header.payloadType !== WEBRTC_OPUS_PAYLOAD_TYPE) return;
+        if (this.closed || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         this.onVoiceFrame(Buffer.from(rtp.payload));
       });
       void audio.sender.replaceTrack(this.outgoingTrack).catch((error: unknown) => {
@@ -119,6 +121,7 @@ export class WebRtcAudioSession {
 
   async createAnswer(offer: WebRtcSessionDescription): Promise<WebRtcSessionDescription> {
     if (this.closed) throw new Error("WebRTC session is closed");
+    this.setOpusPayloadTypes(offer.sdp);
     await this.peer.setRemoteDescription(offer);
     const transceiver = this.peer.getTransceivers().find((candidate) => candidate.kind === "audio");
     if (transceiver) await transceiver.sender.replaceTrack(this.outgoingTrack);
@@ -185,7 +188,7 @@ export class WebRtcAudioSession {
     try {
       const encoded = this.encoder.encode(pcm);
       const packet = new RtpPacket(new RtpHeader({
-        payloadType: WEBRTC_OPUS_PAYLOAD_TYPE,
+        payloadType: this.outgoingPayloadType,
         sequenceNumber: this.sequenceNumber,
         timestamp: this.timestamp,
         ssrc: this.ssrc,
@@ -205,5 +208,16 @@ export class WebRtcAudioSession {
     const ids = [...this.activeSpeakerIds];
     this.activeSpeakerIds.clear();
     this.onVoiceActivity(ids);
+  }
+
+  private setOpusPayloadTypes(sdp: string): void {
+    this.opusPayloadTypes.clear();
+    for (const match of sdp.matchAll(/^a=rtpmap:(\d+)\s+opus\/48000(?:\/\d+)?/gim)) {
+      const payloadType = Number(match[1]);
+      if (!Number.isInteger(payloadType) || payloadType < 0 || payloadType > 127) continue;
+      this.opusPayloadTypes.add(payloadType);
+      this.outgoingPayloadType = payloadType;
+    }
+    if (!this.opusPayloadTypes.size) this.opusPayloadTypes.add(DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE);
   }
 }
