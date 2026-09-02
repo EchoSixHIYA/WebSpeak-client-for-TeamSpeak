@@ -600,7 +600,7 @@ export class VoiceBridge {
       if (reason === "heartbeat-timeout" || reason === "gateway-shutdown") entry.ws.terminate();
       else entry.ws.close(reason === "protocol-error" ? 1008 : 1000, reason);
     }
-    this.logger.info({ entryId: entry.id, reason }, "Client session torn down");
+    this.logger.info({ entryId: entry.id, reason, audio: { ...entry.audio } }, "Client session torn down");
   }
 
   private startHeartbeat(): void {
