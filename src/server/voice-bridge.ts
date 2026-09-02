@@ -46,8 +46,14 @@ export interface AdminSessionSummary {
 export interface AudioFlowStats {
   ingressFrames: number;
   ingressDroppedFrames: number;
+  ingressFirstAt: number | null;
+  ingressLastAt: number | null;
+  ingressMaxGapMs: number;
   egressFrames: number;
   egressDroppedFrames: number;
+  egressFirstAt: number | null;
+  egressLastAt: number | null;
+  egressMaxGapMs: number;
   egressPeakBufferedBytes: number;
 }
 
@@ -410,6 +416,10 @@ export class VoiceBridge {
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
         if (ws.readyState !== WebSocket.OPEN || data.clientId === selfId) return;
+        const now = Date.now();
+        if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
+        entry!.audio.egressFirstAt ??= now;
+        entry!.audio.egressLastAt = now;
         const packet = Buffer.allocUnsafe(3 + data.data.length);
         packet[0] = data.codec;
         packet.writeUInt16BE(data.clientId, 1);
@@ -466,6 +476,10 @@ export class VoiceBridge {
             sendProtocolError(sendJson, "INVALID_AUDIO_FRAME", "音频帧格式无效");
             return;
           }
+          const now = Date.now();
+          if (entry!.audio.ingressLastAt !== null) entry!.audio.ingressMaxGapMs = Math.max(entry!.audio.ingressMaxGapMs, now - entry!.audio.ingressLastAt);
+          entry!.audio.ingressFirstAt ??= now;
+          entry!.audio.ingressLastAt = now;
           entry!.audio.ingressFrames++;
           try {
             if (entry!.opusEncoder) {
@@ -724,8 +738,14 @@ function createAudioFlowStats(): AudioFlowStats {
   return {
     ingressFrames: 0,
     ingressDroppedFrames: 0,
+    ingressFirstAt: null,
+    ingressLastAt: null,
+    ingressMaxGapMs: 0,
     egressFrames: 0,
     egressDroppedFrames: 0,
+    egressFirstAt: null,
+    egressLastAt: null,
+    egressMaxGapMs: 0,
     egressPeakBufferedBytes: 0,
   };
 }
