@@ -35,6 +35,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 - 新增可选的 WebRTC 语音传输，为需要更低、更稳定实时语音延迟的部署提供实验性通道。
 - 增加 WebRTC 环境配置，可设置公网地址和受限的 UDP 端口范围；默认部署方式和默认语音链路保持不变。
+- 将 TeamSpeak 集成迁移到我们维护的 `EchoSixHIYA/teamspeak-js`，带来实时目录快照以及成员、频道同步能力。
 - WebRTC 语音按协商得到的 Opus 参数传输，并且每位发言者只保留最新音频帧，避免网络抖动时旧语音持续堆积。
 - 修复 WebRTC 与兼容性语音链路切换时的重复播放、残留会话和回退不完整问题。
 - 修复原生 Opus 解码调用和浏览器端协商负载类型处理，并整理连接关闭时的资源清理。
@@ -316,6 +317,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 - Added an optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency.
 - Added WebRTC environment configuration for the public host and a bounded UDP port range; the default deployment and default voice path remain unchanged.
+- Migrated the TeamSpeak integration to our maintained `EchoSixHIYA/teamspeak-js` fork, adding live directory snapshots and member/channel synchronization.
 - WebRTC audio now uses negotiated Opus parameters and keeps only the newest frame per speaker, preventing stale voice from accumulating during network jitter.
 - Fixed duplicate playback, incomplete fallback, and leftover server-side media sessions when switching between WebRTC and the compatibility voice path.
 - Fixed native Opus decoder usage and browser-side negotiated payload handling, and tightened cleanup when a connection closes.
