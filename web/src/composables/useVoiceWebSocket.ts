@@ -82,13 +82,19 @@ export function useVoiceWebSocket() {
   const pokeNotifications = reactive<{ id: string; invokerId: number; invokerUid: string; invokerName: string; message: string; timestamp: number }[]>([]);
   let connectionSequence = 0;
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
+  let webrtcPeer: RTCPeerConnection | null = null;
+  let webrtcOutputSource: MediaStreamAudioSourceNode | null = null;
+  let webrtcOutputGain: GainNode | null = null;
+  let webrtcNegotiationPromise: Promise<void> | null = null;
+  let webrtcFallbackStarted = false;
+  const webrtcActive = ref(false);
   const identityMaterial = ref("");
   const storedVolumesByUid = reactive<Record<string, number>>({});
   let microphoneStartPromise: Promise<void> | null = null;
 
-  // Audio capture. The ScriptProcessor path remains the most compatible option
-  // for the current browser support matrix, but the graph now has an explicit
-  // input gain and a silent output to avoid monitoring the microphone locally.
+  // WebRTC carries audio when the gateway advertises it. The bounded PCM
+  // WebSocket path remains the compatibility fallback for older browsers and
+  // for deployments that have not opened the gateway's UDP media range.
   let audioCtx: SinkAudioContext | null = null;
   let micStream: MediaStream | null = null;
   let scriptNode: ScriptProcessorNode | null = null;
@@ -334,6 +340,7 @@ export function useVoiceWebSocket() {
       const socket = ws.value;
       const shouldSend = !microphoneMuted.value
         && !microphoneTestActive.value
+        && !webrtcActive.value
         && socket?.readyState === WebSocket.OPEN
         && voxGate(input);
       if (!shouldSend) {
@@ -445,7 +452,119 @@ export function useVoiceWebSocket() {
     return false;
   }
 
-  function stopMicrophone(closeContext = true): void {
+  async function startWebRtcTransport(sequence: number, socket: WebSocket): Promise<void> {
+    if (typeof RTCPeerConnection === "undefined") throw new Error("当前浏览器不支持 WebRTC");
+    await ensureMicrophone();
+    if (sequence !== connectionSequence || socket.readyState !== WebSocket.OPEN || !micStream) return;
+    const track = micStream.getAudioTracks()[0];
+    if (!track) throw new Error("没有可用的麦克风音轨");
+
+    stopCaptureGraph();
+    const peer = new RTCPeerConnection({ iceServers: [] });
+    webrtcPeer = peer;
+    webrtcFallbackStarted = false;
+    track.enabled = !microphoneMuted.value;
+    peer.addTrack(track, micStream);
+    peer.ontrack = (event) => {
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") void ctx.resume();
+      webrtcOutputSource?.disconnect();
+      webrtcOutputGain?.disconnect();
+      webrtcOutputSource = ctx.createMediaStreamSource(stream);
+      webrtcOutputGain = ctx.createGain();
+      webrtcOutputGain.gain.value = outputVolume.value;
+      webrtcOutputSource.connect(webrtcOutputGain);
+      webrtcOutputGain.connect(ctx.destination);
+    };
+    peer.onconnectionstatechange = () => {
+      if (peer.connectionState === "failed") void fallbackFromWebRtc(sequence, socket);
+    };
+
+    const negotiation = (async () => {
+      webrtcActive.value = true;
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      await waitForIceGathering(peer);
+      if (sequence !== connectionSequence || webrtcPeer !== peer || socket.readyState !== WebSocket.OPEN) return;
+      const description = peer.localDescription;
+      if (!description) throw new Error("WebRTC offer was not created");
+      socket.send(JSON.stringify({ type: "webrtcOffer", payload: { sdp: { type: description.type, sdp: description.sdp } } }));
+      window.setTimeout(() => {
+        if (webrtcPeer === peer && !peer.remoteDescription) void fallbackFromWebRtc(sequence, socket);
+      }, 8_000);
+    })();
+    webrtcNegotiationPromise = negotiation;
+    try {
+      await negotiation;
+    } catch (error) {
+      if (webrtcPeer === peer) await fallbackFromWebRtc(sequence, socket);
+      throw error;
+    } finally {
+      if (webrtcNegotiationPromise === negotiation) webrtcNegotiationPromise = null;
+    }
+  }
+
+  async function waitForIceGathering(peer: RTCPeerConnection): Promise<void> {
+    if (peer.iceGatheringState === "complete") return;
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        peer.removeEventListener("icegatheringstatechange", onStateChange);
+        resolve();
+      };
+      const onStateChange = () => {
+        if (peer.iceGatheringState === "complete") finish();
+      };
+      const timer = window.setTimeout(finish, 5_000);
+      peer.addEventListener("icegatheringstatechange", onStateChange);
+    });
+  }
+
+  async function applyWebRtcAnswer(description: unknown): Promise<void> {
+    if (!webrtcPeer || !isSessionDescription(description, "answer")) return;
+    try {
+      await webrtcPeer.setRemoteDescription(description);
+      webrtcActive.value = true;
+    } catch {
+      if (lastConnection && ws.value) await fallbackFromWebRtc(connectionSequence, ws.value);
+    }
+  }
+
+  async function fallbackFromWebRtc(sequence: number, socket: WebSocket): Promise<void> {
+    if (sequence !== connectionSequence || webrtcFallbackStarted) return;
+    webrtcFallbackStarted = true;
+    webrtcActive.value = false;
+    stopWebRtcTransport();
+    if (socket.readyState === WebSocket.OPEN && state.connected) {
+      try { await startMicrophone(); } catch (error: unknown) {
+        state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
+      }
+    }
+  }
+
+  function stopWebRtcTransport(): void {
+    const peer = webrtcPeer;
+    webrtcPeer = null;
+    webrtcActive.value = false;
+    webrtcNegotiationPromise = null;
+    webrtcOutputSource?.disconnect();
+    webrtcOutputGain?.disconnect();
+    webrtcOutputSource = null;
+    webrtcOutputGain = null;
+    if (peer) void peer.close();
+  }
+
+  function isSessionDescription(value: unknown, type: "answer"): value is RTCSessionDescriptionInit {
+    return Boolean(value) && typeof value === "object"
+      && (value as { type?: unknown }).type === type
+      && typeof (value as { sdp?: unknown }).sdp === "string";
+  }
+
+  function stopCaptureGraph(): void {
     accumLen = 0;
     voxAttack = 0;
     voxRelease = 0;
@@ -461,6 +580,10 @@ export function useVoiceWebSocket() {
     micGain = null;
     micSource = null;
     silentGain = null;
+  }
+
+  function stopMicrophone(closeContext = true): void {
+    stopCaptureGraph();
     micStream?.getTracks().forEach((track) => track.stop());
     micStream = null;
     if (closeContext) {
@@ -478,11 +601,17 @@ export function useVoiceWebSocket() {
 
   async function setInputDevice(deviceId: string): Promise<void> {
     const previousDeviceId = selectedInputDeviceId.value;
+    const shouldRestartWebRtc = webrtcActive.value && Boolean(ws.value);
     selectedInputDeviceId.value = deviceId;
     localStorage.setItem("webspeak:input-device", deviceId);
     void saveAudioPreferences();
     try {
+      if (shouldRestartWebRtc) stopWebRtcTransport();
       if (micStream) await startMicrophone();
+      if (shouldRestartWebRtc && ws.value) {
+        stopWebRtcTransport();
+        await startWebRtcTransport(connectionSequence, ws.value);
+      }
       await refreshAudioDevices();
     } catch (error) {
       selectedInputDeviceId.value = previousDeviceId;
@@ -739,9 +868,6 @@ export function useVoiceWebSocket() {
         socket.close(1000);
         return;
       }
-      ensureMicrophone().catch((error: unknown) => {
-        state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
-      });
     };
     socket.onmessage = (event) => {
       if (typeof event.data === "string") {
@@ -760,6 +886,7 @@ export function useVoiceWebSocket() {
       state.connecting = false;
       state.reconnecting = false;
       if (event.code !== 1000 && !state.error && !state.reconnectFailed) state.error = closeReason(event.code);
+      stopWebRtcTransport();
       stopMicrophone();
       whisperTargetIds.clear();
       whisperActive.value = false;
@@ -791,6 +918,7 @@ export function useVoiceWebSocket() {
     stopMicrophone();
     const socket = ws.value;
     ws.value = null;
+    stopWebRtcTransport();
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000);
     state.connected = false;
     state.connecting = false;
@@ -842,7 +970,18 @@ export function useVoiceWebSocket() {
           if (lastConnection) lastConnection.identity = msg.identity;
         }
         if (wasReconnecting) {
-          ensureMicrophone().catch((error: unknown) => {
+          const start = msg.webrtcAvailable === true && typeof RTCPeerConnection !== "undefined"
+            ? (ws.value ? startWebRtcTransport(connectionSequence, ws.value) : Promise.resolve())
+            : ensureMicrophone();
+          start.catch((error: unknown) => {
+            state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
+          });
+        } else if (msg.webrtcAvailable === true && typeof RTCPeerConnection !== "undefined" && ws.value) {
+          void startWebRtcTransport(connectionSequence, ws.value).catch((error: unknown) => {
+            state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
+          });
+        } else {
+          void ensureMicrophone().catch((error: unknown) => {
             state.error = `麦克风访问失败：${error instanceof Error ? error.message : "请检查浏览器权限"}`;
           });
         }
@@ -904,6 +1043,7 @@ export function useVoiceWebSocket() {
         state.reconnecting = Boolean(msg.recoverable !== false);
         state.reconnectFailed = false;
         if (!state.reconnecting) state.error = "TeamSpeak 连接已断开";
+        stopWebRtcTransport();
         stopMicrophone();
         whisperTargetIds.clear();
         whisperActive.value = false;
@@ -914,6 +1054,7 @@ export function useVoiceWebSocket() {
         state.reconnecting = true;
         state.reconnectFailed = false;
         state.reconnectAttempt = Number(msg.attempt) || state.reconnectAttempt + 1;
+        stopWebRtcTransport();
         stopMicrophone();
         whisperTargetIds.clear();
         whisperActive.value = false;
@@ -933,6 +1074,19 @@ export function useVoiceWebSocket() {
         break;
       case "whisperTargets":
         applyWhisperState(msg.targetIds, msg.active);
+        break;
+      case "webrtcAnswer":
+        void applyWebRtcAnswer(msg.payload?.sdp);
+        break;
+      case "webrtcError":
+        if (ws.value) void fallbackFromWebRtc(connectionSequence, ws.value);
+        break;
+      case "voiceActivity":
+        if (Array.isArray(msg.clientIds)) {
+          for (const clientId of msg.clientIds) {
+            if (typeof clientId === "number" && Number.isInteger(clientId) && clientId > 0) markSpeaking(clientId);
+          }
+        }
         break;
       case "error":
         state.errorCode = String(msg.error?.code || "");
@@ -1031,6 +1185,7 @@ export function useVoiceWebSocket() {
     voxAttack = 0;
     voxRelease = 0;
     accumLen = 0;
+    if (webrtcActive.value) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
     void saveAudioPreferences();
   }
 
@@ -1088,6 +1243,7 @@ export function useVoiceWebSocket() {
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     for (const [clientId, gain] of remoteGains) gain.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
+    if (webrtcOutputGain) webrtcOutputGain.gain.value = outputVolume.value;
     void saveAudioPreferences();
   }
 

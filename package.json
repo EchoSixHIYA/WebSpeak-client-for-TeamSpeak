@@ -21,6 +21,7 @@
     "@echosixhiya/teamspeak-client": "git+https://github.com/EchoSixHIYA/teamspeak-js.git#f38dee6",
     "express": "^5.2.1",
     "pino": "^10.3.1",
+    "werift": "0.24.4",
     "ws": "^8.20.0"
   },
   "devDependencies": {
