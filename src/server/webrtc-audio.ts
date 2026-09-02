@@ -10,9 +10,11 @@ import type { Logger as LoggerType } from "../logger.js";
 import type { TSVoiceData } from "./ts-client.js";
 
 const require = createRequire(import.meta.url);
-const { OpusDecoder, OpusEncoder } = require("@discordjs/opus") as {
-  OpusDecoder: new (sampleRate: number, channels: number) => { decode(data: Buffer): Buffer };
-  OpusEncoder: new (sampleRate: number, channels: number) => { encode(data: Buffer): Buffer };
+const { OpusEncoder } = require("@discordjs/opus") as {
+  OpusEncoder: new (sampleRate: number, channels: number) => {
+    decode(data: Buffer): Buffer;
+    encode(data: Buffer): Buffer;
+  };
 };
 
 const AUDIO_SAMPLE_RATE = 48_000;
@@ -139,7 +141,9 @@ export class WebRtcAudioSession {
     let decoder = this.decoderByClient.get(data.clientId);
     if (!decoder) {
       try {
-        decoder = new OpusDecoder(AUDIO_SAMPLE_RATE, 1);
+        // @discordjs/opus exposes decoding on OpusEncoder instances too;
+        // there is no separate OpusDecoder constructor in that package.
+        decoder = new OpusEncoder(AUDIO_SAMPLE_RATE, 1);
         this.decoderByClient.set(data.clientId, decoder);
       } catch (error: unknown) {
         this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not create WebRTC mixer decoder");
