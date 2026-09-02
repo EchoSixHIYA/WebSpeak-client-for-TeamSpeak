@@ -30,7 +30,7 @@ const MAX_SERVER_AUDIO_BUFFERED_BYTES = 4_096;
 
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
-  webRtc?: WebRtcAudioOptions;
+  webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
 }
 
 export interface AdminSessionSummary {
@@ -267,7 +267,7 @@ export class VoiceBridge {
           serverEventLog: entry!.eventLog,
           whisperTargetIds: [...entry!.whisperTargetIds],
           whisperActive: entry!.whisperActive,
-          webrtcAvailable: this.options.webRtc?.enabled === true,
+          webrtcAvailable: this.getWebRtcOptions()?.enabled === true,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -515,7 +515,7 @@ export class VoiceBridge {
         const rawMessage = typeof data === "string" ? data : data.toString("utf-8");
         const webRtcOffer = parseWebRtcOffer(rawMessage);
         if (webRtcOffer) {
-          if (this.options.webRtc?.enabled !== true) {
+          if (this.getWebRtcOptions()?.enabled !== true) {
             sendProtocolError(sendJson, "WEBRTC_DISABLED", "WebRTC 音频传输未启用");
             return;
           }
@@ -683,6 +683,11 @@ export class VoiceBridge {
     return token ? this.options.joinTickets.consume(token) : null;
   }
 
+  private getWebRtcOptions(): WebRtcAudioOptions | undefined {
+    const configured = this.options.webRtc;
+    return typeof configured === "function" ? configured() : configured;
+  }
+
   private async handleWebRtcOffer(
     entry: WebClientEntry,
     offer: WebRtcSessionDescription,
@@ -692,7 +697,7 @@ export class VoiceBridge {
       try { await entry.webrtc.close(); } catch { /* replace a retried offer */ }
       entry.webrtc = null;
     }
-    const config = this.options.webRtc;
+    const config = this.getWebRtcOptions();
     if (!config?.enabled) return;
     const peer = new WebRtcAudioSession({
       connectionId: entry.id,

@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 
-export const DATABASE_SCHEMA_VERSION = 2;
+export const DATABASE_SCHEMA_VERSION = 3;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
@@ -19,6 +19,10 @@ export interface PersistedSettings {
   lastTestAt: string | null;
   lastTestLatencyMs: number | null;
   lastTestError: string | null;
+  webRtcEnabled: boolean;
+  webRtcPublicHost: string;
+  webRtcUdpStart: number;
+  webRtcUdpEnd: number;
   updatedAt: string;
 }
 
@@ -29,6 +33,10 @@ export interface SettingsUpdate {
   tsHost: string;
   tsPort: number;
   tsPasswordEncrypted: string | null;
+  webRtcEnabled: boolean;
+  webRtcPublicHost: string;
+  webRtcUdpStart: number;
+  webRtcUdpEnd: number;
 }
 
 export interface ManagedInviteRecord {
@@ -70,6 +78,10 @@ interface SettingsRow extends Record<string, unknown> {
   last_test_at: string | null;
   last_test_latency_ms: number | null;
   last_test_error: string | null;
+  webrtc_enabled: number;
+  webrtc_public_host: string;
+  webrtc_udp_start: number;
+  webrtc_udp_end: number;
   updated_at: string;
 }
 
@@ -140,6 +152,10 @@ export class WebSpeakDatabase {
       lastTestAt: row.last_test_at,
       lastTestLatencyMs: row.last_test_latency_ms,
       lastTestError: row.last_test_error,
+      webRtcEnabled: row.webrtc_enabled === 1,
+      webRtcPublicHost: row.webrtc_public_host,
+      webRtcUdpStart: row.webrtc_udp_start,
+      webRtcUdpEnd: row.webrtc_udp_end,
       updatedAt: row.updated_at,
     };
   }
@@ -349,6 +365,18 @@ export class WebSpeakDatabase {
         `);
         this.database.exec("PRAGMA user_version = 2");
       });
+      version = 2;
+    }
+    if (version === 2) {
+      this.transaction(() => {
+        this.database.exec(`
+          ALTER TABLE settings ADD COLUMN webrtc_enabled INTEGER NOT NULL DEFAULT 0 CHECK (webrtc_enabled IN (0, 1));
+          ALTER TABLE settings ADD COLUMN webrtc_public_host TEXT NOT NULL DEFAULT '';
+          ALTER TABLE settings ADD COLUMN webrtc_udp_start INTEGER NOT NULL DEFAULT 40000 CHECK (webrtc_udp_start BETWEEN 1 AND 65535);
+          ALTER TABLE settings ADD COLUMN webrtc_udp_end INTEGER NOT NULL DEFAULT 40099 CHECK (webrtc_udp_end BETWEEN 1 AND 65535);
+        `);
+        this.database.exec("PRAGMA user_version = 3");
+      });
     }
   }
 
@@ -356,7 +384,8 @@ export class WebSpeakDatabase {
     this.database.prepare(
       `UPDATE settings SET
          site_name = ?, welcome_text = ?, access_mode = ?, ts_host = ?, ts_port = ?,
-         ts_password_encrypted = ?, updated_at = ?
+         ts_password_encrypted = ?, webrtc_enabled = ?, webrtc_public_host = ?,
+         webrtc_udp_start = ?, webrtc_udp_end = ?, updated_at = ?
        WHERE id = 1`,
     ).run(
       settings.siteName,
@@ -365,6 +394,10 @@ export class WebSpeakDatabase {
       settings.tsHost,
       settings.tsPort,
       settings.tsPasswordEncrypted,
+      settings.webRtcEnabled ? 1 : 0,
+      settings.webRtcPublicHost,
+      settings.webRtcUdpStart,
+      settings.webRtcUdpEnd,
       now,
     );
   }

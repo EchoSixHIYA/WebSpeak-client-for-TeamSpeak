@@ -8,7 +8,6 @@ import { WebSpeakDatabase } from "./persistence/database.js";
 import { loadOrCreateMasterSecret } from "./security/master-secret.js";
 import { AdminService } from "./admin/admin-service.js";
 import { JoinTicketStore } from "./server/join-ticket.js";
-import type { WebRtcAudioOptions } from "./server/webrtc-audio.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -20,7 +19,6 @@ const DATA_DIR = process.env.WEBSPEAK_DATA_DIR?.trim() || path.join(ROOT_DIR, "d
 const LOG_DIR = path.join(DATA_DIR, "logs");
 const STATIC_DIR = path.join(ROOT_DIR, "web", "dist");
 const APP_VERSION = readPackageVersion();
-const WEBRTC_OPTIONS = readWebRtcOptions();
 
 async function main() {
   const logger = createLogger(LOG_DIR);
@@ -50,7 +48,7 @@ async function main() {
     certDir: hasCert ? CERT_DIR : undefined,
     voiceBridgeOptions: {
       joinTickets,
-      webRtc: WEBRTC_OPTIONS,
+      webRtc: () => adminService.getWebRtcAudioOptions(),
     },
     adminService,
     logger,
@@ -84,23 +82,6 @@ function removeObsoleteBootstrapFile(): void {
   } catch (error: unknown) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
   }
-}
-
-function readWebRtcOptions(): WebRtcAudioOptions {
-  const enabled = /^(1|true|yes)$/i.test(process.env.WEBSPEAK_WEBRTC?.trim() ?? "");
-  const publicHost = process.env.WEBSPEAK_WEBRTC_PUBLIC_HOST?.trim() || undefined;
-  const start = parsePort(process.env.WEBSPEAK_WEBRTC_UDP_START, 40_000);
-  const end = parsePort(process.env.WEBSPEAK_WEBRTC_UDP_END, 40_099);
-  return {
-    enabled,
-    ...(publicHost ? { publicHost } : {}),
-    ...(start <= end ? { icePortRange: [start, end] as [number, number] } : {}),
-  };
-}
-
-function parsePort(value: string | undefined, fallback: number): number {
-  const port = Number(value);
-  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : fallback;
 }
 
 main().catch((err) => {
