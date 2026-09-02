@@ -54,6 +54,10 @@ test("legacy config imports once, seeds the default admin, and allows password r
     accessMode: "open",
     siteName: "Open WebSpeak",
     welcomeText: "Public gateway",
+    webRtcEnabled: true,
+    webRtcPublicHost: "voice.example.com",
+    webRtcUdpStart: 40000,
+    webRtcUdpEnd: 40099,
   });
   const publicConfig = service.getPublicConfig();
   assert.equal(publicConfig.target, "public.example.com:9987");
@@ -61,6 +65,8 @@ test("legacy config imports once, seeds the default admin, and allows password r
   assert.equal("serverPassword" in service.getAdminSettings(), false);
   assert.equal(service.getAdminSettings().hasPassword, true);
   assert.equal(service.getConnectionPolicy().serverPassword, "replacement-secret");
+  assert.equal(service.getAdminSettings().webRtcEnabled, true);
+  assert.deepEqual(service.getWebRtcAudioOptions(), { enabled: true, publicHost: "voice.example.com", icePortRange: [40000, 40099] });
   database.close();
 });
 
@@ -106,7 +112,7 @@ test("managed invites are opaque, bounded, revocable, and included in database b
   assert.ok(backup.length > 100);
   database.close();
   const reopened = new WebSpeakDatabase(path.join(directory, "webspeak.db"));
-  assert.equal(reopened.schemaVersion, 2);
+  assert.equal(reopened.schemaVersion, 3);
   assert.equal(reopened.listManagedInvites().length, 3);
   reopened.close();
 });

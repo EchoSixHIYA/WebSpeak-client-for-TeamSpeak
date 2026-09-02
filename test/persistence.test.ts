@@ -23,6 +23,10 @@ test("SQLite persistence initializes schema and stores the single admin/settings
     tsHost: "voice.example.com",
     tsPort: 9988,
     tsPasswordEncrypted: "v1:ciphertext",
+    webRtcEnabled: true,
+    webRtcPublicHost: "voice.example.com",
+    webRtcUdpStart: 40000,
+    webRtcUdpEnd: 40099,
   });
   assert.equal(database.hasAdmin(), true);
   assert.equal(database.getAdminCredential()?.hash, credential.hash);
@@ -37,6 +41,10 @@ test("SQLite persistence initializes schema and stores the single admin/settings
     lastTestAt: null,
     lastTestLatencyMs: null,
     lastTestError: null,
+    webRtcEnabled: true,
+    webRtcPublicHost: "voice.example.com",
+    webRtcUdpStart: 40000,
+    webRtcUdpEnd: 40099,
     updatedAt: database.getSettings().updatedAt,
   });
   assert.equal(database.recentAudit()[0]?.event, "ADMIN_INITIALIZED");
@@ -48,7 +56,7 @@ test("SQLite persistence initializes schema and stores the single admin/settings
   reopened.close();
 });
 
-test("SQLite schema v1 upgrades to v2 with a migration copy", () => {
+test("SQLite schema v1 upgrades to v3 with a migration copy", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "webspeak-db-migration-"));
   const dbPath = path.join(directory, "webspeak.db");
   const legacy = new DatabaseSync(dbPath);
@@ -68,7 +76,10 @@ test("SQLite schema v1 upgrades to v2 with a migration copy", () => {
   legacy.close();
 
   const upgraded = new WebSpeakDatabase(dbPath);
-  assert.equal(upgraded.schemaVersion, 2);
+  assert.equal(upgraded.schemaVersion, 3);
+  assert.equal(upgraded.getSettings().webRtcEnabled, false);
+  assert.equal(upgraded.getSettings().webRtcUdpStart, 40000);
+  assert.equal(upgraded.getSettings().webRtcUdpEnd, 40099);
   assert.equal(upgraded.listManagedInvites().length, 0);
   assert.equal(existsSync(`${dbPath}.schema-1.bak`), true);
   upgraded.close();

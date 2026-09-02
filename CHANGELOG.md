@@ -7,7 +7,7 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 ### Added
 
 - Optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency.
-- WebRTC configuration through environment variables, including the public host and a bounded UDP port range.
+- WebRTC configuration in the administrator console, including the public host and a bounded UDP port range.
 - Migrated the TeamSpeak integration to the maintained `EchoSixHIYA/teamspeak-js` fork, including live directory snapshots and member/channel synchronization.
 
 ### Changed

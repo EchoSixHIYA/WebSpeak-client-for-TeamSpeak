@@ -197,18 +197,9 @@ WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987
 
 #### 可选 WebRTC 语音传输
 
-`v0.1.3` 提供实验性的 WebRTC 语音通道，默认关闭。它适合已经能够为 WebSpeak 发布一段 UDP 端口范围的部署；普通 Docker 部署无需额外配置，继续使用默认语音链路即可。
+`v0.1.3` 提供实验性的 WebRTC 语音通道，默认关闭。管理员登录 `/admin`，打开“服务器”页面的“WebRTC 语音”卡片即可启用，并填写浏览器可访问的公网地址与 UDP 端口范围；保存后对新语音会话生效。
 
-启用时设置：
-
-```bash
-WEBSPEAK_WEBRTC=true
-WEBSPEAK_WEBRTC_PUBLIC_HOST=<公网 IP 或可解析的公网主机名>
-WEBSPEAK_WEBRTC_UDP_START=40000
-WEBSPEAK_WEBRTC_UDP_END=40099
-```
-
-同时需要将 `40000-40099/udp` 发布到 WebSpeak 容器。若网络或浏览器不支持 WebRTC，客户端会自动回退到兼容性语音链路。
+Docker、服务器防火墙和云安全组仍需发布、放行管理员配置的 UDP 端口范围。普通 Docker 部署不启用 WebRTC 时无需额外配置，继续使用默认语音链路即可。若网络或浏览器不支持 WebRTC，客户端会自动回退到兼容性语音链路。
 
 ### 数据与安全边界
 
@@ -482,18 +473,9 @@ Device labels are controlled by the browser permission model. The first device s
 
 #### Optional WebRTC audio transport
 
-`v0.1.3` includes an experimental WebRTC audio path that is disabled by default. It is intended for deployments that can publish a UDP port range for WebSpeak; a normal Docker deployment needs no extra configuration and continues to use the default voice path.
+`v0.1.3` includes an experimental WebRTC audio path that is disabled by default. An administrator can enable it from `/admin` → “Server” → “WebRTC audio”, then enter the public address reachable by browsers and the UDP port range. Saved settings apply to new voice sessions.
 
-Set these variables when enabling it:
-
-```bash
-WEBSPEAK_WEBRTC=true
-WEBSPEAK_WEBRTC_PUBLIC_HOST=<public IP or resolvable public hostname>
-WEBSPEAK_WEBRTC_UDP_START=40000
-WEBSPEAK_WEBRTC_UDP_END=40099
-```
-
-Publish `40000-40099/udp` to the WebSpeak container as well. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
+The configured UDP range still needs to be published and allowed in Docker, the server firewall, and the cloud security group. A standard Docker deployment needs no extra configuration while WebRTC is disabled and continues to use the default voice path. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
 
 ### Data and Security Boundary
 

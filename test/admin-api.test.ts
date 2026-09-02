@@ -111,11 +111,19 @@ test("admin API requires the default password to be changed before administratio
       accessMode: "open",
       siteName: "Changed",
       welcomeText: "Open access",
+      webRtcEnabled: true,
+      webRtcPublicHost: "voice.example.com",
+      webRtcUdpStart: 40000,
+      webRtcUdpEnd: 40099,
     },
   });
   assert.equal(saved.body.ok, true);
   assert.equal(saved.body.settings.accessMode, "open");
   assert.equal(saved.body.settings.hasPassword, false);
+  assert.equal(saved.body.settings.webRtcEnabled, true);
+  assert.equal(saved.body.settings.webRtcPublicHost, "voice.example.com");
+  assert.equal(saved.body.settings.webRtcUdpStart, 40000);
+  assert.equal(saved.body.settings.webRtcUdpEnd, 40099);
 
   const invite = await request(origin, "/api/admin/invites", {
     method: "POST",
@@ -137,7 +145,7 @@ test("admin API requires the default password to be changed before administratio
   const sessions = await request(origin, "/api/admin/sessions", { cookie });
   assert.deepEqual(sessions.body.sessions, []);
   const diagnostics = await request(origin, "/api/admin/diagnostics", { cookie });
-  assert.equal(diagnostics.body.database.schemaVersion, 2);
+  assert.equal(diagnostics.body.database.schemaVersion, 3);
   assert.equal("target" in diagnostics.body.teamSpeak, true);
   assert.equal("protocol" in diagnostics.body.teamSpeak, false);
 
