@@ -55,6 +55,7 @@ export interface AudioFlowStats {
   egressLastAt: number | null;
   egressMaxGapMs: number;
   egressPeakBufferedBytes: number;
+  egressFramesByClient: Record<string, number>;
 }
 
 interface ChannelMember {
@@ -420,6 +421,8 @@ export class VoiceBridge {
         if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
         entry!.audio.egressFirstAt ??= now;
         entry!.audio.egressLastAt = now;
+        const sourceKey = String(data.clientId);
+        entry!.audio.egressFramesByClient[sourceKey] = (entry!.audio.egressFramesByClient[sourceKey] ?? 0) + 1;
         const packet = Buffer.allocUnsafe(3 + data.data.length);
         packet[0] = data.codec;
         packet.writeUInt16BE(data.clientId, 1);
@@ -747,6 +750,7 @@ function createAudioFlowStats(): AudioFlowStats {
     egressLastAt: null,
     egressMaxGapMs: 0,
     egressPeakBufferedBytes: 0,
+    egressFramesByClient: {},
   };
 }
 
