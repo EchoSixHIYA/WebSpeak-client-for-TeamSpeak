@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="guide-button" href="/admin"><Icon name="settings" :size="15" /> {{ t('adminConsole') }}</a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -99,7 +99,7 @@
             <button class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button>
             <button class="language-switch workspace-language" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button>
-            <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /> {{ t('exit') }}</button>
+            <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /><span>{{ t('exit') }}</span></button>
           </div>
         </header>
 
@@ -1617,6 +1617,7 @@ function stopWhisperTalk(): void {
 /* Keep connected controls in the header; the old bottom dock consumed the
    chat viewport and made the settings action appear detached from its icon. */
 .header-tools { align-items: center; }
+.header-action, .round-icon { line-height: 0; }
 .guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .guide-button:hover { color: #fff; background: #006a64; border-color: #006a64; }
 .workspace-actions { align-items: center; flex-wrap: nowrap; }
@@ -1903,6 +1904,9 @@ function stopWhisperTalk(): void {
 }
 
 @media (max-width: 390px) {
+  .join-page .header-tools { gap: 4px; }
+  .join-page .github-button, .join-page .guide-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
+  .join-page .language-switch { min-width: 44px; padding-inline: 6px; font-size: 11px; }
   .workspace-header { padding-inline: 10px; }
   .channel-switcher { max-width: 112px; }
   .channel-switcher select { max-width: 72px; }
@@ -1910,6 +1914,8 @@ function stopWhisperTalk(): void {
   .disconnect-button { width: 32px; height: 32px; }
   .room-hero { padding-inline: 16px; }
   .mobile-voice-settings { width: 56px; padding-inline: 4px; }
+  .mobile-voice-toggle { flex: 0 0 44px; padding-inline: 0; }
+  .mobile-voice-toggle span { display: none; }
   .mobile-voice-settings span { display: none; }
   .join-content { gap: 18px; }
   .join-card { padding-inline: 15px; }
