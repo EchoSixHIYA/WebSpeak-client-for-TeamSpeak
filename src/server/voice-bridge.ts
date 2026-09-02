@@ -22,9 +22,10 @@ const AUDIO_FRAME_BYTES = 1_920;
 // A browser audio frame is 20 ms of mono 48 kHz PCM. Keep the server-side
 // WebSocket egress queue small enough that a slow browser cannot turn old
 // voice into seconds of latency. Opus frames are variable-sized, so this is
-// deliberately a byte backpressure guard; the browser also enforces a
-// time-based playback limit before scheduling decoded audio.
-const MAX_SERVER_AUDIO_BUFFERED_BYTES = 16_384;
+// deliberately a conservative byte backpressure guard for roughly 10–20
+// small Opus frames; the browser also enforces a time-based playback limit
+// before scheduling decoded audio.
+const MAX_SERVER_AUDIO_BUFFERED_BYTES = 4_096;
 
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
