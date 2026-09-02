@@ -423,7 +423,13 @@ export class VoiceBridge {
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
         if (ws.readyState !== WebSocket.OPEN || data.clientId === selfId) return;
-        entry!.webrtc?.pushTeamSpeakVoice(data);
+        const webRtc = entry!.webrtc;
+        webRtc?.pushTeamSpeakVoice(data);
+        // A negotiated WebRTC session owns the browser's realtime audio
+        // egress. Do not also send the same TeamSpeak packet over the
+        // reliable WebSocket, otherwise the browser plays two copies and
+        // the TCP path can still accumulate stale audio behind the peer.
+        if (webRtc) return;
         const now = Date.now();
         if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
         entry!.audio.egressFirstAt ??= now;

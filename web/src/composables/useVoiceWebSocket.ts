@@ -1096,6 +1096,10 @@ export function useVoiceWebSocket() {
   }
 
   function handleAudioFrame(data: Uint8Array): void {
+    // WebRTC carries the realtime downlink after negotiation. Ignore any
+    // in-flight fallback WebSocket packets so a transport switch cannot
+    // produce duplicate or delayed playback.
+    if (webrtcActive.value) return;
     if (data.length < 4) return;
     const clientId = (data[1] << 8) | data[2];
     if (clientId === state.tsClientId) return;
