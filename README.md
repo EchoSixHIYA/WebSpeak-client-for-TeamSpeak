@@ -34,6 +34,8 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 - 修复晚进入 WebSpeak 的浏览器会话无法看到先进入成员的问题；连接建立后会完成目录同步，并合并分阶段成员事件。
 - 修复私聊消息到达后网页端断开连接的问题，完善成员右键菜单、悬停高亮和语音活动状态展示。
 - 完成中英文界面、默认 TeamSpeak 目标、旧版配置迁移和首次登录强制改密流程。
+- 移除依赖页面焦点的普通空格键按键说话模式；改为桌面端和移动端均可用的一键闭麦/开麦，静音状态会保存在当前浏览器中。
+- 闭麦会在上行音频发送前直接阻断声音，同时保留 VOX 语音激活、输入设备选择、音量与阈值调节能力。
 - 发布流程稳定生成 Windows/Linux 部署包并同步发布 Docker 镜像；Docker 构建会正确处理依赖安装脚本。
 
 #### 2026-08-31 · v0.1.0
@@ -54,13 +56,13 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 | 领域 | 已提供 |
 | --- | --- |
-| 语音 | Opus / PCM 桥接、自由麦、按键说话、VOX、连接状态与重连提示 |
+| 语音 | Opus / PCM 桥接、VOX 语音激活、一键闭麦/开麦、连接状态与重连提示 |
 | 设备 | 浏览器麦克风与扬声器选择、音量调节、实时输入电平、本地麦克风测试 |
 | 频道 | 频道树、频道切换、成员移动、频道文字聊天、服务器事件与状态展示 |
 | 成员 | 在线成员、发言绿色头像边框、Away 状态、私聊、Poke、昵称复制、成员音量 |
 | 管理 | 默认账号首次登录强制改密、默认 TeamSpeak 目标、站点信息、真实连接测试 |
 | 运维 | 活动 Session、邀请创建与撤销、审计事件、结构化日志、诊断报告、SQLite 备份 |
-| 浏览器体验 | 响应式布局、移动端按住说话、紧凑滚动布局、浏览器本地收藏与最近连接 |
+| 浏览器体验 | 响应式布局、桌面与移动端语音控制、紧凑滚动布局、浏览器本地收藏与最近连接 |
 
 ### 架构
 
@@ -137,7 +139,7 @@ WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987
 进入语音空间后，在设置中可以：
 
 - 选择浏览器检测到的麦克风与扬声器；
-- 切换自由麦和按键说话；
+- 一键闭麦或开麦；
 - 调整输入、输出、通知音量与 VOX 阈值；
 - 查看麦克风权限、实时输入电平和音频上下文状态；
 - 使用最多 5 秒的本地麦克风测试，录音只在浏览器本地播放，不发送到 TeamSpeak。
@@ -251,6 +253,8 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - Fixed late WebSpeak browser sessions missing members who joined earlier by reconciling the directory after connect and merging staged member events.
 - Fixed browser sessions disconnecting after receiving a private message, and improved member context menus, hover highlighting, and speaking-state presentation.
 - Added the bilingual interface, default TeamSpeak target, legacy configuration migration, and mandatory first-login password rotation.
+- Removed the focus-dependent normal Space-key PTT mode and replaced it with a one-click microphone mute/unmute control on desktop and mobile; the mute state is persisted in the current browser.
+- Mute now suppresses upstream microphone audio before it is sent, while VOX activation, input-device selection, volume controls, and threshold tuning remain available.
 - Stabilized release publishing for Windows/Linux packages and the matching Docker image; Docker builds now handle the dependency patch script correctly.
 
 #### 2026-08-31 · v0.1.0
@@ -271,13 +275,13 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 | Area | Included |
 | --- | --- |
-| Voice | Opus / PCM bridging, free mic, push-to-talk, VOX, connection state, reconnect feedback, and speaking indicators |
+| Voice | Opus / PCM bridging, VOX activation, one-click microphone mute/unmute, connection state, reconnect feedback, and speaking indicators |
 | Devices | Browser microphone and speaker selection, volume controls, live input level, and a local microphone test |
 | Channels | Channel tree, channel switching, member movement, channel text chat, server events, and status display |
 | Members | Online members, green speaking borders, Away state, private messages, Poke, nickname copy, and per-member volume |
 | Administration | Mandatory first-login password rotation, default TeamSpeak target, site information, and real connection tests |
 | Operations | Active sessions, invite creation and revocation, audit events, structured logs, diagnostics, and SQLite backup |
-| Browser experience | Responsive layouts, press-and-hold mobile PTT, compact scrolling regions, local favorites, and recent connections |
+| Browser experience | Responsive layouts, desktop and mobile voice controls, compact scrolling regions, local favorites, and recent connections |
 
 ### Architecture
 
@@ -356,7 +360,7 @@ In open mode, DNS resolution is followed by blocking loopback, private, link-loc
 Inside a voice space, the settings panel lets users:
 
 - Choose a microphone and speaker detected by the browser.
-- Switch between free mic and push-to-talk.
+- Mute or unmute the microphone with one click.
 - Adjust input, output, notification, and VOX-threshold volumes.
 - Inspect microphone permission, live input level, and audio-context state.
 - Run a local microphone test of up to five seconds; the recording is played in the browser and is not sent to TeamSpeak.

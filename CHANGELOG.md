@@ -19,6 +19,8 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - The README architecture section now uses GitHub-native Markdown instead of a Mermaid rich-display block.
 - The README badge set now uses stable static Shields badges without a repository-metadata 404 dependency.
 - Version tags publish Windows/Linux deployment packages to GitHub Releases and publish the matching Docker image.
+- Removed the focus-dependent normal browser Space-key PTT mode and replaced it with a one-click microphone mute/unmute control on desktop and mobile.
+- Persisted the microphone mute state in browser preferences and suppresses upstream audio before it is sent to TeamSpeak while muted.
 
 ### Fixed
 
