@@ -624,4 +624,32 @@ async function parseResponse(response: Response) { const value = await response.
   .server-page .settings-grid{overflow:visible;grid-auto-rows:auto}
   .server-page .settings-card{overflow:visible}
 }
+
+/* Mobile admin pages should read like one continuous form. Keep the desktop
+   viewport shell untouched, but let the document grow vertically on narrow
+   screens instead of trapping content inside cards and nested panes. */
+@media(max-width:850px){
+  :global(html),:global(body),:global(#app){height:auto;min-height:100%;max-height:none;overflow:auto}
+  .admin-root{height:auto;min-height:100dvh;overflow:visible}
+  .admin-shell{height:auto;min-height:100dvh;overflow:visible}
+  .admin-main{height:auto;min-height:0;overflow:visible}
+  .page-content{display:block;height:auto;min-height:0;overflow:visible}
+  .login-page{height:auto;min-height:100dvh;overflow:visible}
+  .login-card{max-height:none;overflow:visible}
+
+  .overview-page{height:auto;min-height:0;overflow:visible}
+  .overview-page .overview-columns{grid-template-rows:auto;overflow:visible}
+  .overview-page .target-health-card,.overview-page .recent-events-card{height:auto;min-height:0;overflow:visible}
+  .overview-page .recent-events-card .event-list{max-height:none;overflow:visible}
+
+  .server-page{height:auto;min-height:0;overflow:visible}
+  .server-page .settings-grid{height:auto;overflow:visible}
+
+  .operations-page{height:auto;min-height:0;overflow:visible}
+  .operations-page .operations-primary,.operations-page .lower-operations{height:auto;min-height:0;overflow:visible;grid-auto-rows:auto;flex:none}
+  .operations-page .operation-card{height:auto;min-height:0;overflow:visible}
+  .operations-primary .table-wrap{max-height:none;overflow-x:auto;overflow-y:visible}
+  .operations-primary .invite-list{max-height:none;overflow:visible}
+  .logs-card .log-list,.audit-card .event-list{max-height:none;overflow:visible;flex:none}
+}
 </style>
