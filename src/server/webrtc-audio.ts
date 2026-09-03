@@ -23,9 +23,9 @@ const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
 const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
-// TeamSpeak can emit valid Opus comfort-noise/silence packets while a client
-// is muted. Do not turn those packets into a false "speaking" indicator or
-// send them through the WebRTC mixer as if they were voice.
+// TeamSpeak and browsers can emit valid Opus comfort-noise/silence packets
+// while a client is muted. Do not turn those packets into a false "speaking"
+// indicator or forward them to TeamSpeak as if they were voice.
 const MIN_SPEAKER_RMS = 160;
 
 // WebRTC is served by the WebSpeak process itself. Docker publishes this
@@ -65,6 +65,7 @@ export class WebRtcAudioSession {
   private readonly onVoiceFrame: (data: Buffer) => void;
   private readonly onVoiceActivity: (clientIds: number[]) => void;
   private readonly outgoingTrack: MediaStreamTrack;
+  private ingressDecoder: { decode(data: Buffer): Buffer } | null = null;
   private readonly decoderByClient = new Map<number, { decode(data: Buffer): Buffer }>();
   private readonly pendingFrames = new Map<number, Buffer>();
   private readonly activeSpeakerIds = new Set<number>();
@@ -98,7 +99,13 @@ export class WebRtcAudioSession {
     audio.onTrack.subscribe((track) => {
       track.onReceiveRtp.subscribe((rtp) => {
         if (this.closed || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
-        this.onVoiceFrame(Buffer.from(rtp.payload));
+        const payload = Buffer.from(rtp.payload);
+        // A disabled browser MediaStreamTrack normally still produces RTP
+        // comfort-noise packets. TeamSpeak treats any received voice packet
+        // as activity, so enforce mute/VAD at this gateway boundary instead
+        // of relying on the browser's local speaking indicator.
+        if (!this.hasVoiceEnergy(payload)) return;
+        this.onVoiceFrame(payload);
       });
       void audio.sender.replaceTrack(this.outgoingTrack).catch((error: unknown) => {
         this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not attach WebRTC output track");
@@ -110,13 +117,18 @@ export class WebRtcAudioSession {
 
     try {
       this.encoder = new OpusEncoder(AUDIO_SAMPLE_RATE, 1);
+      // Use a separate stateful decoder for browser ingress. RTP payloads do
+      // not identify whether a packet contains microphone energy or DTX/CN
+      // audio, so the gateway must decode it before forwarding to TS.
+      this.ingressDecoder = new OpusEncoder(AUDIO_SAMPLE_RATE, 1);
     } catch (error: unknown) {
       this.encoder = null;
+      this.ingressDecoder = null;
       this.logger.error({ err: error instanceof Error ? error.message : String(error) }, "Could not create WebRTC mixer encoder");
     }
-    if (!this.encoder) {
+    if (!this.encoder || !this.ingressDecoder) {
       this.outgoingTrack.stop();
-      throw new Error("WebRTC mixer encoder is unavailable");
+      throw new Error("WebRTC Opus codec is unavailable");
     }
 
     this.audioTimer = setInterval(() => this.flushAudio(), AUDIO_CLOCK_INTERVAL_MS);
@@ -183,6 +195,7 @@ export class WebRtcAudioSession {
     clearInterval(this.activityTimer);
     this.pendingFrames.clear();
     this.activeSpeakerIds.clear();
+    this.ingressDecoder = null;
     this.decoderByClient.clear();
     this.encoder = null;
     this.outgoingTrack.stop();
@@ -229,6 +242,25 @@ export class WebRtcAudioSession {
     const ids = [...this.activeSpeakerIds];
     this.activeSpeakerIds.clear();
     this.onVoiceActivity(ids);
+  }
+
+  private hasVoiceEnergy(data: Buffer): boolean {
+    const decoder = this.ingressDecoder;
+    if (!decoder) return false;
+    try {
+      const pcm = decoder.decode(data);
+      if (pcm.length < AUDIO_FRAME_BYTES) return false;
+      let sum = 0;
+      for (let index = 0; index + 1 < AUDIO_FRAME_BYTES; index += 2) {
+        const sample = pcm.readInt16LE(index);
+        sum += sample * sample;
+      }
+      return Math.sqrt(sum / AUDIO_FRAME_SAMPLES) >= MIN_SPEAKER_RMS;
+    } catch {
+      // Malformed/transition packets are discarded without interrupting the
+      // rest of the peer. The next valid Opus packet can recover the decoder.
+      return false;
+    }
   }
 
   private setOpusPayloadTypes(sdp: string): void {
