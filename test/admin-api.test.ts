@@ -112,18 +112,12 @@ test("admin API requires the default password to be changed before administratio
       siteName: "Changed",
       welcomeText: "Open access",
       webRtcEnabled: true,
-      webRtcPublicHost: "voice.example.com",
-      webRtcUdpStart: 40000,
-      webRtcUdpEnd: 40099,
     },
   });
   assert.equal(saved.body.ok, true);
   assert.equal(saved.body.settings.accessMode, "open");
   assert.equal(saved.body.settings.hasPassword, false);
   assert.equal(saved.body.settings.webRtcEnabled, true);
-  assert.equal(saved.body.settings.webRtcPublicHost, "voice.example.com");
-  assert.equal(saved.body.settings.webRtcUdpStart, 40000);
-  assert.equal(saved.body.settings.webRtcUdpEnd, 40099);
 
   const invite = await request(origin, "/api/admin/invites", {
     method: "POST",

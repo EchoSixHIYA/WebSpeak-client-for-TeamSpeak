@@ -36,7 +36,7 @@
           <div class="settings-grid">
             <article class="settings-card"><h3>{{ tr('teamSpeakTarget') }}</h3><div class="target-fields"><label><span>{{ tr('serverAddress') }}</span><input v-model.trim="serverForm.address" :placeholder="tr('serverPlaceholder')" /></label><label><span>{{ tr('serverPort') }}</span><input v-model.trim="serverForm.port" inputmode="numeric" type="text" maxlength="5" :placeholder="tr('serverPortPlaceholder')" /></label></div><div class="password-row"><label><span>{{ tr('serverPassword') }}</span><input v-model="serverForm.serverPassword" type="password" autocomplete="off" :disabled="serverForm.passwordAction !== 'replace'" :placeholder="serverForm.hasPassword ? tr('passwordConfigured') : tr('optionalPassword')" /></label><div class="password-actions"><button type="button" :class="{ active: serverForm.passwordAction === 'replace' }" @click="serverForm.passwordAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasPassword" type="button" :class="{ danger: serverForm.passwordAction === 'remove' }" @click="serverForm.passwordAction = 'remove'">{{ tr('remove') }}</button></div></div><button class="secondary-button" type="button" :disabled="testing" @click="testServerConnection"><span v-if="testing" class="spinner small"></span><Icon v-else name="activity" :size="17" />{{ testing ? tr('testing') : tr('testConnection') }}</button><div v-if="testResult" :class="['test-result', testResult.ok ? 'success' : 'error']"><Icon :name="testResult.ok ? 'check' : 'close'" :size="18" /><div><strong>{{ testResult.ok ? tr('connectionReady') : tr('connectionFailed') }}</strong><small>{{ testResultText }}</small></div></div></article>
             <article class="settings-card"><h3>{{ tr('accessAndIdentity') }}</h3><fieldset><legend>{{ tr('accessMode') }}</legend><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset><label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label><label><span>{{ tr('welcomeText') }}</span><textarea v-model="serverForm.welcomeText" maxlength="500" rows="4"></textarea></label></article>
-            <article class="settings-card webrtc-card"><div><h3>{{ tr('webrtcSettings') }}</h3><p class="card-help">{{ tr('webrtcLead') }}</p></div><label class="choice toggle-choice"><input v-model="serverForm.webRtcEnabled" type="checkbox" /><span><strong>{{ tr('webrtcEnabled') }}</strong><small>{{ tr('webrtcEnabledLead') }}</small></span></label><div v-if="serverForm.webRtcEnabled" class="webrtc-fields"><label><span>{{ tr('webrtcPublicHost') }}</span><input v-model.trim="serverForm.webRtcPublicHost" maxlength="253" :placeholder="tr('webrtcPublicHostPlaceholder')" /><small class="field-help">{{ tr('webrtcPublicHostHint') }}</small></label><div class="target-fields webrtc-port-fields"><label><span>{{ tr('webrtcUdpStart') }}</span><input v-model.trim="serverForm.webRtcUdpStart" inputmode="numeric" type="text" maxlength="5" /></label><label><span>{{ tr('webrtcUdpEnd') }}</span><input v-model.trim="serverForm.webRtcUdpEnd" inputmode="numeric" type="text" maxlength="5" /></label></div><small class="field-help">{{ tr('webrtcUdpHint') }}</small></div><small class="field-help">{{ tr('webrtcApplyHint') }}</small></article>
+            <article class="settings-card webrtc-card"><div><h3>{{ tr('webrtcSettings') }}</h3><p class="card-help">{{ tr('webrtcLead') }}</p></div><label class="choice toggle-choice"><input v-model="serverForm.webRtcEnabled" type="checkbox" /><span><strong>{{ tr('webrtcEnabled') }}</strong><small>{{ tr('webrtcEnabledLead') }}</small></span></label><small class="field-help">{{ tr('webrtcApplyHint') }}</small></article>
           </div>
           <article class="readonly-card"><h3>{{ tr('runtimeFacts') }}</h3><dl><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(serverForm.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ serverForm.lastTestLatencyMs == null ? '—' : `${serverForm.lastTestLatencyMs} ms` }}</dd></div><div><dt>{{ tr('internalPort') }}</dt><dd>3040</dd></div></dl></article>
         </section>
@@ -92,7 +92,7 @@ const newPassword = ref("");
 const confirmNewPassword = ref("");
 const testResult = ref<ProbeState | null>(null);
 
-const serverForm = reactive({ address: "", port: "9987", serverPassword: "", passwordAction: "keep" as "keep" | "replace" | "remove", hasPassword: false, accessMode: "fixed" as AccessMode, siteName: "WebSpeak", welcomeText: "", webRtcEnabled: false, webRtcPublicHost: "", webRtcUdpStart: "40000", webRtcUdpEnd: "40099", lastTestAt: null as string | null, lastTestLatencyMs: null as number | null });
+const serverForm = reactive({ address: "", port: "9987", serverPassword: "", passwordAction: "keep" as "keep" | "replace" | "remove", hasPassword: false, accessMode: "fixed" as AccessMode, siteName: "WebSpeak", welcomeText: "", webRtcEnabled: false, lastTestAt: null as string | null, lastTestLatencyMs: null as number | null });
 const overview = reactive({ gateway: { version: "", uptimeSeconds: 0 }, teamSpeak: { target: "", status: "unknown", lastTestAt: null as string | null, latencyMs: null as number | null }, sessions: { active: 0, peak: 0, limit: 100 }, recentEvents: [] as Array<{ event: string; createdAt: string }>, legacyConfigImported: false });
 interface AdminSession { id: string; nickname: string; target: string; state: string; createdAt: string; ageSeconds: number; tsClientId: number | null; channelId: string | null; memberCount: number }
 interface ManagedInvite { id: string; target: string; channel: string; expiresAt: string; maxUses: number; useCount: number; createdAt: string; revokedAt: string | null; status: "active" | "expired" | "exhausted" | "revoked" }
@@ -152,16 +152,10 @@ const copy = {
     connectionFailed: "连接失败",
     accessAndIdentity: "访问与站点信息",
     webrtcSettings: "WebRTC 语音",
-    webrtcLead: "可选的低延迟语音传输，默认关闭；保存后对新语音会话生效。",
+    webrtcLead: "由当前 WebSpeak 网关直接提供低延迟语音传输，无需配置其他服务器。",
     webrtcEnabled: "启用 WebRTC",
-    webrtcEnabledLead: "使用实时语音通道；浏览器或网络不支持时自动回退。",
-    webrtcPublicHost: "WebRTC 公网地址",
-    webrtcPublicHostPlaceholder: "例如：voice.example.com",
-    webrtcPublicHostHint: "填写浏览器能够访问到的 WebSpeak 公网地址，不要填写容器内网地址。",
-    webrtcUdpStart: "UDP 起始端口",
-    webrtcUdpEnd: "UDP 结束端口",
-    webrtcUdpHint: "需在 Docker、服务器防火墙和云安全组中放行此范围。",
-    webrtcApplyHint: "保存后对新连接生效；已连接用户重新进入语音空间后使用新设置。",
+    webrtcEnabledLead: "浏览器和网络支持时使用实时语音通道，否则自动回退到兼容模式。",
+    webrtcApplyHint: "保存后对新连接生效；已连接用户重新进入语音空间后使用新设置。媒体端口由网关自动管理。",
     accessMode: "访客访问模式",
     fixedMode: "仅限此 TeamSpeak 服务器",
     fixedModeLead: "访客只需填写昵称，目标和密码由 WebSpeak 管理。",
@@ -198,8 +192,6 @@ const copy = {
     invalidPassword: "管理员密码错误。",
     rateLimited: "尝试次数过多，请稍后再试。",
     requestFailed: "请求失败，请检查输入后重试。",
-    invalidWebRtcHost: "WebRTC 公网地址格式无效。",
-    invalidWebRtcPorts: "WebRTC UDP 端口范围无效；请填写 1–65535 且最多 100 个连续端口。",
     loginEvent: "管理员登录成功",
     logoutEvent: "管理员退出登录",
     settingsEvent: "服务器设置已更新",
@@ -306,16 +298,10 @@ const copy = {
     connectionFailed: "Connection failed",
     accessAndIdentity: "Access and site identity",
     webrtcSettings: "WebRTC audio",
-    webrtcLead: "Optional low-latency voice transport, disabled by default and applied to new voice sessions.",
+    webrtcLead: "Low-latency voice is provided by this WebSpeak gateway; no extra server is required.",
     webrtcEnabled: "Enable WebRTC",
-    webrtcEnabledLead: "Use the realtime voice path; unsupported browsers or networks fall back automatically.",
-    webrtcPublicHost: "WebRTC public host",
-    webrtcPublicHostPlaceholder: "e.g. voice.example.com",
-    webrtcPublicHostHint: "Use a public WebSpeak address reachable by browsers, not the container's private address.",
-    webrtcUdpStart: "UDP start port",
-    webrtcUdpEnd: "UDP end port",
-    webrtcUdpHint: "Publish and allow this range in Docker, the server firewall, and the cloud security group.",
-    webrtcApplyHint: "Saved settings apply to new connections; connected users must re-enter the voice space.",
+    webrtcEnabledLead: "Use realtime audio when supported; browsers and networks fall back automatically.",
+    webrtcApplyHint: "Saved settings apply to new connections; media ports are managed by the gateway.",
     accessMode: "Guest access mode",
     fixedMode: "Only this TeamSpeak server",
     fixedModeLead: "Guests enter only a nickname; WebSpeak manages the target and password.",
@@ -352,8 +338,6 @@ const copy = {
     invalidPassword: "The admin password is incorrect.",
     rateLimited: "Too many attempts. Try again later.",
     requestFailed: "The request failed. Check the fields and try again.",
-    invalidWebRtcHost: "The WebRTC public host is invalid.",
-    invalidWebRtcPorts: "The WebRTC UDP range is invalid. Use 1–65535 and no more than 100 consecutive ports.",
     loginEvent: "Administrator signed in",
     logoutEvent: "Administrator signed out",
     settingsEvent: "Server settings changed",
@@ -429,7 +413,7 @@ async function login() { submitting.value = true; errorMessage.value = ""; try {
 async function changePassword() { errorMessage.value = ""; if (newPassword.value.length < 12) { errorMessage.value = tr('setupPasswordShort'); return; } if (newPassword.value !== confirmNewPassword.value) { errorMessage.value = tr('setupPasswordsMismatch'); return; } submitting.value = true; try { await sendJson("/api/admin/change-password", "POST", { newPassword: newPassword.value }); newPassword.value = ""; confirmNewPassword.value = ""; screen.value = "admin"; await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function logout() { try { await sendJson("/api/admin/logout", "POST", {}); } finally { csrfToken.value = ""; screen.value = "login"; await router.replace("/admin/login"); } }
 async function loadOverview() { Object.assign(overview, await getJson("/api/admin/overview")); }
-async function loadServerSettings() { const value = await getJson("/api/admin/server"); const target = splitTeamSpeakTarget(value.target); Object.assign(serverForm, value, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: value.webRtcEnabled === true, webRtcPublicHost: String(value.webRtcPublicHost || ""), webRtcUdpStart: String(value.webRtcUdpStart ?? 40000), webRtcUdpEnd: String(value.webRtcUdpEnd ?? 40099) }); }
+async function loadServerSettings() { const value = await getJson("/api/admin/server"); const target = splitTeamSpeakTarget(value.target); Object.assign(serverForm, value, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: value.webRtcEnabled === true }); }
 async function loadOperations() { operationsLoading.value = true; try { const [sessions, invites, diagnostics, logs, audit] = await Promise.all([getJson("/api/admin/sessions"), getJson("/api/admin/invites"), getJson("/api/admin/diagnostics"), getJson("/api/admin/logs?limit=100"), getJson("/api/admin/audit?limit=50")]); operations.sessions = Array.isArray(sessions.sessions) ? sessions.sessions : []; operations.invites = Array.isArray(invites.invites) ? invites.invites : []; operations.diagnostics = { version: String(diagnostics.gateway?.version || ""), node: String(diagnostics.gateway?.node || ""), platform: String(diagnostics.gateway?.platform || ""), arch: String(diagnostics.gateway?.arch || ""), schemaVersion: Number(diagnostics.database?.schemaVersion || 0), createdSessions: Number(diagnostics.sessions?.created || 0) }; operations.logs = { available: Boolean(logs.available), entries: Array.isArray(logs.entries) ? logs.entries : [] }; operations.audit = Array.isArray(audit.events) ? audit.events : []; } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { operationsLoading.value = false; } }
 async function terminateSession(session: AdminSession) { if (!window.confirm(tr('confirmTerminate', { nickname: session.nickname }))) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
 async function createInvite() { submitting.value = true; errorMessage.value = ""; createdInvite.value = null; try { const result = await sendJson("/api/admin/invites", "POST", { channel: inviteForm.channel, expiresInHours: inviteForm.expiresInHours, maxUses: inviteForm.maxUses }); if (typeof result.token !== "string") throw new Error("INVITE_CREATE_FAILED"); createdInvite.value = { token: result.token, link: `${location.origin}/?invite=${encodeURIComponent(result.token)}` }; inviteForm.channel = ""; await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
@@ -437,9 +421,9 @@ async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(tr('con
 async function copyInviteLink() { if (!createdInvite.value) return; try { await navigator.clipboard.writeText(createdInvite.value.link); showOperationNotice(tr('copiedLink')); } catch { errorMessage.value = tr('operationFailed'); } }
 function showOperationNotice(message: string) { errorMessage.value = message; window.setTimeout(() => { if (errorMessage.value === message) errorMessage.value = ""; }, 2200); }
 async function downloadBackup() { try { const response = await fetch("/api/admin/backup", { headers: { accept: "application/octet-stream" } }); if (!response.ok) throw new Error("BACKUP_FAILED"); const blob = await response.blob(); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `webspeak-backup-${new Date().toISOString().slice(0, 10)}.db`; anchor.click(); URL.revokeObjectURL(url); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
-async function saveServerSettings() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/server", "PUT", serverPayload()); const target = splitTeamSpeakTarget(result.settings?.target); Object.assign(serverForm, result.settings, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: result.settings.webRtcEnabled === true, webRtcPublicHost: String(result.settings.webRtcPublicHost || ""), webRtcUdpStart: String(result.settings.webRtcUdpStart ?? 40000), webRtcUdpEnd: String(result.settings.webRtcUdpEnd ?? 40099) }); await loadOverview(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
+async function saveServerSettings() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/server", "PUT", serverPayload()); const target = splitTeamSpeakTarget(result.settings?.target); Object.assign(serverForm, result.settings, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: result.settings.webRtcEnabled === true }); await loadOverview(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function testServerConnection() { await runTest("/api/admin/server/test", { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction }); if (testResult.value?.ok) { await loadOverview(); serverForm.lastTestAt = new Date().toISOString(); serverForm.lastTestLatencyMs = testResult.value.latencyMs ?? null; } }
-function serverPayload() { return { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName, welcomeText: serverForm.welcomeText, webRtcEnabled: serverForm.webRtcEnabled, webRtcPublicHost: serverForm.webRtcPublicHost, webRtcUdpStart: Number(serverForm.webRtcUdpStart), webRtcUdpEnd: Number(serverForm.webRtcUdpEnd) }; }
+function serverPayload() { return { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName, welcomeText: serverForm.welcomeText, webRtcEnabled: serverForm.webRtcEnabled }; }
 async function runTest(url: string, body: Record<string, unknown>) { testing.value = true; errorMessage.value = ""; testResult.value = null; try { testResult.value = await sendJson(url, "POST", body, url.includes("/server/test")); } catch (error) { testResult.value = { ok: false, code: (error as ApiError).code }; } finally { testing.value = false; } }
 async function dismissLegacyNotice() { await sendJson("/api/admin/legacy-import/dismiss", "POST", {}); overview.legacyConfigImported = false; }
 function toggleLanguage() { language.value = language.value === "zh" ? "en" : "zh"; localStorage.setItem("webspeak:language", language.value); }
@@ -477,7 +461,7 @@ async function parseResponse(response: Response) { const value = await response.
 @media(max-width:850px){.operations-grid{grid-template-columns:1fr}.operation-wide{overflow:hidden}}
 @media(max-width:520px){.operation-card{padding:18px}.table-wrap{margin-left:-18px;margin-right:-18px;margin-bottom:-18px}.invite-form-grid,.diagnostic-list{grid-template-columns:1fr}.generated-link{display:grid}.invite-row{align-items:flex-start;flex-direction:column}.invite-row-meta{width:100%;justify-content:flex-end}.lower-operations{margin-top:14px}}
 .target-fields{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:12px}
-.webrtc-card .card-help{margin:5px 0 0;color:#7e8c88;font-size:10px;line-height:1.5}.webrtc-fields{display:grid;gap:14px}.toggle-choice{margin:0}.webrtc-card>.field-help{margin-top:-8px}.webrtc-port-fields{grid-template-columns:1fr 1fr}
+.webrtc-card .card-help{margin:5px 0 0;color:#7e8c88;font-size:10px;line-height:1.5}.toggle-choice{margin:0}.webrtc-card>.field-help{margin-top:-8px}
 @media(max-width:520px){.target-fields{grid-template-columns:1fr}}
 
 /* Keep administration inside the browser viewport. Long data sets scroll in

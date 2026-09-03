@@ -24,10 +24,13 @@ const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
 
+// WebRTC is served by the WebSpeak process itself. Docker publishes this
+// fixed range so the administrator only needs to enable the transport; the
+// advertised host is derived from the browser's current WebSpeak address.
+export const WEBRTC_UDP_PORT_RANGE: [number, number] = [40000, 40099];
+
 export interface WebRtcAudioOptions {
   enabled: boolean;
-  publicHost?: string;
-  icePortRange?: [number, number];
 }
 
 export interface WebRtcSessionDescription {
@@ -37,7 +40,7 @@ export interface WebRtcSessionDescription {
 
 export interface WebRtcAudioSessionOptions {
   connectionId: string;
-  config: WebRtcAudioOptions;
+  publicHost?: string;
   logger: LoggerType;
   onVoiceFrame: (data: Buffer) => void;
   onVoiceActivity: (clientIds: number[]) => void;
@@ -77,13 +80,13 @@ export class WebRtcAudioSession {
     this.onVoiceActivity = options.onVoiceActivity;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
-    const iceAdditionalHostAddresses = options.config.publicHost ? [options.config.publicHost] : undefined;
+    const iceAdditionalHostAddresses = options.publicHost ? [options.publicHost] : undefined;
     this.peer = new RTCPeerConnection({
       iceServers: [],
       iceUseIpv4: true,
       iceUseIpv6: false,
       iceUseTcp: false,
-      ...(options.config.icePortRange ? { icePortRange: options.config.icePortRange } : {}),
+      icePortRange: [...WEBRTC_UDP_PORT_RANGE] as [number, number],
       ...(iceAdditionalHostAddresses ? { iceAdditionalHostAddresses } : {}),
     });
 

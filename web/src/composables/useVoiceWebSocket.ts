@@ -94,7 +94,7 @@ export function useVoiceWebSocket() {
 
   // WebRTC carries audio when the gateway advertises it. The bounded PCM
   // WebSocket path remains the compatibility fallback for older browsers and
-  // for deployments that have not opened the gateway's UDP media range.
+  // for deployments where the gateway's built-in UDP media range is unavailable.
   let audioCtx: SinkAudioContext | null = null;
   let micStream: MediaStream | null = null;
   let scriptNode: ScriptProcessorNode | null = null;
@@ -148,16 +148,29 @@ export function useVoiceWebSocket() {
   const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
   const MAX_AUDIO_BUFFERED_FRAMES = 10;
   const MAX_AUDIO_BUFFERED_BYTES = AUDIO_FRAME_BYTES * MAX_AUDIO_BUFFERED_FRAMES;
-  const MAX_REMOTE_PLAY_AHEAD_SECONDS = 0.12;
-  const MAX_REMOTE_DECODE_QUEUE_FRAMES = 6;
+  // Keep the WebSocket playback buffer below the 100 ms latency target. A
+  // 20 ms frame plus three queued decoder frames leaves only a short cushion
+  // for jitter; stale audio is discarded instead of being played late.
+  const MAX_REMOTE_PLAY_AHEAD_SECONDS = 0.08;
+  const MAX_REMOTE_DECODE_QUEUE_FRAMES = 3;
+  const audioDebugEnabled = typeof location !== "undefined"
+    && new URLSearchParams(location.search).get("audioDebug") === "1";
   const audioDiagnostics = reactive({
     uplinkFrames: 0,
     uplinkDroppedFrames: 0,
     downlinkFrames: 0,
+    decoderOutputFrames: 0,
+    playbackStarts: 0,
     playbackResets: 0,
     peakBufferedBytes: 0,
     peakPlayAheadMs: 0,
     peakDecodeQueueFrames: 0,
+    downlinkFirstAt: null as number | null,
+    lastDownlinkAt: null as number | null,
+    downlinkMaxGapMs: 0,
+    lastDecodeOutputAt: null as number | null,
+    lastPlaybackStartAt: null as number | null,
+    lastPlayAheadMs: 0,
   });
   const audioCounters = { ...audioDiagnostics };
   let nextAudioDiagnosticsPublishAt = 0;
@@ -167,6 +180,12 @@ export function useVoiceWebSocket() {
     if (!force && now < nextAudioDiagnosticsPublishAt) return;
     nextAudioDiagnosticsPublishAt = now + 1_000;
     Object.assign(audioDiagnostics, audioCounters);
+    if (audioDebugEnabled) {
+      console.info("[WebSpeak audio checkpoint]", JSON.stringify({
+        at: new Date(now).toISOString(),
+        ...audioDiagnostics,
+      }));
+    }
   }
 
   async function saveAudioPreferences(): Promise<void> {
@@ -735,6 +754,8 @@ export function useVoiceWebSocket() {
           }
           try {
             const { sampleRate, numberOfChannels, numberOfFrames } = chunk;
+            audioCounters.decoderOutputFrames++;
+            audioCounters.lastDecodeOutputAt = Date.now();
             const buffer = ctx.createBuffer(numberOfChannels, numberOfFrames, sampleRate);
             for (let ch = 0; ch < numberOfChannels; ch++) {
               const data = new Float32Array(numberOfFrames);
@@ -766,10 +787,16 @@ export function useVoiceWebSocket() {
               return;
             }
             source.start(playTime);
+            audioCounters.playbackStarts++;
+            audioCounters.lastPlaybackStartAt = Date.now();
             remotePlayTimes.set(clientId, playTime + numberOfFrames / sampleRate);
+            audioCounters.lastPlayAheadMs = Math.max(
+              0,
+              Math.round((playTime + numberOfFrames / sampleRate - ctx.currentTime) * 1_000),
+            );
             audioCounters.peakPlayAheadMs = Math.max(
               audioCounters.peakPlayAheadMs,
-              Math.round((playTime + numberOfFrames / sampleRate - ctx.currentTime) * 1_000),
+              audioCounters.lastPlayAheadMs,
             );
           } catch {
             // A decoder can finish while the audio context is being torn down.
@@ -1104,6 +1131,12 @@ export function useVoiceWebSocket() {
     if (data.length < 4) return;
     const clientId = (data[1] << 8) | data[2];
     if (clientId === state.tsClientId) return;
+    const receivedAt = Date.now();
+    if (audioCounters.lastDownlinkAt !== null) {
+      audioCounters.downlinkMaxGapMs = Math.max(audioCounters.downlinkMaxGapMs, receivedAt - audioCounters.lastDownlinkAt);
+    }
+    audioCounters.downlinkFirstAt ??= receivedAt;
+    audioCounters.lastDownlinkAt = receivedAt;
     markSpeaking(clientId);
     playAudioFrame(clientId, data.slice(3));
   }

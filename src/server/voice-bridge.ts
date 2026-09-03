@@ -52,11 +52,24 @@ export interface AudioFlowStats {
   ingressFirstAt: number | null;
   ingressLastAt: number | null;
   ingressMaxGapMs: number;
+  tsSendFrames: number;
+  tsSendErrors: number;
+  tsSendFirstAt: number | null;
+  tsSendLastAt: number | null;
+  tsSendMaxGapMs: number;
+  tsEncodeMaxMs: number;
+  tsReceiveFrames: number;
+  tsReceiveFirstAt: number | null;
+  tsReceiveLastAt: number | null;
+  tsReceiveMaxGapMs: number;
   egressFrames: number;
   egressDroppedFrames: number;
   egressFirstAt: number | null;
   egressLastAt: number | null;
   egressMaxGapMs: number;
+  egressSentFirstAt: number | null;
+  egressSentLastAt: number | null;
+  egressSentMaxGapMs: number;
   egressPeakBufferedBytes: number;
   egressFramesByClient: Record<string, number>;
 }
@@ -87,6 +100,7 @@ interface WebClientEntry {
   nickname: string;
   rememberIdentity: boolean;
   target: TeamSpeakTarget;
+  webrtcPublicHost?: string;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
   eventLog: ServerEvent[];
@@ -127,6 +141,7 @@ export class VoiceBridge {
 
       const { target, serverPassword, nickname } = connection;
       const channelName = connection.channel;
+      const webrtcPublicHost = resolveWebRtcPublicHost(req);
       let identity;
       try {
         identity = connection.identity ? identityFromString(connection.identity) : undefined;
@@ -163,6 +178,7 @@ export class VoiceBridge {
         nickname,
         rememberIdentity: connection.rememberIdentity === true,
         target,
+        ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
         channelTree: [],
         members: new Map(),
         eventLog: [],
@@ -422,10 +438,15 @@ export class VoiceBridge {
       });
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
+        const receivedAt = Date.now();
+        if (entry!.audio.tsReceiveLastAt !== null) entry!.audio.tsReceiveMaxGapMs = Math.max(entry!.audio.tsReceiveMaxGapMs, receivedAt - entry!.audio.tsReceiveLastAt);
+        entry!.audio.tsReceiveFirstAt ??= receivedAt;
+        entry!.audio.tsReceiveLastAt = receivedAt;
+        entry!.audio.tsReceiveFrames++;
         if (ws.readyState !== WebSocket.OPEN || data.clientId === selfId) return;
         const webRtc = entry!.webrtc;
         webRtc?.pushTeamSpeakVoice(data);
-        const now = Date.now();
+        const now = receivedAt;
         if (entry!.audio.egressLastAt !== null) entry!.audio.egressMaxGapMs = Math.max(entry!.audio.egressMaxGapMs, now - entry!.audio.egressLastAt);
         entry!.audio.egressFirstAt ??= now;
         entry!.audio.egressLastAt = now;
@@ -452,6 +473,10 @@ export class VoiceBridge {
         try {
           ws.send(packet);
           entry!.audio.egressFrames++;
+          const sentAt = Date.now();
+          if (entry!.audio.egressSentLastAt !== null) entry!.audio.egressSentMaxGapMs = Math.max(entry!.audio.egressSentMaxGapMs, sentAt - entry!.audio.egressSentLastAt);
+          entry!.audio.egressSentFirstAt ??= sentAt;
+          entry!.audio.egressSentLastAt = sentAt;
         } catch {
           entry!.audio.egressDroppedFrames++;
         }
@@ -500,14 +525,23 @@ export class VoiceBridge {
           entry!.audio.ingressFirstAt ??= now;
           entry!.audio.ingressLastAt = now;
           entry!.audio.ingressFrames++;
+          const encodeStartedAt = Date.now();
           try {
             if (entry!.opusEncoder) {
               const encoded = entry!.opusEncoder.encode(frame);
+              const encodedAt = Date.now();
+              entry!.audio.tsEncodeMaxMs = Math.max(entry!.audio.tsEncodeMaxMs, encodedAt - encodeStartedAt);
               if (entry!.whisperActive && entry!.whisperTargetIds.size) tsClient.sendWhisper(encoded, [...entry!.whisperTargetIds], 4);
               else tsClient.sendVoice(encoded, 4);
+              const sentAt = Date.now();
+              if (entry!.audio.tsSendLastAt !== null) entry!.audio.tsSendMaxGapMs = Math.max(entry!.audio.tsSendMaxGapMs, sentAt - entry!.audio.tsSendLastAt);
+              entry!.audio.tsSendFirstAt ??= sentAt;
+              entry!.audio.tsSendLastAt = sentAt;
+              entry!.audio.tsSendFrames++;
             }
           } catch {
             // A frame arriving during shutdown is safe to discard.
+            entry!.audio.tsSendErrors++;
           }
           return;
         }
@@ -701,7 +735,7 @@ export class VoiceBridge {
     if (!config?.enabled) return;
     const peer = new WebRtcAudioSession({
       connectionId: entry.id,
-      config,
+      ...(entry.webrtcPublicHost ? { publicHost: entry.webrtcPublicHost } : {}),
       logger: this.logger,
       onVoiceFrame: (data) => {
         const now = Date.now();
@@ -733,6 +767,33 @@ export class VoiceBridge {
       this.logger.warn({ entryId: entry.id, err: error instanceof Error ? error.message : String(error) }, "WebRTC audio negotiation failed");
       if (entry.ws.readyState === WebSocket.OPEN) sendJson({ type: "webrtcError", code: "WEBRTC_NEGOTIATION_FAILED" });
     }
+  }
+}
+
+function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
+  const origin = firstHeader(request.headers.origin);
+  const forwardedHost = firstHeader(request.headers["x-forwarded-host"]);
+  const directHost = firstHeader(request.headers.host);
+  for (const candidate of [origin, forwardedHost, directHost]) {
+    const host = normalizeWebRtcHost(candidate);
+    if (host) return host;
+  }
+  return undefined;
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeWebRtcHost(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.split(",", 1)[0]?.trim();
+  if (!trimmed || trimmed.toLowerCase() === "null") return undefined;
+  try {
+    const parsed = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+    return parsed.hostname || undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -859,11 +920,24 @@ function createAudioFlowStats(): AudioFlowStats {
     ingressFirstAt: null,
     ingressLastAt: null,
     ingressMaxGapMs: 0,
+    tsSendFrames: 0,
+    tsSendErrors: 0,
+    tsSendFirstAt: null,
+    tsSendLastAt: null,
+    tsSendMaxGapMs: 0,
+    tsEncodeMaxMs: 0,
+    tsReceiveFrames: 0,
+    tsReceiveFirstAt: null,
+    tsReceiveLastAt: null,
+    tsReceiveMaxGapMs: 0,
     egressFrames: 0,
     egressDroppedFrames: 0,
     egressFirstAt: null,
     egressLastAt: null,
     egressMaxGapMs: 0,
+    egressSentFirstAt: null,
+    egressSentLastAt: null,
+    egressSentMaxGapMs: 0,
     egressPeakBufferedBytes: 0,
     egressFramesByClient: {},
   };

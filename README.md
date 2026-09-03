@@ -33,8 +33,8 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 
 #### 2026-09-03 · v0.1.3
 
-- 新增可选的 WebRTC 语音传输，为需要更低、更稳定实时语音延迟的部署提供实验性通道。
-- 增加 WebRTC 环境配置，可设置公网地址和受限的 UDP 端口范围；默认部署方式和默认语音链路保持不变。
+- 新增可选的 WebRTC 语音传输，为需要更低、更稳定实时语音延迟的部署提供同机媒体通道。
+- WebRTC 媒体服务由网关自带，按当前访问地址自动生成候选地址，Docker Compose 自动发布固定 UDP 媒体端口。
 - 将 TeamSpeak 集成迁移到我们维护的 `EchoSixHIYA/teamspeak-js`，带来实时目录快照以及成员、频道同步能力。
 - WebRTC 语音按协商得到的 Opus 参数传输，并且每位发言者只保留最新音频帧，避免网络抖动时旧语音持续堆积。
 - 修复 WebRTC 与兼容性语音链路切换时的重复播放、残留会话和回退不完整问题。
@@ -115,6 +115,8 @@ curl http://127.0.0.1:3040/health
 
 启动完成后打开 [http://127.0.0.1:3040/](http://127.0.0.1:3040/)。首次进入管理后台 `/admin` 使用 `admin / admin`，并按提示修改密码。
 
+Compose 会同时发布内置 WebRTC 使用的 `40000–40099/UDP`。启用 WebRTC 时只需在管理后台打开开关；不需要填写公网地址，也不需要另行部署媒体服务器。
+
 默认数据保存在 Docker volume `webspeak-data` 中。升级时先拉取新镜像，再重新创建应用容器；停止服务使用 `docker compose down`，不要添加 `-v`，否则会删除数据库、密钥和管理员配置。
 
 ```bash
@@ -136,7 +138,7 @@ WebSpeak 默认对外提供 `3040` 端口。如需修改宿主机端口，只需
 WEBSPEAK_PORT=3041 docker compose up -d
 ```
 
-容器内部监听 `3040`，SQLite 数据库、安装级主密钥和日志保存在 `/data`。Dockerfile 仅用于项目 CI、发布资产和开发者本地构建，不是普通用户的默认部署入口。
+容器内部监听 `3040`，并在 `40000–40099/UDP` 提供内置 WebRTC 媒体；SQLite 数据库、安装级主密钥和日志保存在 `/data`。Dockerfile 仅用于项目 CI、发布资产和开发者本地构建，不是普通用户的默认部署入口。
 
 #### 方式 B：源码运行（开发者）
 
@@ -197,9 +199,9 @@ WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987
 
 #### 可选 WebRTC 语音传输
 
-`v0.1.3` 提供实验性的 WebRTC 语音通道，默认关闭。管理员登录 `/admin`，打开“服务器”页面的“WebRTC 语音”卡片即可启用，并填写浏览器可访问的公网地址与 UDP 端口范围；保存后对新语音会话生效。
+WebSpeak 自带 WebRTC 媒体服务。管理员只需在 `/admin` → “服务器” → “WebRTC 语音”中启用开关；网关会根据用户当前访问的域名或地址自动生成媒体候选地址，固定 UDP 媒体端口由 Docker Compose 自动发布，不需要配置额外的媒体服务器、STUN/TURN 地址或公网主机字段。保存后对新语音会话生效。
 
-Docker、服务器防火墙和云安全组仍需发布、放行管理员配置的 UDP 端口范围。普通 Docker 部署不启用 WebRTC 时无需额外配置，继续使用默认语音链路即可。若网络或浏览器不支持 WebRTC，客户端会自动回退到兼容性语音链路。
+使用 Docker Compose 时，项目会同时发布 WebSpeak HTTP 端口和内置的 UDP 媒体端口范围。反向代理仍只负责 HTTPS/WSS 信令；UDP 媒体直接进入同一台 WebSpeak 主机。非 Docker 启动时只需确保同机网络允许该固定 UDP 范围。若浏览器或网络不支持 WebRTC，客户端会自动回退到兼容性语音链路。
 
 ### 数据与安全边界
 
@@ -306,8 +308,8 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 
 #### 2026-09-03 · v0.1.3
 
-- Added an optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency.
-- Added WebRTC environment configuration for the public host and a bounded UDP port range; the default deployment and default voice path remain unchanged.
+- Added an optional WebRTC audio transport for deployments that need lower and more stable realtime voice latency, with media served by the same gateway.
+- Bundled the WebRTC media service into the gateway; it derives candidates from the current access address and Docker Compose publishes the fixed UDP media range automatically.
 - Migrated the TeamSpeak integration to our maintained `EchoSixHIYA/teamspeak-js` fork, adding live directory snapshots and member/channel synchronization.
 - WebRTC audio now uses negotiated Opus parameters and keeps only the newest frame per speaker, preventing stale voice from accumulating during network jitter.
 - Fixed duplicate playback, incomplete fallback, and leftover server-side media sessions when switching between WebRTC and the compatibility voice path.
@@ -389,6 +391,8 @@ curl http://127.0.0.1:3040/health
 
 Then open [http://127.0.0.1:3040/](http://127.0.0.1:3040/). On the first admin login, use `admin / admin` and follow the prompt to change the password.
 
+Compose also publishes `40000–40099/UDP` for the built-in WebRTC media service. Enabling WebRTC only requires the administrator switch; no public-host field or separate media server is needed.
+
 Runtime data is kept in the `webspeak-data` Docker volume. To upgrade, pull the new image and recreate the application container. Stop the service with `docker compose down`; do not add `-v`, because that removes the database, master key, and administrator settings.
 
 ```bash
@@ -410,7 +414,7 @@ The default host port is `3040`. To use another host port, set `WEBSPEAK_PORT`; 
 WEBSPEAK_PORT=3041 docker compose up -d
 ```
 
-The container listens on `3040` internally. SQLite data, the installation master key, and logs are stored in `/data`. The Dockerfile is used by project CI, release assets, and developer builds; it is not the default deployment path for users.
+The container listens on `3040` internally and provides built-in WebRTC media on `40000–40099/UDP`. SQLite data, the installation master key, and logs are stored in `/data`. The Dockerfile is used by project CI, release assets, and developer builds; it is not the default deployment path for users.
 
 #### Option B: Run from source (developers)
 
@@ -473,9 +477,9 @@ Device labels are controlled by the browser permission model. The first device s
 
 #### Optional WebRTC audio transport
 
-`v0.1.3` includes an experimental WebRTC audio path that is disabled by default. An administrator can enable it from `/admin` → “Server” → “WebRTC audio”, then enter the public address reachable by browsers and the UDP port range. Saved settings apply to new voice sessions.
+WebSpeak includes its own WebRTC media service. An administrator only needs to enable the switch at `/admin` → “Server” → “WebRTC audio”; the gateway derives media candidates from the address used by the browser, while Docker Compose publishes the fixed UDP media range automatically. No extra media server, STUN/TURN address, or public-host field is required. Saved settings apply to new voice sessions.
 
-The configured UDP range still needs to be published and allowed in Docker, the server firewall, and the cloud security group. A standard Docker deployment needs no extra configuration while WebRTC is disabled and continues to use the default voice path. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
+With Docker Compose, the WebSpeak HTTP port and the built-in UDP media range are published together. The reverse proxy continues to handle HTTPS/WSS signaling, while UDP media enters the same WebSpeak host directly. For non-Docker startup, only the fixed UDP range on that host must be permitted. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
 
 ### Data and Security Boundary
 

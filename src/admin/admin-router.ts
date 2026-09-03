@@ -333,9 +333,6 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
     siteName: readString(body, "siteName", 80),
     welcomeText: readOptionalString(body, "welcomeText", 500),
     webRtcEnabled: body.webRtcEnabled === true,
-    webRtcPublicHost: readOptionalString(body, "webRtcPublicHost", 253),
-    webRtcUdpStart: readOptionalNumber(body, "webRtcUdpStart", 40000),
-    webRtcUdpEnd: readOptionalNumber(body, "webRtcUdpEnd", 40099),
   };
 }
 

@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     ports:
       - "${WEBSPEAK_PORT:-3040}:3040"
+      - "40000-40099:40000-40099/udp"
     volumes:
       - webspeak-data:/data
 

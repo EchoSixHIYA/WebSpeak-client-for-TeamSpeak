@@ -55,9 +55,6 @@ test("legacy config imports once, seeds the default admin, and allows password r
     siteName: "Open WebSpeak",
     welcomeText: "Public gateway",
     webRtcEnabled: true,
-    webRtcPublicHost: "voice.example.com",
-    webRtcUdpStart: 40000,
-    webRtcUdpEnd: 40099,
   });
   const publicConfig = service.getPublicConfig();
   assert.equal(publicConfig.target, "public.example.com:9987");
@@ -66,7 +63,7 @@ test("legacy config imports once, seeds the default admin, and allows password r
   assert.equal(service.getAdminSettings().hasPassword, true);
   assert.equal(service.getConnectionPolicy().serverPassword, "replacement-secret");
   assert.equal(service.getAdminSettings().webRtcEnabled, true);
-  assert.deepEqual(service.getWebRtcAudioOptions(), { enabled: true, publicHost: "voice.example.com", icePortRange: [40000, 40099] });
+  assert.deepEqual(service.getWebRtcAudioOptions(), { enabled: true });
   database.close();
 });
 
