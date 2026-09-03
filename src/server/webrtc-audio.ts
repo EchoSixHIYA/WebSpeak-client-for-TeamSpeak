@@ -23,6 +23,10 @@ const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
 const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
+// TeamSpeak can emit valid Opus comfort-noise/silence packets while a client
+// is muted. Do not turn those packets into a false "speaking" indicator or
+// send them through the WebRTC mixer as if they were voice.
+const MIN_SPEAKER_RMS = 160;
 
 // WebRTC is served by the WebSpeak process itself. Docker publishes this
 // fixed range so the administrator only needs to enable the transport; the
@@ -158,6 +162,12 @@ export class WebRtcAudioSession {
       // decoded. Otherwise the UI can show activity while the mixer has no
       // audio to send, which is especially confusing on the WebRTC path.
       if (pcm.length < AUDIO_FRAME_BYTES) return;
+      let sum = 0;
+      for (let index = 0; index + 1 < AUDIO_FRAME_BYTES; index += 2) {
+        const sample = pcm.readInt16LE(index);
+        sum += sample * sample;
+      }
+      if (Math.sqrt(sum / AUDIO_FRAME_SAMPLES) < MIN_SPEAKER_RMS) return;
       this.pendingFrames.set(data.clientId, pcm.subarray(0, AUDIO_FRAME_BYTES));
       this.activeSpeakerIds.add(data.clientId);
     } catch {

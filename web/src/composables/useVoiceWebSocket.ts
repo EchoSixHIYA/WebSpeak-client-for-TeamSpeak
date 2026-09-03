@@ -88,6 +88,10 @@ export function useVoiceWebSocket() {
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
   let webrtcPeer: RTCPeerConnection | null = null;
   let webrtcOutputElement: SinkAudioElement | null = null;
+  let webrtcOutputSource: MediaStreamAudioSourceNode | null = null;
+  let webrtcOutputGain: GainNode | null = null;
+  let webrtcPlaybackStream: MediaStream | null = null;
+  let webrtcPlaybackRetryCleanup: (() => void) | null = null;
   let webrtcNegotiationPromise: Promise<void> | null = null;
   let webrtcFallbackStarted = false;
   const webrtcActive = ref(false);
@@ -107,6 +111,10 @@ export function useVoiceWebSocket() {
   let micSource: MediaStreamAudioSourceNode | null = null;
   let micGain: GainNode | null = null;
   let silentGain: GainNode | null = null;
+  let webrtcMicMonitorSource: MediaStreamAudioSourceNode | null = null;
+  let webrtcMicMonitorAnalyser: AnalyserNode | null = null;
+  let webrtcMicMonitorGain: GainNode | null = null;
+  let webrtcMicMonitorTimer: ReturnType<typeof setInterval> | null = null;
   const inputDevices = reactive<AudioInputDevice[]>([]);
   const outputDevices = reactive<AudioOutputDevice[]>([]);
   const selectedInputDeviceId = ref(typeof localStorage !== "undefined" ? localStorage.getItem("webspeak:input-device") ?? "" : "");
@@ -257,6 +265,7 @@ export function useVoiceWebSocket() {
       audioContextState.value = audioCtx.state;
       audioCtx.addEventListener("statechange", () => {
         if (audioCtx) audioContextState.value = audioCtx.state;
+        void syncWebRtcPlayback();
       });
       outputDeviceSupported.value = typeof audioCtx.setSinkId === "function"
         || typeof (HTMLMediaElement.prototype as SinkAudioElement).setSinkId === "function";
@@ -281,6 +290,43 @@ export function useVoiceWebSocket() {
     outputDeviceSupported.value = true;
     if (ctx.setSinkId) await ctx.setSinkId(deviceId || "default");
     if (webrtcOutputElement?.setSinkId) await webrtcOutputElement.setSinkId(deviceId || "default");
+  }
+
+  function installWebRtcPlaybackRetry(): void {
+    if (webrtcPlaybackRetryCleanup) return;
+    const retry = () => { void syncWebRtcPlayback(); };
+    const events: (keyof WindowEventMap)[] = ["pointerdown", "touchstart", "keydown"];
+    for (const event of events) window.addEventListener(event, retry, { passive: true });
+    document.addEventListener("visibilitychange", retry, { passive: true });
+    webrtcPlaybackRetryCleanup = () => {
+      for (const event of events) window.removeEventListener(event, retry);
+      document.removeEventListener("visibilitychange", retry);
+      webrtcPlaybackRetryCleanup = null;
+    };
+  }
+
+  async function syncWebRtcPlayback(): Promise<void> {
+    const output = webrtcOutputElement;
+    if (!output || !webrtcPlaybackStream) return;
+    const ctx = audioCtx;
+    if (ctx?.state === "suspended") {
+      try { await ctx.resume(); } catch { /* fall back to the native media element */ }
+    }
+    const useWebAudio = Boolean(ctx && ctx.state === "running" && webrtcOutputSource && webrtcOutputGain);
+    output.muted = useWebAudio;
+    if (useWebAudio) {
+      webrtcPlaybackRetryCleanup?.();
+      return;
+    }
+    output.muted = false;
+    try {
+      await output.play();
+      webrtcPlaybackRetryCleanup?.();
+    } catch {
+      // Mobile and privacy-focused browsers can require a gesture even for a
+      // MediaStream. Keep retrying after the next real interaction.
+      installWebRtcPlaybackRetry();
+    }
   }
 
   function checkSupport(): string | null {
@@ -497,13 +543,10 @@ export function useVoiceWebSocket() {
       // the control channel could report speaking while a suspended context
       // silently discarded the actual audio. A hidden autoplaying media
       // element keeps WebRTC's decoder and jitter buffer on the native path.
-      webrtcOutputElement?.pause();
-      if (webrtcOutputElement) {
-        webrtcOutputElement.srcObject = null;
-        webrtcOutputElement.remove();
-      }
+      stopWebRtcPlayback();
       const output = document.createElement("audio") as SinkAudioElement;
       output.autoplay = true;
+      output.muted = true;
       output.setAttribute("playsinline", "");
       output.volume = outputVolume.value;
       output.setAttribute("aria-hidden", "true");
@@ -516,20 +559,24 @@ export function useVoiceWebSocket() {
       output.srcObject = stream;
       document.body.append(output);
       webrtcOutputElement = output;
+      webrtcPlaybackStream = stream;
+      try {
+        const ctx = getAudioCtx();
+        webrtcOutputSource = ctx.createMediaStreamSource(stream);
+        webrtcOutputGain = ctx.createGain();
+        webrtcOutputGain.gain.value = outputVolume.value;
+        webrtcOutputSource.connect(webrtcOutputGain);
+        webrtcOutputGain.connect(ctx.destination);
+      } catch {
+        // The native element below remains the playback path when Web Audio
+        // cannot attach to a remote MediaStream on an older browser.
+      }
       if (selectedOutputDeviceId.value && output.setSinkId) {
         void output.setSinkId(selectedOutputDeviceId.value).catch(() => undefined);
       }
-      void output.play().catch(() => {
-        // A browser may require a later user gesture to start media playback.
-        // Retry on the next pointer interaction without interrupting the
-        // active voice connection.
-        const retry = () => {
-          if (webrtcOutputElement !== output) return;
-          void output.play().catch(() => undefined);
-        };
-        window.addEventListener("pointerdown", retry, { once: true, passive: true });
-      });
+      void syncWebRtcPlayback();
     };
+    startWebRtcMicMonitor(getAudioCtx(), micStream, track);
     peer.onconnectionstatechange = () => {
       if (peer.connectionState === "failed") void fallbackFromWebRtc(sequence, socket);
     };
@@ -605,13 +652,66 @@ export function useVoiceWebSocket() {
     webrtcPeer = null;
     webrtcActive.value = false;
     webrtcNegotiationPromise = null;
+    stopWebRtcMicMonitor();
+    stopWebRtcPlayback();
+    if (peer) void peer.close();
+  }
+
+  function stopWebRtcPlayback(): void {
+    webrtcPlaybackRetryCleanup?.();
+    webrtcOutputSource?.disconnect();
+    webrtcOutputGain?.disconnect();
+    webrtcOutputSource = null;
+    webrtcOutputGain = null;
+    webrtcPlaybackStream = null;
     webrtcOutputElement?.pause();
     if (webrtcOutputElement) {
       webrtcOutputElement.srcObject = null;
       webrtcOutputElement.remove();
     }
     webrtcOutputElement = null;
-    if (peer) void peer.close();
+  }
+
+  function startWebRtcMicMonitor(ctx: AudioContext, stream: MediaStream, track: MediaStreamTrack): void {
+    stopWebRtcMicMonitor(false);
+    try {
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      const silent = ctx.createGain();
+      silent.gain.value = 0;
+      source.connect(analyser);
+      analyser.connect(silent);
+      silent.connect(ctx.destination);
+      const samples = new Float32Array(analyser.fftSize);
+      webrtcMicMonitorSource = source;
+      webrtcMicMonitorAnalyser = analyser;
+      webrtcMicMonitorGain = silent;
+      webrtcMicMonitorTimer = setInterval(() => {
+        if (!webrtcMicMonitorAnalyser) return;
+        webrtcMicMonitorAnalyser.getFloatTimeDomainData(samples);
+        let sum = 0;
+        for (const sample of samples) sum += sample * sample;
+        const rms = Math.sqrt(sum / samples.length);
+        micLevel.value = Math.min(1, rms * 6);
+        if (!microphoneMuted.value && track.enabled && rms >= voxThreshold.value) markSpeaking(state.tsClientId);
+        else if (state.tsClientId) clearSpeaking(state.tsClientId);
+      }, 50);
+    } catch {
+      stopWebRtcMicMonitor(false);
+    }
+  }
+
+  function stopWebRtcMicMonitor(resetLevel = true): void {
+    if (webrtcMicMonitorTimer) clearInterval(webrtcMicMonitorTimer);
+    webrtcMicMonitorTimer = null;
+    webrtcMicMonitorSource?.disconnect();
+    webrtcMicMonitorAnalyser?.disconnect();
+    webrtcMicMonitorGain?.disconnect();
+    webrtcMicMonitorSource = null;
+    webrtcMicMonitorAnalyser = null;
+    webrtcMicMonitorGain = null;
+    if (resetLevel) micLevel.value = 0;
   }
 
   function isSessionDescription(value: unknown, type: "answer"): value is RTCSessionDescriptionInit {
@@ -1260,6 +1360,7 @@ export function useVoiceWebSocket() {
     voxRelease = 0;
     accumLen = 0;
     if (webrtcActive.value) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+    if (muted && state.tsClientId) clearSpeaking(state.tsClientId);
     void saveAudioPreferences();
   }
 
@@ -1317,6 +1418,7 @@ export function useVoiceWebSocket() {
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     for (const [clientId, gain] of remoteGains) gain.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
+    if (webrtcOutputGain) webrtcOutputGain.gain.value = outputVolume.value;
     if (webrtcOutputElement) webrtcOutputElement.volume = outputVolume.value;
     void saveAudioPreferences();
   }
