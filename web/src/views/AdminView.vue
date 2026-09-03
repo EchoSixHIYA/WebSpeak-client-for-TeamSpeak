@@ -605,4 +605,23 @@ async function parseResponse(response: Response) { const value = await response.
 :global(:root[data-theme="dark"]) .modal-card{color:#e8f3f0;background:#172321;border-color:#30413d}
 :global(:root[data-theme="dark"]) .modal-card p{color:#9bb0aa}
 @media(max-width:520px){.advanced-card{grid-column:auto}.port-inputs{grid-template-columns:1fr}}
+
+/* Server settings are a short form, not a set of independent data feeds.
+   Let each card keep its natural height so a few extra pixels do not create
+   three nested scrollbars. The section itself is the only fallback scroll
+   surface when a small viewport cannot show the complete form. */
+.server-page{overflow-x:hidden;overflow-y:auto}
+.server-page .settings-grid{flex:0 0 auto;min-height:auto;align-items:start;overflow:visible;grid-auto-rows:auto}
+.server-page .settings-card{height:auto;min-height:0;overflow:visible;padding:16px;gap:12px}
+.server-page .settings-card input{height:40px}
+.server-page .settings-card .choice{padding:10px;gap:8px}
+.server-page .settings-card .choice small{margin-top:3px}
+.server-page .webrtc-port-fields{padding:12px;gap:8px}
+.server-page .readonly-card{margin-top:12px;padding:14px 16px}
+.server-page .readonly-card dl{gap:8px;margin-top:10px}
+
+@media(max-width:850px){
+  .server-page .settings-grid{overflow:visible;grid-auto-rows:auto}
+  .server-page .settings-card{overflow:visible}
+}
 </style>
