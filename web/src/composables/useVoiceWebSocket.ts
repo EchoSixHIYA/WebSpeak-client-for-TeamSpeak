@@ -1054,6 +1054,7 @@ export function useVoiceWebSocket() {
 
   function disconnect(preserveConnection = false): void {
     connectionSequence++;
+    const keepRememberedIdentity = lastConnection?.rememberIdentity === true;
     if (!preserveConnection) lastConnection = null;
     stopMicrophone();
     const socket = ws.value;
@@ -1067,7 +1068,7 @@ export function useVoiceWebSocket() {
     state.reconnectFailed = false;
     state.tsClientId = 0;
     state.errorCode = "";
-    identityMaterial.value = "";
+    if (!keepRememberedIdentity) identityMaterial.value = "";
     members.length = 0;
     channels.length = 0;
     chatMessages.length = 0;

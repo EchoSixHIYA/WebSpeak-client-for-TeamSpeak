@@ -118,6 +118,18 @@ export async function saveStoredIdentity(privateMaterial: string, label = "æ­¤è®
   }
 }
 
+export async function removeStoredIdentity(): Promise<void> {
+  try {
+    await request("identities", "readwrite", (store, resolve, reject) => {
+      const remove = store.delete(CURRENT_IDENTITY_KEY);
+      remove.onsuccess = () => resolve(undefined);
+      remove.onerror = () => reject(remove.error);
+    });
+  } catch {
+    // Identity removal is best effort when browser storage is unavailable.
+  }
+}
+
 export async function loadLocalPreferences(): Promise<LocalPreferences> {
   const defaults: LocalPreferences = { schemaVersion: 1, volumesByUid: {} };
   try {

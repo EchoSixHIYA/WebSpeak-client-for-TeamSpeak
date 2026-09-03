@@ -66,7 +66,7 @@
 
             <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label></details>
 
-            <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || voiceState.connecting" type="submit">
+            <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
               <span>{{ voiceState.connecting ? t('connecting') : t('enterVoice') }}</span>
               <Icon v-if="!voiceState.connecting" name="chevron-right" :size="17" />
@@ -247,7 +247,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import { useVoiceWebSocket, type ChannelInfo, type ChannelMember } from "../composables/useVoiceWebSocket.js";
-import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
+import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
@@ -338,6 +338,7 @@ const audioSettingsError = ref("");
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
 const localPersistenceAvailable = isLocalPersistenceAvailable();
+const identityReady = ref(!localPersistenceAvailable);
 const chatTab = ref<"channel" | "server" | "private" | "events">("channel");
 const privateClientId = ref(0);
 const away = ref(false);
@@ -984,7 +985,10 @@ watch(settingsOpen, (open) => {
 });
 watch(rememberIdentity, (remember) => {
   localStorage.setItem("webspeak:remember-identity", remember ? "1" : "0");
-  if (!remember) identityMaterial.value = "";
+  if (!remember) {
+    identityMaterial.value = "";
+    void removeStoredIdentity();
+  }
 });
 watch([rememberIdentity, identityMaterial], ([remember, material]) => {
   if (remember && material) void saveStoredIdentity(material);
@@ -1029,10 +1033,12 @@ onMounted(() => {
     }
   });
   void loadStoredIdentity().then((stored) => {
-    if (stored) {
+    if (stored && localStorage.getItem("webspeak:remember-identity") === "1") {
       identityMaterial.value = stored.privateMaterial;
       rememberIdentity.value = true;
     }
+  }).finally(() => {
+    identityReady.value = true;
   });
   void listFavorites().then((items) => { favoriteServers.value = items; });
   void listRecentServers().then((items) => { recentServers.value = items; });
