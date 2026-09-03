@@ -651,5 +651,9 @@ async function parseResponse(response: Response) { const value = await response.
   .operations-primary .table-wrap{max-height:none;overflow-x:auto;overflow-y:visible}
   .operations-primary .invite-list{max-height:none;overflow:visible}
   .logs-card .log-list,.audit-card .event-list{max-height:none;overflow:visible;flex:none}
+  .logs-card .log-list{width:100%;min-width:0}
+  .logs-card .log-row{min-width:0;max-width:100%;overflow:hidden}
+  .logs-card .log-row>div{width:0;max-width:100%;flex:1 1 auto;min-width:0;overflow:hidden}
+  .logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
 }
 </style>
