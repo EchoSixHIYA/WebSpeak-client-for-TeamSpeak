@@ -112,12 +112,34 @@ test("admin API requires the default password to be changed before administratio
       siteName: "Changed",
       welcomeText: "Open access",
       webRtcEnabled: true,
+      webRtcUdpStart: 41000,
+      webRtcUdpEnd: 41099,
     },
   });
   assert.equal(saved.body.ok, true);
   assert.equal(saved.body.settings.accessMode, "open");
   assert.equal(saved.body.settings.hasPassword, false);
   assert.equal(saved.body.settings.webRtcEnabled, true);
+  assert.equal(saved.body.settings.webRtcUdpStart, 41000);
+  assert.equal(saved.body.settings.webRtcUdpEnd, 41099);
+
+  const lockedPorts = await request(origin, "/api/admin/server", {
+    method: "PUT",
+    cookie,
+    csrf: login.body.csrfToken,
+    body: {
+      target: "voice.example.com:9988",
+      passwordAction: "keep",
+      accessMode: "open",
+      siteName: "Changed",
+      welcomeText: "Open access",
+      webRtcEnabled: true,
+      webRtcUdpStart: 42000,
+      webRtcUdpEnd: 42099,
+    },
+  });
+  assert.equal(lockedPorts.response.status, 400);
+  assert.equal(lockedPorts.body.code, "WEBRTC_PORT_LOCKED");
 
   const invite = await request(origin, "/api/admin/invites", {
     method: "POST",

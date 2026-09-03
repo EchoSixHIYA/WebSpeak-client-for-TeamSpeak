@@ -8,6 +8,9 @@ import {
 } from "werift";
 import type { Logger as LoggerType } from "../logger.js";
 import type { TSVoiceData } from "./ts-client.js";
+import { WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
+
+export { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -28,13 +31,12 @@ const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
 // indicator or forward them to TeamSpeak as if they were voice.
 const MIN_SPEAKER_RMS = 160;
 
-// WebRTC is served by the WebSpeak process itself. Docker publishes this
-// fixed range so the administrator only needs to enable the transport; the
-// advertised host is derived from the browser's current WebSpeak address.
-export const WEBRTC_UDP_PORT_RANGE: [number, number] = [40000, 40099];
-
+// WebRTC is served by the WebSpeak process itself. The default range is also
+// published by the bundled Docker Compose file; advanced administrators can
+// change it in the admin console before enabling WebRTC.
 export interface WebRtcAudioOptions {
   enabled: boolean;
+  udpPortRange?: [number, number];
 }
 
 export interface WebRtcSessionDescription {
@@ -46,6 +48,7 @@ export interface WebRtcSessionDescription {
 export interface WebRtcAudioSessionOptions {
   connectionId: string;
   publicHost?: string;
+  udpPortRange?: [number, number];
   logger: LoggerType;
   microphoneMuted?: boolean;
   onVoiceFrame: (data: Buffer) => void;
@@ -90,12 +93,13 @@ export class WebRtcAudioSession {
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
     const iceAdditionalHostAddresses = options.publicHost ? [options.publicHost] : undefined;
+    const udpPortRange = options.udpPortRange ?? WEBRTC_UDP_PORT_RANGE;
     this.peer = new RTCPeerConnection({
       iceServers: [],
       iceUseIpv4: true,
       iceUseIpv6: false,
       iceUseTcp: false,
-      icePortRange: [...WEBRTC_UDP_PORT_RANGE] as [number, number],
+      icePortRange: [...udpPortRange] as [number, number],
       ...(iceAdditionalHostAddresses ? { iceAdditionalHostAddresses } : {}),
     });
 

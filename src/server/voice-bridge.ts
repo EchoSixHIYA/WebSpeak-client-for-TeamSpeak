@@ -740,6 +740,7 @@ export class VoiceBridge {
     const peer = new WebRtcAudioSession({
       connectionId: entry.id,
       ...(entry.webrtcPublicHost ? { publicHost: entry.webrtcPublicHost } : {}),
+      udpPortRange: config.udpPortRange,
       logger: this.logger,
       microphoneMuted: offer.muted === true,
       onVoiceFrame: (data) => {

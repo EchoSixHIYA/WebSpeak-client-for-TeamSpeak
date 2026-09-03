@@ -8,6 +8,7 @@ import { hashAdminPassword, validateAdminPassword, verifyAdminPassword } from ".
 import { decryptSecret, encryptSecret } from "../security/secret-crypto.js";
 import { probeTeamSpeak, TeamSpeakProbeError, type TeamSpeakProbeResult } from "../server/teamspeak-probe.js";
 import type { WebRtcAudioOptions } from "../server/webrtc-audio.js";
+import { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_MAX, WEBRTC_UDP_PORT_MIN } from "../server/webrtc-config.js";
 
 export interface AdminSettingsInput {
   target: string;
@@ -17,6 +18,8 @@ export interface AdminSettingsInput {
   siteName: string;
   welcomeText: string;
   webRtcEnabled: boolean;
+  webRtcUdpStart?: number;
+  webRtcUdpEnd?: number;
 }
 
 export interface ConnectionPolicy {
@@ -111,6 +114,8 @@ export class AdminService {
       lastTestLatencyMs: settings.lastTestLatencyMs,
       lastTestError: settings.lastTestError,
       webRtcEnabled: settings.webRtcEnabled,
+      webRtcUdpStart: settings.webRtcUdpStart,
+      webRtcUdpEnd: settings.webRtcUdpEnd,
       internalPort: 3040,
       updatedAt: settings.updatedAt,
     };
@@ -118,7 +123,10 @@ export class AdminService {
 
   getWebRtcAudioOptions(): WebRtcAudioOptions {
     const settings = this.database.getSettings();
-    return { enabled: settings.webRtcEnabled };
+    return {
+      enabled: settings.webRtcEnabled,
+      udpPortRange: [settings.webRtcUdpStart, settings.webRtcUdpEnd],
+    };
   }
 
   updateSettings(input: AdminSettingsInput): void {
@@ -263,6 +271,20 @@ export class AdminService {
     if (typeof input.webRtcEnabled !== "boolean") {
       throw new AdminInputError("INVALID_WEBRTC_ENABLED", "WebRTC enabled value is invalid");
     }
+    const webRtcUdpStart = input.webRtcUdpStart ?? current.webRtcUdpStart ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[0];
+    const webRtcUdpEnd = input.webRtcUdpEnd ?? current.webRtcUdpEnd ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[1];
+    if (!Number.isInteger(webRtcUdpStart) || webRtcUdpStart < WEBRTC_UDP_PORT_MIN || webRtcUdpStart > WEBRTC_UDP_PORT_MAX) {
+      throw new AdminInputError("INVALID_WEBRTC_PORT_RANGE", "WebRTC UDP start port must be between 1024 and 65535");
+    }
+    if (!Number.isInteger(webRtcUdpEnd) || webRtcUdpEnd < WEBRTC_UDP_PORT_MIN || webRtcUdpEnd > WEBRTC_UDP_PORT_MAX) {
+      throw new AdminInputError("INVALID_WEBRTC_PORT_RANGE", "WebRTC UDP end port must be between 1024 and 65535");
+    }
+    if (webRtcUdpStart > webRtcUdpEnd) {
+      throw new AdminInputError("INVALID_WEBRTC_PORT_RANGE", "WebRTC UDP start port must not exceed the end port");
+    }
+    if (current.webRtcEnabled && (webRtcUdpStart !== current.webRtcUdpStart || webRtcUdpEnd !== current.webRtcUdpEnd)) {
+      throw new AdminInputError("WEBRTC_PORT_LOCKED", "Disable WebRTC and save before changing its UDP port range");
+    }
 
     let encryptedPassword = current.tsPasswordEncrypted;
     const action = input.passwordAction ?? (input.serverPassword === undefined ? "keep" : "replace");
@@ -276,6 +298,8 @@ export class AdminService {
       tsPort: target.port,
       tsPasswordEncrypted: encryptedPassword,
       webRtcEnabled: input.webRtcEnabled,
+      webRtcUdpStart,
+      webRtcUdpEnd,
     };
   }
 
@@ -305,6 +329,8 @@ export class AdminService {
       tsPort: settings.tsPort,
       tsPasswordEncrypted: settings.tsPasswordEncrypted,
       webRtcEnabled: settings.webRtcEnabled,
+      webRtcUdpStart: settings.webRtcUdpStart,
+      webRtcUdpEnd: settings.webRtcUdpEnd,
     };
   }
 
@@ -321,6 +347,8 @@ export class AdminService {
         tsPort: legacy.tsPort,
         tsPasswordEncrypted: legacy.tsServerPassword ? encryptSecret(legacy.tsServerPassword, this.masterSecret) : null,
         webRtcEnabled: current.webRtcEnabled,
+        webRtcUdpStart: current.webRtcUdpStart,
+        webRtcUdpEnd: current.webRtcUdpEnd,
       }, "LEGACY_CONFIG_IMPORTED");
       this.database.setMeta("legacy_config_imported", "1");
       this.database.setMeta("legacy_import_notice_pending", "1");

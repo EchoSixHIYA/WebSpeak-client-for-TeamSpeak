@@ -333,6 +333,8 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
     siteName: readString(body, "siteName", 80),
     welcomeText: readOptionalString(body, "welcomeText", 500),
     webRtcEnabled: body.webRtcEnabled === true,
+    webRtcUdpStart: readOptionalInteger(body, "webRtcUdpStart"),
+    webRtcUdpEnd: readOptionalInteger(body, "webRtcUdpEnd"),
   };
 }
 
@@ -347,6 +349,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function readString(body: Record<string, unknown>, key: string, max: number): string {
   if (typeof body[key] !== "string" || body[key].length > max) throw new AdminInputError("INVALID_REQUEST", `${key} is invalid`);
+  return body[key];
+}
+
+function readOptionalInteger(body: Record<string, unknown>, key: string): number | undefined {
+  if (body[key] === undefined) return undefined;
+  if (typeof body[key] !== "number" || !Number.isSafeInteger(body[key])) {
+    throw new AdminInputError("INVALID_REQUEST", `${key} is invalid`);
+  }
   return body[key];
 }
 

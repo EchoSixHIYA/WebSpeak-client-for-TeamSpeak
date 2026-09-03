@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
+import { DEFAULT_WEBRTC_UDP_PORT_RANGE } from "../server/webrtc-config.js";
 
 export const DATABASE_SCHEMA_VERSION = 3;
 export type AccessMode = "fixed" | "open";
@@ -20,6 +21,8 @@ export interface PersistedSettings {
   lastTestLatencyMs: number | null;
   lastTestError: string | null;
   webRtcEnabled: boolean;
+  webRtcUdpStart: number;
+  webRtcUdpEnd: number;
   updatedAt: string;
 }
 
@@ -31,6 +34,8 @@ export interface SettingsUpdate {
   tsPort: number;
   tsPasswordEncrypted: string | null;
   webRtcEnabled: boolean;
+  webRtcUdpStart?: number;
+  webRtcUdpEnd?: number;
 }
 
 export interface ManagedInviteRecord {
@@ -147,6 +152,8 @@ export class WebSpeakDatabase {
       lastTestLatencyMs: row.last_test_latency_ms,
       lastTestError: row.last_test_error,
       webRtcEnabled: row.webrtc_enabled === 1,
+      webRtcUdpStart: row.webrtc_udp_start,
+      webRtcUdpEnd: row.webrtc_udp_end,
       updatedAt: row.updated_at,
     };
   }
@@ -361,9 +368,8 @@ export class WebSpeakDatabase {
     if (version === 2) {
       this.transaction(() => {
         this.database.exec(`
-          -- The host and range columns are retained for v3 database compatibility.
-          -- WebSpeak no longer reads or exposes them; WebRTC now owns its media
-          -- endpoint and derives the public host from each browser connection.
+          -- WebRTC media ports are stored with the administrator settings so the
+          -- same range is used by the gateway and shown in the admin console.
           ALTER TABLE settings ADD COLUMN webrtc_enabled INTEGER NOT NULL DEFAULT 0 CHECK (webrtc_enabled IN (0, 1));
           ALTER TABLE settings ADD COLUMN webrtc_public_host TEXT NOT NULL DEFAULT '';
           ALTER TABLE settings ADD COLUMN webrtc_udp_start INTEGER NOT NULL DEFAULT 40000 CHECK (webrtc_udp_start BETWEEN 1 AND 65535);
@@ -378,7 +384,8 @@ export class WebSpeakDatabase {
     this.database.prepare(
       `UPDATE settings SET
          site_name = ?, welcome_text = ?, access_mode = ?, ts_host = ?, ts_port = ?,
-         ts_password_encrypted = ?, webrtc_enabled = ?, updated_at = ?
+         ts_password_encrypted = ?, webrtc_enabled = ?, webrtc_udp_start = ?,
+         webrtc_udp_end = ?, updated_at = ?
        WHERE id = 1`,
     ).run(
       settings.siteName,
@@ -388,6 +395,8 @@ export class WebSpeakDatabase {
       settings.tsPort,
       settings.tsPasswordEncrypted,
       settings.webRtcEnabled ? 1 : 0,
+      settings.webRtcUdpStart ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[0],
+      settings.webRtcUdpEnd ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[1],
       now,
     );
   }
