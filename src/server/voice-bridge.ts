@@ -737,6 +737,7 @@ export class VoiceBridge {
       connectionId: entry.id,
       ...(entry.webrtcPublicHost ? { publicHost: entry.webrtcPublicHost } : {}),
       logger: this.logger,
+      microphoneMuted: offer.muted === true,
       onVoiceFrame: (data) => {
         const now = Date.now();
         if (entry.audio.ingressLastAt !== null) entry.audio.ingressMaxGapMs = Math.max(entry.audio.ingressMaxGapMs, now - entry.audio.ingressLastAt);
@@ -757,7 +758,7 @@ export class VoiceBridge {
     });
     entry.webrtc = peer;
     try {
-      const answer = await peer.createAnswer(offer);
+      const answer = await peer.createAnswer({ type: offer.type, sdp: offer.sdp });
       if (entry.webrtc !== peer || entry.ws.readyState !== WebSocket.OPEN) return;
       sendJson({ type: "webrtcAnswer", payload: { sdp: answer } });
       this.logger.info({ entryId: entry.id }, "WebRTC audio negotiation completed");
@@ -864,6 +865,8 @@ async function handleCommand(
       }
       entry.whisperActive = active;
       sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
+    } else if (command.type === "setMicrophoneMuted") {
+      entry.webrtc?.setMicrophoneMuted(command.payload.muted as boolean);
     }
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {
@@ -893,7 +896,8 @@ function parseWebRtcOffer(raw: string): WebRtcSessionDescription | null {
   if (!isRecord(value) || value.type !== "webrtcOffer" || !isRecord(value.payload) || !isRecord(value.payload.sdp)) return null;
   const description = value.payload.sdp;
   if (description.type !== "offer" || typeof description.sdp !== "string" || description.sdp.length > 256 * 1024) return null;
-  return { type: "offer", sdp: description.sdp };
+  if (value.payload.muted !== undefined && typeof value.payload.muted !== "boolean") return null;
+  return { type: "offer", sdp: description.sdp, muted: value.payload.muted === true };
 }
 
 function isWebRtcStopMessage(raw: string): boolean {

@@ -569,7 +569,7 @@ export function useVoiceWebSocket() {
       if (sequence !== connectionSequence || webrtcPeer !== peer || socket.readyState !== WebSocket.OPEN) return;
       const description = peer.localDescription;
       if (!description) throw new Error("WebRTC offer was not created");
-      socket.send(JSON.stringify({ type: "webrtcOffer", payload: { sdp: { type: description.type, sdp: description.sdp } } }));
+      socket.send(JSON.stringify({ type: "webrtcOffer", payload: { sdp: { type: description.type, sdp: description.sdp }, muted: microphoneMuted.value } }));
       window.setTimeout(() => {
         if (webrtcPeer === peer && !peer.remoteDescription) void fallbackFromWebRtc(sequence, socket);
       }, 8_000);
@@ -1336,6 +1336,7 @@ export function useVoiceWebSocket() {
     voxRelease = 0;
     accumLen = 0;
     if (webrtcActive.value) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+    if (webrtcActive.value) sendCmd("setMicrophoneMuted", { muted });
     if (muted && state.tsClientId) clearSpeaking(state.tsClientId);
     void saveAudioPreferences();
   }

@@ -73,3 +73,13 @@ test("voice protocol validates whisper targets and its independent push state", 
     error: { code: "INVALID_WHISPER_STATE", message: "私语状态无效" },
   });
 });
+
+test("voice protocol accepts and validates the microphone mute state", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setMicrophoneMuted", payload: { muted: true } })), {
+    type: "setMicrophoneMuted",
+    payload: { muted: true },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setMicrophoneMuted", payload: { muted: "yes" } })), {
+    error: { code: "INVALID_MICROPHONE_STATE", message: "麦克风状态无效" },
+  });
+});

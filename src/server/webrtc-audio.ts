@@ -40,12 +40,14 @@ export interface WebRtcAudioOptions {
 export interface WebRtcSessionDescription {
   type: "offer" | "answer";
   sdp: string;
+  muted?: boolean;
 }
 
 export interface WebRtcAudioSessionOptions {
   connectionId: string;
   publicHost?: string;
   logger: LoggerType;
+  microphoneMuted?: boolean;
   onVoiceFrame: (data: Buffer) => void;
   onVoiceActivity: (clientIds: number[]) => void;
 }
@@ -73,6 +75,7 @@ export class WebRtcAudioSession {
   private readonly audioTimer: ReturnType<typeof setInterval>;
   private readonly activityTimer: ReturnType<typeof setInterval>;
   private encoder: { encode(data: Buffer): Buffer } | null;
+  private microphoneMuted: boolean;
   private sequenceNumber = randomInt(0, 65_536);
   private timestamp = randomInt(0, 0x1_0000_0000) >>> 0;
   private readonly ssrc = randomInt(1, 0x1_0000_0000) >>> 0;
@@ -83,6 +86,7 @@ export class WebRtcAudioSession {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
     this.onVoiceFrame = options.onVoiceFrame;
     this.onVoiceActivity = options.onVoiceActivity;
+    this.microphoneMuted = options.microphoneMuted === true;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
     const iceAdditionalHostAddresses = options.publicHost ? [options.publicHost] : undefined;
@@ -98,7 +102,7 @@ export class WebRtcAudioSession {
     const audio = this.peer.addTransceiver("audio", { direction: "sendrecv" });
     audio.onTrack.subscribe((track) => {
       track.onReceiveRtp.subscribe((rtp) => {
-        if (this.closed || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
+        if (this.closed || this.microphoneMuted || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         const payload = Buffer.from(rtp.payload);
         // A disabled browser MediaStreamTrack normally still produces RTP
         // comfort-noise packets. TeamSpeak treats any received voice packet
@@ -242,6 +246,10 @@ export class WebRtcAudioSession {
     const ids = [...this.activeSpeakerIds];
     this.activeSpeakerIds.clear();
     this.onVoiceActivity(ids);
+  }
+
+  setMicrophoneMuted(muted: boolean): void {
+    this.microphoneMuted = muted;
   }
 
   private hasVoiceEnergy(data: Buffer): boolean {
