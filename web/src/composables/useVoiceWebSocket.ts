@@ -88,8 +88,6 @@ export function useVoiceWebSocket() {
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
   let webrtcPeer: RTCPeerConnection | null = null;
   let webrtcOutputElement: SinkAudioElement | null = null;
-  let webrtcOutputSource: MediaStreamAudioSourceNode | null = null;
-  let webrtcOutputGain: GainNode | null = null;
   let webrtcPlaybackStream: MediaStream | null = null;
   let webrtcPlaybackRetryCleanup: (() => void) | null = null;
   let webrtcNegotiationPromise: Promise<void> | null = null;
@@ -265,7 +263,6 @@ export function useVoiceWebSocket() {
       audioContextState.value = audioCtx.state;
       audioCtx.addEventListener("statechange", () => {
         if (audioCtx) audioContextState.value = audioCtx.state;
-        void syncWebRtcPlayback();
       });
       outputDeviceSupported.value = typeof audioCtx.setSinkId === "function"
         || typeof (HTMLMediaElement.prototype as SinkAudioElement).setSinkId === "function";
@@ -308,16 +305,10 @@ export function useVoiceWebSocket() {
   async function syncWebRtcPlayback(): Promise<void> {
     const output = webrtcOutputElement;
     if (!output || !webrtcPlaybackStream) return;
-    const ctx = audioCtx;
-    if (ctx?.state === "suspended") {
-      try { await ctx.resume(); } catch { /* fall back to the native media element */ }
-    }
-    const useWebAudio = Boolean(ctx && ctx.state === "running" && webrtcOutputSource && webrtcOutputGain);
-    output.muted = useWebAudio;
-    if (useWebAudio) {
-      webrtcPlaybackRetryCleanup?.();
-      return;
-    }
+    // Keep WebRTC on the browser's native MediaStream playback path. The
+    // capture AudioContext is intentionally not used as a second output
+    // route: a running-but-silent graph could leave the UI reporting a live
+    // speaker while the actual remote audio element remained muted.
     output.muted = false;
     try {
       await output.play();
@@ -546,7 +537,7 @@ export function useVoiceWebSocket() {
       stopWebRtcPlayback();
       const output = document.createElement("audio") as SinkAudioElement;
       output.autoplay = true;
-      output.muted = true;
+      output.muted = false;
       output.setAttribute("playsinline", "");
       output.volume = outputVolume.value;
       output.setAttribute("aria-hidden", "true");
@@ -560,17 +551,6 @@ export function useVoiceWebSocket() {
       document.body.append(output);
       webrtcOutputElement = output;
       webrtcPlaybackStream = stream;
-      try {
-        const ctx = getAudioCtx();
-        webrtcOutputSource = ctx.createMediaStreamSource(stream);
-        webrtcOutputGain = ctx.createGain();
-        webrtcOutputGain.gain.value = outputVolume.value;
-        webrtcOutputSource.connect(webrtcOutputGain);
-        webrtcOutputGain.connect(ctx.destination);
-      } catch {
-        // The native element below remains the playback path when Web Audio
-        // cannot attach to a remote MediaStream on an older browser.
-      }
       if (selectedOutputDeviceId.value && output.setSinkId) {
         void output.setSinkId(selectedOutputDeviceId.value).catch(() => undefined);
       }
@@ -659,10 +639,6 @@ export function useVoiceWebSocket() {
 
   function stopWebRtcPlayback(): void {
     webrtcPlaybackRetryCleanup?.();
-    webrtcOutputSource?.disconnect();
-    webrtcOutputGain?.disconnect();
-    webrtcOutputSource = null;
-    webrtcOutputGain = null;
     webrtcPlaybackStream = null;
     webrtcOutputElement?.pause();
     if (webrtcOutputElement) {
@@ -1418,7 +1394,6 @@ export function useVoiceWebSocket() {
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     for (const [clientId, gain] of remoteGains) gain.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
-    if (webrtcOutputGain) webrtcOutputGain.gain.value = outputVolume.value;
     if (webrtcOutputElement) webrtcOutputElement.volume = outputVolume.value;
     void saveAudioPreferences();
   }
