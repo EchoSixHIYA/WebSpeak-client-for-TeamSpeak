@@ -44,6 +44,10 @@ type SinkAudioContext = AudioContext & {
   setSinkId?: (sinkId: string) => Promise<void>;
 };
 
+type SinkAudioElement = HTMLAudioElement & {
+  setSinkId?: (sinkId: string) => Promise<void>;
+};
+
 export interface ChannelInfo {
   id: string;
   parentID: string;
@@ -83,8 +87,7 @@ export function useVoiceWebSocket() {
   let connectionSequence = 0;
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean } | null = null;
   let webrtcPeer: RTCPeerConnection | null = null;
-  let webrtcOutputSource: MediaStreamAudioSourceNode | null = null;
-  let webrtcOutputGain: GainNode | null = null;
+  let webrtcOutputElement: SinkAudioElement | null = null;
   let webrtcNegotiationPromise: Promise<void> | null = null;
   let webrtcFallbackStarted = false;
   const webrtcActive = ref(false);
@@ -255,7 +258,8 @@ export function useVoiceWebSocket() {
       audioCtx.addEventListener("statechange", () => {
         if (audioCtx) audioContextState.value = audioCtx.state;
       });
-      outputDeviceSupported.value = typeof audioCtx.setSinkId === "function";
+      outputDeviceSupported.value = typeof audioCtx.setSinkId === "function"
+        || typeof (HTMLMediaElement.prototype as SinkAudioElement).setSinkId === "function";
       if (selectedOutputDeviceId.value && outputDeviceSupported.value) {
         void setAudioSink(audioCtx, selectedOutputDeviceId.value).catch(() => undefined);
       }
@@ -268,13 +272,15 @@ export function useVoiceWebSocket() {
   }
 
   async function setAudioSink(ctx: SinkAudioContext, deviceId: string): Promise<void> {
-    if (!ctx.setSinkId) {
+    const mediaSinkSupported = typeof (HTMLMediaElement.prototype as SinkAudioElement).setSinkId === "function";
+    if (!ctx.setSinkId && !mediaSinkSupported) {
       outputDeviceSupported.value = false;
       if (deviceId) throw new Error("当前浏览器不支持扬声器设备选择，将使用默认输出设备");
       return;
     }
     outputDeviceSupported.value = true;
-    await ctx.setSinkId(deviceId || "default");
+    if (ctx.setSinkId) await ctx.setSinkId(deviceId || "default");
+    if (webrtcOutputElement?.setSinkId) await webrtcOutputElement.setSinkId(deviceId || "default");
   }
 
   function checkSupport(): string | null {
@@ -486,15 +492,43 @@ export function useVoiceWebSocket() {
     peer.addTrack(track, micStream);
     peer.ontrack = (event) => {
       const stream = event.streams[0] ?? new MediaStream([event.track]);
-      const ctx = getAudioCtx();
-      if (ctx.state === "suspended") void ctx.resume();
-      webrtcOutputSource?.disconnect();
-      webrtcOutputGain?.disconnect();
-      webrtcOutputSource = ctx.createMediaStreamSource(stream);
-      webrtcOutputGain = ctx.createGain();
-      webrtcOutputGain.gain.value = outputVolume.value;
-      webrtcOutputSource.connect(webrtcOutputGain);
-      webrtcOutputGain.connect(ctx.destination);
+      // Use the browser's native WebRTC media output. Routing the remote
+      // track through AudioContext made playback depend on autoplay policy:
+      // the control channel could report speaking while a suspended context
+      // silently discarded the actual audio. A hidden autoplaying media
+      // element keeps WebRTC's decoder and jitter buffer on the native path.
+      webrtcOutputElement?.pause();
+      if (webrtcOutputElement) {
+        webrtcOutputElement.srcObject = null;
+        webrtcOutputElement.remove();
+      }
+      const output = document.createElement("audio") as SinkAudioElement;
+      output.autoplay = true;
+      output.setAttribute("playsinline", "");
+      output.volume = outputVolume.value;
+      output.setAttribute("aria-hidden", "true");
+      output.tabIndex = -1;
+      output.style.position = "fixed";
+      output.style.width = "1px";
+      output.style.height = "1px";
+      output.style.opacity = "0";
+      output.style.pointerEvents = "none";
+      output.srcObject = stream;
+      document.body.append(output);
+      webrtcOutputElement = output;
+      if (selectedOutputDeviceId.value && output.setSinkId) {
+        void output.setSinkId(selectedOutputDeviceId.value).catch(() => undefined);
+      }
+      void output.play().catch(() => {
+        // A browser may require a later user gesture to start media playback.
+        // Retry on the next pointer interaction without interrupting the
+        // active voice connection.
+        const retry = () => {
+          if (webrtcOutputElement !== output) return;
+          void output.play().catch(() => undefined);
+        };
+        window.addEventListener("pointerdown", retry, { once: true, passive: true });
+      });
     };
     peer.onconnectionstatechange = () => {
       if (peer.connectionState === "failed") void fallbackFromWebRtc(sequence, socket);
@@ -571,10 +605,12 @@ export function useVoiceWebSocket() {
     webrtcPeer = null;
     webrtcActive.value = false;
     webrtcNegotiationPromise = null;
-    webrtcOutputSource?.disconnect();
-    webrtcOutputGain?.disconnect();
-    webrtcOutputSource = null;
-    webrtcOutputGain = null;
+    webrtcOutputElement?.pause();
+    if (webrtcOutputElement) {
+      webrtcOutputElement.srcObject = null;
+      webrtcOutputElement.remove();
+    }
+    webrtcOutputElement = null;
     if (peer) void peer.close();
   }
 
@@ -1281,7 +1317,7 @@ export function useVoiceWebSocket() {
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     for (const [clientId, gain] of remoteGains) gain.gain.value = (volumes[clientId] ?? 1) * outputVolume.value;
-    if (webrtcOutputGain) webrtcOutputGain.gain.value = outputVolume.value;
+    if (webrtcOutputElement) webrtcOutputElement.volume = outputVolume.value;
     void saveAudioPreferences();
   }
 

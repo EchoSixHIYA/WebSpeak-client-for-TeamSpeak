@@ -140,7 +140,6 @@ export class WebRtcAudioSession {
 
   pushTeamSpeakVoice(data: TSVoiceData): void {
     if (this.closed || data.codec !== 4) return;
-    this.activeSpeakerIds.add(data.clientId);
     let decoder = this.decoderByClient.get(data.clientId);
     if (!decoder) {
       try {
@@ -155,7 +154,12 @@ export class WebRtcAudioSession {
     }
     try {
       const pcm = decoder.decode(data.data);
-      if (pcm.length >= AUDIO_FRAME_BYTES) this.pendingFrames.set(data.clientId, pcm.subarray(0, AUDIO_FRAME_BYTES));
+      // Only advertise speaking after a valid TeamSpeak Opus frame has been
+      // decoded. Otherwise the UI can show activity while the mixer has no
+      // audio to send, which is especially confusing on the WebRTC path.
+      if (pcm.length < AUDIO_FRAME_BYTES) return;
+      this.pendingFrames.set(data.clientId, pcm.subarray(0, AUDIO_FRAME_BYTES));
+      this.activeSpeakerIds.add(data.clientId);
     } catch {
       // A malformed or codec-transition packet is discarded without touching
       // the peer connection. The next valid Opus frame can recover the stream.
