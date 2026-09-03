@@ -16,7 +16,7 @@
         <div class="admin-brand centered"><span><Icon name="waveform" :size="24" /></span><div><strong>WebSpeak</strong><small>{{ tr('adminConsole') }}</small></div></div>
         <header><h1>{{ tr('welcomeAdmin') }}</h1><p>{{ tr('loginLead') }}</p></header>
         <form @submit.prevent="login"><div v-if="errorMessage" class="alert error">{{ errorMessage }}</div><label><span>{{ tr('adminUsername') }}</span><input v-model.trim="loginUsername" autocomplete="username" autofocus /></label><label><span>{{ tr('adminPassword') }}</span><input v-model="loginPassword" type="password" autocomplete="current-password" /></label><button class="primary-button wide" :disabled="submitting" type="submit"><span v-if="submitting" class="spinner small"></span>{{ tr('login') }}</button></form>
-        <button class="language-link" type="button" @click="toggleLanguage">{{ tr('languageSwitch') }}</button>
+        <div class="login-actions"><RouterLink to="/" class="home-link"><Icon name="home" :size="15" />{{ tr('backHome') }}</RouterLink><button class="language-link" type="button" @click="toggleLanguage">{{ tr('languageSwitch') }}</button></div>
       </section>
     </main>
 
@@ -126,6 +126,7 @@ const copy = {
     loginLead: "输入管理员账号和密码以管理此 WebSpeak 实例。",
     adminPassword: "管理员密码",
     login: "登录",
+    backHome: "返回首页",
     overview: "概览",
     server: "服务器",
     operations: "运维",
@@ -280,6 +281,7 @@ const copy = {
     loginLead: "Enter the admin account and password to manage this WebSpeak instance.",
     adminPassword: "Admin password",
     login: "Sign in",
+    backHome: "Back to home",
     overview: "Overview",
     server: "Server",
     operations: "Operations",
@@ -661,4 +663,9 @@ async function parseResponse(response: Response) { const value = await response.
    log card or introducing page-level horizontal scrolling. */
 .logs-card .log-row{min-width:0}
 .logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
+
+.login-actions{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:20px;flex-wrap:wrap}
+.login-actions .language-link{margin-top:0}
+.home-link{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;color:#08766e;background:#e4f3ef;border:1px solid #cae7e0;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none}
+.home-link:hover{background:#d8eee9}
 </style>
