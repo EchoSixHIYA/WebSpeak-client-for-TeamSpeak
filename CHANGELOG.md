@@ -2,6 +2,22 @@
 
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
+## [0.1.4] — 2026-09-03
+
+### 中文
+
+- 修复 WebRTC 语音收发与发言状态同步。
+- 修复频道文字消息在 WebSpeak 客户端之间无法互收。
+- 优化管理员页面、运行日志换行和移动端顶部布局。
+- 首页新增 Bilibili 入口，管理员登录页新增返回首页。
+
+### English
+
+- Fixed WebRTC voice transport and speaking-state synchronization.
+- Fixed channel text messages between WebSpeak clients.
+- Refined admin pages, log wrapping, and narrow-screen header layout.
+- Added the Bilibili profile link and the admin-login home link.
+
 ## [0.1.3] — 2026-09-03
 
 ### Added

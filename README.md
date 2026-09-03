@@ -9,7 +9,7 @@
 **在线体验：[webspeak.online](https://webspeak.online)**
 
 [![GitHub](https://img.shields.io/badge/GitHub-源代码-181717?style=for-the-badge&logo=github)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak)
-[![Version](https://img.shields.io/badge/version-0.1.3-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3)
+[![Version](https://img.shields.io/badge/version-0.1.4-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
@@ -128,6 +128,12 @@ sudo ufw allow 40000:40099/udp
 ### 更新日志 · Changelog
 
 完整记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+#### 2026-09-03 · v0.1.4
+
+- 修复 WebRTC 语音收发与发言状态同步。
+- 修复频道文字消息在 WebSpeak 客户端之间无法互收。
+- 优化管理员页面、运行日志换行和移动端顶部布局；新增 Bilibili 入口及登录页返回首页。
 
 #### 2026-09-03 · v0.1.3
 
@@ -280,6 +286,12 @@ The admin console can:
 ### Changelog
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete release history.
+
+#### 2026-09-03 · v0.1.4
+
+- Fixed WebRTC voice transport and speaking-state synchronization.
+- Fixed channel text messages between WebSpeak clients.
+- Refined admin pages, log wrapping, and narrow-screen header layout; added Bilibili and admin-login home links.
 
 #### 2026-09-03 · v0.1.3
 
