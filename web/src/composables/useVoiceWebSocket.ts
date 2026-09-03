@@ -1150,10 +1150,14 @@ export function useVoiceWebSocket() {
       case "chatMessage":
         if (Number(msg.invokerId) === state.tsClientId) break;
         const incomingScope = msg.scope === "private" || msg.scope === "server" || msg.scope === "channel" ? msg.scope : "system";
+        const rawTargetId = typeof msg.targetId === "string" || typeof msg.targetId === "number" ? String(msg.targetId) : undefined;
+        // Older gateways and TeamSpeak channel notifications may use 0 as
+        // the broadcast sentinel. It must not be compared with a channel id.
+        const incomingTargetId = rawTargetId && rawTargetId !== "0" ? rawTargetId : undefined;
         chatMessages.push({
           id: `remote-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           scope: incomingScope,
-          targetId: typeof msg.targetId === "string" ? msg.targetId : undefined,
+          ...(incomingTargetId ? { targetId: incomingTargetId } : {}),
           ...(incomingScope === "private" ? { conversationId: String(Number(msg.invokerId) || 0) } : {}),
           senderId: Number(msg.invokerId) || undefined,
           senderUid: typeof msg.senderUid === "string" ? msg.senderUid : undefined,

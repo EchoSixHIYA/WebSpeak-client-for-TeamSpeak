@@ -484,12 +484,16 @@ export class VoiceBridge {
 
       tsClient.on("textMessage", (message) => {
         const scope = message.targetMode === 1 ? "private" : message.targetMode === 3 ? "server" : message.targetMode === 2 ? "channel" : "server";
+        const targetId = message.targetId ?? 0n;
+        // TeamSpeak channel notifications omit `target`; the SDK represents
+        // that as 0. Bind the broadcast to this session's current channel so
+        // it remains visible now but cannot leak into another channel after a
+        // later channel switch.
+        const effectiveTargetId = scope === "channel" && targetId === 0n ? tsClient.getChannelId() : targetId;
         sendJson({
           type: "chatMessage",
           scope,
-          // Keep event handling total: malformed/legacy SDK events must not
-          // throw from this callback and tear down the browser session.
-          targetId: String(message.targetId ?? 0n),
+          ...(effectiveTargetId !== 0n ? { targetId: String(effectiveTargetId) } : {}),
           senderUid: message.invokerUid,
           timestamp: Date.now(),
           invokerName: message.invokerName,

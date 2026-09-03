@@ -937,7 +937,7 @@ const visibleChatMessages = computed(() => {
   if (chatTab.value === "private") return chatMessages.filter((message) => message.scope === "private" && message.conversationId === String(privateClientId.value));
   if (chatTab.value !== "channel") return [];
   const channelId = currentChannel.value?.id;
-  return chatMessages.filter((message) => message.scope === "channel" && (!message.targetId || !channelId || message.targetId === channelId));
+  return chatMessages.filter((message) => message.scope === "channel" && (!message.targetId || message.targetId === "0" || !channelId || message.targetId === channelId));
 });
 
 const chatTabLabel = computed(() => chatTab.value === "channel" ? t("textChannel") : chatTab.value === "server" ? t("serverChat") : chatTab.value === "private" ? t("privateMessage") : t("eventLog"));
