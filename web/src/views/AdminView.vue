@@ -656,4 +656,9 @@ async function parseResponse(response: Response) { const value = await response.
   .logs-card .log-row>div{width:0;max-width:100%;flex:1 1 auto;min-width:0;overflow:hidden}
   .logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
 }
+
+/* Long log messages should wrap on every screen size instead of widening the
+   log card or introducing page-level horizontal scrolling. */
+.logs-card .log-row{min-width:0}
+.logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
 </style>
