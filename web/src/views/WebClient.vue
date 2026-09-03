@@ -1934,6 +1934,28 @@ function stopWhisperTalk(): void {
   .join-card { padding-inline: 15px; }
 }
 
+/* Keep every welcome-page action inside the viewport on narrow phones. */
+@media (max-width: 420px) {
+  .join-page .join-header { width: calc(100% - 20px); gap: 6px; }
+  .join-page .brand-lockup { min-width: 0; flex: 1 1 auto; gap: 7px; }
+  .join-page .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
+  .join-page .brand-lockup strong { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+  .join-page .brand-lockup small { display: none; }
+  .join-page .header-tools { min-width: 0; flex: 0 0 auto; gap: 2px; }
+  .join-page .header-tools .theme-toggle { display: none; }
+  .join-page .github-button, .join-page .bilibili-button, .join-page .changelog-button, .join-page .guide-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
+  .join-page .github-button, .join-page .bilibili-button, .join-page .changelog-button, .join-page .guide-button { justify-content: center; }
+  .join-page .github-button .ui-icon { width: 16px; height: 16px; }
+  .join-page .bilibili-glyph { width: 18px; height: 18px; }
+  .join-page .version-badge { min-width: 28px; min-height: 28px; padding-inline: 4px; font-size: 9px; }
+  .join-page .language-switch { min-width: 40px; min-height: 28px; padding-inline: 4px; font-size: 10px; }
+}
+
+@media (max-width: 360px) {
+  .join-page .brand-lockup > div { display: none; }
+  .join-page .brand-lockup { flex: 0 0 32px; }
+}
+
 .bilibili-button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; color: #e56b91; background: #fff0f5; border: 1px solid #f6d2df; border-radius: 8px; font-size: 11px; font-weight: 800; text-decoration: none; transition: .18s; }
 .bilibili-button:hover { color: #fff; background: #e56b91; border-color: #e56b91; box-shadow: 0 7px 16px rgba(229,107,145,.2); transform: translateY(-1px); }
 .bilibili-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: #fff; background: #e56b91; border-radius: 5px; font-size: 11px; line-height: 1; }
@@ -1946,5 +1968,10 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 390px) {
   .join-page .bilibili-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
+}
+
+/* Override the shared Bilibili sizing above for the tighter welcome header. */
+@media (max-width: 420px) {
+  .join-page .bilibili-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
 }
 </style>
