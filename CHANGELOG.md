@@ -21,6 +21,11 @@ All notable changes to WebSpeak are documented here. Versions follow SemVer.
 - Made WebRTC teardown and fallback explicit so a failed negotiation does not leave a server-side media session behind.
 - Corrected native Opus decoder usage and cleaned up negotiated payload handling for TeamSpeak-to-browser audio.
 
+### Verification
+
+- After allowing inbound `40000–40099/UDP` on the public WebSpeak host, two browser sessions were tested against the same TeamSpeak target with WebRTC enabled: audio frames flowed in both directions, packet drops remained at `0`, ingress frame gaps peaked at about `27 ms`, and egress gaps peaked at about `81–83 ms`.
+- The measured WebRTC path stayed below the previous WebSocket jitter peaks of about `268–376 ms` in the same browser test setup; these figures describe the observed test path, not a universal latency guarantee.
+
 ## [0.1.2] — 2026-09-02
 
 ### Added

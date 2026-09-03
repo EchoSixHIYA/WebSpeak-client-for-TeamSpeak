@@ -39,6 +39,7 @@ A self-hosted TeamSpeak 3 / TeamSpeak 6 web client and voice gateway. Join your 
 - WebRTC 语音按协商得到的 Opus 参数传输，并且每位发言者只保留最新音频帧，避免网络抖动时旧语音持续堆积。
 - 修复 WebRTC 与兼容性语音链路切换时的重复播放、残留会话和回退不完整问题。
 - 修复原生 Opus 解码调用和浏览器端协商负载类型处理，并整理连接关闭时的资源清理。
+- 实测公网主机放行入站 `40000–40099/UDP` 后，两个浏览器会话的 WebRTC 音频帧可双向流通，丢帧为 `0`，入口最大间隔约 `27ms`、出口最大间隔约 `81–83ms`；该数据是测试链路结果，不代表所有网络环境的固定延迟。
 
 #### 2026-09-02 · v0.1.2
 
@@ -116,6 +117,8 @@ curl http://127.0.0.1:3040/health
 启动完成后打开 [http://127.0.0.1:3040/](http://127.0.0.1:3040/)。首次进入管理后台 `/admin` 使用 `admin / admin`，并按提示修改密码。
 
 Compose 会同时发布内置 WebRTC 使用的 `40000–40099/UDP`。启用 WebRTC 时只需在管理后台打开开关；不需要填写公网地址，也不需要另行部署媒体服务器。
+
+如果用户需要从公网浏览器接入，还必须在部署主机所在云平台的安全组或上游防火墙中添加一条“入站 UDP `40000–40099`”规则。Docker Compose 只能发布端口，不能替你修改云安全组；Ubuntu 使用 UFW 时可执行 `sudo ufw allow 40000:40099/udp`。网页和 WSS 继续使用 TCP `80/443`，TeamSpeak 的 `9987` 只需由 WebSpeak 主机访问目标 TeamSpeak，不需要在 WebSpeak 主机对公网开放，也不要把 WebRTC 媒体转发到反向代理的 `443/udp`。
 
 默认数据保存在 Docker volume `webspeak-data` 中。升级时先拉取新镜像，再重新创建应用容器；停止服务使用 `docker compose down`，不要添加 `-v`，否则会删除数据库、密钥和管理员配置。
 
@@ -201,7 +204,7 @@ WebSpeak 的 HTTP 端口固定为 `3040`，TeamSpeak 默认语音端口为 `9987
 
 WebSpeak 自带 WebRTC 媒体服务。管理员只需在 `/admin` → “服务器” → “WebRTC 语音”中启用开关；网关会根据用户当前访问的域名或地址自动生成媒体候选地址，固定 UDP 媒体端口由 Docker Compose 自动发布，不需要配置额外的媒体服务器、STUN/TURN 地址或公网主机字段。保存后对新语音会话生效。
 
-使用 Docker Compose 时，项目会同时发布 WebSpeak HTTP 端口和内置的 UDP 媒体端口范围。反向代理仍只负责 HTTPS/WSS 信令；UDP 媒体直接进入同一台 WebSpeak 主机。非 Docker 启动时只需确保同机网络允许该固定 UDP 范围。若浏览器或网络不支持 WebRTC，客户端会自动回退到兼容性语音链路。
+使用 Docker Compose 时，项目会同时发布 WebSpeak HTTP 端口和内置的 UDP 媒体端口范围；公网部署还需要在云安全组或上游防火墙放行入站 UDP `40000–40099`。反向代理仍只负责 HTTPS/WSS 信令；UDP 媒体直接进入同一台 WebSpeak 主机。非 Docker 启动时也要确保同机防火墙允许该固定 UDP 范围。若浏览器或网络不支持 WebRTC，客户端会自动回退到兼容性语音链路。
 
 ### 数据与安全边界
 
@@ -314,6 +317,7 @@ WebSpeak brings TeamSpeak voice spaces to the browser. It is a self-hosted gatew
 - WebRTC audio now uses negotiated Opus parameters and keeps only the newest frame per speaker, preventing stale voice from accumulating during network jitter.
 - Fixed duplicate playback, incomplete fallback, and leftover server-side media sessions when switching between WebRTC and the compatibility voice path.
 - Fixed native Opus decoder usage and browser-side negotiated payload handling, and tightened cleanup when a connection closes.
+- Verified the public deployment after allowing inbound `UDP 40000–40099`: two browser sessions exchanged WebRTC audio with `0` dropped frames, about `27 ms` peak ingress gaps, and `81–83 ms` peak egress gaps. These are measurements from the test path, not a universal latency guarantee.
 
 #### 2026-09-02 · v0.1.2
 
@@ -392,6 +396,8 @@ curl http://127.0.0.1:3040/health
 Then open [http://127.0.0.1:3040/](http://127.0.0.1:3040/). On the first admin login, use `admin / admin` and follow the prompt to change the password.
 
 Compose also publishes `40000–40099/UDP` for the built-in WebRTC media service. Enabling WebRTC only requires the administrator switch; no public-host field or separate media server is needed.
+
+For browsers connecting over the public internet, also add an inbound `UDP 40000–40099` rule in the cloud security group or upstream firewall for the WebSpeak host. Docker Compose publishes the ports but cannot change a provider-level security group; with Ubuntu UFW, use `sudo ufw allow 40000:40099/udp`. Keep TCP `80/443` for the web page and WSS signaling. TeamSpeak port `9987` only needs to be reachable from WebSpeak to the target TeamSpeak server; it does not need to be exposed publicly on the WebSpeak host, and WebRTC media must not be routed through the reverse proxy's `443/udp`.
 
 Runtime data is kept in the `webspeak-data` Docker volume. To upgrade, pull the new image and recreate the application container. Stop the service with `docker compose down`; do not add `-v`, because that removes the database, master key, and administrator settings.
 
@@ -479,7 +485,7 @@ Device labels are controlled by the browser permission model. The first device s
 
 WebSpeak includes its own WebRTC media service. An administrator only needs to enable the switch at `/admin` → “Server” → “WebRTC audio”; the gateway derives media candidates from the address used by the browser, while Docker Compose publishes the fixed UDP media range automatically. No extra media server, STUN/TURN address, or public-host field is required. Saved settings apply to new voice sessions.
 
-With Docker Compose, the WebSpeak HTTP port and the built-in UDP media range are published together. The reverse proxy continues to handle HTTPS/WSS signaling, while UDP media enters the same WebSpeak host directly. For non-Docker startup, only the fixed UDP range on that host must be permitted. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
+With Docker Compose, the WebSpeak HTTP port and the built-in UDP media range are published together, but a public deployment must also allow inbound UDP `40000–40099` in the cloud security group or upstream firewall. The reverse proxy continues to handle HTTPS/WSS signaling, while UDP media enters the same WebSpeak host directly. For non-Docker startup, the same fixed UDP range must be permitted on that host. If WebRTC is unavailable because of the network or browser, the client automatically falls back to the compatibility voice path.
 
 ### Data and Security Boundary
 
