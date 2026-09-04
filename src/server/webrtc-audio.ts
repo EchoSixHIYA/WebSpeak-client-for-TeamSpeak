@@ -30,8 +30,6 @@ const MAX_MIXER_QUEUE_FRAMES = 4;
 const MAX_MIXER_PACER_LAG_MS = AUDIO_CLOCK_INTERVAL_MS * 2;
 const MAX_MIXER_FRAME_AGE_MS = MAX_MIXER_QUEUE_FRAMES * AUDIO_CLOCK_INTERVAL_MS;
 const MIXER_UNDERRUN_WINDOW_MS = 200;
-const MIXER_SOFT_CLIP_DRIVE = 0.9;
-const MIXER_SOFT_CLIP_REFERENCE = Math.tanh(MIXER_SOFT_CLIP_DRIVE);
 // TeamSpeak and browsers can emit valid Opus comfort-noise/silence packets
 // while a client is muted. Do not turn those packets into a false "speaking"
 // indicator or forward them to TeamSpeak as if they were voice.
@@ -90,6 +88,8 @@ export interface WebRtcAudioStats {
 interface PendingAudioFrame {
   pcm: Buffer;
   receivedAt: number;
+  /** Preserve a native 20 ms Opus frame when no mix is required. */
+  opus?: Buffer;
 }
 
 /**
@@ -269,7 +269,13 @@ export class WebRtcAudioSession {
       const pendingPcm = this.partialPcmByClient.get(data.clientId);
       const combined = pendingPcm ? Buffer.concat([pendingPcm, pcm]) : pcm;
       const rms = this.calculateRms(pcm);
+      // A muted TeamSpeak client can still produce comfort-noise packets.
+      // Do not let those packets turn a single accompaniment stream into a
+      // synthetic multi-source mix. Music packets use codec 5 and must be
+      // retained even when their instantaneous RMS is low.
+      if (data.codec !== 5 && rms < MIN_SPEAKER_RMS) return;
       if (rms >= MIN_SPEAKER_RMS) this.activeSpeakerIds.add(data.clientId);
+      const canForwardOpus = !pendingPcm && pcm.length === AUDIO_FRAME_BYTES;
       let offset = 0;
       let enqueued = false;
       let queue = this.pendingFrames.get(data.clientId);
@@ -282,7 +288,11 @@ export class WebRtcAudioSession {
           queue.shift();
           this.stats.webrtcQueueDroppedFrames++;
         }
-        queue.push({ pcm: Buffer.from(combined.subarray(offset, offset + AUDIO_FRAME_BYTES)), receivedAt: performance.now() });
+        queue.push({
+          pcm: Buffer.from(combined.subarray(offset, offset + AUDIO_FRAME_BYTES)),
+          receivedAt: performance.now(),
+          ...(canForwardOpus && offset === 0 ? { opus: Buffer.from(data.data) } : {}),
+        });
         enqueued = true;
         offset += AUDIO_FRAME_BYTES;
       }
@@ -346,46 +356,55 @@ export class WebRtcAudioSession {
       }
     }
     const mixed = new Int32Array(AUDIO_FRAME_SAMPLES);
+    const selectedFrames: PendingAudioFrame[] = [];
     for (const [clientId, queue] of this.pendingFrames) {
       const frame = queue.shift();
       if (queue.length === 0) this.pendingFrames.delete(clientId);
       if (!frame) continue;
+      selectedFrames.push(frame);
       for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) mixed[index] += frame.pcm.readInt16LE(index * 2);
+    }
+
+    if (selectedFrames.length === 1 && selectedFrames[0]?.opus) {
+      this.sendRtpAudio(selectedFrames[0].opus);
+      return;
     }
 
     const pcm = Buffer.allocUnsafe(AUDIO_FRAME_BYTES);
     for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) {
-      // Keep per-speaker volume stable. Normalizing by the number of frames
-      // present in this tick made a speaker jump louder whenever another
-      // speaker's packet arrived late. A fixed soft limiter absorbs overlap
-      // without changing gain when the active speaker set changes.
-      const normalized = (mixed[index]! / 32_768) * MIXER_SOFT_CLIP_DRIVE;
-      const limited = Math.tanh(normalized) / MIXER_SOFT_CLIP_REFERENCE;
-      const sample = Math.max(-32_768, Math.min(32_767, Math.round(limited * 32_767)));
+      // Keep a fixed gain for the mixed path. Per-sample soft limiting changes
+      // the waveform's apparent loudness as the source level changes, which
+      // is especially noticeable on music. Only clip actual overflow caused
+      // by simultaneous speakers; never normalize by the active speaker count.
+      const sample = Math.max(-32_768, Math.min(32_767, mixed[index]!));
       pcm.writeInt16LE(sample, index * 2);
     }
     try {
       const encoded = this.encoder.encode(pcm);
-      const packet = new RtpPacket(new RtpHeader({
-        payloadType: this.outgoingPayloadType,
-        sequenceNumber: this.sequenceNumber,
-        timestamp: this.timestamp,
-        ssrc: this.ssrc,
-        marker: true,
-      }), encoded);
-      this.sequenceNumber = (this.sequenceNumber + 1) & 0xffff;
-      this.timestamp = (this.timestamp + AUDIO_FRAME_SAMPLES) >>> 0;
-      this.outgoingTrack.writeRtp(packet);
-      const sentAt = performance.now();
-      if (this.lastEgressRtpAt !== null) this.stats.webrtcEgressRtpMaxGapMs = Math.max(this.stats.webrtcEgressRtpMaxGapMs, Math.round(sentAt - this.lastEgressRtpAt));
-      this.lastEgressRtpAt = sentAt;
-      this.stats.webrtcEgressRtpFirstAt ??= Date.now();
-      this.stats.webrtcEgressRtpLastAt = Date.now();
-      this.stats.webrtcEgressRtpFrames++;
+      this.sendRtpAudio(encoded);
     } catch {
       // A peer closing concurrently may reject a packet; teardown owns the
       // session lifecycle and no per-frame error needs to reach the logs.
     }
+  }
+
+  private sendRtpAudio(encoded: Buffer): void {
+    const packet = new RtpPacket(new RtpHeader({
+      payloadType: this.outgoingPayloadType,
+      sequenceNumber: this.sequenceNumber,
+      timestamp: this.timestamp,
+      ssrc: this.ssrc,
+      marker: true,
+    }), encoded);
+    this.sequenceNumber = (this.sequenceNumber + 1) & 0xffff;
+    this.timestamp = (this.timestamp + AUDIO_FRAME_SAMPLES) >>> 0;
+    this.outgoingTrack.writeRtp(packet);
+    const sentAt = performance.now();
+    if (this.lastEgressRtpAt !== null) this.stats.webrtcEgressRtpMaxGapMs = Math.max(this.stats.webrtcEgressRtpMaxGapMs, Math.round(sentAt - this.lastEgressRtpAt));
+    this.lastEgressRtpAt = sentAt;
+    this.stats.webrtcEgressRtpFirstAt ??= Date.now();
+    this.stats.webrtcEgressRtpLastAt = Date.now();
+    this.stats.webrtcEgressRtpFrames++;
   }
 
   private flushSpeakerActivity(): void {
