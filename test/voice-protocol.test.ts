@@ -93,3 +93,16 @@ test("voice protocol accepts and validates the accompaniment state", () => {
     error: { code: "INVALID_ACCOMPANIMENT_STATE", message: "伴奏状态无效" },
   });
 });
+
+test("voice protocol accepts and validates per-member volume", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setMemberVolume", payload: { clientId: 7, volume: 1.5 } })), {
+    type: "setMemberVolume",
+    payload: { clientId: 7, volume: 1.5 },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setMemberVolume", payload: { clientId: 7, volume: 4.1 } })), {
+    error: { code: "INVALID_MEMBER_VOLUME", message: "成员音量无效" },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setMemberVolume", payload: { clientId: 7, volume: Number.NaN } })), {
+    error: { code: "INVALID_MEMBER_VOLUME", message: "成员音量无效" },
+  });
+});

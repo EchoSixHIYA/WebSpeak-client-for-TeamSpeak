@@ -92,6 +92,11 @@ interface PendingAudioFrame {
   opus?: Buffer;
 }
 
+interface SelectedAudioFrame extends PendingAudioFrame {
+  clientId: number;
+  volume: number;
+}
+
 /**
  * One low-latency WebRTC audio session for one browser connection.
  *
@@ -111,6 +116,7 @@ export class WebRtcAudioSession {
   private readonly decoderByClient = new Map<number, { decode(data: Buffer): Buffer }>();
   private readonly partialPcmByClient = new Map<number, Buffer>();
   private readonly pendingFrames = new Map<number, PendingAudioFrame[]>();
+  private readonly memberVolumes = new Map<number, number>();
   private readonly activeSpeakerIds = new Set<number>();
   private readonly opusPayloadTypes = new Set<number>();
   private audioTimer: ReturnType<typeof setTimeout> | null = null;
@@ -316,6 +322,7 @@ export class WebRtcAudioSession {
     this.audioTimer = null;
     clearInterval(this.activityTimer);
     this.pendingFrames.clear();
+    this.memberVolumes.clear();
     this.partialPcmByClient.clear();
     this.activeSpeakerIds.clear();
     this.ingressDecoder = null;
@@ -356,16 +363,19 @@ export class WebRtcAudioSession {
       }
     }
     const mixed = new Int32Array(AUDIO_FRAME_SAMPLES);
-    const selectedFrames: PendingAudioFrame[] = [];
+    const selectedFrames: SelectedAudioFrame[] = [];
     for (const [clientId, queue] of this.pendingFrames) {
       const frame = queue.shift();
       if (queue.length === 0) this.pendingFrames.delete(clientId);
       if (!frame) continue;
-      selectedFrames.push(frame);
-      for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) mixed[index] += frame.pcm.readInt16LE(index * 2);
+      const volume = this.memberVolumes.get(clientId) ?? 1;
+      selectedFrames.push({ ...frame, clientId, volume });
+      for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) {
+        mixed[index] += Math.round(frame.pcm.readInt16LE(index * 2) * volume);
+      }
     }
 
-    if (selectedFrames.length === 1 && selectedFrames[0]?.opus) {
+    if (selectedFrames.length === 1 && selectedFrames[0]?.opus && selectedFrames[0].volume === 1) {
       this.sendRtpAudio(selectedFrames[0].opus);
       return;
     }
@@ -423,6 +433,13 @@ export class WebRtcAudioSession {
 
   setAccompanimentActive(active: boolean): void {
     this.accompanimentActive = active;
+  }
+
+  setMemberVolume(clientId: number, volume: number): void {
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535 || !Number.isFinite(volume)) return;
+    const normalized = Math.max(0, Math.min(4, volume));
+    if (normalized === 1) this.memberVolumes.delete(clientId);
+    else this.memberVolumes.set(clientId, normalized);
   }
 
   private getIngressRms(data: Buffer): number | null {

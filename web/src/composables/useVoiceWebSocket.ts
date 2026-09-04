@@ -707,6 +707,7 @@ export function useVoiceWebSocket() {
     try {
       await webrtcPeer.setRemoteDescription(description);
       webrtcActive.value = true;
+      syncWebRtcMemberVolumes();
     } catch {
       if (lastConnection && ws.value) await fallbackFromWebRtc(connectionSequence, ws.value);
     }
@@ -1449,6 +1450,7 @@ export function useVoiceWebSocket() {
       INVALID_POKE_MESSAGE: "戳一戳消息无效",
       INVALID_AWAY_STATUS: "离开状态无效",
       INVALID_AUDIO_FRAME: "音频帧格式无效",
+      INVALID_MEMBER_VOLUME: "成员音量无效",
       INVALID_WHISPER_TARGETS: "私语目标无效",
       INVALID_WHISPER_STATE: "私语状态无效",
       NO_WHISPER_TARGETS: "请先选择私语目标",
@@ -1473,6 +1475,16 @@ export function useVoiceWebSocket() {
     }
     const gain = remoteGains.get(clientId);
     if (gain) gain.gain.value = normalized * outputVolume.value;
+    if (webrtcActive.value) sendCmd("setMemberVolume", { clientId, volume: normalized });
+  }
+
+  function syncWebRtcMemberVolumes(): void {
+    if (!webrtcActive.value || ws.value?.readyState !== WebSocket.OPEN) return;
+    for (const [rawClientId, volume] of Object.entries(volumes)) {
+      const clientId = Number(rawClientId);
+      if (!Number.isInteger(clientId) || clientId <= 0 || volume === 1) continue;
+      sendCmd("setMemberVolume", { clientId, volume });
+    }
   }
 
   function setInputVolume(volume: number): void {
