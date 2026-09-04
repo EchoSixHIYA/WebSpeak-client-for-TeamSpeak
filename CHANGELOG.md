@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.5] — 2026-09-04
+
+### 中文
+
+- 修复并优化主题切换按钮，首次点击即可切换，并使用太阳/月亮图标。
+- 修复浏览器身份保存与退出后的保持逻辑。
+
+### English
+
+- Fixed and refined the theme toggle so the first click switches themes, with sun/moon icons.
+- Fixed browser identity persistence across exit and return.
+
 All notable changes to WebSpeak are documented here. Versions follow SemVer.
 
 ## [0.1.4] — 2026-09-03

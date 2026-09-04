@@ -9,7 +9,7 @@
 **在线体验：[webspeak.online](https://webspeak.online)**
 
 [![GitHub](https://img.shields.io/badge/GitHub-源代码-181717?style=for-the-badge&logo=github)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak)
-[![Version](https://img.shields.io/badge/version-0.1.4-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4)
+[![Version](https://img.shields.io/badge/version-0.1.5-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.5)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
 [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
 
@@ -128,6 +128,11 @@ sudo ufw allow 40000:40099/udp
 ### 更新日志 · Changelog
 
 完整记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+#### 2026-09-04 · v0.1.5
+
+- 修复并优化主题切换按钮，首次点击即可切换，并使用太阳/月亮图标。
+- 修复浏览器身份保存与退出后的保持逻辑。
 
 #### 2026-09-03 · v0.1.4
 
@@ -286,6 +291,11 @@ The admin console can:
 ### Changelog
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete release history.
+
+#### 2026-09-04 · v0.1.5
+
+- Fixed and refined the theme toggle so the first click switches themes, with sun/moon icons.
+- Fixed browser identity persistence across exit and return.
 
 #### 2026-09-03 · v0.1.4
 
