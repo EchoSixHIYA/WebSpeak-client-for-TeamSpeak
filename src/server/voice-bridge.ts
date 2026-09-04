@@ -11,7 +11,7 @@ import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { SessionManager, type ManagedSession, type SessionTeardownReason } from "./session-manager.js";
 import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
 import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnect-policy.js";
-import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcSessionDescription } from "./webrtc-audio.js";
+import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioStats, type WebRtcSessionDescription } from "./webrtc-audio.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -72,6 +72,19 @@ export interface AudioFlowStats {
   egressSentMaxGapMs: number;
   egressPeakBufferedBytes: number;
   egressFramesByClient: Record<string, number>;
+  webrtcIngressRtpFrames: number;
+  webrtcIngressRtpFirstAt: number | null;
+  webrtcIngressRtpLastAt: number | null;
+  webrtcIngressRtpMaxGapMs: number;
+  webrtcEgressRtpFrames: number;
+  webrtcEgressRtpFirstAt: number | null;
+  webrtcEgressRtpLastAt: number | null;
+  webrtcEgressRtpMaxGapMs: number;
+  webrtcQueuePeakFrames: number;
+  webrtcQueueDroppedFrames: number;
+  webrtcQueueUnderrunTicks: number;
+  webrtcPacerLateTicks: number;
+  webrtcQueueCurrentFrames: number;
 }
 
 interface ChannelMember {
@@ -658,7 +671,7 @@ export class VoiceBridge {
           tsClientId,
           channelId,
           memberCount: entry.members.size,
-          audio: { ...entry.audio },
+          audio: snapshotAudioStats(entry),
         };
       });
   }
@@ -684,6 +697,7 @@ export class VoiceBridge {
     entry.webrtc = null;
     if (webRtc) {
       try { await webRtc.close(); } catch { /* peer teardown is idempotent */ }
+      Object.assign(entry.audio, webRtc.getStats());
     }
     entry.whisperTargetIds.clear();
     entry.whisperActive = false;
@@ -752,7 +766,13 @@ export class VoiceBridge {
         try {
           if (entry.whisperActive && entry.whisperTargetIds.size) entry.tsClient.sendWhisper(data, [...entry.whisperTargetIds], 4);
           else entry.tsClient.sendVoice(data, 4);
+          const sentAt = Date.now();
+          if (entry.audio.tsSendLastAt !== null) entry.audio.tsSendMaxGapMs = Math.max(entry.audio.tsSendMaxGapMs, sentAt - entry.audio.tsSendLastAt);
+          entry.audio.tsSendFirstAt ??= sentAt;
+          entry.audio.tsSendLastAt = sentAt;
+          entry.audio.tsSendFrames++;
         } catch {
+          entry.audio.tsSendErrors++;
           // A packet arriving while the TeamSpeak session is being replaced
           // is discarded; the WebRTC peer remains independently closable.
         }
@@ -949,7 +969,27 @@ function createAudioFlowStats(): AudioFlowStats {
     egressSentMaxGapMs: 0,
     egressPeakBufferedBytes: 0,
     egressFramesByClient: {},
+    webrtcIngressRtpFrames: 0,
+    webrtcIngressRtpFirstAt: null,
+    webrtcIngressRtpLastAt: null,
+    webrtcIngressRtpMaxGapMs: 0,
+    webrtcEgressRtpFrames: 0,
+    webrtcEgressRtpFirstAt: null,
+    webrtcEgressRtpLastAt: null,
+    webrtcEgressRtpMaxGapMs: 0,
+    webrtcQueuePeakFrames: 0,
+    webrtcQueueDroppedFrames: 0,
+    webrtcQueueUnderrunTicks: 0,
+    webrtcPacerLateTicks: 0,
+    webrtcQueueCurrentFrames: 0,
   };
+}
+
+function snapshotAudioStats(entry: WebClientEntry): AudioFlowStats {
+  const stats = { ...entry.audio };
+  const webRtcStats: WebRtcAudioStats | undefined = entry.webrtc?.getStats();
+  if (webRtcStats) Object.assign(stats, webRtcStats);
+  return stats;
 }
 
 function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {

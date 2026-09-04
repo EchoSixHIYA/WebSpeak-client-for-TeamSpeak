@@ -26,6 +26,10 @@ const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
 const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
+const MAX_MIXER_QUEUE_FRAMES = 4;
+const MAX_MIXER_PACER_LAG_MS = AUDIO_CLOCK_INTERVAL_MS * 2;
+const MAX_MIXER_FRAME_AGE_MS = MAX_MIXER_QUEUE_FRAMES * AUDIO_CLOCK_INTERVAL_MS;
+const MIXER_UNDERRUN_WINDOW_MS = 200;
 // TeamSpeak and browsers can emit valid Opus comfort-noise/silence packets
 // while a client is muted. Do not turn those packets into a false "speaking"
 // indicator or forward them to TeamSpeak as if they were voice.
@@ -55,14 +59,35 @@ export interface WebRtcAudioSessionOptions {
   onVoiceActivity: (clientIds: number[]) => void;
 }
 
+export interface WebRtcAudioStats {
+  webrtcIngressRtpFrames: number;
+  webrtcIngressRtpFirstAt: number | null;
+  webrtcIngressRtpLastAt: number | null;
+  webrtcIngressRtpMaxGapMs: number;
+  webrtcEgressRtpFrames: number;
+  webrtcEgressRtpFirstAt: number | null;
+  webrtcEgressRtpLastAt: number | null;
+  webrtcEgressRtpMaxGapMs: number;
+  webrtcQueuePeakFrames: number;
+  webrtcQueueDroppedFrames: number;
+  webrtcQueueUnderrunTicks: number;
+  webrtcPacerLateTicks: number;
+  webrtcQueueCurrentFrames: number;
+}
+
+interface PendingAudioFrame {
+  pcm: Buffer;
+  receivedAt: number;
+}
+
 /**
  * One low-latency WebRTC audio session for one browser connection.
  *
  * TeamSpeak provides one Opus payload per speaker. WebRTC has one negotiated
- * audio track in this first transport, so this class mixes only the newest
- * 20 ms frame from each active speaker and packetizes the result as RTP. The
- * map is deliberately bounded to one frame per speaker; an old frame is
- * replaced instead of becoming a playback queue.
+ * audio track in this first transport, so this class mixes one 20 ms frame
+ * from each active speaker and packetizes the result as RTP. Each speaker has
+ * a very small bounded queue so bursts from the TeamSpeak adapter can be
+ * smoothed without turning into an ever-growing playback delay.
  */
 export class WebRtcAudioSession {
   readonly peer: RTCPeerConnection;
@@ -72,10 +97,10 @@ export class WebRtcAudioSession {
   private readonly outgoingTrack: MediaStreamTrack;
   private ingressDecoder: { decode(data: Buffer): Buffer } | null = null;
   private readonly decoderByClient = new Map<number, { decode(data: Buffer): Buffer }>();
-  private readonly pendingFrames = new Map<number, Buffer>();
+  private readonly pendingFrames = new Map<number, PendingAudioFrame[]>();
   private readonly activeSpeakerIds = new Set<number>();
   private readonly opusPayloadTypes = new Set<number>();
-  private readonly audioTimer: ReturnType<typeof setInterval>;
+  private audioTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly activityTimer: ReturnType<typeof setInterval>;
   private encoder: { encode(data: Buffer): Buffer } | null;
   private microphoneMuted: boolean;
@@ -84,6 +109,25 @@ export class WebRtcAudioSession {
   private readonly ssrc = randomInt(1, 0x1_0000_0000) >>> 0;
   private outgoingPayloadType = DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE;
   private closed = false;
+  private nextAudioDeadline = 0;
+  private lastIngressRtpAt: number | null = null;
+  private lastEgressRtpAt: number | null = null;
+  private lastQueueEnqueuedAt: number | null = null;
+  private readonly stats: WebRtcAudioStats = {
+    webrtcIngressRtpFrames: 0,
+    webrtcIngressRtpFirstAt: null,
+    webrtcIngressRtpLastAt: null,
+    webrtcIngressRtpMaxGapMs: 0,
+    webrtcEgressRtpFrames: 0,
+    webrtcEgressRtpFirstAt: null,
+    webrtcEgressRtpLastAt: null,
+    webrtcEgressRtpMaxGapMs: 0,
+    webrtcQueuePeakFrames: 0,
+    webrtcQueueDroppedFrames: 0,
+    webrtcQueueUnderrunTicks: 0,
+    webrtcPacerLateTicks: 0,
+    webrtcQueueCurrentFrames: 0,
+  };
 
   constructor(options: WebRtcAudioSessionOptions) {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
@@ -106,7 +150,14 @@ export class WebRtcAudioSession {
     const audio = this.peer.addTransceiver("audio", { direction: "sendrecv" });
     audio.onTrack.subscribe((track) => {
       track.onReceiveRtp.subscribe((rtp) => {
-        if (this.closed || this.microphoneMuted || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
+        if (this.closed) return;
+        const receivedAt = performance.now();
+        if (this.lastIngressRtpAt !== null) this.stats.webrtcIngressRtpMaxGapMs = Math.max(this.stats.webrtcIngressRtpMaxGapMs, Math.round(receivedAt - this.lastIngressRtpAt));
+        this.lastIngressRtpAt = receivedAt;
+        this.stats.webrtcIngressRtpFirstAt ??= Date.now();
+        this.stats.webrtcIngressRtpLastAt = Date.now();
+        this.stats.webrtcIngressRtpFrames++;
+        if (this.microphoneMuted || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         const payload = Buffer.from(rtp.payload);
         // A disabled browser MediaStreamTrack normally still produces RTP
         // comfort-noise packets. TeamSpeak treats any received voice packet
@@ -139,13 +190,17 @@ export class WebRtcAudioSession {
       throw new Error("WebRTC Opus codec is unavailable");
     }
 
-    this.audioTimer = setInterval(() => this.flushAudio(), AUDIO_CLOCK_INTERVAL_MS);
-    this.audioTimer.unref?.();
+    this.nextAudioDeadline = performance.now();
+    this.scheduleAudioTick();
     this.activityTimer = setInterval(() => this.flushSpeakerActivity(), SPEAKER_ACTIVITY_INTERVAL_MS);
     this.activityTimer.unref?.();
     this.peer.onconnectionstatechange = () => {
       this.logger.info({ state: this.peer.connectionState }, "WebRTC connection state changed");
     };
+  }
+
+  getStats(): WebRtcAudioStats {
+    return { ...this.stats, webrtcQueueCurrentFrames: this.getQueueFrameCount() };
   }
 
   async createAnswer(offer: WebRtcSessionDescription): Promise<WebRtcSessionDescription> {
@@ -188,7 +243,18 @@ export class WebRtcAudioSession {
         sum += sample * sample;
       }
       if (Math.sqrt(sum / AUDIO_FRAME_SAMPLES) < MIN_SPEAKER_RMS) return;
-      this.pendingFrames.set(data.clientId, pcm.subarray(0, AUDIO_FRAME_BYTES));
+      let queue = this.pendingFrames.get(data.clientId);
+      if (!queue) {
+        queue = [];
+        this.pendingFrames.set(data.clientId, queue);
+      }
+      if (queue.length >= MAX_MIXER_QUEUE_FRAMES) {
+        queue.shift();
+        this.stats.webrtcQueueDroppedFrames++;
+      }
+      queue.push({ pcm: Buffer.from(pcm.subarray(0, AUDIO_FRAME_BYTES)), receivedAt: performance.now() });
+      this.lastQueueEnqueuedAt = performance.now();
+      this.stats.webrtcQueuePeakFrames = Math.max(this.stats.webrtcQueuePeakFrames, this.getQueueFrameCount());
       this.activeSpeakerIds.add(data.clientId);
     } catch {
       // A malformed or codec-transition packet is discarded without touching
@@ -199,7 +265,8 @@ export class WebRtcAudioSession {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    clearInterval(this.audioTimer);
+    if (this.audioTimer) clearTimeout(this.audioTimer);
+    this.audioTimer = null;
     clearInterval(this.activityTimer);
     this.pendingFrames.clear();
     this.activeSpeakerIds.clear();
@@ -210,15 +277,43 @@ export class WebRtcAudioSession {
     await this.peer.close();
   }
 
+  private scheduleAudioTick(): void {
+    if (this.closed) return;
+    const delay = Math.max(0, this.nextAudioDeadline - performance.now());
+    this.audioTimer = setTimeout(() => this.flushAudio(), delay);
+    this.audioTimer.unref?.();
+  }
+
   private flushAudio(): void {
-    if (this.closed || !this.encoder || !this.pendingFrames.size) return;
+    if (this.closed) return;
+    const now = performance.now();
+    if (now > this.nextAudioDeadline + MAX_MIXER_PACER_LAG_MS) {
+      this.stats.webrtcPacerLateTicks++;
+      this.nextAudioDeadline = now;
+      this.trimQueuesAfterLateTick();
+    }
+    this.nextAudioDeadline += AUDIO_CLOCK_INTERVAL_MS;
+    this.audioTimer = null;
+    this.mixAndSendAudio();
+    this.scheduleAudioTick();
+  }
+
+  private mixAndSendAudio(): void {
+    if (!this.encoder || !this.pendingFrames.size) {
+      if (this.lastQueueEnqueuedAt !== null && performance.now() - this.lastQueueEnqueuedAt <= MIXER_UNDERRUN_WINDOW_MS) {
+        this.stats.webrtcQueueUnderrunTicks++;
+      }
+      return;
+    }
     const mixed = new Int32Array(AUDIO_FRAME_SAMPLES);
     let sourceCount = 0;
-    for (const pcm of this.pendingFrames.values()) {
+    for (const [clientId, queue] of this.pendingFrames) {
+      const frame = queue.shift();
+      if (queue.length === 0) this.pendingFrames.delete(clientId);
+      if (!frame) continue;
       sourceCount++;
-      for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) mixed[index] += pcm.readInt16LE(index * 2);
+      for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) mixed[index] += frame.pcm.readInt16LE(index * 2);
     }
-    this.pendingFrames.clear();
     if (!sourceCount) return;
 
     const pcm = Buffer.allocUnsafe(AUDIO_FRAME_BYTES);
@@ -239,6 +334,12 @@ export class WebRtcAudioSession {
       this.sequenceNumber = (this.sequenceNumber + 1) & 0xffff;
       this.timestamp = (this.timestamp + AUDIO_FRAME_SAMPLES) >>> 0;
       this.outgoingTrack.writeRtp(packet);
+      const sentAt = performance.now();
+      if (this.lastEgressRtpAt !== null) this.stats.webrtcEgressRtpMaxGapMs = Math.max(this.stats.webrtcEgressRtpMaxGapMs, Math.round(sentAt - this.lastEgressRtpAt));
+      this.lastEgressRtpAt = sentAt;
+      this.stats.webrtcEgressRtpFirstAt ??= Date.now();
+      this.stats.webrtcEgressRtpLastAt = Date.now();
+      this.stats.webrtcEgressRtpFrames++;
     } catch {
       // A peer closing concurrently may reject a packet; teardown owns the
       // session lifecycle and no per-frame error needs to reach the logs.
@@ -273,6 +374,27 @@ export class WebRtcAudioSession {
       // rest of the peer. The next valid Opus packet can recover the decoder.
       return false;
     }
+  }
+
+  private trimQueuesAfterLateTick(): void {
+    const now = performance.now();
+    for (const [clientId, queue] of this.pendingFrames) {
+      while (queue.length > 1) {
+        queue.shift();
+        this.stats.webrtcQueueDroppedFrames++;
+      }
+      if (queue[0] && now - queue[0].receivedAt > MAX_MIXER_FRAME_AGE_MS) {
+        queue.shift();
+        this.stats.webrtcQueueDroppedFrames++;
+      }
+      if (queue.length === 0) this.pendingFrames.delete(clientId);
+    }
+  }
+
+  private getQueueFrameCount(): number {
+    let count = 0;
+    for (const queue of this.pendingFrames.values()) count += queue.length;
+    return count;
   }
 
   private setOpusPayloadTypes(sdp: string): void {
