@@ -31,7 +31,12 @@
     </template>
     <path v-else-if="name === 'mic'" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a7 7 0 0 0 14 0m-7 7v3m-3 0h6" />
     <path v-else-if="name === 'mic-off'" d="m4 4 16 16M10 6v5a2 2 0 0 0 3.2 1.6M14 6V5a2 2 0 0 0-3.7-1M5 11a7 7 0 0 0 10.6 6m3.4-6a7 7 0 0 0-.5-2.5M12 18v3m-3 0h6" />
-    <path v-else-if="name === 'headset'" d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v5H5a1 1 0 0 1-1-1zm16 0h-3v5h2a1 1 0 0 0 1-1z" />
+    <template v-else-if="name === 'music'">
+      <path d="M9 18V5l10-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="16" cy="16" r="3" />
+    </template>
+    <path v-else-if="name === 'headset'" d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v5H5a1 1 0 0 1-1-1zm16 0h-3v5h2a1 1 0 0 1-1-1z" />
     <path v-else-if="name === 'volume'" d="M4 10v4h3l4 3V7l-4 3zm10.5-2.5a6 6 0 0 1 0 9m2-11a9 9 0 0 1 0 13" />
     <path v-else-if="name === 'volume-off'" d="m4 4 16 16M4 10v4h3l4 3V7l-4 3z" />
     <template v-else-if="name === 'search'">

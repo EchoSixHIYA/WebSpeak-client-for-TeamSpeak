@@ -95,8 +95,8 @@
               </select>
             </label>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
-            <button class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
-            <button class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+            <button v-if="isMobileViewport" class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
+            <button v-if="isMobileViewport" class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon :name="themeIcon" :size="17" /></button>
             <button class="language-switch workspace-language" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button>
             <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /><span>{{ t('exit') }}</span></button>
@@ -198,7 +198,14 @@
           </section>
         </div>
         <div v-if="!filteredMemberChannels.length" class="member-empty">{{ t('noMatchingMembers') }}</div>
-        <div class="member-panel-tip"><Icon name="volume" :size="16" /><span>{{ t('volumeTip') }}</span></div>
+        <div v-if="!isMobileViewport" class="desktop-audio-dock" role="toolbar" :aria-label="t('desktopAudioControls')">
+          <div class="desktop-audio-dock-copy"><strong>{{ t('desktopAudioControls') }}</strong><span>{{ accompanimentActive ? t('accompanimentActive') : t('volumeTip') }}</span></div>
+          <div class="desktop-audio-dock-actions">
+            <button type="button" class="dock-audio-button microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
+            <button type="button" class="dock-audio-button" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+            <button type="button" class="dock-audio-button accompaniment-toggle" :class="{ active: accompanimentActive }" :title="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-label="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-pressed="accompanimentActive" @click="toggleAccompaniment"><Icon name="music" :size="18" /></button>
+          </div>
+        </div>
       </aside>
 
       <section v-if="mobileSection === 'more'" class="mobile-more-panel">
@@ -307,6 +314,10 @@ const {
   setWhisperTargets,
   setWhisperActive,
   setMicrophoneMuted,
+  accompanimentActive,
+  accompanimentErrorCode,
+  startAccompaniment,
+  stopAccompaniment,
   checkSupport,
   clearError,
 } = useVoiceWebSocket();
@@ -425,6 +436,16 @@ const translations: Record<Language, Record<string, string>> = {
     serverOptions: "更多服务器选项",
     online: "在线",
     audioSettings: "音频设置",
+    desktopAudioControls: "音频控制",
+    startAccompaniment: "共享伴奏",
+    stopAccompaniment: "停止伴奏",
+    accompanimentStarted: "伴奏共享已开始",
+    accompanimentStopped: "伴奏共享已停止",
+    accompanimentActive: "伴奏共享中",
+    accompanimentNeedsWebRtc: "伴奏功能需要启用 WebRTC",
+    accompanimentNoAudio: "所选来源没有可共享音频，请重新选择并勾选共享音频",
+    accompanimentPermissionDenied: "无法获取伴奏音频，请允许屏幕共享并勾选共享音频",
+    accompanimentUnsupported: "当前浏览器不支持伴奏共享",
     serverPassword: "服务器密码",
     optionalPassword: "没有密码可留空",
     switchChannel: "切换频道",
@@ -645,6 +666,16 @@ const translations: Record<Language, Record<string, string>> = {
     serverOptions: "More server options",
     online: "Online",
     audioSettings: "Audio settings",
+    desktopAudioControls: "Audio controls",
+    startAccompaniment: "Share accompaniment",
+    stopAccompaniment: "Stop accompaniment",
+    accompanimentStarted: "Accompaniment sharing started",
+    accompanimentStopped: "Accompaniment sharing stopped",
+    accompanimentActive: "Accompaniment sharing",
+    accompanimentNeedsWebRtc: "Accompaniment requires WebRTC",
+    accompanimentNoAudio: "The selected source has no shareable audio. Select it again and enable audio sharing",
+    accompanimentPermissionDenied: "Could not access accompaniment audio. Allow screen sharing and enable audio sharing",
+    accompanimentUnsupported: "This browser does not support accompaniment sharing",
     serverPassword: "Server password",
     optionalPassword: "Leave blank if not required",
     switchChannel: "Switch channel",
@@ -1053,6 +1084,7 @@ onMounted(() => {
   viewportChangeHandler = () => {
     isMobileViewport.value = viewportMediaQuery?.matches ?? false;
     if (!isMobileViewport.value) memberMenu.value = null;
+    else if (accompanimentActive.value) void stopAccompaniment();
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
@@ -1361,6 +1393,27 @@ function toggleMicrophone(): void {
   showToast(microphoneMuted.value ? t("microphoneMuted") : t("microphoneActive"));
 }
 
+async function toggleAccompaniment(): Promise<void> {
+  if (accompanimentActive.value) {
+    await stopAccompaniment();
+    showToast(t("accompanimentStopped"));
+    return;
+  }
+  try {
+    await startAccompaniment();
+    showToast(t("accompanimentStarted"));
+  } catch {
+    const messageKey = accompanimentErrorCode.value === "needsWebRtc"
+      ? "accompanimentNeedsWebRtc"
+      : accompanimentErrorCode.value === "noAudio"
+        ? "accompanimentNoAudio"
+        : accompanimentErrorCode.value === "unsupported"
+          ? "accompanimentUnsupported"
+          : "accompanimentPermissionDenied";
+    showToast(t(messageKey));
+  }
+}
+
 function onWhisperPttDown(event: PointerEvent): void {
   if (!whisperTargetIds.size) return;
   const target = event.currentTarget as HTMLElement | null;
@@ -1636,8 +1689,9 @@ function stopWhisperTalk(): void {
   .app-shell { grid-template-rows: minmax(0, 1fr) 220px; }
 }
 
-/* Keep connected controls in the header; the old bottom dock consumed the
-   chat viewport and made the settings action appear detached from its icon. */
+/* Desktop audio controls live in the member rail so the workspace header
+   stays focused on navigation. Mobile keeps its existing controls below the
+   voice cards and in the More panel. */
 .header-tools { align-items: center; }
 .header-action, .round-icon { line-height: 0; }
 .guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
@@ -1645,6 +1699,15 @@ function stopWhisperTalk(): void {
 .workspace-actions { align-items: center; flex-wrap: nowrap; }
 .workspace-actions .header-action { flex: 0 0 34px; padding: 0; line-height: 0; }
 .workspace-actions .header-action .ui-icon { margin: 0; }
+.desktop-audio-dock { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; min-width: 0; margin-top: 12px; padding: 9px; color: var(--text-muted); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 20px color-mix(in srgb, var(--text-primary) 10%, transparent); }
+.desktop-audio-dock-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.desktop-audio-dock-copy strong { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.desktop-audio-dock-copy span { overflow: hidden; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.desktop-audio-dock-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.dock-audio-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: 9px; cursor: pointer; transition: color .16s, background .16s, border-color .16s, transform .16s; }
+.dock-audio-button:hover, .dock-audio-button:focus-visible { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 32%, var(--border)); transform: translateY(-1px); }
+.dock-audio-button.microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-1)); }
+.dock-audio-button.accompaniment-toggle.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
 .settings-mode-switch { width: fit-content; margin: 0 0 7px; }
 .settings-hint { margin: -1px 0 19px; color: #8b9994; font-size: 11px; }
 
@@ -1869,7 +1932,7 @@ function stopWhisperTalk(): void {
   .member-presence { width: 10px; height: 10px; }
   .member-copy strong { font-size: 14px; }
   .member-copy span { margin-top: 3px; font-size: 12px; }
-  .member-flags, .member-volume, .member-panel-tip { display: none; }
+  .desktop-audio-dock, .member-flags, .member-volume, .member-panel-tip { display: none; }
   .member-action-button { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; color: var(--text-muted); background: transparent; border-radius: 10px; cursor: pointer; }
   .member-action-button:hover, .member-action-button:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
 

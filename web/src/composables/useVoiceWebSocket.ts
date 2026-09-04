@@ -109,6 +109,15 @@ export function useVoiceWebSocket() {
   let micSource: MediaStreamAudioSourceNode | null = null;
   let micGain: GainNode | null = null;
   let silentGain: GainNode | null = null;
+  const accompanimentActive = ref(false);
+  const accompanimentSupported = ref(typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia));
+  const accompanimentErrorCode = ref<"" | "unsupported" | "needsWebRtc" | "noAudio" | "permission">("");
+  let accompanimentStream: MediaStream | null = null;
+  let webrtcMixDestination: MediaStreamAudioDestinationNode | null = null;
+  let webrtcMixMicSource: MediaStreamAudioSourceNode | null = null;
+  let webrtcMixMicGain: GainNode | null = null;
+  let webrtcMixAccompanimentSource: MediaStreamAudioSourceNode | null = null;
+  let webrtcMixAccompanimentGain: GainNode | null = null;
   let webrtcMicMonitorSource: MediaStreamAudioSourceNode | null = null;
   let webrtcMicMonitorAnalyser: AnalyserNode | null = null;
   let webrtcMicMonitorGain: GainNode | null = null;
@@ -514,19 +523,140 @@ export function useVoiceWebSocket() {
     return false;
   }
 
+  function stopWebRtcMix(): void {
+    webrtcMixAccompanimentSource?.disconnect();
+    webrtcMixAccompanimentGain?.disconnect();
+    webrtcMixMicSource?.disconnect();
+    webrtcMixMicGain?.disconnect();
+    webrtcMixDestination?.disconnect();
+    webrtcMixAccompanimentSource = null;
+    webrtcMixAccompanimentGain = null;
+    webrtcMixMicSource = null;
+    webrtcMixMicGain = null;
+    webrtcMixDestination = null;
+  }
+
+  function releaseAccompanimentStream(): void {
+    accompanimentStream?.getTracks().forEach((track) => track.stop());
+    accompanimentStream = null;
+    accompanimentActive.value = false;
+  }
+
+  function createWebRtcMixStream(): MediaStream {
+    if (!micStream) throw new Error("没有可用的麦克风音轨");
+    const ctx = getAudioCtx();
+    stopWebRtcMix();
+    const destination = ctx.createMediaStreamDestination();
+    destination.channelCount = 1;
+    destination.channelCountMode = "explicit";
+    const microphoneSource = ctx.createMediaStreamSource(micStream);
+    const microphoneGain = ctx.createGain();
+    microphoneGain.gain.value = microphoneMuted.value ? 0 : inputVolume.value;
+    microphoneSource.connect(microphoneGain);
+    microphoneGain.connect(destination);
+
+    webrtcMixDestination = destination;
+    webrtcMixMicSource = microphoneSource;
+    webrtcMixMicGain = microphoneGain;
+
+    const accompanimentTrack = accompanimentStream?.getAudioTracks()[0];
+    if (accompanimentTrack) {
+      const accompanimentSource = ctx.createMediaStreamSource(accompanimentStream!);
+      const accompanimentGain = ctx.createGain();
+      accompanimentGain.gain.value = 0.78;
+      accompanimentSource.connect(accompanimentGain);
+      accompanimentGain.connect(destination);
+      webrtcMixAccompanimentSource = accompanimentSource;
+      webrtcMixAccompanimentGain = accompanimentGain;
+    }
+    return destination.stream;
+  }
+
+  async function replaceWebRtcAudioTrack(): Promise<void> {
+    if (!webrtcPeer || !micStream) return;
+    const sender = webrtcPeer.getSenders().find((candidate) => candidate.track?.kind === "audio");
+    if (!sender) throw new Error("WebRTC 音频轨道尚未就绪");
+    const mixedStream = createWebRtcMixStream();
+    const mixedTrack = mixedStream.getAudioTracks()[0];
+    if (!mixedTrack) throw new Error("混合音频轨道创建失败");
+    await sender.replaceTrack(mixedTrack);
+  }
+
+  async function startAccompaniment(): Promise<void> {
+    accompanimentErrorCode.value = "";
+    if (!accompanimentSupported.value) {
+      accompanimentErrorCode.value = "unsupported";
+      throw new Error("伴奏共享不可用");
+    }
+    if (!webrtcActive.value || !webrtcPeer || !micStream) {
+      accompanimentErrorCode.value = "needsWebRtc";
+      throw new Error("伴奏功能需要启用 WebRTC");
+    }
+
+    const audioConstraints = {} as MediaTrackConstraints & { restrictOwnAudio?: boolean };
+    const supportedConstraints = navigator.mediaDevices.getSupportedConstraints?.() as Record<string, boolean> | undefined;
+    if (supportedConstraints?.restrictOwnAudio) audioConstraints.restrictOwnAudio = true;
+    const options = {
+      video: { displaySurface: "browser" },
+      audio: audioConstraints,
+      selfBrowserSurface: "exclude",
+      systemAudio: "include",
+      windowAudio: "window",
+    } as unknown as DisplayMediaStreamOptions;
+
+    let nextStream: MediaStream;
+    try {
+      nextStream = await navigator.mediaDevices.getDisplayMedia(options);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      accompanimentErrorCode.value = "permission";
+      throw error;
+    }
+    const audioTrack = nextStream.getAudioTracks()[0];
+    nextStream.getVideoTracks().forEach((track) => track.stop());
+    if (!audioTrack) {
+      nextStream.getTracks().forEach((track) => track.stop());
+      accompanimentErrorCode.value = "noAudio";
+      throw new Error("所选来源没有可共享音频");
+    }
+
+    accompanimentStream?.getTracks().forEach((track) => track.stop());
+    accompanimentStream = nextStream;
+    accompanimentActive.value = true;
+    audioTrack.addEventListener("ended", () => { void stopAccompaniment(); }, { once: true });
+    try {
+      await replaceWebRtcAudioTrack();
+    } catch (error) {
+      releaseAccompanimentStream();
+      stopWebRtcMix();
+      accompanimentErrorCode.value = "permission";
+      throw error;
+    }
+  }
+
+  async function stopAccompaniment(): Promise<void> {
+    accompanimentErrorCode.value = "";
+    releaseAccompanimentStream();
+    if (webrtcActive.value && webrtcPeer && micStream) await replaceWebRtcAudioTrack();
+    else stopWebRtcMix();
+  }
+
   async function startWebRtcTransport(sequence: number, socket: WebSocket): Promise<void> {
     if (typeof RTCPeerConnection === "undefined") throw new Error("当前浏览器不支持 WebRTC");
     await ensureMicrophone();
     if (sequence !== connectionSequence || socket.readyState !== WebSocket.OPEN || !micStream) return;
-    const track = micStream.getAudioTracks()[0];
-    if (!track) throw new Error("没有可用的麦克风音轨");
+    const microphoneTrack = micStream.getAudioTracks()[0];
+    if (!microphoneTrack) throw new Error("没有可用的麦克风音轨");
 
     stopCaptureGraph();
     const peer = new RTCPeerConnection({ iceServers: [] });
     webrtcPeer = peer;
     webrtcFallbackStarted = false;
-    track.enabled = !microphoneMuted.value;
-    peer.addTrack(track, micStream);
+    microphoneTrack.enabled = !microphoneMuted.value;
+    const mixedStream = createWebRtcMixStream();
+    const mixedTrack = mixedStream.getAudioTracks()[0];
+    if (!mixedTrack) throw new Error("混合音频轨道创建失败");
+    peer.addTrack(mixedTrack, mixedStream);
     peer.ontrack = (event) => {
       const stream = event.streams[0] ?? new MediaStream([event.track]);
       // Use the browser's native WebRTC media output. Routing the remote
@@ -556,7 +686,7 @@ export function useVoiceWebSocket() {
       }
       void syncWebRtcPlayback();
     };
-    startWebRtcMicMonitor(getAudioCtx(), micStream, track);
+    startWebRtcMicMonitor(getAudioCtx(), micStream, microphoneTrack);
     peer.onconnectionstatechange = () => {
       if (peer.connectionState === "failed") void fallbackFromWebRtc(sequence, socket);
     };
@@ -632,6 +762,8 @@ export function useVoiceWebSocket() {
     webrtcPeer = null;
     webrtcActive.value = false;
     webrtcNegotiationPromise = null;
+    releaseAccompanimentStream();
+    stopWebRtcMix();
     stopWebRtcMicMonitor();
     stopWebRtcPlayback();
     if (peer) void peer.close();
@@ -716,6 +848,8 @@ export function useVoiceWebSocket() {
 
   function stopMicrophone(closeContext = true): void {
     stopCaptureGraph();
+    releaseAccompanimentStream();
+    stopWebRtcMix();
     micStream?.getTracks().forEach((track) => track.stop());
     micStream = null;
     if (closeContext) {
@@ -1341,6 +1475,7 @@ export function useVoiceWebSocket() {
     voxRelease = 0;
     accumLen = 0;
     if (webrtcActive.value) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+    if (webrtcMixMicGain) webrtcMixMicGain.gain.value = muted ? 0 : inputVolume.value;
     if (webrtcActive.value) sendCmd("setMicrophoneMuted", { muted });
     if (muted && state.tsClientId) clearSpeaking(state.tsClientId);
     void saveAudioPreferences();
@@ -1394,6 +1529,7 @@ export function useVoiceWebSocket() {
   function setInputVolume(volume: number): void {
     inputVolume.value = Math.max(0, Math.min(1, volume));
     if (micGain) micGain.gain.value = inputVolume.value;
+    if (webrtcMixMicGain) webrtcMixMicGain.gain.value = microphoneMuted.value ? 0 : inputVolume.value;
     void saveAudioPreferences();
   }
 
@@ -1443,6 +1579,9 @@ export function useVoiceWebSocket() {
     whisperTargetIds,
     whisperActive,
     volumes,
+    accompanimentActive,
+    accompanimentSupported,
+    accompanimentErrorCode,
     setVolume,
     setInputVolume,
     setOutputVolume,
@@ -1467,6 +1606,8 @@ export function useVoiceWebSocket() {
     setWhisperTargets,
     setWhisperActive,
     setMicrophoneMuted,
+    startAccompaniment,
+    stopAccompaniment,
     checkSupport,
     clearError,
   };
