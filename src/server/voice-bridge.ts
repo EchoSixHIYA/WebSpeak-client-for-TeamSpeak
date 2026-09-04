@@ -580,7 +580,11 @@ export class VoiceBridge {
         if (isWebRtcStopMessage(rawMessage)) {
           const webRtc = entry!.webrtc;
           entry!.webrtc = null;
-          if (webRtc) void webRtc.close();
+          if (webRtc) {
+            void webRtc.close()
+              .then(() => Object.assign(entry!.audio, webRtc.getStats()))
+              .catch(() => undefined);
+          }
           return;
         }
         const command = parseClientCommand(rawMessage);
@@ -746,7 +750,9 @@ export class VoiceBridge {
     sendJson: (message: Record<string, unknown>) => void,
   ): Promise<void> {
     if (entry.webrtc) {
-      try { await entry.webrtc.close(); } catch { /* replace a retried offer */ }
+      const previousWebRtc = entry.webrtc;
+      try { await previousWebRtc.close(); } catch { /* replace a retried offer */ }
+      Object.assign(entry.audio, previousWebRtc.getStats());
       entry.webrtc = null;
     }
     const config = this.getWebRtcOptions();
