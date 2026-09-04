@@ -1394,14 +1394,14 @@ function toggleMicrophone(): void {
 }
 
 async function toggleAccompaniment(): Promise<void> {
-  if (accompanimentActive.value) {
-    await stopAccompaniment();
-    showToast(t("accompanimentStopped"));
-    return;
-  }
   try {
+    if (accompanimentActive.value) {
+      await stopAccompaniment();
+      showToast(t("accompanimentStopped"));
+      return;
+    }
     await startAccompaniment();
-    showToast(t("accompanimentStarted"));
+    if (accompanimentActive.value) showToast(t("accompanimentStarted"));
   } catch {
     const messageKey = accompanimentErrorCode.value === "needsWebRtc"
       ? "accompanimentNeedsWebRtc"
