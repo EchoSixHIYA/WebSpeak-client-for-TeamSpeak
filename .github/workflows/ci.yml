@@ -22,7 +22,9 @@ jobs:
             web/package-lock.json
       - name: Install dependencies
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run prepare:sdk
+          npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
       - name: Test and build
         run: |

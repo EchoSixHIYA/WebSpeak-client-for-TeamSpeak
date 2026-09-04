@@ -34,7 +34,11 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $releaseVersion = $env:RELEASE_REF -replace '^v', ''
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run prepare:sdk
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix web ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -130,7 +134,9 @@ jobs:
         run: |
           set -euo pipefail
           release_version="${RELEASE_REF#v}"
-          npm ci --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run prepare:sdk
+          npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
           current_version="$(node -p "require('./package.json').version")"
           if [ "$current_version" != "$release_version" ]; then
