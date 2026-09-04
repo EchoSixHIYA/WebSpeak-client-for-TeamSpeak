@@ -2,6 +2,10 @@
 
 # WebSpeak
 
+<p>
+  <img src="./仓库图标.png" alt="WebSpeak" width="220">
+</p>
+
 **让 TeamSpeak 真正进入浏览器。**
 
 自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端。打开网页即可加入语音、查看频道、发送消息，无需安装桌面客户端。
