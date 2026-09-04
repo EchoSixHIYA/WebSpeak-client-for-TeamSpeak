@@ -171,40 +171,6 @@ export function useVoiceWebSocket() {
   // for jitter; stale audio is discarded instead of being played late.
   const MAX_REMOTE_PLAY_AHEAD_SECONDS = 0.08;
   const MAX_REMOTE_DECODE_QUEUE_FRAMES = 3;
-  const audioDebugEnabled = typeof location !== "undefined"
-    && new URLSearchParams(location.search).get("audioDebug") === "1";
-  const audioDiagnostics = reactive({
-    uplinkFrames: 0,
-    uplinkDroppedFrames: 0,
-    downlinkFrames: 0,
-    decoderOutputFrames: 0,
-    playbackStarts: 0,
-    playbackResets: 0,
-    peakBufferedBytes: 0,
-    peakPlayAheadMs: 0,
-    peakDecodeQueueFrames: 0,
-    downlinkFirstAt: null as number | null,
-    lastDownlinkAt: null as number | null,
-    downlinkMaxGapMs: 0,
-    lastDecodeOutputAt: null as number | null,
-    lastPlaybackStartAt: null as number | null,
-    lastPlayAheadMs: 0,
-  });
-  const audioCounters = { ...audioDiagnostics };
-  let nextAudioDiagnosticsPublishAt = 0;
-
-  function publishAudioDiagnostics(force = false): void {
-    const now = Date.now();
-    if (!force && now < nextAudioDiagnosticsPublishAt) return;
-    nextAudioDiagnosticsPublishAt = now + 1_000;
-    Object.assign(audioDiagnostics, audioCounters);
-    if (audioDebugEnabled) {
-      console.info("[WebSpeak audio checkpoint]", JSON.stringify({
-        at: new Date(now).toISOString(),
-        ...audioDiagnostics,
-      }));
-    }
-  }
 
   async function saveAudioPreferences(): Promise<void> {
     await saveLocalPreferences({
@@ -427,11 +393,8 @@ export function useVoiceWebSocket() {
         return;
       }
       const bufferedBytes = socket.bufferedAmount;
-      audioCounters.peakBufferedBytes = Math.max(audioCounters.peakBufferedBytes, bufferedBytes);
       if (bufferedBytes > MAX_AUDIO_BUFFERED_BYTES) {
         accumLen = 0;
-        audioCounters.uplinkDroppedFrames++;
-        publishAudioDiagnostics();
         return;
       }
 
@@ -450,8 +413,6 @@ export function useVoiceWebSocket() {
       while (offset + AUDIO_FRAME_SAMPLES <= accumLen && socket.readyState === WebSocket.OPEN && socket.bufferedAmount <= MAX_AUDIO_BUFFERED_BYTES) {
         socket.send(accumBuf.slice(offset, offset + AUDIO_FRAME_SAMPLES).buffer);
         offset += AUDIO_FRAME_SAMPLES;
-        audioCounters.uplinkFrames++;
-        publishAudioDiagnostics();
       }
       if (offset > 0) markSpeaking(state.tsClientId);
       accumLen -= offset;
@@ -984,7 +945,6 @@ export function useVoiceWebSocket() {
     const now = ctx.currentTime;
     const scheduledUntil = remotePlayTimes.get(clientId) ?? now;
     const decodeQueueSize = decoder?.decodeQueueSize ?? 0;
-    audioCounters.peakDecodeQueueFrames = Math.max(audioCounters.peakDecodeQueueFrames, decodeQueueSize);
     if (
       decoder &&
       (scheduledUntil > now + MAX_REMOTE_PLAY_AHEAD_SECONDS || decodeQueueSize >= MAX_REMOTE_DECODE_QUEUE_FRAMES)
@@ -1007,8 +967,6 @@ export function useVoiceWebSocket() {
           }
           try {
             const { sampleRate, numberOfChannels, numberOfFrames } = chunk;
-            audioCounters.decoderOutputFrames++;
-            audioCounters.lastDecodeOutputAt = Date.now();
             const buffer = ctx.createBuffer(numberOfChannels, numberOfFrames, sampleRate);
             for (let ch = 0; ch < numberOfChannels; ch++) {
               const data = new Float32Array(numberOfFrames);
@@ -1040,17 +998,7 @@ export function useVoiceWebSocket() {
               return;
             }
             source.start(playTime);
-            audioCounters.playbackStarts++;
-            audioCounters.lastPlaybackStartAt = Date.now();
             remotePlayTimes.set(clientId, playTime + numberOfFrames / sampleRate);
-            audioCounters.lastPlayAheadMs = Math.max(
-              0,
-              Math.round((playTime + numberOfFrames / sampleRate - ctx.currentTime) * 1_000),
-            );
-            audioCounters.peakPlayAheadMs = Math.max(
-              audioCounters.peakPlayAheadMs,
-              audioCounters.lastPlayAheadMs,
-            );
           } catch {
             // A decoder can finish while the audio context is being torn down.
           }
@@ -1073,8 +1021,6 @@ export function useVoiceWebSocket() {
       const timestamp = remoteDecodeTimestamps.get(clientId) ?? 0;
       decoder.decode(new EncodedAudioChunk({ type: "key", timestamp, duration: 20_000, data: opusData }));
       remoteDecodeTimestamps.set(clientId, timestamp + 20_000);
-      audioCounters.downlinkFrames++;
-      publishAudioDiagnostics();
     } catch {
       // Ignore malformed frames; the next valid frame can still be decoded.
     }
@@ -1101,8 +1047,6 @@ export function useVoiceWebSocket() {
 
   function resetRemotePlayback(clientId: number): void {
     clearRemotePlayback(clientId);
-    audioCounters.playbackResets++;
-    publishAudioDiagnostics();
   }
 
   function connect(target: string, channel: string, nickname: string, serverPassword = "", identity = "", rememberIdentity = false, inviteToken = ""): void {
@@ -1166,15 +1110,18 @@ export function useVoiceWebSocket() {
       state.connected = false;
       state.connecting = false;
       state.reconnecting = false;
-      if (event.code !== 1000 && !state.error && !state.reconnectFailed) state.error = closeReason(event.code);
+      // Prefer the close code over the generic WebSocket error event. The
+      // gateway uses a dedicated code when a remembered identity is already
+      // active in another browser page.
+      if (event.code !== 1000 && !state.reconnectFailed) state.error = closeReason(event.code);
       stopWebRtcTransport();
       stopMicrophone();
       whisperTargetIds.clear();
       whisperActive.value = false;
     };
     socket.onerror = () => {
-      if (sequence !== connectionSequence) return;
-      state.error = "连接服务器失败，请检查邀请链接或服务器状态";
+      // The following close event contains the actionable close code. Do not
+      // overwrite it with a generic browser WebSocket error first.
     };
   }
 
@@ -1190,6 +1137,7 @@ export function useVoiceWebSocket() {
     if (code === 4002) return "TeamSpeak 服务器地址无效";
     if (code === 4003) return "TeamSpeak 服务器连接失败";
     if (code === 4004) return "服务器当前已满，请稍后重试";
+    if (code === 4005) return "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试";
     return "连接已断开";
   }
 
@@ -1389,12 +1337,6 @@ export function useVoiceWebSocket() {
     if (data.length < 4) return;
     const clientId = (data[1] << 8) | data[2];
     if (clientId === state.tsClientId) return;
-    const receivedAt = Date.now();
-    if (audioCounters.lastDownlinkAt !== null) {
-      audioCounters.downlinkMaxGapMs = Math.max(audioCounters.downlinkMaxGapMs, receivedAt - audioCounters.lastDownlinkAt);
-    }
-    audioCounters.downlinkFirstAt ??= receivedAt;
-    audioCounters.lastDownlinkAt = receivedAt;
     markSpeaking(clientId);
     playAudioFrame(clientId, data.slice(3));
   }
@@ -1577,7 +1519,6 @@ export function useVoiceWebSocket() {
     outputDeviceSupported,
     audioPermission,
     audioContextState,
-    audioDiagnostics,
     identityMaterial,
     micLevel,
     microphoneTestActive,

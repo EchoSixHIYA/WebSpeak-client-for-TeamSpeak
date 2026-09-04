@@ -64,7 +64,7 @@
               <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
             </div>
 
-            <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label></details>
+            <details class="identity-options"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label><p v-if="rememberIdentity" class="identity-warning">{{ t('rememberIdentityConcurrentWarning') }}</p></details>
 
             <button class="primary-button connect-button" :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
@@ -408,6 +408,7 @@ const translations: Record<Language, Record<string, string>> = {
     emptyDefault: "留空进入默认频道",
     rememberIdentity: "记住此设备的 TeamSpeak 身份",
     rememberIdentityHint: "仅保存在本设备，用于下次连接时保持身份。",
+    rememberIdentityConcurrentWarning: "同一浏览器只能同时使用一条保持身份的连接；要开启第二条，请取消勾选或使用另一个浏览器。",
     identityOptions: "设备身份选项",
     localPersistenceUnavailable: "当前浏览器无法使用持久化存储，本次将使用临时身份。",
     favoriteServers: "常用服务器",
@@ -638,6 +639,7 @@ const translations: Record<Language, Record<string, string>> = {
     emptyDefault: "Leave empty to use the default channel",
     rememberIdentity: "Remember this TeamSpeak identity on this device",
     rememberIdentityHint: "Stored only on this device and reused on the next connection.",
+    rememberIdentityConcurrentWarning: "Only one connection can use this identity in the same browser. Clear this option for a second connection or use another browser.",
     identityOptions: "Device identity options",
     localPersistenceUnavailable: "Persistent browser storage is unavailable; this session will use an ephemeral identity.",
     favoriteServers: "Favorites",
@@ -861,6 +863,7 @@ function localizedMessage(message: string) {
     "连接服务器失败，请检查邀请链接或服务器状态": "Could not connect. Check the invite link or server status",
     "TeamSpeak 连接已断开": "The TeamSpeak connection was closed",
     "连接已断开": "The connection was closed",
+    "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
     "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
@@ -1593,6 +1596,7 @@ function stopWhisperTalk(): void {
 .remember-identity strong, .remember-identity small { display: block; }
 .remember-identity strong { font-size: 11px; font-weight: 700; }
 .remember-identity small { margin-top: 3px; color: #8b9994; font-size: 10px; line-height: 1.4; }
+.identity-warning { margin: 8px 0 0 25px; color: #9a6a32; font-size: 10px; line-height: 1.45; }
 .local-servers { display: grid; gap: 8px; margin: 1px 0 5px; }
 .local-server-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .local-server-group > span { width: 100%; color: #87958f; font-size: 10px; font-weight: 700; }

@@ -6,8 +6,9 @@ import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
 import { normalizeTeamSpeakError } from "../errors.js";
-import { formatTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
+import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
+import { IdentityLeaseStore } from "./identity-lease.js";
 import { SessionManager, type ManagedSession, type SessionTeardownReason } from "./session-manager.js";
 import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
 import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnect-policy.js";
@@ -118,6 +119,7 @@ interface WebClientEntry {
   nickname: string;
   rememberIdentity: boolean;
   target: TeamSpeakTarget;
+  identityLeaseKey?: string;
   webrtcPublicHost?: string;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
@@ -134,6 +136,7 @@ interface WebClientEntry {
 export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
+  private readonly identityLeases = new IdentityLeaseStore();
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private logger: LoggerType;
@@ -178,11 +181,22 @@ export class VoiceBridge {
         return;
       }
 
+      const identityLeaseKey = identity
+        ? `${teamSpeakTargetKey(target)}:${identity.toString()}`
+        : "";
+      if (identityLeaseKey && !this.identityLeases.acquire(identityLeaseKey, entryId)) {
+        this.logger.warn({ entryId, nickname, target: formatTeamSpeakTarget(target) }, "TeamSpeak identity already in use");
+        void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
+        ws.close(4005, "IDENTITY_IN_USE");
+        return;
+      }
+
       this.logger.info({ entryId, nickname, channel: channelName, target: formatTeamSpeakTarget(target) }, "WebClient connecting");
       let tsClient: TSClient;
       try {
         tsClient = new TSClient({ target, nickname, serverPassword, defaultChannel: channelName, identity }, this.logger);
       } catch (error: unknown) {
+        if (identityLeaseKey) this.identityLeases.release(identityLeaseKey, entryId);
         this.logger.error({ err: error, entryId }, "Could not create TeamSpeak client");
         void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
         ws.close(4003, "TeamSpeak client unavailable");
@@ -196,6 +210,7 @@ export class VoiceBridge {
         nickname,
         rememberIdentity: connection.rememberIdentity === true,
         target,
+        ...(identityLeaseKey ? { identityLeaseKey } : {}),
         ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
         channelTree: [],
         members: new Map(),
@@ -719,6 +734,7 @@ export class VoiceBridge {
       if (reason === "heartbeat-timeout" || reason === "gateway-shutdown") entry.ws.terminate();
       else entry.ws.close(reason === "protocol-error" ? 1008 : 1000, reason);
     }
+    if (entry.identityLeaseKey) this.identityLeases.release(entry.identityLeaseKey, entry.id);
     this.logger.info({ entryId: entry.id, reason, audio: { ...entry.audio } }, "Client session torn down");
   }
 
