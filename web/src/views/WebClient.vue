@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="bilibili-button" href="https://space.bilibili.com/25414873" target="_blank" rel="noreferrer" :title="t('bilibiliProfile')" :aria-label="t('bilibiliProfile')"><span class="bilibili-glyph">B</span><span class="bilibili-label">{{ t('bilibiliProfile') }}</span></a><span class="version-badge" :title="`${t('currentVersion')}: v${appVersion}`" :aria-label="`${t('currentVersion')}: v${appVersion}`">v{{ appVersion }}</span><a class="changelog-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md" target="_blank" rel="noreferrer" :title="t('viewChangelog')" :aria-label="t('viewChangelog')"><Icon name="clock" :size="16" /><span>{{ t('viewChangelog') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="bilibili-button" href="https://space.bilibili.com/25414873" target="_blank" rel="noreferrer" :title="t('bilibiliProfile')" :aria-label="t('bilibiliProfile')"><span class="bilibili-glyph">B</span><span class="bilibili-label">{{ t('bilibiliProfile') }}</span></a><span class="version-badge" :title="`${t('currentVersion')}: v${appVersion}`" :aria-label="`${t('currentVersion')}: v${appVersion}`">v{{ appVersion }}</span><a class="changelog-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md" target="_blank" rel="noreferrer" :title="t('viewChangelog')" :aria-label="t('viewChangelog')"><Icon name="clock" :size="16" /><span>{{ t('viewChangelog') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon :name="themeIcon" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -97,7 +97,7 @@
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
             <button class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
             <button class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
-            <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon name="monitor" :size="17" /></button>
+            <button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon :name="themeIcon" :size="17" /></button>
             <button class="language-switch workspace-language" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button>
             <button class="disconnect-button" @click="doDisconnect"><Icon name="door" :size="17" /><span>{{ t('exit') }}</span></button>
           </div>
@@ -206,7 +206,7 @@
         <h2>{{ t('mobileMore') }}</h2>
         <button type="button" :class="{ muted: microphoneMuted }" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button>
         <button type="button" @click="settingsOpen = true"><Icon name="settings" :size="18" /> {{ t('audioSettings') }}</button>
-        <button type="button" @click="cycleTheme"><Icon name="monitor" :size="18" /> {{ themeLabel }}</button>
+        <button type="button" @click="cycleTheme"><Icon :name="themeIcon" :size="18" /> {{ themeLabel }}</button>
         <button type="button" @click="toggleLanguage"><Icon name="globe" :size="18" /> {{ t('langSwitch') }}</button>
         <button type="button" class="danger" @click="doDisconnect"><Icon name="door" :size="18" /> {{ t('exit') }}</button>
       </section>
@@ -248,7 +248,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import { useVoiceWebSocket, type ChannelInfo, type ChannelMember } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
-import { applyTheme, getStoredTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
+import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 interface TreeChannel extends ChannelInfo {
@@ -352,13 +352,16 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 type Language = "zh" | "en";
 const language = ref<Language>(getInitialLanguage());
 const themeMode = ref<ThemeMode>(getStoredTheme());
-const themeLabel = computed(() => themeMode.value === "dark" ? t("themeDark") : themeMode.value === "light" ? t("themeLight") : t("themeSystem"));
+const themeIcon = computed(() => isDarkTheme(themeMode.value) ? "sun" : "moon");
+const themeLabel = computed(() => isDarkTheme(themeMode.value) ? t("switchToLightTheme") : t("switchToDarkTheme"));
 applyTheme(themeMode.value);
 const translations: Record<Language, Record<string, string>> = {
   zh: {
     themeSystem: "跟随系统",
     themeLight: "浅色主题",
     themeDark: "深色主题",
+    switchToLightTheme: "切换到浅色主题",
+    switchToDarkTheme: "切换到深色主题",
     browserWorkspace: "浏览器语音工作台",
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
@@ -577,6 +580,8 @@ const translations: Record<Language, Record<string, string>> = {
     themeSystem: "System theme",
     themeLight: "Light theme",
     themeDark: "Dark theme",
+    switchToLightTheme: "Switch to light theme",
+    switchToDarkTheme: "Switch to dark theme",
     browserWorkspace: "Browser voice workspace",
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",

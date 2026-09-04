@@ -17,8 +17,16 @@ export function saveTheme(theme: ThemeMode): void {
   applyTheme(theme);
 }
 
+export function isDarkTheme(theme: ThemeMode): boolean {
+  if (theme === "dark") return true;
+  if (theme === "light") return false;
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)").matches
+    : false;
+}
+
 export function nextTheme(theme: ThemeMode): ThemeMode {
-  return theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+  return isDarkTheme(theme) ? "light" : "dark";
 }
 
 applyTheme(getStoredTheme());
