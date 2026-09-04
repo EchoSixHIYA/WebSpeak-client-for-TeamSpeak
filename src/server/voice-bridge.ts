@@ -925,7 +925,7 @@ async function handleCommand(
       entry.webrtc?.setAccompanimentActive(command.payload.active as boolean);
     } else if (command.type === "setMemberVolume") {
       const clientId = command.payload.clientId as number;
-      if (entry.members.has(clientId)) entry.webrtc?.setMemberVolume(clientId, command.payload.volume as number);
+      entry.webrtc?.setMemberVolume(clientId, command.payload.volume as number);
     }
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {

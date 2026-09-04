@@ -1475,14 +1475,14 @@ export function useVoiceWebSocket() {
     }
     const gain = remoteGains.get(clientId);
     if (gain) gain.gain.value = normalized * outputVolume.value;
-    if (webrtcActive.value) sendCmd("setMemberVolume", { clientId, volume: normalized });
+    if (webrtcPeer || webrtcActive.value) sendCmd("setMemberVolume", { clientId, volume: normalized });
   }
 
   function syncWebRtcMemberVolumes(): void {
     if (!webrtcActive.value || ws.value?.readyState !== WebSocket.OPEN) return;
     for (const [rawClientId, volume] of Object.entries(volumes)) {
       const clientId = Number(rawClientId);
-      if (!Number.isInteger(clientId) || clientId <= 0 || volume === 1) continue;
+      if (!Number.isInteger(clientId) || clientId <= 0) continue;
       sendCmd("setMemberVolume", { clientId, volume });
     }
   }
