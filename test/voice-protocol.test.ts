@@ -83,3 +83,13 @@ test("voice protocol accepts and validates the microphone mute state", () => {
     error: { code: "INVALID_MICROPHONE_STATE", message: "麦克风状态无效" },
   });
 });
+
+test("voice protocol accepts and validates the accompaniment state", () => {
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setAccompanimentActive", payload: { active: true } })), {
+    type: "setAccompanimentActive",
+    payload: { active: true },
+  });
+  assert.deepEqual(parseClientCommand(JSON.stringify({ type: "setAccompanimentActive", payload: { active: "yes" } })), {
+    error: { code: "INVALID_ACCOMPANIMENT_STATE", message: "伴奏状态无效" },
+  });
+});

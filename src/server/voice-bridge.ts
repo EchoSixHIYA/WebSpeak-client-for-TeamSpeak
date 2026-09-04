@@ -768,15 +768,16 @@ export class VoiceBridge {
       udpPortRange: config.udpPortRange,
       logger: this.logger,
       microphoneMuted: offer.muted === true,
-      onVoiceFrame: (data) => {
+      accompanimentActive: offer.accompanimentActive === true,
+      onVoiceFrame: (data, codec) => {
         const now = Date.now();
         if (entry.audio.ingressLastAt !== null) entry.audio.ingressMaxGapMs = Math.max(entry.audio.ingressMaxGapMs, now - entry.audio.ingressLastAt);
         entry.audio.ingressFirstAt ??= now;
         entry.audio.ingressLastAt = now;
         entry.audio.ingressFrames++;
         try {
-          if (entry.whisperActive && entry.whisperTargetIds.size) entry.tsClient.sendWhisper(data, [...entry.whisperTargetIds], 4);
-          else entry.tsClient.sendVoice(data, 4);
+          if (entry.whisperActive && entry.whisperTargetIds.size) entry.tsClient.sendWhisper(data, [...entry.whisperTargetIds], codec);
+          else entry.tsClient.sendVoice(data, codec);
           const sentAt = Date.now();
           if (entry.audio.tsSendLastAt !== null) entry.audio.tsSendMaxGapMs = Math.max(entry.audio.tsSendMaxGapMs, sentAt - entry.audio.tsSendLastAt);
           entry.audio.tsSendFirstAt ??= sentAt;
@@ -903,6 +904,8 @@ async function handleCommand(
       sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
     } else if (command.type === "setMicrophoneMuted") {
       entry.webrtc?.setMicrophoneMuted(command.payload.muted as boolean);
+    } else if (command.type === "setAccompanimentActive") {
+      entry.webrtc?.setAccompanimentActive(command.payload.active as boolean);
     }
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {
@@ -933,7 +936,13 @@ function parseWebRtcOffer(raw: string): WebRtcSessionDescription | null {
   const description = value.payload.sdp;
   if (description.type !== "offer" || typeof description.sdp !== "string" || description.sdp.length > 256 * 1024) return null;
   if (value.payload.muted !== undefined && typeof value.payload.muted !== "boolean") return null;
-  return { type: "offer", sdp: description.sdp, muted: value.payload.muted === true };
+  if (value.payload.accompanimentActive !== undefined && typeof value.payload.accompanimentActive !== "boolean") return null;
+  return {
+    type: "offer",
+    sdp: description.sdp,
+    muted: value.payload.muted === true,
+    accompanimentActive: value.payload.accompanimentActive === true,
+  };
 }
 
 function isWebRtcStopMessage(raw: string): boolean {

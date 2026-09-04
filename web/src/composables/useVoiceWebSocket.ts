@@ -623,11 +623,13 @@ export function useVoiceWebSocket() {
     accompanimentStream?.getTracks().forEach((track) => track.stop());
     accompanimentStream = nextStream;
     accompanimentActive.value = true;
+    sendCmd("setAccompanimentActive", { active: true });
     audioTrack.addEventListener("ended", () => { void stopAccompaniment(); }, { once: true });
     try {
       await replaceWebRtcAudioTrack();
     } catch (error) {
       releaseAccompanimentStream();
+      sendCmd("setAccompanimentActive", { active: false });
       stopWebRtcMix();
       accompanimentErrorCode.value = "permission";
       throw error;
@@ -637,6 +639,7 @@ export function useVoiceWebSocket() {
   async function stopAccompaniment(): Promise<void> {
     accompanimentErrorCode.value = "";
     releaseAccompanimentStream();
+    if (webrtcActive.value) sendCmd("setAccompanimentActive", { active: false });
     if (webrtcActive.value && webrtcPeer && micStream) await replaceWebRtcAudioTrack();
     else stopWebRtcMix();
   }
@@ -699,7 +702,11 @@ export function useVoiceWebSocket() {
       if (sequence !== connectionSequence || webrtcPeer !== peer || socket.readyState !== WebSocket.OPEN) return;
       const description = peer.localDescription;
       if (!description) throw new Error("WebRTC offer was not created");
-      socket.send(JSON.stringify({ type: "webrtcOffer", payload: { sdp: { type: description.type, sdp: description.sdp }, muted: microphoneMuted.value } }));
+      socket.send(JSON.stringify({ type: "webrtcOffer", payload: {
+        sdp: { type: description.type, sdp: description.sdp },
+        muted: microphoneMuted.value,
+        accompanimentActive: accompanimentActive.value,
+      } }));
       window.setTimeout(() => {
         if (webrtcPeer === peer && !peer.remoteDescription) void fallbackFromWebRtc(sequence, socket);
       }, 8_000);

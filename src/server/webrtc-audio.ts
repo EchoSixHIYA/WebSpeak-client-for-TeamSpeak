@@ -52,6 +52,7 @@ export interface WebRtcSessionDescription {
   type: "offer" | "answer";
   sdp: string;
   muted?: boolean;
+  accompanimentActive?: boolean;
 }
 
 export interface WebRtcAudioSessionOptions {
@@ -60,7 +61,8 @@ export interface WebRtcAudioSessionOptions {
   udpPortRange?: [number, number];
   logger: LoggerType;
   microphoneMuted?: boolean;
-  onVoiceFrame: (data: Buffer) => void;
+  accompanimentActive?: boolean;
+  onVoiceFrame: (data: Buffer, codec: 4 | 5) => void;
   onVoiceActivity: (clientIds: number[]) => void;
 }
 
@@ -102,7 +104,7 @@ interface PendingAudioFrame {
 export class WebRtcAudioSession {
   readonly peer: RTCPeerConnection;
   private readonly logger: LoggerType;
-  private readonly onVoiceFrame: (data: Buffer) => void;
+  private readonly onVoiceFrame: (data: Buffer, codec: 4 | 5) => void;
   private readonly onVoiceActivity: (clientIds: number[]) => void;
   private readonly outgoingTrack: MediaStreamTrack;
   private ingressDecoder: { decode(data: Buffer): Buffer } | null = null;
@@ -123,6 +125,7 @@ export class WebRtcAudioSession {
   private lastIngressRtpAt: number | null = null;
   private lastEgressRtpAt: number | null = null;
   private lastQueueEnqueuedAt: number | null = null;
+  private accompanimentActive: boolean;
   private readonly stats: WebRtcAudioStats = {
     webrtcIngressRtpFrames: 0,
     webrtcIngressRtpFirstAt: null,
@@ -148,6 +151,7 @@ export class WebRtcAudioSession {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
     this.onVoiceFrame = options.onVoiceFrame;
     this.onVoiceActivity = options.onVoiceActivity;
+    this.accompanimentActive = options.accompanimentActive === true;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
     const iceAdditionalHostAddresses = options.publicHost ? [options.publicHost] : undefined;
@@ -174,18 +178,17 @@ export class WebRtcAudioSession {
         if (!this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         const payload = Buffer.from(rtp.payload);
         // The track is a browser-side mix of microphone and accompaniment.
-        // `microphoneMuted` cannot be used to drop the whole RTP packet because
-        // accompaniment must still pass while the microphone is muted. Decode
-        // only to distinguish actual mixed audio from comfort noise; forward
-        // quiet but valid music instead of applying the much higher UI VAD
-        // threshold here.
+        // Decode it once to reject malformed RTP. A normal microphone still
+        // uses the low-level comfort-noise gate, while accompaniment must not
+        // be treated as speech: quiet music frames are valid audio and are
+        // forwarded with TeamSpeak's music codec marker.
         const rms = this.getIngressRms(payload);
         if (rms === null) return;
-        if (rms < MIN_FORWARD_RMS) {
+        if (!this.accompanimentActive && rms < MIN_FORWARD_RMS) {
           this.stats.webrtcIngressQuietFrames++;
           return;
         }
-        this.onVoiceFrame(payload);
+        this.onVoiceFrame(payload, this.accompanimentActive ? 5 : 4);
       });
       void audio.sender.replaceTrack(this.outgoingTrack).catch((error: unknown) => {
         this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not attach WebRTC output track");
@@ -239,7 +242,7 @@ export class WebRtcAudioSession {
   }
 
   pushTeamSpeakVoice(data: TSVoiceData): void {
-    if (this.closed || data.codec !== 4) return;
+    if (this.closed || (data.codec !== 4 && data.codec !== 5)) return;
     let decoder = this.decoderByClient.get(data.clientId);
     if (!decoder) {
       try {
@@ -397,6 +400,10 @@ export class WebRtcAudioSession {
     // is applied before RTP encoding, so a server-side mute flag must not drop
     // the whole packet and silence a still-playing accompaniment.
     void muted;
+  }
+
+  setAccompanimentActive(active: boolean): void {
+    this.accompanimentActive = active;
   }
 
   private getIngressRms(data: Buffer): number | null {

@@ -1,5 +1,5 @@
 export interface ClientCommand {
-  type: "switchChannel" | "sendTextMessage" | "sendServerMessage" | "sendPrivateMessage" | "poke" | "setAway" | "setWhisperTargets" | "setWhisperActive" | "setMicrophoneMuted";
+  type: "switchChannel" | "sendTextMessage" | "sendServerMessage" | "sendPrivateMessage" | "poke" | "setAway" | "setWhisperTargets" | "setWhisperActive" | "setMicrophoneMuted" | "setAccompanimentActive";
   requestId?: string;
   payload: Record<string, unknown>;
 }
@@ -19,7 +19,7 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   if (value.requestId !== undefined && (typeof value.requestId !== "string" || value.requestId.length > 64)) {
     return { error: { code: "INVALID_REQUEST_ID", message: "请求标识无效" } };
   }
-  const supportedTypes = new Set(["switchChannel", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway", "setWhisperTargets", "setWhisperActive", "setMicrophoneMuted"]);
+  const supportedTypes = new Set(["switchChannel", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway", "setWhisperTargets", "setWhisperActive", "setMicrophoneMuted", "setAccompanimentActive"]);
   if (!supportedTypes.has(value.type)) {
     return { error: { code: "UNKNOWN_MESSAGE_TYPE", message: "不支持的消息类型" } };
   }
@@ -58,6 +58,9 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   }
   if (value.type === "setMicrophoneMuted" && typeof value.payload.muted !== "boolean") {
     return { error: { code: "INVALID_MICROPHONE_STATE", message: "麦克风状态无效" } };
+  }
+  if (value.type === "setAccompanimentActive" && typeof value.payload.active !== "boolean") {
+    return { error: { code: "INVALID_ACCOMPANIMENT_STATE", message: "伴奏状态无效" } };
   }
   return {
     type: value.type as ClientCommand["type"],
