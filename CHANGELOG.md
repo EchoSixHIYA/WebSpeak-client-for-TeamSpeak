@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.6] — 2026-09-04
+
+### 中文
+
+- 新增保持身份并发连接提醒，避免同一浏览器复用身份造成连接卡住。
+- 新增桌面端伴奏共享功能。
+- 新增网站 favicon，并更新仓库 README 主视觉。
+
+### English
+
+- Added a warning for concurrent remembered-identity connections in the same browser.
+- Added desktop accompaniment sharing.
+- Added a site favicon and refreshed the repository README branding.
+
 ## [0.1.5] — 2026-09-04
 
 ### 中文

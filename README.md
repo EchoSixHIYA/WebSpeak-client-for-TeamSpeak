@@ -133,6 +133,12 @@ sudo ufw allow 40000:40099/udp
 
 完整记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
+#### 2026-09-04 · v0.1.6
+
+- 新增保持身份并发连接提醒。
+- 新增桌面端伴奏共享功能。
+- 新增网站 favicon，并更新仓库 README 主视觉。
+
 #### 2026-09-04 · v0.1.5
 
 - 修复并优化主题切换按钮，首次点击即可切换，并使用太阳/月亮图标。
@@ -295,6 +301,12 @@ The admin console can:
 ### Changelog
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete release history.
+
+#### 2026-09-04 · v0.1.6
+
+- Added a warning for concurrent remembered-identity connections.
+- Added desktop accompaniment sharing.
+- Added a site favicon and refreshed the repository README branding.
 
 #### 2026-09-04 · v0.1.5
 
