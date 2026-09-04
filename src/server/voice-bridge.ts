@@ -85,6 +85,11 @@ export interface AudioFlowStats {
   webrtcQueueUnderrunTicks: number;
   webrtcPacerLateTicks: number;
   webrtcQueueCurrentFrames: number;
+  webrtcIngressQuietFrames: number;
+  webrtcIngressDecodeErrors: number;
+  webrtcDownlinkDecodedFrames: number;
+  webrtcDownlinkDecodeErrors: number;
+  webrtcDownlinkShortFrames: number;
 }
 
 interface ChannelMember {
@@ -988,6 +993,11 @@ function createAudioFlowStats(): AudioFlowStats {
     webrtcQueueUnderrunTicks: 0,
     webrtcPacerLateTicks: 0,
     webrtcQueueCurrentFrames: 0,
+    webrtcIngressQuietFrames: 0,
+    webrtcIngressDecodeErrors: 0,
+    webrtcDownlinkDecodedFrames: 0,
+    webrtcDownlinkDecodeErrors: 0,
+    webrtcDownlinkShortFrames: 0,
   };
 }
 

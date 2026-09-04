@@ -30,10 +30,15 @@ const MAX_MIXER_QUEUE_FRAMES = 4;
 const MAX_MIXER_PACER_LAG_MS = AUDIO_CLOCK_INTERVAL_MS * 2;
 const MAX_MIXER_FRAME_AGE_MS = MAX_MIXER_QUEUE_FRAMES * AUDIO_CLOCK_INTERVAL_MS;
 const MIXER_UNDERRUN_WINDOW_MS = 200;
+const MIXER_SOFT_CLIP_DRIVE = 0.9;
+const MIXER_SOFT_CLIP_REFERENCE = Math.tanh(MIXER_SOFT_CLIP_DRIVE);
 // TeamSpeak and browsers can emit valid Opus comfort-noise/silence packets
 // while a client is muted. Do not turn those packets into a false "speaking"
 // indicator or forward them to TeamSpeak as if they were voice.
 const MIN_SPEAKER_RMS = 160;
+// Keep this below the speaking threshold so quiet but valid accompaniment is
+// forwarded while comfort-noise packets remain filtered.
+const MIN_FORWARD_RMS = 24;
 
 // WebRTC is served by the WebSpeak process itself. The default range is also
 // published by the bundled Docker Compose file; advanced administrators can
@@ -73,6 +78,11 @@ export interface WebRtcAudioStats {
   webrtcQueueUnderrunTicks: number;
   webrtcPacerLateTicks: number;
   webrtcQueueCurrentFrames: number;
+  webrtcIngressQuietFrames: number;
+  webrtcIngressDecodeErrors: number;
+  webrtcDownlinkDecodedFrames: number;
+  webrtcDownlinkDecodeErrors: number;
+  webrtcDownlinkShortFrames: number;
 }
 
 interface PendingAudioFrame {
@@ -97,13 +107,13 @@ export class WebRtcAudioSession {
   private readonly outgoingTrack: MediaStreamTrack;
   private ingressDecoder: { decode(data: Buffer): Buffer } | null = null;
   private readonly decoderByClient = new Map<number, { decode(data: Buffer): Buffer }>();
+  private readonly partialPcmByClient = new Map<number, Buffer>();
   private readonly pendingFrames = new Map<number, PendingAudioFrame[]>();
   private readonly activeSpeakerIds = new Set<number>();
   private readonly opusPayloadTypes = new Set<number>();
   private audioTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly activityTimer: ReturnType<typeof setInterval>;
   private encoder: { encode(data: Buffer): Buffer } | null;
-  private microphoneMuted: boolean;
   private sequenceNumber = randomInt(0, 65_536);
   private timestamp = randomInt(0, 0x1_0000_0000) >>> 0;
   private readonly ssrc = randomInt(1, 0x1_0000_0000) >>> 0;
@@ -127,13 +137,17 @@ export class WebRtcAudioSession {
     webrtcQueueUnderrunTicks: 0,
     webrtcPacerLateTicks: 0,
     webrtcQueueCurrentFrames: 0,
+    webrtcIngressQuietFrames: 0,
+    webrtcIngressDecodeErrors: 0,
+    webrtcDownlinkDecodedFrames: 0,
+    webrtcDownlinkDecodeErrors: 0,
+    webrtcDownlinkShortFrames: 0,
   };
 
   constructor(options: WebRtcAudioSessionOptions) {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
     this.onVoiceFrame = options.onVoiceFrame;
     this.onVoiceActivity = options.onVoiceActivity;
-    this.microphoneMuted = options.microphoneMuted === true;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
     const iceAdditionalHostAddresses = options.publicHost ? [options.publicHost] : undefined;
@@ -157,13 +171,20 @@ export class WebRtcAudioSession {
         this.stats.webrtcIngressRtpFirstAt ??= Date.now();
         this.stats.webrtcIngressRtpLastAt = Date.now();
         this.stats.webrtcIngressRtpFrames++;
-        if (this.microphoneMuted || !this.opusPayloadTypes.has(rtp.header.payloadType)) return;
+        if (!this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         const payload = Buffer.from(rtp.payload);
-        // A disabled browser MediaStreamTrack normally still produces RTP
-        // comfort-noise packets. TeamSpeak treats any received voice packet
-        // as activity, so enforce mute/VAD at this gateway boundary instead
-        // of relying on the browser's local speaking indicator.
-        if (!this.hasVoiceEnergy(payload)) return;
+        // The track is a browser-side mix of microphone and accompaniment.
+        // `microphoneMuted` cannot be used to drop the whole RTP packet because
+        // accompaniment must still pass while the microphone is muted. Decode
+        // only to distinguish actual mixed audio from comfort noise; forward
+        // quiet but valid music instead of applying the much higher UI VAD
+        // threshold here.
+        const rms = this.getIngressRms(payload);
+        if (rms === null) return;
+        if (rms < MIN_FORWARD_RMS) {
+          this.stats.webrtcIngressQuietFrames++;
+          return;
+        }
         this.onVoiceFrame(payload);
       });
       void audio.sender.replaceTrack(this.outgoingTrack).catch((error: unknown) => {
@@ -233,30 +254,43 @@ export class WebRtcAudioSession {
     }
     try {
       const pcm = decoder.decode(data.data);
-      // Only advertise speaking after a valid TeamSpeak Opus frame has been
-      // decoded. Otherwise the UI can show activity while the mixer has no
-      // audio to send, which is especially confusing on the WebRTC path.
-      if (pcm.length < AUDIO_FRAME_BYTES) return;
-      let sum = 0;
-      for (let index = 0; index + 1 < AUDIO_FRAME_BYTES; index += 2) {
-        const sample = pcm.readInt16LE(index);
-        sum += sample * sample;
+      this.stats.webrtcDownlinkDecodedFrames++;
+      if (pcm.length < 2) {
+        this.stats.webrtcDownlinkShortFrames++;
+        return;
       }
-      if (Math.sqrt(sum / AUDIO_FRAME_SAMPLES) < MIN_SPEAKER_RMS) return;
+      // TeamSpeak may deliver 10/20/40/60 ms Opus frames. Keep a partial
+      // decoded frame per speaker and split every decoded buffer into the
+      // fixed 20 ms cadence used by the WebRTC mixer instead of discarding
+      // anything after the first 20 ms.
+      const pendingPcm = this.partialPcmByClient.get(data.clientId);
+      const combined = pendingPcm ? Buffer.concat([pendingPcm, pcm]) : pcm;
+      const rms = this.calculateRms(pcm);
+      if (rms >= MIN_SPEAKER_RMS) this.activeSpeakerIds.add(data.clientId);
+      let offset = 0;
+      let enqueued = false;
       let queue = this.pendingFrames.get(data.clientId);
-      if (!queue) {
-        queue = [];
-        this.pendingFrames.set(data.clientId, queue);
+      while (offset + AUDIO_FRAME_BYTES <= combined.length) {
+        if (!queue) {
+          queue = [];
+          this.pendingFrames.set(data.clientId, queue);
+        }
+        if (queue.length >= MAX_MIXER_QUEUE_FRAMES) {
+          queue.shift();
+          this.stats.webrtcQueueDroppedFrames++;
+        }
+        queue.push({ pcm: Buffer.from(combined.subarray(offset, offset + AUDIO_FRAME_BYTES)), receivedAt: performance.now() });
+        enqueued = true;
+        offset += AUDIO_FRAME_BYTES;
       }
-      if (queue.length >= MAX_MIXER_QUEUE_FRAMES) {
-        queue.shift();
-        this.stats.webrtcQueueDroppedFrames++;
+      if (offset < combined.length) this.partialPcmByClient.set(data.clientId, Buffer.from(combined.subarray(offset)));
+      else this.partialPcmByClient.delete(data.clientId);
+      if (enqueued) {
+        this.lastQueueEnqueuedAt = performance.now();
+        this.stats.webrtcQueuePeakFrames = Math.max(this.stats.webrtcQueuePeakFrames, this.getQueueFrameCount());
       }
-      queue.push({ pcm: Buffer.from(pcm.subarray(0, AUDIO_FRAME_BYTES)), receivedAt: performance.now() });
-      this.lastQueueEnqueuedAt = performance.now();
-      this.stats.webrtcQueuePeakFrames = Math.max(this.stats.webrtcQueuePeakFrames, this.getQueueFrameCount());
-      this.activeSpeakerIds.add(data.clientId);
     } catch {
+      this.stats.webrtcDownlinkDecodeErrors++;
       // A malformed or codec-transition packet is discarded without touching
       // the peer connection. The next valid Opus frame can recover the stream.
     }
@@ -269,6 +303,7 @@ export class WebRtcAudioSession {
     this.audioTimer = null;
     clearInterval(this.activityTimer);
     this.pendingFrames.clear();
+    this.partialPcmByClient.clear();
     this.activeSpeakerIds.clear();
     this.ingressDecoder = null;
     this.decoderByClient.clear();
@@ -299,27 +334,31 @@ export class WebRtcAudioSession {
   }
 
   private mixAndSendAudio(): void {
-    if (!this.encoder || !this.pendingFrames.size) {
+    if (!this.encoder) {
+      return;
+    }
+    if (!this.pendingFrames.size) {
       if (this.lastQueueEnqueuedAt !== null && performance.now() - this.lastQueueEnqueuedAt <= MIXER_UNDERRUN_WINDOW_MS) {
         this.stats.webrtcQueueUnderrunTicks++;
       }
-      return;
     }
     const mixed = new Int32Array(AUDIO_FRAME_SAMPLES);
-    let sourceCount = 0;
     for (const [clientId, queue] of this.pendingFrames) {
       const frame = queue.shift();
       if (queue.length === 0) this.pendingFrames.delete(clientId);
       if (!frame) continue;
-      sourceCount++;
       for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) mixed[index] += frame.pcm.readInt16LE(index * 2);
     }
-    if (!sourceCount) return;
 
     const pcm = Buffer.allocUnsafe(AUDIO_FRAME_BYTES);
-    const scale = 1 / Math.sqrt(sourceCount);
     for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) {
-      const sample = Math.max(-32_768, Math.min(32_767, Math.round(mixed[index]! * scale)));
+      // Keep per-speaker volume stable. Normalizing by the number of frames
+      // present in this tick made a speaker jump louder whenever another
+      // speaker's packet arrived late. A fixed soft limiter absorbs overlap
+      // without changing gain when the active speaker set changes.
+      const normalized = (mixed[index]! / 32_768) * MIXER_SOFT_CLIP_DRIVE;
+      const limited = Math.tanh(normalized) / MIXER_SOFT_CLIP_REFERENCE;
+      const sample = Math.max(-32_768, Math.min(32_767, Math.round(limited * 32_767)));
       pcm.writeInt16LE(sample, index * 2);
     }
     try {
@@ -354,26 +393,39 @@ export class WebRtcAudioSession {
   }
 
   setMicrophoneMuted(muted: boolean): void {
-    this.microphoneMuted = muted;
+    // The browser sends a mixed microphone/accompaniment track. The mute gain
+    // is applied before RTP encoding, so a server-side mute flag must not drop
+    // the whole packet and silence a still-playing accompaniment.
+    void muted;
   }
 
-  private hasVoiceEnergy(data: Buffer): boolean {
+  private getIngressRms(data: Buffer): number | null {
     const decoder = this.ingressDecoder;
-    if (!decoder) return false;
+    if (!decoder) return null;
     try {
       const pcm = decoder.decode(data);
-      if (pcm.length < AUDIO_FRAME_BYTES) return false;
-      let sum = 0;
-      for (let index = 0; index + 1 < AUDIO_FRAME_BYTES; index += 2) {
-        const sample = pcm.readInt16LE(index);
-        sum += sample * sample;
+      if (pcm.length < 2) {
+        this.stats.webrtcIngressDecodeErrors++;
+        return null;
       }
-      return Math.sqrt(sum / AUDIO_FRAME_SAMPLES) >= MIN_SPEAKER_RMS;
+      return this.calculateRms(pcm);
     } catch {
       // Malformed/transition packets are discarded without interrupting the
       // rest of the peer. The next valid Opus packet can recover the decoder.
-      return false;
+      this.stats.webrtcIngressDecodeErrors++;
+      return null;
     }
+  }
+
+  private calculateRms(pcm: Buffer): number {
+    let sum = 0;
+    let samples = 0;
+    for (let index = 0; index + 1 < pcm.length; index += 2) {
+      const sample = pcm.readInt16LE(index);
+      sum += sample * sample;
+      samples++;
+    }
+    return samples ? Math.sqrt(sum / samples) : 0;
   }
 
   private trimQueuesAfterLateTick(): void {
