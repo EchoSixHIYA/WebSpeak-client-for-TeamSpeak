@@ -1,358 +1,369 @@
 <div align="center">
+  <a id="readme-top"></a>
 
-# WebSpeak
+  <img src="./仓库图标.png" alt="WebSpeak 项目图标" width="190" />
 
-<p>
-  <img src="./仓库图标.png" alt="WebSpeak" width="220">
-</p>
+  <h1>WebSpeak</h1>
 
-**让 TeamSpeak 真正进入浏览器。**
+  <p><strong>让 TeamSpeak 自然地进入浏览器。</strong></p>
+  <p>A self-hosted browser voice client for TeamSpeak 3 and TeamSpeak 6.</p>
 
-自托管的 TeamSpeak 3 / TeamSpeak 6 网页客户端。打开网页即可加入语音、查看频道、发送消息，无需安装桌面客户端。
+  [![Latest Release](https://img.shields.io/github/v/release/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?sort=semver&display_name=tag&style=flat-square&color=0f766e)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)
+  [![Docker Image](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/actions/workflows/docker-publish.yml/badge.svg?branch=master)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/actions/workflows/docker-publish.yml)
+  [![License](https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square)](./LICENSE)
+  [![GitHub Stars](https://img.shields.io/github/stars/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&logo=github&color=0f766e)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/stargazers)
+  <br />
+  [![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-2580C3?style=flat-square)](https://www.teamspeak.com/)
+  [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.5-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+  [![Vue](https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+  [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/users/EchoSixHIYA/packages/container/package/webspeak)
+  [![Platforms](https://img.shields.io/badge/packages-Windows%20x64%20%7C%20Linux%20x64-59636e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)
 
-**在线体验：[webspeak.online](https://webspeak.online)**
+  <p>
+    <a href="#简体中文">简体中文</a> ·
+    <a href="#english">English</a> ·
+    <a href="#demo">在线 Demo</a> ·
+    <a href="#community">QQ 群</a> ·
+    <a href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest">下载</a>
+  </p>
+</div>
 
-[![GitHub](https://img.shields.io/badge/GitHub-源代码-181717?style=for-the-badge&logo=github)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak)
-[![Version](https://img.shields.io/badge/version-0.1.6-0f766e?style=flat-square)](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.6)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square)](LICENSE)
-[![TeamSpeak](https://img.shields.io/badge/TeamSpeak-3%20%7C%206-0f766e?style=flat-square)](https://www.teamspeak.com/)
+<details>
+<summary><kbd>目录 / Table of contents</kbd></summary>
 
-[中文](#中文) · [English](#english) · [更新日志](#更新日志--changelog) · [快速开始](#快速开始--quick-start) · [社区](#社区--community)
+- [项目简介 · Overview](#overview)
+- [在线 Demo · Live Demo](#demo)
+- [QQ 群 · Community](#community)
+- [简体中文](#简体中文)
+  - [特性](#zh-features)
+  - [更新日志](#zh-changelog)
+  - [部署方案](#zh-deployment)
+  - [要求和注意事项](#zh-requirements)
+  - [许可证](#zh-license)
+- [English](#english)
+  - [Features](#en-features)
+  - [Changelog](#en-changelog)
+  - [Deployment](#en-deployment)
+  - [Requirements and notes](#en-requirements)
+  - [License](#en-license)
+
+</details>
+
+<a id="overview"></a>
+
+## 项目简介 · Overview
+
+| 逻辑 | 中文 | English |
+| --- | --- | --- |
+| **WHAT** | WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户打开网页即可进入频道、交流和管理自己的音频设备。 | WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Users can join channels, communicate, and manage their audio devices directly in a browser. |
+| **WHY** | 它降低了临时加入 TeamSpeak 的门槛：无需安装桌面客户端，只需分享一个网页地址，同时仍由部署者控制目标服务器、访问方式和数据。 | It lowers the barrier to joining TeamSpeak: no desktop installation is required, only a web address, while the operator keeps control of targets, access policies, and data. |
+| **HOW** | 部署 WebSpeak 后，管理员在网页控制台设置默认 TeamSpeak 目标和访问策略。浏览器负责交互与音频，WebSpeak 负责连接 TeamSpeak；需要更低延迟时可启用内置 WebRTC。 | After deployment, the administrator configures the default TeamSpeak target and access policy in the web console. The browser handles interaction and audio, WebSpeak connects to TeamSpeak, and the bundled WebRTC path can be enabled for lower latency. |
+
+<a id="demo"></a>
+
+## 在线 Demo · Live Demo
+
+<div align="center">
+
+[![Open WebSpeak Demo](https://img.shields.io/badge/Open%20Demo-webspeak.online-0f766e?style=for-the-badge&logo=googlechrome&logoColor=white)](https://webspeak.online)
 
 </div>
 
-## 中文
+> [!WARNING]
+> **中文：** 公共演示服务器位于香港，网络和运行负载可能不稳定。延迟、断线或暂时不可用不代表自行部署后的实际表现，请勿将该节点用于重要或长期会话。
+>
+> **English:** The public demo is hosted in Hong Kong and its network conditions and load may be unstable. Latency, disconnections, or temporary downtime do not represent a self-hosted deployment. Do not rely on this node for important or long-running sessions.
 
-WebSpeak 是一个面向 TeamSpeak 服务器的浏览器客户端。部署一次，用户通过网页即可加入语音空间，不需要安装 TeamSpeak 桌面客户端。
+<a id="community"></a>
 
-### 功能
+## QQ 群 · Community
 
-- 支持 TeamSpeak 3 和 TeamSpeak 6，自动识别协议。
-- 浏览频道、在线成员和实时成员状态。
-- 加入、切换频道，并显示成员所在频道。
-- 频道文字聊天、服务器消息、私聊和戳一戳。
-- 浏览器麦克风和扬声器选择、音量调节、输入电平和本地麦克风测试。
-- 一键闭麦/开麦、VOX 语音激活、发言状态提示。
-- 可选 WebRTC 低延迟语音，网络不支持时自动回退。
-- 固定服务器、开放服务器和一次性邀请链接三种访问方式。
-- 管理控制台：默认目标、邀请链接、在线会话、日志、诊断和数据库备份。
-- 中英文界面、主题切换、桌面端和移动端适配。
-- 移动端提供成员操作菜单，桌面端支持右键菜单。
+<div align="center">
 
-### 快速开始 · Quick Start
+<a href="http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475">
+  <img src="./web/public/qq-group-qr.jpg" alt="WebSpeak QQ 群二维码" width="290" />
+</a>
+
+**群号 / Group ID：`869500475`**
+
+[通过群聊链接直接加入 / Join directly through the group link](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475)
+
+中文：在群内获取部署帮助、版本通知和使用交流。<br />
+English: Join for deployment help, release announcements, and user discussion.
+
+</div>
+
+---
+
+<a id="简体中文"></a>
+
+## 简体中文
+
+WebSpeak 面向希望通过网页提供 TeamSpeak 语音服务的个人、社区和服务器管理员。它提供完整的访客页面、语音工作区和管理控制台，并可使用 Docker、预编译包或源码部署。
+
+<a id="zh-features"></a>
+
+### ✨ 特性
+
+| 能力 | 说明 |
+| --- | --- |
+| TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
+| 频道与成员 | 浏览完整频道树、查看各频道成员和实时状态，并可切换频道。 |
+| 实时语音 | 使用 Opus 语音；支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
+| 音频控制 | 选择麦克风与扬声器、调节输入/输出音量、测试麦克风、闭麦、VOX，以及单独调整成员音量。 |
+| 消息与互动 | 支持频道消息、服务器消息、私聊、戳一戳和耳语目标。 |
+| 桌面端伴奏 | 在桌面浏览器中选择带音频的窗口或标签页，将其声音分享给当前 TeamSpeak 频道。 |
+| 身份与访问 | 支持浏览器身份保持、默认目标、访客自定义目标及可撤销、可过期的邀请链接。 |
+| 管理控制台 | 管理默认目标、访问策略、WebRTC、邀请链接、活动会话、连接历史、日志、诊断与数据库备份。 |
+| 界面体验 | 提供完整中英文界面、浅色/深色主题，以及桌面端和移动端响应式布局。 |
+| 自托管 | 数据由部署者保存；提供 Docker 镜像、Windows x64 和 Linux x64 发布包。 |
+
+<a id="zh-changelog"></a>
+
+### 🧾 更新日志
+
+| 版本 | 日期 | 摘要 |
+| --- | --- | --- |
+| [v0.1.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.6) | 2026-09-04 | 新增桌面端伴奏、身份保持提醒和网站图标，并修复 WebRTC 下的成员独立音量。 |
+| [v0.1.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.5) | 2026-09-04 | 修复身份保持逻辑，优化主题切换按钮。 |
+| [v0.1.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4) | 2026-09-03 | 修复 WebRTC 语音和频道聊天，优化管理页、日志与移动端布局。 |
+| [v0.1.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3) | 2026-09-03 | 引入内置 WebRTC，迁移 TeamSpeak SDK，并改善成员同步和语音缓冲。 |
+| [v0.1.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.2) | 2026-09-02 | 大幅改进移动端、设备选择、AudioWorklet 和响应式顶部操作。 |
+| [v0.1.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.1) | 2026-09-02 | 完成网页客户端、管理后台、邀请链接及运维能力的首轮规范化。 |
+| [v0.1.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.0) | 2026-08-31 | 首个规范化版本。 |
+
+完整记录见 [CHANGELOG.md](./CHANGELOG.md)。
+
+<a id="zh-deployment"></a>
+
+### 🚀 部署方案
+
+| 方案 | 适用场景 | 运行环境 |
+| --- | --- | --- |
+| **Docker Compose（推荐）** | 服务器长期运行、便于升级和持久化 | Docker Engine + Docker Compose |
+| **发布包** | 不希望安装 Node.js 或构建依赖 | Windows x64 或 Linux x64 |
+| **源码运行** | 开发、调试或二次开发 | Node.js 22.5+、Git 与本地编译工具 |
 
 #### Docker Compose（推荐）
 
-要求：安装 Docker Engine 和 Docker Compose。
-
 ```bash
-git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 docker compose pull
 docker compose up -d
 ```
 
-打开 `http://你的服务器地址:3040/`，首次进入管理后台 `/admin` 使用：
-
-```text
-账号：admin
-密码：admin
-```
-
-首次登录必须修改管理员密码。然后在管理控制台的“服务器”页面设置“默认 TeamSpeak 目标”，例如：
-
-```text
-ts.example.com#9987
-```
-
-用户欢迎页没有邀请链接参数时，会自动使用管理员设置的默认目标。开放模式下，用户可以自行输入要连接的服务器地址和端口。
-
-数据会保存在 Docker volume `webspeak-data` 中。升级时执行：
+默认网页端口为 `3040/TCP`，数据保存在 Docker volume `webspeak-data`。查看状态：
 
 ```bash
+docker compose ps
+docker compose logs -f webspeak
+```
+
+升级：
+
+```bash
+git pull --ff-only
 docker compose pull
 docker compose up -d
 ```
 
-不要使用 `docker compose down -v`，否则会删除数据库和管理员配置。
+不要执行 `docker compose down -v`，否则会删除数据库、管理员设置和其他持久化数据。
 
-如需更换网页端口：
+如需修改宿主机网页端口，在仓库目录创建 `.env`：
 
-```bash
-WEBSPEAK_PORT=3041 docker compose up -d
+```dotenv
+WEBSPEAK_PORT=3041
 ```
+
+#### Windows / Linux 发布包
+
+1. 从 [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 下载对应的 `windows-x64.zip` 或 `linux-x64.tar.gz`。
+2. 解压到独立目录。
+3. Windows 运行 `start-webspeak.cmd`；Linux 运行 `./start-webspeak.sh`。
+4. 发布包自带 Node.js 运行时和生产依赖，无需再次执行 `npm install`。
 
 #### 源码运行
 
-需要 Node.js `22.5.0` 或更高版本，以及 `@discordjs/opus` 所需的本地编译工具。
-
 ```bash
-npm ci
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+npm ci --ignore-scripts
+npm run prepare:sdk
+npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build
 npm run build
-node dist/index.js
+npm start
 ```
 
-服务默认监听 `3040` 端口。
+源码构建 `@discordjs/opus` 时需要 Python、Make 和 C/C++ 编译工具。开发模式可分别使用 `npm run dev` 与 `npm run web:dev`。
 
-### WebRTC 低延迟语音
+#### 首次配置（所有方案）
 
-WebRTC 是可选功能，由 WebSpeak 自带，不需要额外部署媒体服务器。
+1. 打开 `http://<你的主机>:3040/admin`。
+2. 使用默认账号 `admin`、默认密码 `admin` 登录，并按提示立即设置至少 12 位的新密码。
+3. 在“服务器”页填写默认 TeamSpeak 目标和访问方式；目标可写为 `voice.example.com#9987`。
+4. 公网使用时为站点配置 HTTPS。若启用 WebRTC，还需放行管理后台显示的 UDP 端口范围。
 
-1. 在管理后台打开“WebRTC 语音”。
-2. 在部署主机所在云平台安全组或上游防火墙放行入站 UDP `40000–40099`。
-3. 重新进入语音空间即可生效。
+<a id="zh-requirements"></a>
 
-Docker Compose 已自动发布 `40000–40099/UDP`，但无法替你修改云安全组。Ubuntu 使用 UFW 时可执行：
+### ⚠️ 要求和注意事项
 
-```bash
-sudo ufw allow 40000:40099/udp
-```
+| 项目 | 要求或注意事项 |
+| --- | --- |
+| 浏览器 | 建议使用最新版 Chrome、Edge 或其他支持 WebRTC 的现代浏览器。麦克风和屏幕音频通常要求 HTTPS 安全上下文。 |
+| TeamSpeak 网络 | WebSpeak 主机必须能够访问目标 TeamSpeak 服务器。目标默认语音端口为 `9987`，也可在网页中填写其他端口。 |
+| Web 服务网络 | 服务默认监听 `3040/TCP`。公网部署建议通过 HTTPS 反向代理提供网页和 WebSocket。 |
+| WebRTC | 默认使用 `40000–40099/UDP`。Docker Compose 已发布该范围，但云安全组和主机防火墙仍需放行；自定义范围时也要同步修改 Docker 端口映射。启用 WebRTC 后需先关闭它才能修改端口范围。 |
+| 身份保持 | 同一浏览器身份同时只能保持一条活动连接。需要并行连接时，请取消第二条连接的“保持身份”，或使用另一个浏览器/浏览器配置文件。 |
+| 伴奏 | 仅桌面端提供，并要求启用 WebRTC。选择窗口或标签页时必须同时勾选共享音频；浏览器无法直接任意读取本地应用音频。 |
+| 数据 | Docker 数据位于 `webspeak-data` volume；发布包和源码运行的数据位于程序目录的 `data/`。升级或迁移前建议从管理后台导出数据库备份。 |
+| 会话上限 | 单实例最多允许 100 个活动网页会话。 |
+| 项目关系 | WebSpeak 是社区项目，不是 TeamSpeak 官方产品；TeamSpeak 名称及商标归其权利人所有。 |
 
-网页和 WSS 使用 TCP `80/443`。TeamSpeak 的 `9987` 只需要让 WebSpeak 主机能够访问目标 TeamSpeak，不需要在 WebSpeak 主机对公网开放。WebRTC 不支持或端口未放行时，客户端会自动使用兼容模式。
+<a id="zh-license"></a>
 
-### 管理员设置
+### 📜 许可证
 
-管理员可以在控制台中：
+WebSpeak 使用 [GNU Affero General Public License v3.0 only](./LICENSE) 发布。你可以使用、研究、修改和再分发本项目；如果修改后的版本通过网络向用户提供服务，需要按照 AGPL-3.0 向这些用户提供对应源代码。
 
-- 修改默认 TeamSpeak 目标和服务器密码。
-- 选择固定目标或允许用户自定义目标。
-- 创建、撤销和设置有效期的邀请链接。
-- 查看在线会话、运行日志、诊断信息和审计记录。
-- 下载诊断报告和 SQLite 数据库备份。
-- 开启或关闭 WebRTC 低延迟语音。
+<div align="right"><a href="#readme-top">返回顶部 ↑</a></div>
 
-### 浏览器要求
+---
 
-- 使用较新的 Chrome、Edge 或其他支持 WebRTC 的现代浏览器。
-- 使用麦克风需要浏览器权限；公网部署建议使用 HTTPS。
-- 目标 TeamSpeak 服务器必须能被 WebSpeak 主机访问。
-
-### 更新日志 · Changelog
-
-完整记录见 [`CHANGELOG.md`](CHANGELOG.md)。
-
-#### 2026-09-04 · v0.1.6
-
-- 新增保持身份并发连接提醒。
-- 新增桌面端伴奏共享功能。
-- 新增网站 favicon，并更新仓库 README 主视觉。
-
-#### 2026-09-04 · v0.1.5
-
-- 修复并优化主题切换按钮，首次点击即可切换，并使用太阳/月亮图标。
-- 修复浏览器身份保存与退出后的保持逻辑。
-
-#### 2026-09-03 · v0.1.4
-
-- 修复 WebRTC 语音收发与发言状态同步。
-- 修复频道文字消息在 WebSpeak 客户端之间无法互收。
-- 优化管理员页面、运行日志换行和移动端顶部布局；新增 Bilibili 入口及登录页返回首页。
-
-#### 2026-09-03 · v0.1.3
-
-- 增加可选 WebRTC 低延迟语音。
-- 支持在管理员页面直接启用 WebRTC，无需额外媒体服务器。
-- 更新 TeamSpeak 集成，改善频道、成员和实时状态同步。
-- 优化语音缓冲和连接回退，减少网络抖动造成的延迟堆积。
-- 公网部署放行 UDP `40000–40099` 后，双浏览器语音测试稳定运行，实测间隔峰值约 `27–83ms`。
-
-#### 2026-09-02 · v0.1.2
-
-- 大幅优化移动端界面和成员操作。
-- 首页增加 GitHub、当前版本和更新日志入口。
-- 修复设置按钮错位，优化窄屏布局和滚动体验。
-- 增加 AudioWorklet、设备选择和更稳定的语音缓冲处理。
-
-#### 2026-09-02 · v0.1.1
-
-- 正式提供浏览器客户端、管理控制台、邀请链接和运维功能。
-- 修复成员同步、私聊断开和频道显示问题。
-- 增加中英文切换、默认目标、首次登录改密和一键闭麦。
-- 发布 Windows、Linux 和 Docker 部署方式。
-
-#### 2026-08-31 · v0.1.0
-
-- 首个规范化版本。
-
-### 社区 · Community
-
-QQ群：`869500475`
-
-加入 QQ 群获取使用帮助、版本更新和交流支持：
-
-![WebSpeak 群聊二维码](group-chat.png)
-
-### 许可证
-
-WebSpeak 使用 [GNU Affero General Public License v3.0](LICENSE) 发布。
+<a id="english"></a>
 
 ## English
 
-WebSpeak is a self-hosted browser client for TeamSpeak 3 and TeamSpeak 6. Deploy it once and let users join voice channels from a browser without installing the desktop TeamSpeak client.
+WebSpeak is built for individuals, communities, and server operators who want to offer TeamSpeak voice access through the web. It includes a complete visitor page, voice workspace, and administration console, with Docker, prebuilt-package, and source deployment options.
 
-**Live demo: [webspeak.online](https://webspeak.online)**
+<a id="en-features"></a>
 
-### Features
+### ✨ Features
 
-- TeamSpeak 3 and TeamSpeak 6 support with automatic protocol detection.
-- Live channel tree, online members, member locations, and status updates.
-- Channel switching and member presence grouped under the correct channel.
-- Channel text chat, server messages, private messages, and poke actions.
-- Browser microphone and speaker selection, volume control, input level, and local microphone test.
-- One-click microphone mute/unmute, VOX activation, and speaking indicators.
-- Optional low-latency WebRTC audio with automatic compatibility fallback.
-- Fixed targets, open targets, and expiring one-time invite links.
-- Admin console for targets, invites, sessions, logs, diagnostics, and database backups.
-- Chinese and English UI, theme switching, and responsive desktop/mobile layouts.
-- Mobile member action menus and desktop context menus.
+| Capability | Description |
+| --- | --- |
+| TeamSpeak compatibility | Supports TeamSpeak 3 and TeamSpeak 6 and automatically detects the target server protocol. |
+| Channels and members | Browse the complete channel tree, see members and live states in each channel, and switch channels. |
+| Realtime voice | Uses Opus audio with a compatibility transport and an optional bundled WebRTC low-latency transport. |
+| Audio controls | Select microphones and speakers, adjust input/output volume, test the microphone, mute, use VOX, and control each member's volume. |
+| Messaging and actions | Supports channel chat, server chat, private messages, poke actions, and whisper targets. |
+| Desktop accompaniment | Select an audio-enabled window or browser tab on desktop and share its sound with the current TeamSpeak channel. |
+| Identity and access | Supports remembered browser identities, a default target, visitor-defined targets, and revocable expiring invite links. |
+| Administration | Manage the default target, access policy, WebRTC, invites, active sessions, connection history, logs, diagnostics, and database backups. |
+| User experience | Complete Chinese and English interfaces, light/dark themes, and responsive desktop/mobile layouts. |
+| Self-hosting | Data stays with the operator; Docker images and Windows x64 / Linux x64 packages are provided. |
 
-### Quick Start
+<a id="en-changelog"></a>
+
+### 🧾 Changelog
+
+| Version | Date | Summary |
+| --- | --- | --- |
+| [v0.1.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.6) | 2026-09-04 | Added desktop accompaniment, remembered-identity guidance, and the site icon; fixed per-member volume under WebRTC. |
+| [v0.1.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.5) | 2026-09-04 | Fixed identity persistence and refined the theme switch. |
+| [v0.1.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4) | 2026-09-03 | Fixed WebRTC voice and channel chat; improved administration, logs, and mobile layouts. |
+| [v0.1.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3) | 2026-09-03 | Added bundled WebRTC, migrated the TeamSpeak SDK, and improved member sync and voice buffering. |
+| [v0.1.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.2) | 2026-09-02 | Major mobile, device-selection, AudioWorklet, and responsive-header improvements. |
+| [v0.1.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.1) | 2026-09-02 | First normalized browser client, admin console, invite, and operations feature set. |
+| [v0.1.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.0) | 2026-08-31 | First normalized release. |
+
+See [CHANGELOG.md](./CHANGELOG.md) for the complete history.
+
+<a id="en-deployment"></a>
+
+### 🚀 Deployment
+
+| Method | Best for | Runtime |
+| --- | --- | --- |
+| **Docker Compose (recommended)** | Long-running servers, simple upgrades, and persistent data | Docker Engine + Docker Compose |
+| **Release packages** | Running without installing Node.js or build dependencies | Windows x64 or Linux x64 |
+| **From source** | Development, debugging, and customization | Node.js 22.5+, Git, and native build tools |
 
 #### Docker Compose (recommended)
 
-Requirements: Docker Engine and Docker Compose.
-
 ```bash
-git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 docker compose pull
 docker compose up -d
 ```
 
-Open `http://your-server:3040/`. On the first admin login at `/admin`, use:
-
-```text
-Username: admin
-Password: admin
-```
-
-You must change the administrator password after the first login. Then configure the **Default TeamSpeak target** in the **Servers** page, for example:
-
-```text
-ts.example.com#9987
-```
-
-If a welcome link does not contain an invite target, the default target is pre-filled automatically. In open mode, users may enter their own TeamSpeak address and port.
-
-Data is stored in the `webspeak-data` Docker volume. To upgrade:
+The web service uses `3040/TCP` by default. Persistent data is stored in the `webspeak-data` Docker volume. Check the service with:
 
 ```bash
+docker compose ps
+docker compose logs -f webspeak
+```
+
+Upgrade with:
+
+```bash
+git pull --ff-only
 docker compose pull
 docker compose up -d
 ```
 
-Do not run `docker compose down -v`, because it removes the database and administrator settings.
+Do not run `docker compose down -v`; it removes the database, administrator settings, and other persistent data.
 
-To change the web host port:
+To change the host-side web port, create `.env` in the repository directory:
 
-```bash
-WEBSPEAK_PORT=3041 docker compose up -d
+```dotenv
+WEBSPEAK_PORT=3041
 ```
+
+#### Windows / Linux release packages
+
+1. Download the matching `windows-x64.zip` or `linux-x64.tar.gz` from [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest).
+2. Extract it into a dedicated directory.
+3. Run `start-webspeak.cmd` on Windows or `./start-webspeak.sh` on Linux.
+4. Release packages include the Node.js runtime and production dependencies; do not run `npm install` inside them.
 
 #### Run from source
 
-Requires Node.js `22.5.0` or newer and native build tools for `@discordjs/opus`.
-
 ```bash
-npm ci
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+npm ci --ignore-scripts
+npm run prepare:sdk
+npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build
 npm run build
-node dist/index.js
+npm start
 ```
 
-The service listens on port `3040` by default.
+Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain. For development, run `npm run dev` and `npm run web:dev` separately.
 
-### Low-latency WebRTC audio
+#### First-time setup (all methods)
 
-WebRTC is optional and bundled with WebSpeak. No separate media server is required.
+1. Open `http://<your-host>:3040/admin`.
+2. Sign in with the default username `admin` and password `admin`, then immediately set a new password of at least 12 characters as prompted.
+3. Configure the default TeamSpeak target and access mode on the **Servers** page. A target can be written as `voice.example.com#9987`.
+4. Configure HTTPS for public access. If WebRTC is enabled, also allow the UDP range shown in the administration console.
 
-1. Enable **WebRTC audio** in the admin console.
-2. Allow inbound UDP `40000–40099` in the cloud security group or upstream firewall for the WebSpeak host.
-3. Re-enter the voice space to apply the setting.
+<a id="en-requirements"></a>
 
-Docker Compose publishes `40000–40099/UDP` automatically, but it cannot change a cloud security group. With Ubuntu UFW:
+### ⚠️ Requirements and notes
 
-```bash
-sudo ufw allow 40000:40099/udp
-```
+| Area | Requirement or note |
+| --- | --- |
+| Browser | Use a current Chrome, Edge, or another modern browser with WebRTC support. Microphone and shared-screen audio normally require an HTTPS secure context. |
+| TeamSpeak network | The WebSpeak host must be able to reach the target TeamSpeak server. The default voice port is `9987`, and other ports can be entered in the web interface. |
+| Web network | The service listens on `3040/TCP` by default. Public deployments should expose the page and WebSocket through an HTTPS reverse proxy. |
+| WebRTC | The default range is `40000–40099/UDP`. Docker Compose publishes it, but the cloud security group and host firewall must also allow it. A custom range must also be reflected in Docker port mappings. Disable WebRTC before changing the range. |
+| Remembered identity | One browser identity can hold only one active remembered connection at a time. For parallel connections, disable **Remember identity** on the second connection or use another browser/profile. |
+| Accompaniment | Desktop only and requires WebRTC. When selecting a window or tab, enable audio sharing as well. Browsers cannot arbitrarily capture every local application's audio. |
+| Data | Docker data is stored in the `webspeak-data` volume. Release packages and source installs store data in the program directory's `data/` folder. Export a database backup from the admin console before upgrades or migration. |
+| Session limit | One instance accepts up to 100 active browser sessions. |
+| Project relationship | WebSpeak is a community project and is not an official TeamSpeak product. TeamSpeak names and trademarks belong to their respective owners. |
 
-The web page and WSS signaling use TCP `80/443`. TeamSpeak port `9987` only needs to be reachable from WebSpeak to the target TeamSpeak server; it does not need to be exposed publicly on the WebSpeak host. If WebRTC is unavailable, the client automatically uses the compatibility mode.
+<a id="en-license"></a>
 
-### Administrator settings
+### 📜 License
 
-The admin console can:
+WebSpeak is released under the [GNU Affero General Public License v3.0 only](./LICENSE). You may use, study, modify, and redistribute the project. If a modified version is made available to users over a network, the corresponding source code must be offered to those users under AGPL-3.0.
 
-- Set the default TeamSpeak target and server password.
-- Choose a fixed target or allow users to enter their own target.
-- Create, revoke, expire, and limit invite links.
-- View online sessions, runtime logs, diagnostics, and audit records.
-- Download diagnostic reports and SQLite backups.
-- Enable or disable low-latency WebRTC audio.
-
-### Browser requirements
-
-- A recent Chrome, Edge, or another modern browser with WebRTC support.
-- Microphone permission is required for voice input; HTTPS is recommended for public deployments.
-- The target TeamSpeak server must be reachable from the WebSpeak host.
-
-### Changelog
-
-See [`CHANGELOG.md`](CHANGELOG.md) for the complete release history.
-
-#### 2026-09-04 · v0.1.6
-
-- Added a warning for concurrent remembered-identity connections.
-- Added desktop accompaniment sharing.
-- Added a site favicon and refreshed the repository README branding.
-
-#### 2026-09-04 · v0.1.5
-
-- Fixed and refined the theme toggle so the first click switches themes, with sun/moon icons.
-- Fixed browser identity persistence across exit and return.
-
-#### 2026-09-03 · v0.1.4
-
-- Fixed WebRTC voice transport and speaking-state synchronization.
-- Fixed channel text messages between WebSpeak clients.
-- Refined admin pages, log wrapping, and narrow-screen header layout; added Bilibili and admin-login home links.
-
-#### 2026-09-03 · v0.1.3
-
-- Added optional low-latency WebRTC audio.
-- Added an admin switch for WebRTC without requiring a separate media server.
-- Updated TeamSpeak integration for better channel, member, and realtime status synchronization.
-- Improved audio buffering and connection fallback to reduce delay growth during network jitter.
-- After allowing inbound UDP `40000–40099`, a two-browser voice test ran reliably with observed peak gaps of about `27–83 ms`.
-
-#### 2026-09-02 · v0.1.2
-
-- Major mobile UI and member-action improvements.
-- Added GitHub, current-version, and changelog entries to the welcome page.
-- Fixed settings-button alignment and improved narrow-screen layout and scrolling.
-- Added AudioWorklet, device selection, and more stable voice buffering.
-
-#### 2026-09-02 · v0.1.1
-
-- Official browser client, admin console, invite links, and operations tools.
-- Fixed member synchronization, private-message disconnects, and channel display issues.
-- Added Chinese/English switching, default targets, first-login password rotation, and one-click mute.
-- Added Windows, Linux, and Docker deployment options.
-
-#### 2026-08-31 · v0.1.0
-
-- First normalized release.
-
-### Community
-
-QQ group: `869500475`
-
-Join the group for support, release updates, and discussion:
-
-![WebSpeak QQ group QR code](group-chat.png)
-
-### License
-
-WebSpeak is released under the [GNU Affero General Public License v3.0](LICENSE).
+<div align="right"><a href="#readme-top">Back to top ↑</a></div>
