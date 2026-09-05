@@ -7,6 +7,18 @@ import { AdminLoginRateLimiter, waitFor } from "./login-rate-limit.js";
 import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
 import type { AdminSessionSummary } from "../server/voice-bridge.js";
 
+export interface AdminConnectionRecord {
+  id: string;
+  nickname: string;
+  target: string;
+  startedAt: string;
+  connectedAt: string | null;
+  disconnectedAt: string | null;
+  durationSeconds: number;
+  status: "active" | "connecting" | "disconnected" | "failed";
+  reason: string | null;
+}
+
 export interface AdminRouterOptions {
   service: AdminService;
   sessions: AdminSessionStore;
@@ -155,7 +167,12 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   });
 
   router.get("/logs", (request, response) => {
-    response.json({ available: Boolean(options.logFile && existsSync(options.logFile)), entries: readRecentLogs(options.logFile, readLimit(request.query.limit, 100)) });
+    const limit = readLimit(request.query.limit, 100);
+    response.json({
+      available: Boolean(options.logFile && existsSync(options.logFile)),
+      entries: readRecentLogs(options.logFile, limit),
+      sessions: readConnectionHistory(options.logFile, limit),
+    });
   });
 
   router.get("/diagnostics", (_request, response) => {
@@ -405,6 +422,111 @@ function readRecentLogs(logFile: string | undefined, limit: number): AdminLogEnt
   } catch {
     return [];
   }
+}
+
+interface StructuredLogEntry {
+  timestamp: string | null;
+  message: string;
+  raw: Record<string, unknown>;
+}
+
+export function readConnectionHistory(logFile: string | undefined, limit: number): AdminConnectionRecord[] {
+  if (!logFile) return [];
+  const records = new Map<string, {
+    id: string;
+    nickname: string;
+    target: string;
+    startedAt: string | null;
+    connectedAt: string | null;
+    disconnectedAt: string | null;
+    durationSeconds: number | null;
+    status: AdminConnectionRecord["status"];
+    reason: string | null;
+  }>();
+  for (const log of readStructuredLogs(logFile)) {
+    const entryId = typeof log.raw.entryId === "string" ? log.raw.entryId : "";
+    if (!entryId || !log.timestamp) continue;
+    const current = records.get(entryId) ?? {
+      id: entryId,
+      nickname: "",
+      target: "",
+      startedAt: null,
+      connectedAt: null,
+      disconnectedAt: null,
+      durationSeconds: null,
+      status: "connecting" as const,
+      reason: null,
+    };
+    const nickname = typeof log.raw.nickname === "string" ? log.raw.nickname : "";
+    const target = typeof log.raw.target === "string" ? log.raw.target : "";
+    if (nickname) current.nickname = nickname;
+    if (target) current.target = target;
+    if (log.message === "WebClient connecting") {
+      current.startedAt ??= log.timestamp;
+      current.status = "connecting";
+    } else if (log.message === "Web client connected to TeamSpeak") {
+      current.startedAt ??= log.timestamp;
+      current.connectedAt = log.timestamp;
+      current.status = "active";
+    } else if (log.message === "Client session torn down") {
+      current.startedAt ??= log.timestamp;
+      current.disconnectedAt = log.timestamp;
+      current.durationSeconds = current.connectedAt && typeof log.raw.durationSeconds === "number"
+        ? Math.max(0, Math.floor(log.raw.durationSeconds))
+        : current.connectedAt
+          ? Math.max(0, Math.floor((Date.parse(log.timestamp) - Date.parse(current.connectedAt)) / 1000))
+          : 0;
+      current.reason = typeof log.raw.reason === "string" ? log.raw.reason : null;
+      current.status = current.connectedAt ? "disconnected" : "failed";
+    }
+    records.set(entryId, current);
+  }
+  const now = Date.now();
+  return [...records.values()]
+    .filter((record): record is typeof record & { startedAt: string } => Boolean(record.startedAt))
+    .map((record) => {
+      const start = record.connectedAt ?? record.startedAt;
+      const end = record.disconnectedAt ? Date.parse(record.disconnectedAt) : now;
+      return {
+        id: record.id,
+        nickname: record.nickname || "—",
+        target: record.target || "—",
+        startedAt: record.startedAt,
+        connectedAt: record.connectedAt,
+        disconnectedAt: record.disconnectedAt,
+        durationSeconds: record.durationSeconds ?? Math.max(0, Math.floor((end - Date.parse(start)) / 1000)),
+        status: record.status,
+        reason: record.reason,
+      };
+    })
+    .sort((left, right) => Date.parse(right.disconnectedAt ?? right.startedAt) - Date.parse(left.disconnectedAt ?? left.startedAt))
+    .slice(0, limit);
+}
+
+function readStructuredLogs(logFile: string): StructuredLogEntry[] {
+  const paths = [logFile, `${logFile}.1`, `${logFile}.2`, `${logFile}.3`].filter((value, index, all) => value && all.indexOf(value) === index);
+  const entries: StructuredLogEntry[] = [];
+  for (const path of paths) {
+    if (!existsSync(path)) continue;
+    try {
+      for (const line of readFileSync(path, "utf8").split(/\r?\n/).filter(Boolean)) {
+        try {
+          const raw = JSON.parse(line) as Record<string, unknown>;
+          entries.push({
+            timestamp: typeof raw.time === "string" ? raw.time : null,
+            message: typeof raw.msg === "string" ? raw.msg : "",
+            raw,
+          });
+        } catch {
+          // Non-JSON lines are still shown by the normal log viewer, but cannot
+          // be associated with a user session safely.
+        }
+      }
+    } catch {
+      // A rotated file can disappear between existsSync and readFileSync.
+    }
+  }
+  return entries.sort((left, right) => Date.parse(left.timestamp ?? "") - Date.parse(right.timestamp ?? ""));
 }
 
 interface AdminOverview {

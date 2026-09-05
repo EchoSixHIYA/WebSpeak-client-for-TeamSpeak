@@ -307,6 +307,7 @@ export class VoiceBridge {
         reconnectStartedAt = 0;
         if (!wasReconnecting) {
           entry!.eventLog.push({ id: `event-${Date.now().toString(36)}-connected`, kind: "connection", message: "已连接到服务器", timestamp: Date.now() });
+          this.logger.info({ entryId: entry!.id, nickname: entry!.nickname, target: formatTeamSpeakTarget(entry!.target) }, "Web client connected to TeamSpeak");
         }
         session.transition("connected");
         sendJson({
@@ -736,7 +737,14 @@ export class VoiceBridge {
       else entry.ws.close(reason === "protocol-error" ? 1008 : 1000, reason);
     }
     if (entry.identityLeaseKey) this.identityLeases.release(entry.identityLeaseKey, entry.id);
-    this.logger.info({ entryId: entry.id, reason, audio: { ...entry.audio } }, "Client session torn down");
+    this.logger.info({
+      entryId: entry.id,
+      nickname: entry.nickname,
+      target: formatTeamSpeakTarget(entry.target),
+      reason,
+      durationSeconds: Math.max(0, Math.floor((Date.now() - entry.session.createdAt) / 1000)),
+      audio: { ...entry.audio },
+    }, "Client session torn down");
   }
 
   private startHeartbeat(): void {
