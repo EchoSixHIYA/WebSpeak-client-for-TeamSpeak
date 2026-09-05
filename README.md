@@ -62,7 +62,7 @@ docker compose up -d
 首次登录必须修改管理员密码。然后在管理控制台的“服务器”页面设置“默认 TeamSpeak 目标”，例如：
 
 ```text
-106.15.36.235#9987
+ts.example.com#9987
 ```
 
 用户欢迎页没有邀请链接参数时，会自动使用管理员设置的默认目标。开放模式下，用户可以自行输入要连接的服务器地址和端口。
@@ -231,7 +231,7 @@ Password: admin
 You must change the administrator password after the first login. Then configure the **Default TeamSpeak target** in the **Servers** page, for example:
 
 ```text
-106.15.36.235#9987
+ts.example.com#9987
 ```
 
 If a welcome link does not contain an invite target, the default target is pre-filled automatically. In open mode, users may enter their own TeamSpeak address and port.
