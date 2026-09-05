@@ -64,11 +64,7 @@
 
 ## 在线 Demo · Live Demo
 
-<div align="center">
-
-[![Open WebSpeak Demo](https://img.shields.io/badge/Open%20Demo-webspeak.online-0f766e?style=for-the-badge&logo=googlechrome&logoColor=white)](https://webspeak.online)
-
-</div>
+**在线地址 / Live URL：<https://webspeak.online>**
 
 > [!WARNING]
 > **中文：** 公共演示服务器位于香港，网络和运行负载可能不稳定。延迟、断线或暂时不可用不代表自行部署后的实际表现，请勿将该节点用于重要或长期会话。
