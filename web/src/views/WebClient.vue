@@ -10,7 +10,7 @@
             <small>{{ t('browserWorkspace') }}</small>
           </div>
         </div>
-        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><a class="bilibili-button" href="https://space.bilibili.com/25414873" target="_blank" rel="noreferrer" :title="t('bilibiliProfile')" :aria-label="t('bilibiliProfile')"><span class="bilibili-glyph">B</span><span class="bilibili-label">{{ t('bilibiliProfile') }}</span></a><span class="version-badge" :title="`${t('currentVersion')}: v${appVersion}`" :aria-label="`${t('currentVersion')}: v${appVersion}`">v{{ appVersion }}</span><a class="changelog-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md" target="_blank" rel="noreferrer" :title="t('viewChangelog')" :aria-label="t('viewChangelog')"><Icon name="clock" :size="16" /><span>{{ t('viewChangelog') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon :name="themeIcon" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
+        <div class="header-tools"><div class="header-note"><span class="tiny-dot"></span> {{ t('secureGateway') }}</div><a class="github-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')" :aria-label="t('githubRepository')"><Icon name="github" :size="18" /><span>{{ t('githubRepository') }}</span></a><button type="button" class="qq-button" :title="t('qqGroup')" :aria-label="t('qqGroup')" aria-haspopup="dialog" @click="qqModalOpen = true"><span class="qq-glyph">Q</span><span class="qq-label">{{ t('qqGroup') }}</span></button><a class="bilibili-button" href="https://space.bilibili.com/25414873" target="_blank" rel="noreferrer" :title="t('bilibiliProfile')" :aria-label="t('bilibiliProfile')"><span class="bilibili-glyph">B</span><span class="bilibili-label">{{ t('bilibiliProfile') }}</span></a><span class="version-badge" :title="`${t('currentVersion')}: v${appVersion}`" :aria-label="`${t('currentVersion')}: v${appVersion}`">v{{ appVersion }}</span><a class="changelog-button" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md" target="_blank" rel="noreferrer" :title="t('viewChangelog')" :aria-label="t('viewChangelog')"><Icon name="clock" :size="16" /><span>{{ t('viewChangelog') }}</span></a><a class="guide-button" href="/admin" :title="t('adminConsole')" :aria-label="t('adminConsole')"><Icon name="settings" :size="15" /><span>{{ t('adminConsole') }}</span></a><button type="button" class="header-action theme-toggle" :title="themeLabel" :aria-label="themeLabel" @click="cycleTheme"><Icon :name="themeIcon" :size="17" /></button><button class="language-switch" :aria-label="t('langSwitch')" @click="toggleLanguage">{{ t('langSwitch') }}</button></div>
       </header>
 
       <main class="join-content">
@@ -80,6 +80,17 @@
       <footer class="join-footer">
         <span>WebSpeak</span><span class="footer-separator">·</span><span>{{ t('teamSpeakClient') }}</span><span class="footer-spacer"></span><button type="button" class="clear-local-button" @click="clearBrowserData">{{ t('clearLocalData') }}</button><span class="footer-separator">·</span><span>{{ t('browserSupport') }}</span>
       </footer>
+
+      <!-- QQ community modal -->
+      <div v-if="qqModalOpen" class="modal-backdrop qq-modal-backdrop" @click.self="qqModalOpen = false">
+        <section class="qq-modal-card" role="dialog" aria-modal="true" :aria-labelledby="'qq-group-title'">
+          <button type="button" class="qq-modal-close" :aria-label="t('close')" :title="t('close')" @click="qqModalOpen = false"><Icon name="close" :size="19" /></button>
+          <div class="qq-modal-heading"><span class="card-kicker">{{ t('qqGroup') }}</span><h2 id="qq-group-title">{{ t('qqGroup') }}</h2></div>
+          <img class="qq-qr-image" src="/qq-group-qr.jpg" :alt="t('qqGroupQrAlt')" />
+          <p class="qq-direct-join">{{ t('qqJoinDirect') }}</p>
+          <a class="qq-join-link" :href="qqJoinUrl" :aria-label="t('joinQqGroup')" target="_blank" rel="noreferrer">{{ qqJoinUrl }}</a>
+        </section>
+      </div>
     </section>
 
     <!-- Connected application shell -->
@@ -345,6 +356,8 @@ const memberQuery = ref("");
 const messageDraft = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
+const qqModalOpen = ref(false);
+const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475";
 const audioSettingsError = ref("");
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
@@ -424,6 +437,10 @@ const translations: Record<Language, Record<string, string>> = {
     enterVoice: "进入语音空间",
     connectionAuthorized: "连接信息仅用于本次语音会话",
     githubRepository: "GitHub 仓库",
+    qqGroup: "QQ群",
+    qqGroupQrAlt: "QQ群二维码",
+    qqJoinDirect: "或通过群聊链接直接加入",
+    joinQqGroup: "点击加入QQ群",
     bilibiliProfile: "Bilibili 个人空间",
     browserSupport: "Chrome / Edge 94+",
     teamSpeakClient: "TeamSpeak 浏览器客户端",
@@ -655,6 +672,10 @@ const translations: Record<Language, Record<string, string>> = {
     enterVoice: "Enter voice space",
     connectionAuthorized: "Connection details are used only for this voice session",
     githubRepository: "GitHub repository",
+    qqGroup: "QQ group",
+    qqGroupQrAlt: "QQ group QR code",
+    qqJoinDirect: "Or join directly via the group link",
+    joinQqGroup: "Join the QQ group",
     bilibiliProfile: "Bilibili profile",
     browserSupport: "Chrome / Edge 94+",
     teamSpeakClient: "TeamSpeak browser client",
@@ -1542,7 +1563,7 @@ function stopWhisperTalk(): void {
 
 .member-panel { min-width: 0; padding: 26px 16px; color: #2c3935; background: #fbfcfc; border-left: 1px solid #eef2f0; }.member-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; }.member-panel-heading h2 { margin: 5px 0 0; color: #25322e; font-size: 19px; letter-spacing: -.04em; }.member-search { margin-top: 18px; padding: 0 10px; min-height: 33px; }.member-group { margin-top: 24px; }.member-group-title { display: flex; align-items: center; gap: 8px; color: #85928e; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.group-line { height: 1px; flex: 1; background: #e6edeb; }.member-list { display: flex; flex-direction: column; gap: 17px; margin-top: 17px; }.member-row { display: flex; align-items: center; gap: 8px; min-width: 0; }.member-avatar { position: relative; display: grid; place-items: center; width: 33px; height: 33px; flex: 0 0 auto; color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; }.member-avatar.speaking { box-shadow: 0 0 0 2px #90f691, 0 0 10px rgba(144,246,145,.35); }.member-presence { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #fbfcfc; border-radius: 50%; background: #65d879; }.member-copy { min-width: 0; flex: 1; }.member-copy strong, .member-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.member-copy strong { color: #34423d; font-size: 10px; }.member-copy span { margin-top: 4px; color: #96a29e; font-size: 9px; }.member-volume { display: flex; align-items: center; gap: 5px; color: #a1afaa; width: 64px; }.member-volume input { width: 45px; height: 4px; appearance: none; border-radius: 99px; outline: none; cursor: pointer; }.member-volume input::-webkit-slider-thumb, .settings-range::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.12); cursor: pointer; }.member-volume input::-moz-range-thumb, .settings-range::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.12); cursor: pointer; }.member-empty { margin-top: 22px; color: #98a49f; font-size: 10px; text-align: center; }.member-panel-tip { display: flex; gap: 8px; margin-top: 36px; padding: 12px; color: #72827c; background: #eef5f2; border-radius: 9px; font-size: 9px; line-height: 1.5; }.member-panel-tip .ui-icon { color: #5e9e96; }
 
-.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 28px; background: rgba(25, 33, 31, .42); backdrop-filter: blur(5px); }.settings-modal { display: flex; width: min(920px, 100%); max-height: min(760px, calc(100dvh - 56px)); overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.2); }.settings-nav { display: flex; flex-direction: column; width: 215px; flex: 0 0 auto; padding: 28px 12px 20px; background: #f8faf9; border-right: 1px solid #e6ecea; }.settings-title { padding: 0 13px 20px; color: #25322e; font-size: 19px; font-weight: 700; }.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 13px; color: #65736f; background: transparent; border-left: 3px solid transparent; border-radius: 8px; font-size: 11px; text-align: left; cursor: pointer; }.settings-nav-item.active { color: #006a64; background: #e2efec; border-left-color: #006a64; font-weight: 700; }.settings-version { margin-top: auto; padding: 20px 13px 0; color: #98a5a0; border-top: 1px solid #e4ebe8; font-size: 10px; line-height: 1.7; }.settings-version span { color: #b0bbb7; }.settings-main { display: flex; min-width: 0; flex: 1; flex-direction: column; }.settings-header { display: flex; align-items: center; justify-content: space-between; min-height: 75px; padding: 0 28px; border-bottom: 1px solid #edf1ef; }.settings-header h2 { margin: 0; color: #202c29; font-size: 22px; letter-spacing: -.045em; }.settings-content { flex: 1; overflow-y: auto; padding: 28px 40px; }.settings-section { max-width: 620px; margin: 0 auto; }.settings-section h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 21px; color: #293631; font-size: 16px; }.settings-section h3 .ui-icon { color: #006a64; }.settings-label { display: block; margin-bottom: 8px; color: #5e6d67; font-size: 10px; font-weight: 500; }.select-like { display: flex; align-items: center; justify-content: space-between; min-height: 39px; margin-bottom: 19px; padding: 0 13px; color: #394742; background: #f4f7f6; border-radius: 8px; font-size: 11px; }.select-like .ui-icon { color: #677671; }.settings-range-row { display: flex; align-items: center; justify-content: space-between; }.settings-range-row .settings-label { margin: 0; }.settings-range-row strong { color: #006a64; font-size: 10px; }.settings-range { width: 100%; height: 6px; margin: 11px 0 20px; appearance: none; border-radius: 999px; outline: none; cursor: pointer; }.settings-range::-webkit-slider-thumb { width: 19px; height: 19px; }.settings-range::-moz-range-thumb { width: 19px; height: 19px; }.mic-test { padding: 15px; border: 1px solid #e5ece9; border-radius: 11px; background: #fafcfb; }.mic-test-header { display: flex; align-items: center; justify-content: space-between; }.mic-test-header strong { color: #36453f; font-size: 11px; }.mic-test-header button { padding: 6px 9px; color: #006a64; background: #e0f1ee; border-radius: 5px; font-size: 10px; cursor: pointer; }.meter { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; height: 39px; margin-top: 12px; padding: 0 4px 4px; border-bottom: 1px solid #dce6e2; }.meter i { width: 5px; min-height: 4px; border-radius: 3px 3px 0 0; background: #dfe6e3; }.meter i.active { background: #81ed8b; box-shadow: 0 0 7px rgba(129,237,139,.45); animation: meter 1s ease-in-out infinite alternate; }.meter-labels { display: flex; justify-content: space-between; margin-top: 6px; color: #9ba6a2; font-size: 8px; }.settings-separator { max-width: 620px; margin: 32px auto; border-top: 1px solid #edf1ef; }.mode-note { display: flex; align-items: flex-start; gap: 8px; padding: 12px; color: #66817a; background: #eef7f4; border-radius: 8px; font-size: 10px; line-height: 1.5; }.mode-note .ui-icon { color: #4f9c91; }.settings-footer { display: flex; justify-content: flex-end; gap: 16px; min-height: 67px; padding: 15px 28px; border-top: 1px solid #edf1ef; }.text-button { padding: 0 6px; color: #63716c; background: transparent; font-size: 11px; font-weight: 600; cursor: pointer; }.save-button { padding: 0 23px; }.toast { position: fixed; z-index: 30; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 11px 15px; color: #fff; background: #263e39; border-radius: 9px; box-shadow: 0 10px 24px rgba(16,48,42,.2); font-size: 11px; animation: toast-in .25s ease-out; }
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 28px; background: rgba(25, 33, 31, .42); backdrop-filter: blur(5px); }.settings-modal { display: flex; width: min(920px, 100%); max-height: min(760px, calc(100dvh - 56px)); overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.2); }.settings-nav { display: flex; flex-direction: column; width: 215px; flex: 0 0 auto; padding: 28px 12px 20px; background: #f8faf9; border-right: 1px solid #e6ecea; }.settings-title { padding: 0 13px 20px; color: #25322e; font-size: 19px; font-weight: 700; }.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 13px; color: #65736f; background: transparent; border-left: 3px solid transparent; border-radius: 8px; font-size: 11px; text-align: left; cursor: pointer; }.settings-nav-item.active { color: #006a64; background: #e2efec; border-left-color: #006a64; font-weight: 700; }.settings-version { margin-top: auto; padding: 20px 13px 0; color: #98a5a0; border-top: 1px solid #e4ebe8; font-size: 10px; line-height: 1.7; }.settings-version span { color: #b0bbb7; }.settings-main { display: flex; min-width: 0; flex: 1; flex-direction: column; }.settings-header { display: flex; align-items: center; justify-content: space-between; min-height: 75px; padding: 0 28px; border-bottom: 1px solid #edf1ef; }.settings-header h2 { margin: 0; color: #202c29; font-size: 22px; letter-spacing: -.045em; }.settings-content { flex: 1; overflow-y: auto; padding: 28px 40px; }.settings-section { max-width: 620px; margin: 0 auto; }.settings-section h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 21px; color: #293631; font-size: 16px; }.settings-section h3 .ui-icon { color: #006a64; }.settings-label { display: block; margin-bottom: 8px; color: #5e6d67; font-size: 10px; font-weight: 500; }.select-like { display: flex; align-items: center; justify-content: space-between; min-height: 39px; margin-bottom: 19px; padding: 0 13px; color: #394742; background: #f4f7f6; border-radius: 8px; font-size: 11px; }.select-like .ui-icon { color: #677671; }.settings-range-row { display: flex; align-items: center; justify-content: space-between; }.settings-range-row .settings-label { margin: 0; }.settings-range-row strong { color: #006a64; font-size: 10px; }.settings-range { width: 100%; height: 6px; margin: 11px 0 20px; appearance: none; border-radius: 999px; outline: none; cursor: pointer; }.settings-range::-webkit-slider-thumb { width: 19px; height: 19px; }.settings-range::-moz-range-thumb { width: 19px; height: 19px; }.mic-test { padding: 15px; border: 1px solid #e5ece9; border-radius: 11px; background: #fafcfb; }.mic-test-header { display: flex; align-items: center; justify-content: space-between; }.mic-test-header strong { color: #36453f; font-size: 11px; }.mic-test-header button { padding: 6px 9px; color: #006a64; background: #e0f1ee; border-radius: 5px; font-size: 10px; cursor: pointer; }.meter { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; height: 39px; margin-top: 12px; padding: 0 4px 4px; border-bottom: 1px solid #dce6e2; }.meter i { width: 5px; min-height: 4px; border-radius: 3px 3px 0 0; background: #dfe6e3; }.meter i.active { background: #81ed8b; box-shadow: 0 0 7px rgba(129,237,139,.45); animation: meter 1s ease-in-out infinite alternate; }.meter-labels { display: flex; justify-content: space-between; margin-top: 6px; color: #9ba6a2; font-size: 8px; }.settings-separator { max-width: 620px; margin: 32px auto; border-top: 1px solid #edf1ef; }.mode-note { display: flex; align-items: flex-start; gap: 8px; padding: 12px; color: #66817a; background: #eef7f4; border-radius: 8px; font-size: 10px; line-height: 1.5; }.mode-note .ui-icon { color: #4f9c91; }.settings-footer { display: flex; justify-content: flex-end; gap: 16px; min-height: 67px; padding: 15px 28px; border-top: 1px solid #edf1ef; }.text-button { padding: 0 6px; color: #63716c; background: transparent; font-size: 11px; font-weight: 600; cursor: pointer; }.save-button { padding: 0 23px; }.qq-modal-card { position: relative; width: min(460px, 100%); max-height: min(90dvh, 720px); overflow-y: auto; padding: 30px; color: #263431; border: 1px solid #d9e7e3; border-radius: 20px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.22); text-align: center; }.qq-modal-heading { padding: 0 24px 18px; }.qq-modal-heading h2 { margin: 8px 0 0; color: #1d2d29; font-size: 25px; letter-spacing: -.04em; }.qq-modal-close { position: absolute; top: 13px; right: 13px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: #6d7d78; background: #f1f6f4; border: 1px solid #e1ebe8; border-radius: 50%; cursor: pointer; }.qq-modal-close:hover { color: #006a64; background: #e2f2ef; border-color: #c8e6e1; }.qq-qr-image { display: block; width: min(100%, 360px); max-height: min(55vh, 520px); margin: 0 auto; object-fit: contain; border-radius: 12px; }.qq-direct-join { margin: 18px 0 9px; color: #667773; font-size: 13px; }.qq-join-link { display: block; padding: 11px 14px; color: #006a64; background: #edf8f5; border: 1px solid #cfe9e4; border-radius: 10px; font-size: 12px; font-weight: 700; line-height: 1.45; text-decoration: none; overflow-wrap: anywhere; }.qq-join-link:hover { color: #fff; background: #006a64; border-color: #006a64; }.toast { position: fixed; z-index: 30; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 11px 15px; color: #fff; background: #263e39; border-radius: 9px; box-shadow: 0 10px 24px rgba(16,48,42,.2); font-size: 11px; animation: toast-in .25s ease-out; }
 
 @keyframes spin { to { transform: rotate(360deg); } } @keyframes wave { from { transform: scaleY(.68); opacity: .65; } to { transform: scaleY(1.08); opacity: 1; } } @keyframes meter { from { transform: scaleY(.65); } to { transform: scaleY(1); } } @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -1739,8 +1760,9 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 740px) {
   .header-tools { gap: 7px; }
-  .header-note, .github-button span, .changelog-button span, .guide-button span { display: none; }
+  .header-note, .github-button span, .qq-button .qq-label, .changelog-button span, .guide-button span { display: none; }
   .github-button { width: 34px; justify-content: center; padding: 0; }
+  .qq-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
   .changelog-button { width: 32px; min-width: 32px; min-height: 32px; padding: 0; }
   .guide-button { width: 32px; justify-content: center; padding: 0; }
 }
@@ -1834,6 +1856,12 @@ function stopWhisperTalk(): void {
 :global(html[data-theme="dark"] .join-page .join-card) { background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-color: var(--border); box-shadow: 0 20px 52px color-mix(in srgb, var(--text-primary) 14%, transparent); }
 :global(html[data-theme="dark"] .join-page .field-wrap) { color: var(--text-muted); background: var(--surface-2); }
 :global(html[data-theme="dark"] .join-page .field-wrap input) { color: var(--text-primary); }
+:global(html[data-theme="dark"] .join-page .qq-modal-card) { color: var(--text-primary); border-color: var(--border); background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 18%, transparent); }
+:global(html[data-theme="dark"] .join-page .qq-modal-heading h2) { color: var(--text-primary); }
+:global(html[data-theme="dark"] .join-page .qq-direct-join) { color: var(--text-muted); }
+:global(html[data-theme="dark"] .join-page .qq-modal-close) { color: var(--text-muted); background: var(--surface-2); border-color: var(--border); }
+:global(html[data-theme="dark"] .join-page .qq-join-link) { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+:global(html[data-theme="dark"] .join-page .qq-join-link:hover) { color: var(--surface-1); background: var(--accent); border-color: var(--accent); }
 :global(html[data-theme="dark"] .join-page .field-wrap input::placeholder) { color: var(--text-muted); }
 :global(html[data-theme="dark"] .join-page .join-footer) { border-top-color: var(--border); }
 
@@ -2021,6 +2049,8 @@ function stopWhisperTalk(): void {
 
   .modal-backdrop { align-items: flex-end; padding: 0; }
   .settings-modal { width: 100%; max-height: calc(100svh - env(safe-area-inset-top, 0px)); border-radius: 22px 22px 0 0; }
+  .qq-modal-card { width: 100%; max-height: calc(100svh - env(safe-area-inset-top, 0px)); padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; }
+  .qq-qr-image { width: min(100%, 330px); max-height: 52svh; }
   .settings-main { min-height: 0; overflow: hidden; }
   .settings-header { min-height: 64px; padding-inline: 18px; }
   .settings-content { min-height: 0; padding: 20px 18px; overflow-y: auto; }
@@ -2088,9 +2118,16 @@ function stopWhisperTalk(): void {
 .bilibili-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: #fff; background: #e56b91; border-radius: 5px; font-size: 11px; line-height: 1; }
 .bilibili-button:hover .bilibili-glyph { color: #e56b91; background: #fff; }
 
+.qq-button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; color: #1684b8; background: #eef9ff; border: 1px solid #cdeafa; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: .18s; }
+.qq-button:hover { color: #fff; background: #168fca; border-color: #168fca; box-shadow: 0 7px 16px rgba(22,143,202,.2); transform: translateY(-1px); }
+.qq-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: #fff; background: #168fca; border-radius: 5px; font-size: 11px; line-height: 1; }
+.qq-button:hover .qq-glyph { color: #168fca; background: #fff; }
+
 @media (max-width: 740px) {
   .bilibili-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
   .bilibili-button .bilibili-label { display: none; }
+  .qq-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
+  .qq-button .qq-label { display: none; }
 }
 
 @media (max-width: 390px) {
@@ -2100,5 +2137,7 @@ function stopWhisperTalk(): void {
 /* Override the shared Bilibili sizing above for the tighter welcome header. */
 @media (max-width: 420px) {
   .join-page .bilibili-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
+  .join-page .qq-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
+  .join-page .qq-glyph { width: 17px; height: 17px; }
 }
 </style>
