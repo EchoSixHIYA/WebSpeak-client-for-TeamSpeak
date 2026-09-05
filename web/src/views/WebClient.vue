@@ -1445,8 +1445,7 @@ function stopWhisperTalk(): void {
 :global(button) { border: 0; }
 
 .web-client { min-height: 100dvh; outline: none; background: #f7f9f8; color: #192120; }
-.join-page { min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background-color: #f7f9f8; background-image: url('/看板娘.png'); background-position: center; background-repeat: no-repeat; background-size: cover; }
-.join-page::before { display: none; }
+.join-page { min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: #f7f9f8; }
 .join-header, .join-content, .join-footer { width: min(1240px, calc(100% - 64px)); margin: 0 auto; }
 .join-header, .join-content, .join-footer { position: relative; z-index: 1; }
 .join-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; }
@@ -1817,21 +1816,6 @@ function stopWhisperTalk(): void {
 :global(html[data-theme="dark"] .join-page .field-wrap input::placeholder) { color: var(--text-muted); }
 :global(html[data-theme="dark"] .join-page .join-footer) { border-top-color: var(--border); }
 
-.join-page .brand-lockup small,
-.join-page .join-description,
-.join-page .join-footer,
-.join-page .join-footer a { color: #31403b !important; -webkit-text-stroke: 0; text-shadow: 0 1px 2px rgba(255, 255, 255, .72); }
-:global(html[data-theme="dark"] .join-page .brand-lockup small),
-:global(html[data-theme="dark"] .join-page .join-description),
-:global(html[data-theme="dark"] .join-page .join-footer),
-:global(html[data-theme="dark"] .join-page .join-footer a) { color: var(--text-muted) !important; -webkit-text-stroke: 0; text-shadow: none; }
-@media (prefers-color-scheme: dark) {
-  :global(html[data-theme="system"] .join-page .brand-lockup small),
-  :global(html[data-theme="system"] .join-page .join-description),
-  :global(html[data-theme="system"] .join-page .join-footer),
-  :global(html[data-theme="system"] .join-page .join-footer a) { color: var(--text-muted) !important; -webkit-text-stroke: 0; text-shadow: none; }
-}
-
 /* M007 whisper target controls and M008 mobile navigation. */
 .whisper-strip { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 14px; color: #52645e; border: 1px solid #d6ebe5; border-radius: 10px; background: #eef8f5; }
 .whisper-strip-copy { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
@@ -2032,14 +2016,10 @@ function stopWhisperTalk(): void {
   .join-description { font-size: 15px; line-height: 1.65; }
   .promise-list { margin-top: 23px; }
   .join-card { padding: 22px 18px; border-radius: 18px; }
-  .join-page::before { display: none; }
   .join-card h2 { font-size: 25px; }
   .field-grid { grid-template-columns: minmax(0, 1fr) 112px; }
   .join-footer { width: min(100% - 28px, 560px); }
 }
-
-:global(html[data-theme="dark"] .join-page) { background-image: none; }
-@media (prefers-color-scheme: dark) { :global(html[data-theme="system"] .join-page) { background-image: none; } }
 
 @media (max-width: 390px) {
   .join-page .header-tools { gap: 4px; }
