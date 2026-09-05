@@ -4,7 +4,7 @@
     <section v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed" class="join-page">
       <header class="join-header">
         <div class="brand-lockup">
-          <div class="brand-mark"><Icon name="waveform" :size="22" /></div>
+          <img class="brand-mark" src="/网站图标.jpg" alt="WebSpeak" />
           <div>
             <strong>{{ siteName }}</strong>
             <small>{{ t('browserWorkspace') }}</small>
@@ -1445,12 +1445,12 @@ function stopWhisperTalk(): void {
 :global(button) { border: 0; }
 
 .web-client { min-height: 100dvh; outline: none; background: #f7f9f8; color: #192120; }
-.join-page { min-height: 100dvh; display: flex; flex-direction: column; background: radial-gradient(circle at 76% 30%, rgba(126, 213, 205, .16), transparent 27rem), #f7f9f8; }
+.join-page { min-height: 100dvh; display: flex; flex-direction: column; background-color: #f7f9f8; background-image: linear-gradient(90deg, rgba(247, 249, 248, .26) 0%, rgba(247, 249, 248, .08) 52%, rgba(247, 249, 248, .7) 100%), url('/看板娘.png'); background-position: center, center; background-repeat: no-repeat; background-size: cover, cover; }
 .join-header, .join-content, .join-footer { width: min(1240px, calc(100% - 64px)); margin: 0 auto; }
 .join-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; }
 .brand-mark, .rail-logo { display: grid; place-items: center; color: #fff; background: #006a64; box-shadow: 0 8px 18px rgba(0, 106, 100, .15); }
-.brand-mark { width: 40px; height: 40px; border-radius: 12px; }
+.brand-mark { display: block; width: 40px; height: 40px; border-radius: 12px; object-fit: cover; }
 .brand-lockup strong { display: block; color: #006a64; font-size: 18px; letter-spacing: -.04em; }
 .brand-lockup strong span { color: #24312f; font-weight: 500; }
 .brand-lockup small { display: block; margin-top: 2px; color: #7b8885; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
@@ -1762,7 +1762,8 @@ function stopWhisperTalk(): void {
 :global(:root) { color-scheme: light; --surface-0: #f7f9f8; --surface-1: #fff; --surface-2: #f1f6f4; --text-primary: #192120; --text-muted: #71807c; --border: #e4ece9; --accent: #006a64; --success: #65d879; --warning: #c89143; --danger: #c95a54; }
 :global(:root[data-theme="dark"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; }
 @media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; } }
-.web-client, .join-page { background: var(--surface-0); color: var(--text-primary); }
+.web-client { background: var(--surface-0); color: var(--text-primary); }
+.join-page { background-color: var(--surface-0); background-image: linear-gradient(90deg, rgba(16, 25, 24, .58) 0%, rgba(16, 25, 24, .3) 52%, rgba(16, 25, 24, .86) 100%), url('/看板娘.png'); color: var(--text-primary); }
 .app-shell, .workspace { background: var(--surface-1); }
 .workspace-header, .member-panel, .voice-card, .settings-modal { background: var(--surface-1); border-color: var(--border); }
 .workspace-header { border-bottom-color: var(--border); }
@@ -1988,6 +1989,7 @@ function stopWhisperTalk(): void {
   .join-description { font-size: 15px; line-height: 1.65; }
   .promise-list { margin-top: 23px; }
   .join-card { padding: 22px 18px; border-radius: 18px; }
+  .join-page { background-position: 32% center, 32% center; }
   .join-card h2 { font-size: 25px; }
   .field-grid { grid-template-columns: minmax(0, 1fr) 112px; }
   .join-footer { width: min(100% - 28px, 560px); }
