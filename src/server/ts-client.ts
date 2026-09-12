@@ -14,6 +14,7 @@ import {
   type TextMessage,
 } from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
+import { describeTeamSpeakError, normalizeTeamSpeakError } from "../errors.js";
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { createAccelerationRelayClient, type AccelerationRelayClient, type AccelerationRelayOptions } from "./acceleration-relay.js";
@@ -138,8 +139,9 @@ export class TSClient extends EventEmitter {
       this.emit("directorySnapshot", { channels, clients });
     } catch (error: unknown) {
       this.logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-      }, "Could not reconcile the TeamSpeak directory snapshot");
+        failureCode: "DIRECTORY_SNAPSHOT_UNAVAILABLE",
+        failureDetail: error instanceof Error ? error.message : String(error),
+      }, "TeamSpeak directory snapshot unavailable");
     }
 
     const connectedChannelId = client.channelID();
@@ -193,7 +195,15 @@ export class TSClient extends EventEmitter {
     });
 
     client.on("disconnected", (err) => {
-      this.logger.warn({ err: err?.message }, "Disconnected from TS");
+      if (err) {
+        const normalized = normalizeTeamSpeakError(err);
+        this.logger.warn({
+          failureCode: normalized.code.toUpperCase(),
+          failureDetail: describeTeamSpeakError(normalized),
+        }, "TeamSpeak transport disconnected unexpectedly");
+      } else {
+        this.logger.info("TeamSpeak transport disconnected");
+      }
       this.connected = false;
       this.clientId = 0;
       this.emit("disconnected", err);

@@ -51,7 +51,7 @@
           </div>
           <div class="operations-grid lower-operations">
             <article class="operation-card diagnostics-card"><header><div><h3>{{ tr('diagnostics') }}</h3><p>{{ tr('diagnosticsLead') }}</p></div><a class="text-link" href="/api/admin/diagnostics/report">{{ tr('downloadReport') }}</a></header><dl class="diagnostic-list"><div><dt>{{ tr('version') }}</dt><dd>{{ operations.diagnostics.version || '—' }}</dd></div><div><dt>{{ tr('runtime') }}</dt><dd>{{ operations.diagnostics.node || '—' }}</dd></div><div><dt>{{ tr('platform') }}</dt><dd>{{ operations.diagnostics.platform || '—' }} / {{ operations.diagnostics.arch || '—' }}</dd></div><div><dt>{{ tr('databaseSchema') }}</dt><dd>v{{ operations.diagnostics.schemaVersion || '—' }}</dd></div><div><dt>{{ tr('createdSessions') }}</dt><dd>{{ operations.diagnostics.createdSessions }}</dd></div></dl><button class="secondary-button" type="button" @click="downloadBackup">{{ tr('exportBackup') }}</button></article>
-            <article class="operation-card logs-card"><header><div><h3>{{ tr('logViewer') }}</h3><p>{{ tr('logViewerLead') }}</p></div><span v-if="!operations.logs.available" class="muted-label">{{ tr('logsUnavailable') }}</span></header><div v-if="operations.logs.sessions.length" class="connection-list"><div class="connection-history-heading"><strong>{{ tr('connectionHistory') }}</strong><small>{{ tr('connectionHistoryLead') }}</small></div><div v-for="record in operations.logs.sessions" :key="record.id" class="connection-row"><div class="connection-person"><strong>{{ record.nickname }}</strong><small>{{ record.target }}</small><small class="connection-route">{{ connectionRoute(record) }}</small></div><div class="connection-detail"><span :class="['connection-status', record.status]">{{ connectionStatusLabel(record.status) }}</span><small>{{ record.connectedAt ? tr('connectedAt') : tr('connectionAttemptedAt') }}：{{ formatDate(record.connectedAt || record.startedAt) }}</small><small>{{ tr('duration') }}：{{ formatAge(record.durationSeconds) }}</small><small v-if="record.disconnectedAt">{{ tr('disconnectedAt') }}：{{ formatDate(record.disconnectedAt) }}</small><small v-if="record.reason">{{ tr('failureReason') }}：{{ connectionFailureText(record.reason) }}</small></div></div></div><div v-if="operations.logs.entries.length" class="log-list"><div v-for="(entry, index) in operations.logs.entries" :key="`${entry.timestamp}-${index}`" class="log-row"><span :class="['log-level', entry.level.toLowerCase()]">{{ entry.level }}</span><div><strong>{{ entry.message || '—' }}</strong><small>{{ formatDate(entry.timestamp) }}<template v-if="Object.keys(entry.context).length"> · {{ formatContext(entry.context) }}</template></small></div></div></div><div v-if="!operations.logs.sessions.length && !operations.logs.entries.length" class="operation-empty"><Icon name="activity" :size="22" /><span>{{ tr('noLogs') }}</span></div></article>
+            <article class="operation-card logs-card"><header><div><h3>{{ tr('logViewer') }}</h3><p>{{ tr('logViewerLead') }}</p></div><span v-if="!operations.logs.available" class="muted-label">{{ tr('logsUnavailable') }}</span></header><div v-if="operations.logs.sessions.length" class="connection-list"><div class="connection-history-heading"><strong>{{ tr('connectionHistory') }}</strong><small>{{ tr('connectionHistoryLead') }}</small></div><div v-for="record in operations.logs.sessions" :key="record.id" class="connection-row"><div class="connection-person"><strong>{{ record.nickname }}</strong><small>{{ record.target }}</small><small class="connection-route">{{ connectionRoute(record) }}</small></div><div class="connection-detail"><span :class="['connection-status', record.status]">{{ connectionStatusLabel(record.status) }}</span><small>{{ record.connectedAt ? tr('connectedAt') : tr('connectionAttemptedAt') }}：{{ formatDate(record.connectedAt || record.startedAt) }}</small><small>{{ tr('duration') }}：{{ formatAge(record.durationSeconds) }}</small><small v-if="record.disconnectedAt">{{ tr('disconnectedAt') }}：{{ formatDate(record.disconnectedAt) }}</small><small v-if="record.reason">{{ tr('failureReason') }}：{{ connectionFailureText(record.reason) }}</small><small v-if="record.failureDetail" class="failure-detail">{{ tr('failureDetail') }}：{{ record.failureDetail }}</small></div></div></div><div v-if="operations.logs.entries.length" class="log-list"><div v-for="(entry, index) in operations.logs.entries" :key="`${entry.timestamp}-${index}`" class="log-row"><span :class="['log-level', entry.level.toLowerCase()]">{{ entry.level }}</span><div><strong>{{ entry.message || '—' }}</strong><small>{{ formatDate(entry.timestamp) }}<template v-if="Object.keys(entry.context).length"> · {{ formatContext(entry.context) }}</template></small></div></div></div><div v-if="!operations.logs.sessions.length && !operations.logs.entries.length" class="operation-empty"><Icon name="activity" :size="22" /><span>{{ tr('noLogs') }}</span></div></article>
             <article class="operation-card audit-card"><header><div><h3>{{ tr('audit') }}</h3><p>{{ tr('auditLead') }}</p></div></header><ul class="event-list"><li v-for="event in operations.audit" :key="`${event.event}-${event.createdAt}`"><span><Icon name="check" :size="14" /></span><div><strong>{{ eventName(event.event) }}</strong><small>{{ formatDate(event.createdAt) }}</small></div></li><li v-if="!operations.audit.length" class="empty-event">{{ tr('auditEmpty') }}</li></ul></article>
           </div>
         </section>
@@ -107,7 +107,7 @@ const overview = reactive({ gateway: { version: "", uptimeSeconds: 0 }, teamSpea
 interface AdminSession { id: string; nickname: string; target: string; state: string; createdAt: string; ageSeconds: number; tsClientId: number | null; channelId: string | null; memberCount: number }
 interface ManagedInvite { id: string; target: string; channel: string; expiresAt: string; maxUses: number; useCount: number; createdAt: string; revokedAt: string | null; status: "active" | "expired" | "exhausted" | "revoked" }
 interface AdminLog { timestamp: string | null; level: string; message: string; context: Record<string, string | number | boolean> }
-interface AdminConnectionRecord { id: string; nickname: string; clientIp: string; target: string; relayName: string | null; relayTarget: string | null; startedAt: string; connectedAt: string | null; disconnectedAt: string | null; durationSeconds: number | null; status: "active" | "connecting" | "disconnected" | "failed"; reason: string | null }
+interface AdminConnectionRecord { id: string; nickname: string; clientIp: string; target: string; relayName: string | null; relayTarget: string | null; startedAt: string; connectedAt: string | null; disconnectedAt: string | null; durationSeconds: number | null; status: "active" | "connecting" | "disconnected" | "failed"; reason: string | null; failureDetail: string | null }
 const operationsLoading = ref(false);
 const terminatingSession = ref("");
 const inviteForm = reactive({ channel: "", expiresInHours: 24, maxUses: 0 });
@@ -170,8 +170,11 @@ const copy = {
     networkReachable: "网络可达（未验证密码）",
     networkReachableHint: "Ping 成功；管理员测试不会创建额外 TeamSpeak 成员，因此未验证服务器密码。",
     failureReason: "原因",
+    failureDetail: "诊断",
     hostNotFoundError: "找不到服务器",
     networkUnreachableError: "网络不可达",
+    connectionRefusedError: "服务器拒绝连接",
+    connectionResetError: "连接被服务器或网络重置",
     networkTimeoutError: "网络请求超时",
     serverPasswordRequiredError: "服务器需要密码",
     invalidServerPasswordError: "服务器密码错误",
@@ -369,8 +372,11 @@ const copy = {
     networkReachable: "Network reachable (password not verified)",
     networkReachableHint: "Ping succeeded. The admin test does not create an extra TeamSpeak client, so the server password was not verified.",
     failureReason: "Reason",
+    failureDetail: "Diagnostics",
     hostNotFoundError: "Server not found",
     networkUnreachableError: "Network unreachable",
+    connectionRefusedError: "Connection refused",
+    connectionResetError: "Connection reset",
     networkTimeoutError: "Network request timed out",
     serverPasswordRequiredError: "Server password required",
     invalidServerPasswordError: "Invalid server password",
@@ -565,8 +571,11 @@ const germanCopy = {
   networkReachable: "Netzwerk erreichbar (Passwort nicht geprüft)",
   networkReachableHint: "Ping erfolgreich. Der Admin-Test erstellt keinen zusätzlichen TeamSpeak-Client und prüft daher das Serverpasswort nicht.",
   failureReason: "Grund",
+  failureDetail: "Diagnose",
   hostNotFoundError: "Server nicht gefunden",
   networkUnreachableError: "Netzwerk nicht erreichbar",
+  connectionRefusedError: "Verbindung abgelehnt",
+  connectionResetError: "Verbindung zurückgesetzt",
   networkTimeoutError: "Netzwerk-Zeitüberschreitung",
   serverPasswordRequiredError: "Serverpasswort erforderlich",
   invalidServerPasswordError: "Falsches Serverpasswort",
@@ -683,6 +692,8 @@ const testResultTitle = computed(() => {
     INVALID_TARGET: "serverAddress",
     HOST_NOT_FOUND: "hostNotFoundError",
     UNREACHABLE: "networkUnreachableError",
+    CONNECTION_REFUSED: "connectionRefusedError",
+    CONNECTION_RESET: "connectionResetError",
     TIMEOUT: "networkTimeoutError",
     PASSWORD_REQUIRED: "serverPasswordRequiredError",
     INVALID_PASSWORD: "invalidServerPasswordError",
@@ -754,14 +765,18 @@ function connectionFailureText(code?: string) {
   const names: Record<string, keyof typeof copy.zh> = {
     PASSWORD_REQUIRED: "serverPasswordRequiredError",
     SERVER_PASSWORD_REQUIRED: "serverPasswordRequiredError",
-    INVALID_PASSWORD: "invalidServerPasswordError",
-    INVALID_SERVER_PASSWORD: "invalidServerPasswordError",
-    HOST_NOT_FOUND: "hostNotFoundError",
-    UNREACHABLE: "networkUnreachableError",
-    TIMEOUT: "networkTimeoutError",
+  INVALID_PASSWORD: "invalidServerPasswordError",
+  INVALID_SERVER_PASSWORD: "invalidServerPasswordError",
+  INVALID_TARGET: "serverAddress",
+  HOST_NOT_FOUND: "hostNotFoundError",
+  UNREACHABLE: "networkUnreachableError",
+  CONNECTION_REFUSED: "connectionRefusedError",
+  CONNECTION_RESET: "connectionResetError",
+  TIMEOUT: "networkTimeoutError",
     PROTOCOL_NEGOTIATION_FAILED: "protocolFailureError",
     SERVER_REJECTED: "serverRejectedError",
-    PING_UNAVAILABLE: "pingUnavailableError",
+  PING_UNAVAILABLE: "pingUnavailableError",
+  CONNECTION_FAILED: "connectionFailed",
   };
   return names[code || ""] ? tr(names[code || ""]) : errorText(code);
 }

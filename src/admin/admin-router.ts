@@ -20,6 +20,7 @@ export interface AdminConnectionRecord {
   durationSeconds: number | null;
   status: "active" | "connecting" | "disconnected" | "failed";
   reason: string | null;
+  failureDetail: string | null;
 }
 
 export interface AdminRouterOptions {
@@ -473,6 +474,7 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
     durationSeconds: number | null;
     status: AdminConnectionRecord["status"];
     reason: string | null;
+    failureDetail: string | null;
   }>();
   for (const log of readStructuredLogs(logFile)) {
     const entryId = typeof log.raw.entryId === "string" ? log.raw.entryId : "";
@@ -490,6 +492,7 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
       durationSeconds: null,
       status: "connecting" as const,
       reason: null,
+      failureDetail: null,
     };
     const nickname = typeof log.raw.nickname === "string" ? log.raw.nickname : "";
     const clientIp = typeof log.raw.clientIp === "string" ? log.raw.clientIp : "";
@@ -501,9 +504,13 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
     if (target) current.target = target;
     if (relayName) current.relayName = relayName;
     if (relayTarget) current.relayTarget = relayTarget;
+    if (typeof log.raw.failureDetail === "string" && log.raw.failureDetail) current.failureDetail = log.raw.failureDetail;
     if (log.message === "WebClient connecting") {
       current.startedAt ??= log.timestamp;
       current.status = "connecting";
+    } else if (log.message === "TS connect failed") {
+      current.reason = typeof log.raw.code === "string" ? log.raw.code : current.reason;
+      current.status = "failed";
     } else if (log.message === "Web client connected to TeamSpeak") {
       current.startedAt ??= log.timestamp;
       current.connectedAt = log.timestamp;
@@ -523,7 +530,7 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
       // rendered by the admin UI as the generic request-failed message.
       current.reason = typeof log.raw.failureCode === "string" && log.raw.failureCode
         ? log.raw.failureCode
-        : null;
+        : current.reason;
     }
     records.set(entryId, current);
   }
@@ -552,6 +559,7 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
         // an untraceable failed connection explicitly visible as the generic
         // request-failed message instead of implying a guessed cause.
         reason: record.reason ?? (record.status === "failed" ? "CONNECTION_FAILED" : null),
+        failureDetail: record.failureDetail,
       };
     })
     .sort((left, right) => Date.parse(right.disconnectedAt ?? right.startedAt) - Date.parse(left.disconnectedAt ?? left.startedAt))

@@ -6,7 +6,7 @@ import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
-import { clientConnectionFailureCode, normalizeTeamSpeakError } from "../errors.js";
+import { clientConnectionFailureCode, describeTeamSpeakError, normalizeTeamSpeakError } from "../errors.js";
 import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { IdentityLeaseStore } from "./identity-lease.js";
@@ -436,7 +436,15 @@ export class VoiceBridge {
           const normalized = normalizeTeamSpeakError(error);
           const failureCode = clientConnectionFailureCode(normalized, serverPassword);
           entry!.connectionFailureCode = failureCode;
-          this.logger.error({ code: failureCode, normalizedCode: normalized.code, entryId, reconnect: isReconnect, attempt: reconnectAttempt }, "TS connect failed");
+          this.logger.warn({
+            code: failureCode,
+            normalizedCode: normalized.code,
+            failureDetail: describeTeamSpeakError(normalized),
+            ...(Object.keys(normalized.diagnostics).length ? { failureDiagnostics: normalized.diagnostics } : {}),
+            entryId,
+            reconnect: isReconnect,
+            attempt: reconnectAttempt,
+          }, "TS connect failed");
           if (!isReconnect) {
             try {
               if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");

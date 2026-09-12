@@ -7,6 +7,8 @@ import type { TeamSpeakProtocol } from "./teamspeak-adapter.js";
 export type ProbeErrorCode =
   | "HOST_NOT_FOUND"
   | "UNREACHABLE"
+  | "CONNECTION_REFUSED"
+  | "CONNECTION_RESET"
   | "TIMEOUT"
   | "PASSWORD_REQUIRED"
   | "INVALID_PASSWORD"
@@ -103,6 +105,9 @@ export function toProbeError(error: unknown, password = ""): TeamSpeakProbeError
   const mapping: Record<WebSpeakErrorCode, ProbeErrorCode> = {
     invalid_target: "INTERNAL_ERROR",
     unreachable: "UNREACHABLE",
+    host_not_found: "HOST_NOT_FOUND",
+    connection_refused: "CONNECTION_REFUSED",
+    connection_reset: "CONNECTION_RESET",
     timeout: "TIMEOUT",
     authentication_failed: password.trim() ? "INVALID_PASSWORD" : "PASSWORD_REQUIRED",
     protocol_negotiation_failed: "PROTOCOL_NEGOTIATION_FAILED",

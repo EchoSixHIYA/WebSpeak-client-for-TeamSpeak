@@ -1178,7 +1178,7 @@ export function useVoiceWebSocket() {
   }
 
   function closeErrorCode(code: number, reason = ""): string {
-    const known = new Set(["INVALID_TARGET", "UNREACHABLE", "TIMEOUT", "SERVER_PASSWORD_REQUIRED", "INVALID_SERVER_PASSWORD", "PROTOCOL_NEGOTIATION_FAILED", "SERVER_REJECTED", "CONNECTION_FAILED"]);
+    const known = new Set(["INVALID_TARGET", "HOST_NOT_FOUND", "UNREACHABLE", "CONNECTION_REFUSED", "CONNECTION_RESET", "TIMEOUT", "SERVER_PASSWORD_REQUIRED", "INVALID_SERVER_PASSWORD", "PROTOCOL_NEGOTIATION_FAILED", "SERVER_REJECTED", "CONNECTION_FAILED"]);
     if (known.has(reason)) return reason;
     if (code === 4002) return "INVALID_TARGET";
     if (code === 4004) return "SERVER_REJECTED";
@@ -1189,7 +1189,10 @@ export function useVoiceWebSocket() {
   function connectionFailureMessage(code: string): string {
     const messages: Record<string, string> = {
       INVALID_TARGET: "TeamSpeak 服务器地址无效",
+      HOST_NOT_FOUND: "找不到 TeamSpeak 服务器主机名，请检查地址",
       UNREACHABLE: "无法到达 TeamSpeak 服务器，请检查网络或地址",
+      CONNECTION_REFUSED: "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态",
+      CONNECTION_RESET: "TeamSpeak 连接被服务器或网络重置，请稍后重试",
       TIMEOUT: "连接 TeamSpeak 超时，请检查网络或服务器状态",
       SERVER_PASSWORD_REQUIRED: "该服务器需要密码，请输入密码后重试",
       INVALID_SERVER_PASSWORD: "服务器密码错误，请重新输入",
