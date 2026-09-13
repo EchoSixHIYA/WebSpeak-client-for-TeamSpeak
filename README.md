@@ -112,6 +112,8 @@ English: Join for deployment help, release announcements, and user discussion.<b
 Deutsch: Hilfe bei der Bereitstellung, Versionsankündigungen und Austausch in der Community.<br />
 Telegram: [Join the Telegram group](https://t.me/+8qShpTcuN9A3MWY9)
 
+友链 / Friend project: [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
+
 </div>
 
 ---
