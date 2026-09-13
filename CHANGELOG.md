@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1] — 2026-09-13
+
+### 中文
+
+- 统一首页连接错误显示：保留错误代码，未知错误安全截断，并显示可追溯的服务端原因。
+- 默认支持 IPv6 TeamSpeak 目标，并补充主机、运行时和网络条件说明。
+
+### English
+
+- Unified connection-error display on the welcome page: preserve error codes, safely truncate unknown codes, and show traceable server reasons.
+- Added default IPv6 TeamSpeak target support and documented the required host, runtime, and network conditions.
+
+### Deutsch
+
+- Verbindungsfehler auf der Willkommensseite vereinheitlicht: Fehlercodes bleiben erhalten, unbekannte Codes werden sicher gekürzt und nachvollziehbare Serverursachen angezeigt.
+- IPv6-Ziele für TeamSpeak standardmäßig unterstützt und erforderliche Host-, Laufzeit- und Netzwerkbedingungen dokumentiert.
+
 ## [0.2.0] — 2026-09-10
 
 ### 中文

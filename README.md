@@ -159,6 +159,7 @@ WebSpeak 面向希望通过网页提供 TeamSpeak 语音服务的个人、社区
 | 能力 | 说明 |
 | --- | --- |
 | TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
+| IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标，并兼容域名解析出的 IPv6 地址。 |
 | 频道与成员 | 浏览完整频道树、查看各频道成员和实时状态，并可切换频道。 |
 | 实时语音 | 使用 Opus 语音；支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
 | 音频控制 | 选择麦克风与扬声器、调节输入/输出音量、测试麦克风、闭麦、VOX，以及单独调整成员音量。 |
@@ -278,6 +279,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
+| [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | 统一首页连接错误显示，保留并安全截断错误代码，补充可追溯服务端原因；默认支持 IPv6 TeamSpeak 目标并补充使用条件。 |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | 2026-09-10 | 修复连接错误显示并增加服务器密码提示与重试；加入正式中继部署模式、多中继节点选择和高级功能配置教程，优化管理员历史连接日志的原因显示。 |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | 2026-09-08 | 简化 Docker 部署并支持连接同机 TeamSpeak；开放模式加强目标校验；SDK 增加 15 秒连接超时；网络性能面板改为每 3 秒持续监测。 |
 | [v0.1.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.7) | 2026-09-06 | 增加德语支持、Telegram 群组入口、网络性能面板和丢包率测试；管理员测试不再创建临时客户端，并修复语言菜单留白与伴奏音量波动。 |
@@ -366,6 +368,7 @@ npm start
 | 浏览器 | 建议使用最新版 Chrome、Edge 或其他支持 WebRTC 的现代浏览器。麦克风和屏幕音频通常要求 HTTPS 安全上下文。 |
 | TeamSpeak 网络 | WebSpeak 主机必须能够访问目标 TeamSpeak 服务器。目标默认语音端口为 `9987`，也可在网页中填写其他端口。 |
 | Web 服务网络 | 服务使用 `3040/TCP`。公网部署建议通过 HTTPS 反向代理提供网页和 WebSocket。 |
+| IPv6 | 默认支持 IPv6 目标；IPv6 字面量请写为 `[2001:db8::1]#9987`。WebSpeak 所在主机/容器需要可路由 IPv6、操作系统和 Node.js 启用 IPv6，并在云安全组与防火墙中放行对应 TCP/UDP；仅有本地链路地址或没有 IPv6 路由时不可用。 |
 | WebRTC | 默认使用 `40000–40099/UDP`，请在云安全组和主机防火墙中放行。自定义范围时同步放行对应端口；启用 WebRTC 后需先关闭它才能修改端口范围。 |
 | 身份保持 | 同一浏览器身份同时只能保持一条活动连接。需要并行连接时，请取消第二条连接的“保持身份”，或使用另一个浏览器/浏览器配置文件。 |
 | 伴奏 | 仅桌面端提供，并要求启用 WebRTC。选择窗口或标签页时必须同时勾选共享音频；浏览器无法直接任意读取本地应用音频。 |
@@ -426,6 +429,7 @@ These screenshots come from the Shanghai test node and show the welcome page, vo
 | Capability | Description |
 | --- | --- |
 | TeamSpeak compatibility | Supports TeamSpeak 3 and TeamSpeak 6 and automatically detects the target server protocol. |
+| IPv6 targets | IPv6 TeamSpeak targets are supported by default, including IPv6 addresses resolved from hostnames. |
 | Channels and members | Browse the complete channel tree, see members and live states in each channel, and switch channels. |
 | Realtime voice | Uses Opus audio with a compatibility transport and an optional bundled WebRTC low-latency transport. |
 | Audio controls | Select microphones and speakers, adjust input/output volume, test the microphone, mute, use VOX, and control each member's volume. |
@@ -545,6 +549,7 @@ Disable and save the relay configuration to remove the option from the welcome p
 
 | Version | Date | Summary |
 | --- | --- | --- |
+| [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | Unified welcome-page connection errors, preserved and safely truncated error codes, exposed traceable server reasons, and added default IPv6 TeamSpeak target support with documented conditions. |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | 2026-09-10 | Fixed connection-error reporting, added server-password prompts and retry, introduced formal relay deployment, multi-relay selection, and advanced-feature guidance, and improved reason reporting in administrator connection history. |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | 2026-09-08 | Simplified Docker deployment for local TeamSpeak targets; hardened open-target validation; added a 15-second SDK connection timeout; network metrics now refresh every 3 seconds. |
 | [v0.1.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.7) | 2026-09-06 | Added German support, a Telegram community link, network performance and packet-loss checks; admin tests no longer create temporary clients, and language-menu spacing and accompaniment volume fluctuations were fixed. |
@@ -633,6 +638,7 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain. For dev
 | Browser | Use a current Chrome, Edge, or another modern browser with WebRTC support. Microphone and shared-screen audio normally require an HTTPS secure context. |
 | TeamSpeak network | The WebSpeak host must be able to reach the target TeamSpeak server. The default voice port is `9987`, and other ports can be entered in the web interface. |
 | Web network | The service uses `3040/TCP`. Public deployments should expose the page and WebSocket through an HTTPS reverse proxy. |
+| IPv6 | IPv6 targets are supported by default; write literal targets as `[2001:db8::1]#9987`. The WebSpeak host/container needs routed IPv6 with IPv6 enabled in the OS and Node.js, and the relevant TCP/UDP traffic must be allowed by the cloud security group and firewall. Link-local-only addresses or hosts without an IPv6 route are not supported. |
 | WebRTC | The default range is `40000–40099/UDP`; allow it in the cloud security group and host firewall. For a custom range, allow the corresponding ports. Disable WebRTC before changing the range. |
 | Remembered identity | One browser identity can hold only one active remembered connection at a time. For parallel connections, disable **Remember identity** on the second connection or use another browser/profile. |
 | Accompaniment | Desktop only and requires WebRTC. When selecting a window or tab, enable audio sharing as well. Browsers cannot arbitrarily capture every local application's audio. |
@@ -693,6 +699,7 @@ Diese Screenshots stammen vom Shanghai-Testknoten und zeigen die Willkommensseit
 | Funktion | Beschreibung |
 | --- | --- |
 | TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Protokoll des Zielservers automatisch. |
+| IPv6-Ziele | IPv6-TeamSpeak-Ziele werden standardmäßig unterstützt, auch über IPv6-Adressen aus der Namensauflösung. |
 | Kanäle und Mitglieder | Zeigt die Kanalstruktur, Mitglieder und ihren aktuellen Status an. |
 | Echtzeit-Sprache | Opus-Audio mit kompatiblem Transport und optionalem integriertem WebRTC für geringere Latenz. |
 | Audiosteuerung | Mikrofon und Lautsprecher auswählen, Lautstärke anpassen, testen und einzelne Mitglieder regeln. |
@@ -814,6 +821,7 @@ Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entf
 
 | Version | Datum | Zusammenfassung |
 | --- | --- | --- |
+| [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | Verbindungsfehler auf der Willkommensseite vereinheitlicht, Fehlercodes erhalten und sicher gekürzt, nachvollziehbare Serverursachen angezeigt sowie IPv6-TeamSpeak-Ziele standardmäßig mit dokumentierten Bedingungen unterstützt. |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | 2026-09-10 | Verbindungsfehleranzeigen korrigiert, Passwortabfrage und Wiederholung ergänzt, dedizierten Relay-Modus, Auswahl mehrerer Relay-Knoten und Anleitungen für erweiterte Funktionen hinzugefügt sowie die Ursachendarstellung im Verbindungsverlauf verbessert. |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | 2026-09-08 | Docker-Bereitstellung für lokale TeamSpeak-Ziele vereinfacht; Zielprüfung im offenen Modus gehärtet; 15-Sekunden-Timeout für SDK-Verbindungen ergänzt; Netzwerkmetriken werden alle 3 Sekunden aktualisiert. |
 | [v0.1.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.7) | 2026-09-06 | Deutsche Oberfläche, Telegram-Link sowie Netzwerk- und Paketverlustprüfung hinzugefügt; Admin-Tests erzeugen keine temporären Clients mehr, außerdem wurden Sprachmenü-Leerraum und Begleitton-Schwankungen behoben. |
@@ -861,6 +869,7 @@ Lade das passende Paket von [GitHub Releases](https://github.com/EchoSixHIYA/Web
 | --- | --- |
 | Browser | Aktuelles Chrome, Edge oder ein moderner WebRTC-fähiger Browser wird empfohlen. Für Mikrofon- und Bildschirm-Audio ist normalerweise HTTPS erforderlich. |
 | TeamSpeak-Netzwerk | Der WebSpeak-Host muss den Zielserver erreichen können. Der Standard-Sprachport ist `9987`; andere Ports können im Webinterface eingetragen werden. |
+| IPv6 | IPv6-Ziele werden standardmäßig unterstützt; literale Ziele als `[2001:db8::1]#9987` eintragen. Der WebSpeak-Host/Container benötigt geroutetes IPv6 mit aktiviertem IPv6 in Betriebssystem und Node.js; Sicherheitsgruppe und Firewall müssen den relevanten TCP-/UDP-Verkehr erlauben. Nur lokale Link-Local-Adressen oder fehlende IPv6-Routen werden nicht unterstützt. |
 | WebRTC | Der Standardbereich ist `40000–40099/UDP`; Firewall und Sicherheitsgruppe müssen den gesamten Bereich erlauben. Bei einem benutzerdefinierten Bereich sind die entsprechenden Ports freizugeben. |
 | Gespeicherte Identität | Eine Browseridentität kann nur eine aktive gespeicherte Verbindung gleichzeitig halten. Für parallele Verbindungen die Option deaktivieren oder ein anderes Browserprofil verwenden. |
 | Begleitton | Nur auf Desktop-Browsern verfügbar und WebRTC erforderlich. Bei der Freigabe eines Fensters oder Tabs muss auch Audio freigegeben werden. |

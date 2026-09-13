@@ -395,7 +395,7 @@ const initialized = ref(false);
 const siteName = ref("WebSpeak");
 const welcomeTextZh = ref("");
 const welcomeTextEn = ref("");
-const appVersion = ref("0.2.0-preview");
+const appVersion = ref("0.2.1");
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
 const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
