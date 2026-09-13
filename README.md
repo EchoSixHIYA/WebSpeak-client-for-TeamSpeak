@@ -36,7 +36,7 @@
 - [项目简介 · Overview](#overview)
 - [在线 Demo · Live Demo](#demo)
 - [社区 · Community](#community)
-- [友链项目 · Friend projects](#友链项目--friend-projects)
+- [友链项目 · Friend projects](#friend-projects)
 - [简体中文](#简体中文)
   - [界面截图](#zh-screenshots)
   - [特性](#zh-features)
@@ -115,7 +115,9 @@ Telegram: [Join the Telegram group](https://t.me/+8qShpTcuN9A3MWY9)
 
 </div>
 
-### 友链项目 · Friend projects
+<a id="friend-projects"></a>
+
+## 友链项目 · Friend projects
 
 #### [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
 
