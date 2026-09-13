@@ -35,11 +35,9 @@
 
 - [项目简介 · Overview](#overview)
 - [在线 Demo · Live Demo](#demo)
-- [社区 · Community](#community)
-- [友链项目 · Friend projects](#friend-projects)
 - [简体中文](#简体中文)
-  - [界面截图](#zh-screenshots)
   - [特性](#zh-features)
+  - [界面截图](#zh-screenshots)
   - [高级功能](#zh-advanced)
     - [WebRTC 低延迟语音](#zh-webrtc)
     - [中继模式](#zh-relay)
@@ -47,10 +45,9 @@
   - [更新日志](#zh-changelog)
   - [部署方案](#zh-deployment)
   - [要求和注意事项](#zh-requirements)
-  - [许可证](#zh-license)
 - [English](#english)
-  - [Screenshots](#en-screenshots)
   - [Features](#en-features)
+  - [Screenshots](#en-screenshots)
   - [Advanced features](#en-advanced)
     - [WebRTC low-latency voice](#en-webrtc)
     - [Relay mode](#en-relay)
@@ -58,10 +55,9 @@
   - [Changelog](#en-changelog)
   - [Deployment](#en-deployment)
   - [Requirements and notes](#en-requirements)
-  - [License](#en-license)
 - [Deutsch](#deutsch)
-  - [Screenshots](#de-screenshots)
   - [Funktionen](#de-features)
+  - [Screenshots](#de-screenshots)
   - [Erweiterte Funktionen](#de-advanced)
     - [WebRTC-Sprache mit niedriger Latenz](#de-webrtc)
     - [Relay-Modus](#de-relay)
@@ -69,7 +65,9 @@
   - [Änderungsprotokoll](#de-changelog)
   - [Bereitstellung](#de-deployment)
   - [Voraussetzungen und Hinweise](#de-requirements)
-  - [Lizenz](#de-license)
+- [社区 · Community](#community)
+- [友链项目 · Friend projects](#friend-projects)
+- [许可证 · License · Lizenz](#license)
 
 </details>
 
@@ -94,37 +92,6 @@
 >
 > **English:** The public demo is hosted in Hong Kong and its network conditions and load may be unstable. Latency, disconnections, or temporary downtime do not represent a self-hosted deployment. Do not rely on this node for important or long-running sessions.
 
-<a id="community"></a>
-
-## 社区 · Community
-
-<div align="center">
-
-<a href="http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475">
-  <img src="./web/public/qq-group-qr.jpg" alt="WebSpeak QQ 群二维码" width="290" />
-</a>
-
-**群号 / Group ID：`869500475`**
-
-[通过群聊链接直接加入 / Join directly through the group link](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475)
-
-中文：在群内获取部署帮助、版本通知和使用交流。<br />
-English: Join for deployment help, release announcements, and user discussion.<br />
-Deutsch: Hilfe bei der Bereitstellung, Versionsankündigungen und Austausch in der Community.<br />
-Telegram: [Join the Telegram group](https://t.me/+8qShpTcuN9A3MWY9)
-
-</div>
-
-<a id="friend-projects"></a>
-
-## 友链项目 · Friend projects
-
-#### [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
-
-中文：面向 TeamSpeak 3/6 的多平台音乐点播机器人，支持网易云音乐、QQ 音乐和 Bilibili 音频播放，并提供 Web 控制台。<br />
-English: A multi-platform music bot for TeamSpeak 3/6 with Netease Cloud Music, QQ Music, and Bilibili playback, plus a web console.<br />
-Deutsch: Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Wiedergabe von Netease Cloud Music, QQ Music und Bilibili sowie Webkonsole.
-
 ---
 
 <a id="简体中文"></a>
@@ -132,6 +99,24 @@ Deutsch: Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Wiedergabe
 ## 简体中文
 
 WebSpeak 面向希望通过网页提供 TeamSpeak 语音服务的个人、社区和服务器管理员。它提供完整的访客页面、语音工作区和管理控制台，并可使用 Docker、预编译包或源码部署。
+
+<a id="zh-features"></a>
+
+### ✨ 特性
+
+| 能力 | 说明 |
+| --- | --- |
+| TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
+| IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标，并兼容域名解析出的 IPv6 地址。 |
+| 频道与成员 | 浏览完整频道树、查看各频道成员和实时状态，并可切换频道。 |
+| 实时语音 | 使用 Opus 语音；支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
+| 音频控制 | 选择麦克风与扬声器、调节输入/输出音量、测试麦克风、闭麦、VOX，以及单独调整成员音量。 |
+| 消息与互动 | 支持频道消息、服务器消息、私聊、戳一戳和耳语目标。 |
+| 桌面端伴奏 | 在桌面浏览器中选择带音频的窗口或标签页，将其声音分享给当前 TeamSpeak 频道。 |
+| 身份与访问 | 支持浏览器身份保持、默认目标、访客自定义目标及可撤销、可过期的邀请链接。 |
+| 管理控制台 | 管理默认目标、访问策略、WebRTC、邀请链接、活动会话、连接历史、日志、诊断与数据库备份。 |
+| 界面体验 | 提供中文、English 和 Deutsch 界面、浅色/深色主题，以及桌面端和移动端响应式布局。 |
+| 自托管 | 数据由部署者保存；提供 Docker 镜像、Windows x64 和 Linux x64 发布包。 |
 
 <a id="zh-screenshots"></a>
 
@@ -162,24 +147,6 @@ WebSpeak 面向希望通过网页提供 TeamSpeak 语音服务的个人、社区
 <p align="center">
   <img src="./docs/screenshots/webspeak-zh-menu.png" alt="WebSpeak 中文成员右键菜单" width="100%" />
 </p>
-
-<a id="zh-features"></a>
-
-### ✨ 特性
-
-| 能力 | 说明 |
-| --- | --- |
-| TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
-| IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标，并兼容域名解析出的 IPv6 地址。 |
-| 频道与成员 | 浏览完整频道树、查看各频道成员和实时状态，并可切换频道。 |
-| 实时语音 | 使用 Opus 语音；支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
-| 音频控制 | 选择麦克风与扬声器、调节输入/输出音量、测试麦克风、闭麦、VOX，以及单独调整成员音量。 |
-| 消息与互动 | 支持频道消息、服务器消息、私聊、戳一戳和耳语目标。 |
-| 桌面端伴奏 | 在桌面浏览器中选择带音频的窗口或标签页，将其声音分享给当前 TeamSpeak 频道。 |
-| 身份与访问 | 支持浏览器身份保持、默认目标、访客自定义目标及可撤销、可过期的邀请链接。 |
-| 管理控制台 | 管理默认目标、访问策略、WebRTC、邀请链接、活动会话、连接历史、日志、诊断与数据库备份。 |
-| 界面体验 | 提供中文、English 和 Deutsch 界面、浅色/深色主题，以及桌面端和移动端响应式布局。 |
-| 自托管 | 数据由部署者保存；提供 Docker 镜像、Windows x64 和 Linux x64 发布包。 |
 
 <a id="zh-advanced"></a>
 
@@ -387,12 +354,6 @@ npm start
 | 会话上限 | 单实例最多允许 100 个活动网页会话。 |
 | 项目关系 | WebSpeak 是社区项目，不是 TeamSpeak 官方产品；TeamSpeak 名称及商标归其权利人所有。 |
 
-<a id="zh-license"></a>
-
-### 📜 许可证
-
-WebSpeak 使用 [GNU Affero General Public License v3.0 only](./LICENSE) 发布。你可以使用、研究、修改和再分发本项目；如果修改后的版本通过网络向用户提供服务，需要按照 AGPL-3.0 向这些用户提供对应源代码。
-
 <div align="right"><a href="#readme-top">返回顶部 ↑</a></div>
 
 ---
@@ -402,6 +363,24 @@ WebSpeak 使用 [GNU Affero General Public License v3.0 only](./LICENSE) 发布�
 ## English
 
 WebSpeak is built for individuals, communities, and server operators who want to offer TeamSpeak voice access through the web. It includes a complete visitor page, voice workspace, and administration console, with Docker, prebuilt-package, and source deployment options.
+
+<a id="en-features"></a>
+
+### ✨ Features
+
+| Capability | Description |
+| --- | --- |
+| TeamSpeak compatibility | Supports TeamSpeak 3 and TeamSpeak 6 and automatically detects the target server protocol. |
+| IPv6 targets | IPv6 TeamSpeak targets are supported by default, including IPv6 addresses resolved from hostnames. |
+| Channels and members | Browse the complete channel tree, see members and live states in each channel, and switch channels. |
+| Realtime voice | Uses Opus audio with a compatibility transport and an optional bundled WebRTC low-latency transport. |
+| Audio controls | Select microphones and speakers, adjust input/output volume, test the microphone, mute, use VOX, and control each member's volume. |
+| Messaging and actions | Supports channel chat, server chat, private messages, poke actions, and whisper targets. |
+| Desktop accompaniment | Select an audio-enabled window or browser tab on desktop and share its sound with the current TeamSpeak channel. |
+| Identity and access | Supports remembered browser identities, a default target, visitor-defined targets, and revocable expiring invite links. |
+| Administration | Manage the default target, access policy, WebRTC, invites, active sessions, connection history, logs, diagnostics, and database backups. |
+| User experience | Chinese, English, and German interfaces, light/dark themes, and responsive desktop/mobile layouts. |
+| Self-hosting | Data stays with the operator; Docker images and Windows x64 / Linux x64 packages are provided. |
 
 <a id="en-screenshots"></a>
 
@@ -432,24 +411,6 @@ These screenshots come from the Shanghai test node and show the welcome page, vo
 <p align="center">
   <img src="./docs/screenshots/webspeak-en-menu.png" alt="WebSpeak English member context menu" width="100%" />
 </p>
-
-<a id="en-features"></a>
-
-### ✨ Features
-
-| Capability | Description |
-| --- | --- |
-| TeamSpeak compatibility | Supports TeamSpeak 3 and TeamSpeak 6 and automatically detects the target server protocol. |
-| IPv6 targets | IPv6 TeamSpeak targets are supported by default, including IPv6 addresses resolved from hostnames. |
-| Channels and members | Browse the complete channel tree, see members and live states in each channel, and switch channels. |
-| Realtime voice | Uses Opus audio with a compatibility transport and an optional bundled WebRTC low-latency transport. |
-| Audio controls | Select microphones and speakers, adjust input/output volume, test the microphone, mute, use VOX, and control each member's volume. |
-| Messaging and actions | Supports channel chat, server chat, private messages, poke actions, and whisper targets. |
-| Desktop accompaniment | Select an audio-enabled window or browser tab on desktop and share its sound with the current TeamSpeak channel. |
-| Identity and access | Supports remembered browser identities, a default target, visitor-defined targets, and revocable expiring invite links. |
-| Administration | Manage the default target, access policy, WebRTC, invites, active sessions, connection history, logs, diagnostics, and database backups. |
-| User experience | Chinese, English, and German interfaces, light/dark themes, and responsive desktop/mobile layouts. |
-| Self-hosting | Data stays with the operator; Docker images and Windows x64 / Linux x64 packages are provided. |
 
 <a id="en-advanced"></a>
 
@@ -657,12 +618,6 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain. For dev
 | Session limit | One instance accepts up to 100 active browser sessions. |
 | Project relationship | WebSpeak is a community project and is not an official TeamSpeak product. TeamSpeak names and trademarks belong to their respective owners. |
 
-<a id="en-license"></a>
-
-### 📜 License
-
-WebSpeak is released under the [GNU Affero General Public License v3.0 only](./LICENSE). You may use, study, modify, and redistribute the project. If a modified version is made available to users over a network, the corresponding source code must be offered to those users under AGPL-3.0.
-
 <div align="right"><a href="#readme-top">Back to top ↑</a></div>
 
 ---
@@ -672,6 +627,24 @@ WebSpeak is released under the [GNU Affero General Public License v3.0 only](./L
 ## Deutsch
 
 WebSpeak ist ein selbst gehosteter TeamSpeak-3-/TeamSpeak-6-Webclient und ein Sprach-Gateway. Nutzer können direkt im Browser Kanälen beitreten, sprechen und chatten; Administratoren verwalten Zielserver und Zugriff über die Webkonsole.
+
+<a id="de-features"></a>
+
+### ✨ Funktionen
+
+| Funktion | Beschreibung |
+| --- | --- |
+| TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Protokoll des Zielservers automatisch. |
+| IPv6-Ziele | IPv6-TeamSpeak-Ziele werden standardmäßig unterstützt, auch über IPv6-Adressen aus der Namensauflösung. |
+| Kanäle und Mitglieder | Zeigt die Kanalstruktur, Mitglieder und ihren aktuellen Status an. |
+| Echtzeit-Sprache | Opus-Audio mit kompatiblem Transport und optionalem integriertem WebRTC für geringere Latenz. |
+| Audiosteuerung | Mikrofon und Lautsprecher auswählen, Lautstärke anpassen, testen und einzelne Mitglieder regeln. |
+| Nachrichten und Interaktion | Kanal- und Serverchat, private Nachrichten, Anstupsen und Flüsterziele. |
+| Begleitton auf dem Desktop | Audio eines freigegebenen Fensters oder Browser-Tabs mit dem TeamSpeak-Kanal teilen. |
+| Identität und Zugriff | Geräteidentität speichern, Standardziele verwalten, eigene Ziele erlauben und zeitlich begrenzte Einladungen erstellen. |
+| Administrationskonsole | Ziele, Zugriff, WebRTC, Sitzungen, Verbindungen, Protokolle, Diagnosen und Datenbanksicherungen verwalten. |
+| Responsive Oberfläche | Deutsche, englische und chinesische Oberfläche, helle/dunkle Designs sowie Desktop- und Mobilansicht. |
+| Selbst gehostet | Die Daten bleiben beim Betreiber; Docker-, Windows-x64- und Linux-x64-Pakete sind verfügbar. |
 
 <a id="de-screenshots"></a>
 
@@ -702,24 +675,6 @@ Diese Screenshots stammen vom Shanghai-Testknoten und zeigen die Willkommensseit
 <p align="center">
   <img src="./docs/screenshots/webspeak-de-menu.png" alt="WebSpeak deutsches Mitglieder-Menü" width="100%" />
 </p>
-
-<a id="de-features"></a>
-
-### ✨ Funktionen
-
-| Funktion | Beschreibung |
-| --- | --- |
-| TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Protokoll des Zielservers automatisch. |
-| IPv6-Ziele | IPv6-TeamSpeak-Ziele werden standardmäßig unterstützt, auch über IPv6-Adressen aus der Namensauflösung. |
-| Kanäle und Mitglieder | Zeigt die Kanalstruktur, Mitglieder und ihren aktuellen Status an. |
-| Echtzeit-Sprache | Opus-Audio mit kompatiblem Transport und optionalem integriertem WebRTC für geringere Latenz. |
-| Audiosteuerung | Mikrofon und Lautsprecher auswählen, Lautstärke anpassen, testen und einzelne Mitglieder regeln. |
-| Nachrichten und Interaktion | Kanal- und Serverchat, private Nachrichten, Anstupsen und Flüsterziele. |
-| Begleitton auf dem Desktop | Audio eines freigegebenen Fensters oder Browser-Tabs mit dem TeamSpeak-Kanal teilen. |
-| Identität und Zugriff | Geräteidentität speichern, Standardziele verwalten, eigene Ziele erlauben und zeitlich begrenzte Einladungen erstellen. |
-| Administrationskonsole | Ziele, Zugriff, WebRTC, Sitzungen, Verbindungen, Protokolle, Diagnosen und Datenbanksicherungen verwalten. |
-| Responsive Oberfläche | Deutsche, englische und chinesische Oberfläche, helle/dunkle Designs sowie Desktop- und Mobilansicht. |
-| Selbst gehostet | Die Daten bleiben beim Betreiber; Docker-, Windows-x64- und Linux-x64-Pakete sind verfügbar. |
 
 <a id="de-advanced"></a>
 
@@ -886,10 +841,47 @@ Lade das passende Paket von [GitHub Releases](https://github.com/EchoSixHIYA/Web
 | Begleitton | Nur auf Desktop-Browsern verfügbar und WebRTC erforderlich. Bei der Freigabe eines Fensters oder Tabs muss auch Audio freigegeben werden. |
 | Selbsthosting | WebSpeak ist kein offizielles TeamSpeak-Produkt. Namen und Marken gehören den jeweiligen Rechteinhabern. |
 
-<a id="de-license"></a>
-
-### 📜 Lizenz
-
-WebSpeak wird unter der [GNU Affero General Public License v3.0 only](./LICENSE) veröffentlicht. Bei Bereitstellung einer veränderten Version über ein Netzwerk muss der entsprechende Quellcode den Nutzern unter AGPL-3.0 angeboten werden.
-
 <div align="right"><a href="#readme-top">Nach oben ↑</a></div>
+
+<a id="community"></a>
+
+## 社区 · Community
+
+<div align="center">
+
+<a href="http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475">
+  <img src="./web/public/qq-group-qr.jpg" alt="WebSpeak QQ 群二维码" width="290" />
+</a>
+
+**群号 / Group ID：`869500475`**
+
+[通过群聊链接直接加入 / Join directly through the group link](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475)
+
+中文：在群内获取部署帮助、版本通知和使用交流。<br />
+English: Join for deployment help, release announcements, and user discussion.<br />
+Deutsch: Hilfe bei der Bereitstellung, Versionsankündigungen und Austausch in der Community.<br />
+Telegram: [Join the Telegram group](https://t.me/+8qShpTcuN9A3MWY9)
+
+</div>
+
+<a id="friend-projects"></a>
+
+## 友链项目 · Friend projects
+
+#### [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
+
+中文：面向 TeamSpeak 3/6 的多平台音乐点播机器人，支持网易云音乐、QQ 音乐和 Bilibili 音频播放，并提供 Web 控制台。<br />
+English: A multi-platform music bot for TeamSpeak 3/6 with Netease Cloud Music, QQ Music, and Bilibili playback, plus a web console.<br />
+Deutsch: Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Wiedergabe von Netease Cloud Music, QQ Music und Bilibili sowie Webkonsole.
+
+<a id="license"></a>
+
+## 许可证 · License · Lizenz
+
+**中文：** WebSpeak 使用 [GNU Affero General Public License v3.0 only](./LICENSE) 发布。你可以使用、研究、修改和再分发本项目；如果修改后的版本通过网络向用户提供服务，需要按照 AGPL-3.0 向这些用户提供对应源代码。
+
+**English:** WebSpeak is released under the [GNU Affero General Public License v3.0 only](./LICENSE). You may use, study, modify, and redistribute the project. If a modified version is made available to users over a network, the corresponding source code must be offered to those users under AGPL-3.0.
+
+**Deutsch:** WebSpeak wird unter der [GNU Affero General Public License v3.0 only](./LICENSE) veröffentlicht. Bei Bereitstellung einer veränderten Version über ein Netzwerk muss der entsprechende Quellcode den Nutzern unter AGPL-3.0 angeboten werden.
+
+<div align="right"><a href="#readme-top">返回顶部 ↑</a></div>
