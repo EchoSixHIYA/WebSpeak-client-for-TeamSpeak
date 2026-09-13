@@ -449,6 +449,10 @@ export class VoiceBridge {
             try {
               if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
             } catch { /* teardown below remains authoritative */ }
+            // Send the structured failure before closing. Some browsers and
+            // reverse proxies do not preserve a WebSocket close reason, which
+            // would otherwise collapse every failure into a generic message.
+            sendJson({ type: "connectionFailed", code: failureCode });
             if (ws.readyState === WebSocket.OPEN) ws.close(4003, failureCode);
             void this.teardown(entryId, "teamSpeak-connect-failed");
             return;

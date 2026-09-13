@@ -1408,6 +1408,16 @@ export function useVoiceWebSocket() {
         whisperTargetIds.clear();
         whisperActive.value = false;
         break;
+      case "connectionFailed":
+        state.connected = false;
+        state.connecting = false;
+        state.reconnecting = false;
+        state.reconnectFailed = true;
+        state.errorCode = typeof msg.code === "string" ? msg.code : "CONNECTION_FAILED";
+        state.error = connectionFailureMessage(state.errorCode);
+        whisperTargetIds.clear();
+        whisperActive.value = false;
+        break;
       case "whisperTargets":
         applyWhisperState(msg.targetIds, msg.active);
         break;

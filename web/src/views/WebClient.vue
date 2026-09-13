@@ -1280,7 +1280,10 @@ function localizedMessage(message: string) {
     "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "The TeamSpeak server hostname could not be resolved. Check the address",
     "无法到达 TeamSpeak 服务器，请检查网络或地址": "The TeamSpeak server is unreachable. Check the network or address",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "The TeamSpeak server refused the connection. Check the port and server status",
+    "TeamSpeak 连接被服务器或网络重置，请稍后重试": "The TeamSpeak connection was reset by the server or network. Try again shortly",
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "The TeamSpeak connection timed out. Check the network or server status",
     "该服务器需要密码，请输入密码后重试": "This server requires a password. Enter it and try again",
     "服务器密码错误，请重新输入": "The server password is incorrect. Enter it again",
@@ -1314,9 +1317,31 @@ function localizedMessage(message: string) {
     "成员已离线": "This member is offline",
     "操作失败": "The operation failed",
   };
-  if (exact[message]) return exact[message];
+  if (language.value !== "de" && exact[message]) return exact[message];
   if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
   if (message.startsWith("切换失败：")) return `Channel switch failed: ${message.slice(5)}`;
+  if (language.value === "de") {
+    const german: Record<string, string> = {
+      "语音功能需要 HTTPS 安全连接": "Für Sprachfunktionen ist eine sichere HTTPS-Verbindung erforderlich",
+      "当前浏览器不支持麦克风访问": "Dieser Browser unterstützt keinen Mikrofonzugriff",
+      "当前浏览器不支持 Web Audio 音频处理": "Dieser Browser unterstützt keine Web-Audio-Verarbeitung",
+      "连接服务器失败，请检查邀请链接或服务器状态": "Verbindung fehlgeschlagen. Prüfe den Einladungslink oder den Serverstatus",
+      "TeamSpeak 连接已断开": "Die TeamSpeak-Verbindung wurde getrennt",
+      "连接已断开": "Die Verbindung wurde getrennt",
+      "TeamSpeak 服务器地址无效": "Die TeamSpeak-Serveradresse ist ungültig",
+      "找不到 TeamSpeak 服务器主机名，请检查地址": "Der TeamSpeak-Servername konnte nicht aufgelöst werden. Prüfe die Adresse",
+      "无法到达 TeamSpeak 服务器，请检查网络或地址": "Der TeamSpeak-Server ist nicht erreichbar. Prüfe Netzwerk und Adresse",
+      "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Der TeamSpeak-Server hat die Verbindung abgelehnt. Prüfe Port und Serverstatus",
+      "TeamSpeak 连接被服务器或网络重置，请稍后重试": "Die TeamSpeak-Verbindung wurde vom Server oder Netzwerk zurückgesetzt. Versuche es später erneut",
+      "连接 TeamSpeak 超时，请检查网络或服务器状态": "Die TeamSpeak-Verbindung hat das Zeitlimit überschritten. Prüfe Netzwerk und Serverstatus",
+      "该服务器需要密码，请输入密码后重试": "Dieser Server benötigt ein Passwort. Gib es ein und versuche es erneut",
+      "服务器密码错误，请重新输入": "Das Serverpasswort ist falsch. Gib es erneut ein",
+      "TeamSpeak 协议协商失败": "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen",
+      "TeamSpeak 服务器拒绝了连接": "Der TeamSpeak-Server hat die Verbindung abgelehnt",
+      "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "Die TeamSpeak-Verbindung ist fehlgeschlagen. Prüfe Adresse, Netzwerk und Serverstatus",
+    };
+    if (german[message]) return german[message];
+  }
   return message;
 }
 
