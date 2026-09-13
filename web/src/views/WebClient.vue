@@ -30,7 +30,7 @@
           <h2>{{ t('welcomeBack') }}</h2>
           <p class="card-lead">{{ t('joinLead') }}</p>
 
-          <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span>{{ localizedMessage(voiceState.error) }}</span></div>
+          <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span class="notice-content"><span>{{ localizedMessage(voiceState.error) }}</span><code v-if="voiceState.errorCode">{{ t('errorCode') }}: {{ visibleErrorCode(voiceState.errorCode) }}</code></span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
           <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin">{{ t('configureNow') }}</a></span></div>
           <div v-if="!localPersistenceAvailable" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('localPersistenceUnavailable') }}</span></div>
@@ -451,6 +451,7 @@ const translations: Record<string, Record<string, string>> = {
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
     currentVersion: "当前版本",
+    errorCode: "错误代码",
     viewChangelog: "查看更新日志",
     notConfigured: "WebSpeak 尚未配置 TeamSpeak 目标。",
     configureNow: "打开管理控制台",
@@ -717,6 +718,7 @@ const translations: Record<string, Record<string, string>> = {
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",
     currentVersion: "Current version",
+    errorCode: "Error code",
     viewChangelog: "View changelog",
     notConfigured: "The WebSpeak TeamSpeak target has not been configured.",
     configureNow: "Open admin console",
@@ -986,6 +988,7 @@ translations.de = {
   secureGateway: "Sicheres Sprach-Gateway",
   adminConsole: "Administrationskonsole",
   currentVersion: "Aktuelle Version",
+  errorCode: "Fehlercode",
   viewChangelog: "Änderungsprotokoll ansehen",
   notConfigured: "Das TeamSpeak-Ziel von WebSpeak wurde noch nicht konfiguriert.",
   configureNow: "Administrationskonsole öffnen",
@@ -1267,6 +1270,14 @@ function t(key: string, variables: Record<string, string | number> = {}) {
 
 function localizedMessage(message: string) {
   if (language.value === "zh") return message;
+  const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
+  if (errorCodeMatch) {
+    const code = errorCodeMatch[1];
+    const detail = errorCodeMatch[2] ? `: ${errorCodeMatch[2]}` : "";
+    const operation = message.startsWith("操作失败");
+    if (language.value === "de") return `${operation ? "Vorgang" : "TeamSpeak-Verbindung"} fehlgeschlagen (Fehlercode: ${code})${detail}. Prüfe Eingaben, Netzwerk und Serverstatus`;
+    return `${operation ? "Operation" : "TeamSpeak connection"} failed (error code: ${code})${detail}. Check your input, network, and server status`;
+  }
   const exact: Record<string, string> = {
     "语音功能需要 HTTPS 安全连接": "Voice requires a secure HTTPS connection",
     "当前浏览器不支持麦克风访问": "This browser does not support microphone access",
@@ -1275,6 +1286,11 @@ function localizedMessage(message: string) {
     "当前浏览器不支持扬声器设备选择，将使用默认输出设备": "Output device selection is not supported by this browser. Using the default output device",
     "所选扬声器当前不可用": "The selected speaker is not available",
     "连接服务器失败，请检查邀请链接或服务器状态": "Could not connect. Check the invite link or server status",
+    "请求来源不受信任，请从正确的网站入口重新打开": "The request origin is not trusted. Reopen the official WebSpeak page",
+    "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak has not been configured yet. Contact the administrator",
+    "请求过于频繁，请稍后重试": "Too many requests. Try again shortly",
+    "当前中继加速不可用，请关闭加速或联系管理员": "The selected relay is unavailable. Turn off relay mode or contact the administrator",
+    "邀请链接已失效或已被撤销": "The invite link is invalid, expired, or revoked",
     "TeamSpeak 连接已断开": "The TeamSpeak connection was closed",
     "连接已断开": "The connection was closed",
     "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
@@ -1292,6 +1308,7 @@ function localizedMessage(message: string) {
     "TeamSpeak 服务器拒绝了连接": "The TeamSpeak server rejected the connection",
     "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "TeamSpeak connection failed. Check the address, network, or server status",
     "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
+    "服务器当前已满或拒绝了连接，请稍后重试": "The server is full or rejected the connection. Try again shortly",
     "WebSpeak 尚未配置 TeamSpeak 目标。": "The WebSpeak TeamSpeak target has not been configured",
     "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
     "请输入有效的昵称": "Enter a valid nickname",
@@ -1327,6 +1344,11 @@ function localizedMessage(message: string) {
       "当前浏览器不支持麦克风访问": "Dieser Browser unterstützt keinen Mikrofonzugriff",
       "当前浏览器不支持 Web Audio 音频处理": "Dieser Browser unterstützt keine Web-Audio-Verarbeitung",
       "连接服务器失败，请检查邀请链接或服务器状态": "Verbindung fehlgeschlagen. Prüfe den Einladungslink oder den Serverstatus",
+      "请求来源不受信任，请从正确的网站入口重新打开": "Die Anfragequelle ist nicht vertrauenswürdig. Öffne die offizielle WebSpeak-Seite erneut",
+      "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak wurde noch nicht konfiguriert. Wende dich an den Administrator",
+      "请求过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
+      "当前中继加速不可用，请关闭加速或联系管理员": "Das ausgewählte Relay ist nicht verfügbar. Deaktiviere den Relay-Modus oder wende dich an den Administrator",
+      "邀请链接已失效或已被撤销": "Der Einladungslink ist ungültig, abgelaufen oder widerrufen",
       "TeamSpeak 连接已断开": "Die TeamSpeak-Verbindung wurde getrennt",
       "连接已断开": "Die Verbindung wurde getrennt",
       "TeamSpeak 服务器地址无效": "Die TeamSpeak-Serveradresse ist ungültig",
@@ -1341,10 +1363,20 @@ function localizedMessage(message: string) {
       "TeamSpeak 协议协商失败": "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen",
       "TeamSpeak 服务器拒绝了连接": "Der TeamSpeak-Server hat die Verbindung abgelehnt",
       "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "Die TeamSpeak-Verbindung ist fehlgeschlagen. Prüfe Adresse, Netzwerk und Serverstatus",
+      "服务器当前已满或拒绝了连接，请稍后重试": "Der Server ist voll oder hat die Verbindung abgelehnt. Versuche es später erneut",
     };
     if (german[message]) return german[message];
   }
   return message;
+}
+
+function visibleErrorCode(code: string): string {
+  const normalized = String(code || "CONNECTION_FAILED")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return (normalized || "CONNECTION_FAILED").slice(0, 64);
 }
 
 function persistLanguage() {
@@ -2078,7 +2110,9 @@ function stopWhisperTalk(): void {
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
 .card-lead { margin: 0 0 18px; color: #7b8885; font-size: 13px; }
-.notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.notice-content { min-width: 0; overflow-wrap: anywhere; }
+.notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
 .error-notice { color: #a53c38; background: #fff0ef; border: 1px solid #f7d4d1; }
 .warning-notice { color: #8a6537; background: #fff8e9; border: 1px solid #f2dfb3; }
 .notice-symbol { display: grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; color: #fff; background: currentColor; color: #fff; font-size: 10px; font-weight: 800; }

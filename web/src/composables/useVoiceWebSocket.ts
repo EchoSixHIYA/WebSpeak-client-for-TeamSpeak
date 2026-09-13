@@ -84,6 +84,40 @@ export interface LatencyProbeResult {
   teamSpeakErrorCode?: string;
 }
 
+const MAX_VISIBLE_ERROR_CODE_LENGTH = 64;
+const CLIENT_ERROR_CODE_ALIASES: Record<string, string> = {
+  PASSWORD_REQUIRED: "SERVER_PASSWORD_REQUIRED",
+  INVALID_PASSWORD: "INVALID_SERVER_PASSWORD",
+  AUTHENTICATION_FAILED: "INVALID_SERVER_PASSWORD",
+  SERVER_FULL: "SERVER_REJECTED",
+  GATEWAY_FULL: "SERVER_REJECTED",
+  TS_CONNECT_FAILED: "CONNECTION_FAILED",
+  TEAM_SPEAK_CONNECT_FAILED: "CONNECTION_FAILED",
+};
+
+/** Keep codes useful to the user without allowing an unbounded server value into the UI. */
+function safeClientErrorCode(value: unknown): string {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized.slice(0, MAX_VISIBLE_ERROR_CODE_LENGTH);
+}
+
+function normalizedClientErrorCode(value: unknown, fallback = "CONNECTION_FAILED"): string {
+  const safe = safeClientErrorCode(value);
+  return CLIENT_ERROR_CODE_ALIASES[safe] ?? (safe || fallback);
+}
+
+function safeClientErrorDetail(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
+
 export function useVoiceWebSocket() {
   const ws = ref<WebSocket | null>(null);
   const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", channelSwitchedChannelId: "" });
@@ -1109,16 +1143,21 @@ export function useVoiceWebSocket() {
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({ target, nickname, channel, serverPassword, ...(inviteToken ? { invite: inviteToken } : {}), ...(accelerated ? { accelerated: true, ...(lastConnection?.accelerationRelayId ? { accelerationRelayId: lastConnection.accelerationRelayId } : {}) } : {}), ...(lastConnection?.rememberIdentity && lastConnection.identity ? { identity: lastConnection.identity } : {}), ...(lastConnection?.rememberIdentity ? { rememberIdentity: true } : {}) }),
       });
-      const result = await response.json().catch(() => ({})) as { ticket?: unknown; code?: unknown };
+      const result = await response.json().catch(() => ({})) as { ticket?: unknown; code?: unknown; detail?: unknown };
       if (!response.ok || typeof result.ticket !== "string") {
-        throw new Error(joinTicketReason(typeof result.code === "string" ? result.code : ""));
+        const failureCode = normalizedClientErrorCode(result.code);
+        const failure = new Error(joinTicketReason(failureCode, result.detail));
+        Object.assign(failure, { code: failureCode });
+        throw failure;
       }
       if (sequence !== connectionSequence) return;
       openVoiceSocket(sequence, result.ticket);
     } catch (error: unknown) {
       if (sequence !== connectionSequence) return;
       state.connecting = false;
-      state.error = error instanceof Error ? error.message : "连接服务器失败，请检查邀请链接或服务器状态";
+      const errorRecord = error && typeof error === "object" ? error as { code?: unknown } : {};
+      state.errorCode = normalizedClientErrorCode(errorRecord.code, "REQUEST_FAILED");
+      state.error = error instanceof Error ? error.message : connectionFailureMessage(state.errorCode);
     }
   }
 
@@ -1168,26 +1207,34 @@ export function useVoiceWebSocket() {
     };
   }
 
-  function joinTicketReason(code: string): string {
-    if (code === "NOT_INITIALIZED") return "WebSpeak 尚未完成首次配置";
-    if (code === "TARGET_NOT_ALLOWED") return "此 TeamSpeak 服务器地址不允许连接";
-    if (code === "ACCELERATION_UNAVAILABLE") return "大陆节点智能加速尚未在当前网关配置";
-    if (code === "INVALID_NICKNAME") return "请输入有效的昵称";
-    if (code === "INVITE_INVALID") return "邀请链接已失效或已被撤销";
-    return "连接服务器失败，请检查邀请链接或服务器状态";
+  function joinTicketReason(code: string, detail?: unknown): string {
+    const messages: Record<string, string> = {
+      ORIGIN_REJECTED: "请求来源不受信任，请从正确的网站入口重新打开",
+      NOT_INITIALIZED: "WebSpeak 尚未完成配置，请联系管理员",
+      RATE_LIMITED: "请求过于频繁，请稍后重试",
+      TARGET_NOT_ALLOWED: "此 TeamSpeak 服务器地址不允许连接",
+      ACCELERATION_UNAVAILABLE: "当前中继加速不可用，请关闭加速或联系管理员",
+      INVALID_NICKNAME: "请输入有效的昵称",
+      INVITE_INVALID: "邀请链接已失效或已被撤销",
+    };
+    const normalized = normalizedClientErrorCode(code);
+    return messages[normalized] ?? connectionFailureMessage(normalized, detail);
   }
 
   function closeErrorCode(code: number, reason = ""): string {
-    const known = new Set(["INVALID_TARGET", "INVALID_NICKNAME", "HOST_NOT_FOUND", "UNREACHABLE", "CONNECTION_REFUSED", "CONNECTION_RESET", "TIMEOUT", "SERVER_PASSWORD_REQUIRED", "INVALID_SERVER_PASSWORD", "PROTOCOL_NEGOTIATION_FAILED", "SERVER_REJECTED", "CONNECTION_FAILED"]);
-    if (known.has(reason)) return reason;
+    const closeCode = normalizedClientErrorCode(reason, "");
+    if (closeCode) return closeCode;
     if (code === 4002) return "INVALID_TARGET";
     if (code === 4004) return "SERVER_REJECTED";
     if (code === 4005) return "IDENTITY_IN_USE";
     return "CONNECTION_FAILED";
   }
 
-  function connectionFailureMessage(code: string): string {
+  function connectionFailureMessage(code: string, detail?: unknown): string {
     const messages: Record<string, string> = {
+      ORIGIN_REJECTED: "请求来源不受信任，请从正确的网站入口重新打开",
+      NOT_INITIALIZED: "WebSpeak 尚未完成配置，请联系管理员",
+      RATE_LIMITED: "请求过于频繁，请稍后重试",
       INVALID_TARGET: "TeamSpeak 服务器地址无效",
       INVALID_NICKNAME: "昵称长度不符合 TeamSpeak 服务器要求，请修改后重试",
       HOST_NOT_FOUND: "找不到 TeamSpeak 服务器主机名，请检查地址",
@@ -1202,17 +1249,17 @@ export function useVoiceWebSocket() {
       IDENTITY_IN_USE: "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试",
       CONNECTION_FAILED: "TeamSpeak 连接失败，请检查地址、网络或服务器状态",
     };
-    return messages[code] ?? "连接已断开";
+    const normalized = normalizedClientErrorCode(code);
+    if (messages[normalized]) return messages[normalized];
+    const safeCode = safeClientErrorCode(normalized);
+    const safeDetail = safeClientErrorDetail(detail);
+    return `TeamSpeak 连接失败（错误代码：${safeCode}）${safeDetail ? `：${safeDetail}` : ""}，请检查输入、网络或服务器状态`;
   }
 
   function closeReason(code: number, reason = ""): string {
     const failureCode = closeErrorCode(code, reason);
-    if (failureCode !== "CONNECTION_FAILED") return connectionFailureMessage(failureCode);
-    if (code === 4002) return "TeamSpeak 服务器地址无效";
-    if (code === 4003) return "TeamSpeak 服务器连接失败";
-    if (code === 4004) return "服务器当前已满，请稍后重试";
-    if (code === 4005) return "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试";
-    return "连接已断开";
+    if (code === 4004 && failureCode === "SERVER_REJECTED") return "服务器当前已满或拒绝了连接，请稍后重试";
+    return connectionFailureMessage(failureCode);
   }
 
   function disconnect(preserveConnection = false): void {
@@ -1404,8 +1451,8 @@ export function useVoiceWebSocket() {
         state.connecting = false;
         state.reconnecting = false;
         state.reconnectFailed = true;
-        state.errorCode = typeof msg.code === "string" ? msg.code : "CONNECTION_FAILED";
-        state.error = connectionFailureMessage(state.errorCode);
+        state.errorCode = normalizedClientErrorCode(msg.code);
+        state.error = connectionFailureMessage(state.errorCode, msg.detail);
         whisperTargetIds.clear();
         whisperActive.value = false;
         break;
@@ -1416,8 +1463,8 @@ export function useVoiceWebSocket() {
         // This is the first connection attempt, not a failed reconnect. Keep
         // the user on the welcome form instead of showing an empty voice room.
         state.reconnectFailed = false;
-        state.errorCode = typeof msg.code === "string" ? msg.code : "CONNECTION_FAILED";
-        state.error = connectionFailureMessage(state.errorCode);
+        state.errorCode = normalizedClientErrorCode(msg.code);
+        state.error = connectionFailureMessage(state.errorCode, msg.detail);
         whisperTargetIds.clear();
         whisperActive.value = false;
         break;
@@ -1438,7 +1485,7 @@ export function useVoiceWebSocket() {
         }
         break;
       case "error":
-        state.errorCode = String(msg.error?.code || "");
+        state.errorCode = normalizedClientErrorCode(msg.error?.code, "OPERATION_FAILED");
         state.error = protocolErrorMessage(state.errorCode, String(msg.error?.message || msg.message || "操作失败"));
         break;
     }
@@ -1591,7 +1638,11 @@ export function useVoiceWebSocket() {
       CLIENT_NOT_FOUND: "成员已离线",
       OPERATION_FAILED: "操作失败",
     };
-    return messages[code] || fallback;
+    const normalized = normalizedClientErrorCode(code, "OPERATION_FAILED");
+    if (messages[normalized]) return messages[normalized];
+    const safeCode = safeClientErrorCode(normalized);
+    const safeFallback = safeClientErrorDetail(fallback);
+    return `操作失败（错误代码：${safeCode}）${safeFallback ? `：${safeFallback}` : ""}`;
   }
 
   function setVolume(clientId: number, volume: number): void {

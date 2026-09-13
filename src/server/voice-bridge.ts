@@ -32,6 +32,14 @@ const AUDIO_FRAME_BYTES = 1_920;
 // before scheduling decoded audio.
 const MAX_SERVER_AUDIO_BUFFERED_BYTES = 4_096;
 
+function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>): string | undefined {
+  const serverMessage = error.diagnostics.serverMessage?.trim();
+  const serverId = error.diagnostics.id?.trim();
+  const detail = [serverMessage, serverId ? `server error id=${serverId}` : ""].filter(Boolean).join("; ");
+  const safe = detail.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return safe || undefined;
+}
+
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
@@ -379,8 +387,9 @@ export class VoiceBridge {
           if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
         } catch { /* teardown below remains authoritative */ }
         const failureCode = clientConnectionFailureCode(normalized, serverPassword);
+        const failureDetail = publicFailureDetail(normalized);
         entry!.connectionFailureCode = failureCode;
-        sendJson({ type: "reconnectFailed", code: failureCode });
+        sendJson({ type: "reconnectFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
         void this.teardown(entryId, "teamSpeak-connect-failed");
       };
 
@@ -435,6 +444,7 @@ export class VoiceBridge {
         } catch (error: unknown) {
           const normalized = normalizeTeamSpeakError(error);
           const failureCode = clientConnectionFailureCode(normalized, serverPassword);
+          const failureDetail = publicFailureDetail(normalized);
           entry!.connectionFailureCode = failureCode;
           this.logger.warn({
             code: failureCode,
@@ -452,7 +462,7 @@ export class VoiceBridge {
             // Send the structured failure before closing. Some browsers and
             // reverse proxies do not preserve a WebSocket close reason, which
             // would otherwise collapse every failure into a generic message.
-            sendJson({ type: "connectionFailed", code: failureCode });
+            sendJson({ type: "connectionFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
             if (ws.readyState === WebSocket.OPEN) ws.close(4003, failureCode);
             void this.teardown(entryId, "teamSpeak-connect-failed");
             return;
