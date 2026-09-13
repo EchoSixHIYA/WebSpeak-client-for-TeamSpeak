@@ -36,6 +36,7 @@
 - [项目简介 · Overview](#overview)
 - [在线 Demo · Live Demo](#demo)
 - [社区 · Community](#community)
+- [友链项目 · Friend projects](#友链项目--friend-projects)
 - [简体中文](#简体中文)
   - [界面截图](#zh-screenshots)
   - [特性](#zh-features)
@@ -112,9 +113,15 @@ English: Join for deployment help, release announcements, and user discussion.<b
 Deutsch: Hilfe bei der Bereitstellung, Versionsankündigungen und Austausch in der Community.<br />
 Telegram: [Join the Telegram group](https://t.me/+8qShpTcuN9A3MWY9)
 
-友链 / Friend project: [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
-
 </div>
+
+### 友链项目 · Friend projects
+
+#### [NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)
+
+中文：面向 TeamSpeak 3/6 的多平台音乐点播机器人，支持网易云音乐、QQ 音乐和 Bilibili 音频播放，并提供 Web 控制台。<br />
+English: A multi-platform music bot for TeamSpeak 3/6 with Netease Cloud Music, QQ Music, and Bilibili playback, plus a web console.<br />
+Deutsch: Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Wiedergabe von Netease Cloud Music, QQ Music und Bilibili sowie Webkonsole.
 
 ---
 
