@@ -5,6 +5,7 @@ import { TSClient } from "./ts-client.js";
 import type { TeamSpeakProtocol } from "./teamspeak-adapter.js";
 
 export type ProbeErrorCode =
+  | "INVALID_NICKNAME"
   | "HOST_NOT_FOUND"
   | "UNREACHABLE"
   | "CONNECTION_REFUSED"
@@ -104,6 +105,7 @@ export function toProbeError(error: unknown, password = ""): TeamSpeakProbeError
   }
   const mapping: Record<WebSpeakErrorCode, ProbeErrorCode> = {
     invalid_target: "INTERNAL_ERROR",
+    invalid_nickname: "INVALID_NICKNAME",
     unreachable: "UNREACHABLE",
     host_not_found: "HOST_NOT_FOUND",
     connection_refused: "CONNECTION_REFUSED",

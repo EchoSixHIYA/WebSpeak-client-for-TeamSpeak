@@ -1,5 +1,6 @@
 export type WebSpeakErrorCode =
   | "invalid_target"
+  | "invalid_nickname"
   | "host_not_found"
   | "unreachable"
   | "connection_refused"
@@ -12,6 +13,7 @@ export type WebSpeakErrorCode =
 
 export type ClientConnectionFailureCode =
   | "INVALID_TARGET"
+  | "INVALID_NICKNAME"
   | "HOST_NOT_FOUND"
   | "UNREACHABLE"
   | "CONNECTION_REFUSED"
@@ -60,6 +62,9 @@ export function normalizeTeamSpeakError(error: unknown): WebSpeakError {
   if (/password|authenticate|authentication|not authorized|invalid.*(credential|password)/.test(text)) {
     return new WebSpeakError("authentication_failed", "TeamSpeak authentication failed", false, error, diagnostics);
   }
+  if (/invalid parameter size|nickname.{0,20}(length|size)|(?:length|size).{0,20}nickname|id[=: ]1541/.test(text)) {
+    return new WebSpeakError("invalid_nickname", "TeamSpeak nickname length is invalid", false, error, diagnostics);
+  }
   if (/enotfound|eai_again|host not found|name or service not known|dns/.test(text)) {
     return new WebSpeakError("host_not_found", "TeamSpeak server hostname could not be resolved", true, error, diagnostics);
   }
@@ -87,6 +92,7 @@ export function clientConnectionFailureCode(error: WebSpeakError, serverPassword
   }
   const mapping: Record<WebSpeakErrorCode, ClientConnectionFailureCode> = {
     invalid_target: "INVALID_TARGET",
+    invalid_nickname: "INVALID_NICKNAME",
     host_not_found: "HOST_NOT_FOUND",
     unreachable: "UNREACHABLE",
     connection_refused: "CONNECTION_REFUSED",

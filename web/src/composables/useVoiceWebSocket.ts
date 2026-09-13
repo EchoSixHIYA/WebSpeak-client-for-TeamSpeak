@@ -1153,7 +1153,7 @@ export function useVoiceWebSocket() {
       // Prefer the close code over the generic WebSocket error event. The
       // gateway uses a dedicated code when a remembered identity is already
       // active in another browser page.
-      if (event.code !== 1000 && !state.reconnectFailed) {
+      if (event.code !== 1000 && !state.reconnectFailed && !state.errorCode) {
         state.errorCode = closeErrorCode(event.code, event.reason);
         state.error = closeReason(event.code, event.reason);
       }
@@ -1178,7 +1178,7 @@ export function useVoiceWebSocket() {
   }
 
   function closeErrorCode(code: number, reason = ""): string {
-    const known = new Set(["INVALID_TARGET", "HOST_NOT_FOUND", "UNREACHABLE", "CONNECTION_REFUSED", "CONNECTION_RESET", "TIMEOUT", "SERVER_PASSWORD_REQUIRED", "INVALID_SERVER_PASSWORD", "PROTOCOL_NEGOTIATION_FAILED", "SERVER_REJECTED", "CONNECTION_FAILED"]);
+    const known = new Set(["INVALID_TARGET", "INVALID_NICKNAME", "HOST_NOT_FOUND", "UNREACHABLE", "CONNECTION_REFUSED", "CONNECTION_RESET", "TIMEOUT", "SERVER_PASSWORD_REQUIRED", "INVALID_SERVER_PASSWORD", "PROTOCOL_NEGOTIATION_FAILED", "SERVER_REJECTED", "CONNECTION_FAILED"]);
     if (known.has(reason)) return reason;
     if (code === 4002) return "INVALID_TARGET";
     if (code === 4004) return "SERVER_REJECTED";
@@ -1189,6 +1189,7 @@ export function useVoiceWebSocket() {
   function connectionFailureMessage(code: string): string {
     const messages: Record<string, string> = {
       INVALID_TARGET: "TeamSpeak 服务器地址无效",
+      INVALID_NICKNAME: "昵称长度不符合 TeamSpeak 服务器要求，请修改后重试",
       HOST_NOT_FOUND: "找不到 TeamSpeak 服务器主机名，请检查地址",
       UNREACHABLE: "无法到达 TeamSpeak 服务器，请检查网络或地址",
       CONNECTION_REFUSED: "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态",
@@ -1412,7 +1413,9 @@ export function useVoiceWebSocket() {
         state.connected = false;
         state.connecting = false;
         state.reconnecting = false;
-        state.reconnectFailed = true;
+        // This is the first connection attempt, not a failed reconnect. Keep
+        // the user on the welcome form instead of showing an empty voice room.
+        state.reconnectFailed = false;
         state.errorCode = typeof msg.code === "string" ? msg.code : "CONNECTION_FAILED";
         state.error = connectionFailureMessage(state.errorCode);
         whisperTargetIds.clear();
