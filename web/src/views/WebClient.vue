@@ -292,7 +292,7 @@
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
-          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="mode-note audio-processing-note" aria-live="polite"><Icon name="activity" :size="16" /><span>{{ t('noiseSuppression') }}：{{ processingStateLabel(microphoneProcessing.noiseSuppression) }} · {{ t('echoCancellation') }}：{{ processingStateLabel(microphoneProcessing.echoCancellation) }} · {{ t('autoGainControl') }}：{{ processingStateLabel(microphoneProcessing.autoGainControl) }}</span></div><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
           <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? t('audioReady') : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
@@ -335,6 +335,7 @@ const {
   selectedOutputDeviceId,
   outputDeviceSupported,
   audioPermission,
+  microphoneProcessing,
   audioContextState,
   identityMaterial,
   micLevel,
@@ -676,6 +677,12 @@ const translations: Record<string, Record<string, string>> = {
     audioReady: "音频已就绪",
     audioSuspended: "音频被浏览器暂停",
     audioUnknown: "尚未初始化",
+    noiseSuppression: "浏览器降噪",
+    echoCancellation: "回声消除",
+    autoGainControl: "自动增益",
+    processingEnabled: "已启用",
+    processingDisabled: "已关闭",
+    processingUnknown: "浏览器未报告",
     audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
     mobileNavigation: "移动端导航",
     mobileChannels: "频道",
@@ -943,6 +950,12 @@ const translations: Record<string, Record<string, string>> = {
     audioReady: "Audio ready",
     audioSuspended: "Audio paused by the browser",
     audioUnknown: "Not initialized",
+    noiseSuppression: "Browser noise suppression",
+    echoCancellation: "Echo cancellation",
+    autoGainControl: "Automatic gain control",
+    processingEnabled: "Enabled",
+    processingDisabled: "Disabled",
+    processingUnknown: "Not reported by browser",
     audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
     mobileNavigation: "Mobile navigation",
     mobileChannels: "Channels",
@@ -1213,6 +1226,12 @@ translations.de = {
   audioReady: "Audio bereit",
   audioSuspended: "Audio wurde vom Browser pausiert",
   audioUnknown: "Nicht initialisiert",
+  noiseSuppression: "Browser-Geräuschunterdrückung",
+  echoCancellation: "Echounterdrückung",
+  autoGainControl: "Automatische Verstärkungsregelung",
+  processingEnabled: "Aktiviert",
+  processingDisabled: "Deaktiviert",
+  processingUnknown: "Vom Browser nicht gemeldet",
   audioPrivacy: "WebSpeak verarbeitet Audio im sicheren Browserkontext und speichert keine Aufnahmen.",
   mobileNavigation: "Mobile Navigation",
   mobileChannels: "Kanäle",
@@ -1266,6 +1285,12 @@ function t(key: string, variables: Record<string, string | number> = {}) {
   let value = translations[language.value][key] ?? translations.en[key] ?? translations.zh[key] ?? key;
   for (const [name, replacement] of Object.entries(variables)) value = value.replaceAll(`{{${name}}}`, String(replacement));
   return value;
+}
+
+function processingStateLabel(value: boolean | null) {
+  if (value === true) return t("processingEnabled");
+  if (value === false) return t("processingDisabled");
+  return t("processingUnknown");
 }
 
 function localizedMessage(message: string) {
@@ -2906,4 +2931,5 @@ function stopWhisperTalk(): void {
   .performance-route { gap: 3px; }
   .performance-route span { padding-inline: 4px; font-size: 8px; }
 }
+.audio-processing-note { margin: 12px 0; }
 </style>

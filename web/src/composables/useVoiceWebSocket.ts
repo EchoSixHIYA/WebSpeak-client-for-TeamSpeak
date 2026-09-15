@@ -41,6 +41,12 @@ export interface AudioOutputDevice {
 
 export type AudioPermission = "unknown" | "granted" | "denied";
 
+export interface MicrophoneProcessingSettings {
+  echoCancellation: boolean | null;
+  noiseSuppression: boolean | null;
+  autoGainControl: boolean | null;
+}
+
 type SinkAudioContext = AudioContext & {
   setSinkId?: (sinkId: string) => Promise<void>;
 };
@@ -171,6 +177,11 @@ export function useVoiceWebSocket() {
   const selectedOutputDeviceId = ref(typeof localStorage !== "undefined" ? localStorage.getItem("webspeak:output-device") ?? "" : "");
   const outputDeviceSupported = ref(false);
   const audioPermission = ref<AudioPermission>("unknown");
+  const microphoneProcessing = reactive<MicrophoneProcessingSettings>({
+    echoCancellation: null,
+    noiseSuppression: null,
+    autoGainControl: null,
+  });
   const audioContextState = ref<AudioContextState | "unknown">("unknown");
   const micLevel = ref(0);
   const microphoneTestActive = ref(false);
@@ -364,7 +375,9 @@ export function useVoiceWebSocket() {
       channelCount: { ideal: 1 },
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
+      // Keep the microphone's natural dynamics. Browser AGC can make speech
+      // pump in volume, especially while background noise changes.
+      autoGainControl: false,
     };
     if (selectedInputDeviceId.value) constraints.deviceId = { exact: selectedInputDeviceId.value };
     return constraints;
@@ -416,6 +429,11 @@ export function useVoiceWebSocket() {
       if (error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name)) audioPermission.value = "denied";
       throw error;
     }
+    const microphoneTrack = nextStream.getAudioTracks()[0];
+    const settings = microphoneTrack?.getSettings();
+    microphoneProcessing.echoCancellation = typeof settings?.echoCancellation === "boolean" ? settings.echoCancellation : null;
+    microphoneProcessing.noiseSuppression = typeof settings?.noiseSuppression === "boolean" ? settings.noiseSuppression : null;
+    microphoneProcessing.autoGainControl = typeof settings?.autoGainControl === "boolean" ? settings.autoGainControl : null;
     stopMicrophone(false);
     micStream = nextStream;
 
@@ -1715,6 +1733,7 @@ export function useVoiceWebSocket() {
     selectedOutputDeviceId,
     outputDeviceSupported,
     audioPermission,
+    microphoneProcessing,
     audioContextState,
     identityMaterial,
     micLevel,
