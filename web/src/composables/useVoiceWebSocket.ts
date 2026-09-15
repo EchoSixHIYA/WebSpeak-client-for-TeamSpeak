@@ -1,4 +1,8 @@
 import { reactive, ref } from "vue";
+import { RnnoiseWorkletNode, loadRnnoise } from "@sapphi-red/web-noise-suppressor";
+import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
+import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
+import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
 const micCaptureWorkletUrl = "/mic-capture-worklet.js";
@@ -45,6 +49,7 @@ export interface MicrophoneProcessingSettings {
   echoCancellation: boolean | null;
   noiseSuppression: boolean | null;
   autoGainControl: boolean | null;
+  rnnoise: boolean | null;
 }
 
 type SinkAudioContext = AudioContext & {
@@ -156,9 +161,13 @@ export function useVoiceWebSocket() {
   let workletNode: AudioWorkletNode | null = null;
   let workletContext: AudioContext | null = null;
   let workletModulePromise: Promise<void> | null = null;
+  let rnnoiseNode: RnnoiseWorkletNode | null = null;
+  let rnnoiseWorkletModulePromise: Promise<void> | null = null;
+  let rnnoiseWasmPromise: Promise<ArrayBuffer> | null = null;
   let micSource: MediaStreamAudioSourceNode | null = null;
   let micGain: GainNode | null = null;
   let silentGain: GainNode | null = null;
+  let processedMicDestination: MediaStreamAudioDestinationNode | null = null;
   const accompanimentActive = ref(false);
   const accompanimentSupported = ref(typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia));
   const accompanimentErrorCode = ref<"" | "unsupported" | "needsWebRtc" | "noAudio" | "permission">("");
@@ -181,6 +190,7 @@ export function useVoiceWebSocket() {
     echoCancellation: null,
     noiseSuppression: null,
     autoGainControl: null,
+    rnnoise: null,
   });
   const audioContextState = ref<AudioContextState | "unknown">("unknown");
   const micLevel = ref(0);
@@ -416,6 +426,36 @@ export function useVoiceWebSocket() {
     await refreshAudioDevices();
   }
 
+  async function createRnnoiseNode(ctx: AudioContext): Promise<RnnoiseWorkletNode | null> {
+    if (typeof AudioWorkletNode === "undefined" || !ctx.audioWorklet) {
+      microphoneProcessing.rnnoise = false;
+      return null;
+    }
+    try {
+      if (!rnnoiseWasmPromise) {
+        rnnoiseWasmPromise = loadRnnoise({ url: rnnoiseWasmUrl, simdUrl: rnnoiseSimdWasmUrl }).catch((error) => {
+          rnnoiseWasmPromise = null;
+          throw error;
+        });
+      }
+      if (!rnnoiseWorkletModulePromise) {
+        rnnoiseWorkletModulePromise = ctx.audioWorklet.addModule(rnnoiseWorkletUrl).catch((error) => {
+          rnnoiseWorkletModulePromise = null;
+          throw error;
+        });
+      }
+      const [wasmBinary] = await Promise.all([rnnoiseWasmPromise, rnnoiseWorkletModulePromise]);
+      const node = new RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
+      microphoneProcessing.rnnoise = true;
+      return node;
+    } catch {
+      // Native browser NS remains active as a fallback. RNNoise is an optional
+      // enhancement and must never prevent a microphone from starting.
+      microphoneProcessing.rnnoise = false;
+      return null;
+    }
+  }
+
   async function startMicrophone(): Promise<void> {
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") await ctx.resume();
@@ -438,6 +478,13 @@ export function useVoiceWebSocket() {
     micStream = nextStream;
 
     micSource = ctx.createMediaStreamSource(micStream);
+    rnnoiseNode = await createRnnoiseNode(ctx);
+    const processedSource: AudioNode = rnnoiseNode ?? micSource;
+    if (rnnoiseNode) micSource.connect(rnnoiseNode);
+    processedMicDestination = ctx.createMediaStreamDestination();
+    processedMicDestination.channelCount = 1;
+    processedMicDestination.channelCountMode = "explicit";
+    processedSource.connect(processedMicDestination);
     micGain = ctx.createGain();
     micGain.gain.value = inputVolume.value;
     silentGain = ctx.createGain();
@@ -520,7 +567,7 @@ export function useVoiceWebSocket() {
       scriptNode.onaudioprocess = (event) => handleCaptureChunk(event.inputBuffer.getChannelData(0));
     }
 
-    micSource.connect(micGain);
+    processedSource.connect(micGain);
     const captureNode = workletNode ?? scriptNode!;
     micGain.connect(captureNode);
     captureNode.connect(silentGain);
@@ -580,7 +627,11 @@ export function useVoiceWebSocket() {
     const destination = ctx.createMediaStreamDestination();
     destination.channelCount = 1;
     destination.channelCountMode = "explicit";
-    const microphoneSource = ctx.createMediaStreamSource(micStream);
+    // Use the browser-native processed track plus the browser-side RNNoise
+    // graph. Display/application audio is added separately below and never
+    // passes through this microphone denoiser.
+    const microphoneStream = processedMicDestination?.stream ?? micStream;
+    const microphoneSource = ctx.createMediaStreamSource(microphoneStream);
     const microphoneGain = ctx.createGain();
     microphoneGain.gain.value = microphoneMuted.value ? 0 : inputVolume.value;
     microphoneSource.connect(microphoneGain);
@@ -896,17 +947,27 @@ export function useVoiceWebSocket() {
     workletNode?.port.close();
     workletNode?.disconnect();
     micGain?.disconnect();
-    micSource?.disconnect();
     silentGain?.disconnect();
     scriptNode = null;
     workletNode = null;
     micGain = null;
-    micSource = null;
     silentGain = null;
+  }
+
+  function stopMicrophoneProcessingGraph(): void {
+    rnnoiseNode?.destroy();
+    rnnoiseNode?.disconnect();
+    rnnoiseNode = null;
+    micSource?.disconnect();
+    processedMicDestination?.disconnect();
+    processedMicDestination?.stream.getTracks().forEach((track) => track.stop());
+    micSource = null;
+    processedMicDestination = null;
   }
 
   function stopMicrophone(closeContext = true): void {
     stopCaptureGraph();
+    stopMicrophoneProcessingGraph();
     releaseAccompanimentStream();
     stopWebRtcMix();
     micStream?.getTracks().forEach((track) => track.stop());
@@ -916,6 +977,7 @@ export function useVoiceWebSocket() {
       audioCtx = null;
       workletContext = null;
       workletModulePromise = null;
+      rnnoiseWorkletModulePromise = null;
     }
   }
 
