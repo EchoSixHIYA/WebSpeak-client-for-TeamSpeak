@@ -103,15 +103,31 @@ export function toProbeError(error: unknown, password = ""): TeamSpeakProbeError
   if (/enotfound|eai_again|getaddrinfo|host not found/.test(raw)) {
     return new TeamSpeakProbeError("HOST_NOT_FOUND", "TeamSpeak host was not found", error);
   }
+  // 探测只回答「该地址是否可用」，因此把网关能细分的拒绝原因收敛到既有探测码，
+  // 具体原因由连接/重连路径向浏览器上报。
+  // The probe only answers "can this address be used at all", so the richer
+  // rejection reasons the gateway can now name are bucketed into the existing
+  // probe codes; the exact reason is reported by the connect/reconnect path.
   const mapping: Record<WebSpeakErrorCode, ProbeErrorCode> = {
     invalid_target: "INTERNAL_ERROR",
     invalid_nickname: "INVALID_NICKNAME",
+    nickname_in_use: "INVALID_NICKNAME",
+    invalid_parameter_size: "INVALID_NICKNAME",
     unreachable: "UNREACHABLE",
     host_not_found: "HOST_NOT_FOUND",
     connection_refused: "CONNECTION_REFUSED",
     connection_reset: "CONNECTION_RESET",
     timeout: "TIMEOUT",
     authentication_failed: password.trim() ? "INVALID_PASSWORD" : "PASSWORD_REQUIRED",
+    channel_password_required: "PASSWORD_REQUIRED",
+    identity_security_level_too_low: "SERVER_REJECTED",
+    identity_limit_reached: "SERVER_REJECTED",
+    client_version_outdated: "SERVER_REJECTED",
+    flooding: "SERVER_REJECTED",
+    banned: "SERVER_REJECTED",
+    kicked: "SERVER_REJECTED",
+    server_shutting_down: "SERVER_REJECTED",
+    connection_initialisation_failed: "SERVER_REJECTED",
     protocol_negotiation_failed: "PROTOCOL_NEGOTIATION_FAILED",
     server_full: "SERVER_REJECTED",
     unknown: "SERVER_REJECTED",
