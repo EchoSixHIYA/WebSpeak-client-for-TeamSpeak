@@ -293,7 +293,7 @@
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
           <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
-          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? t('audioReady') : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
+          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? (voiceState.microphoneError ? t('audioUnavailable') : t('audioReady')) : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><p v-if="voiceState.microphoneError" class="settings-error">{{ localizedMessage(voiceState.microphoneError) }}</p><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
     </div>
@@ -674,6 +674,8 @@ const translations: Record<string, Record<string, string>> = {
     notificationVolume: "通知音量",
     audioStatus: "音频状态",
     audioReady: "音频已就绪",
+    audioUnavailable: "音频不可用（麦克风故障）",
+    microphoneUnavailable: "麦克风不可用，你暂时无法说话",
     audioSuspended: "音频被浏览器暂停",
     audioUnknown: "尚未初始化",
     audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
@@ -941,6 +943,8 @@ const translations: Record<string, Record<string, string>> = {
     notificationVolume: "Notification volume",
     audioStatus: "Audio status",
     audioReady: "Audio ready",
+    audioUnavailable: "Audio unavailable (microphone failure)",
+    microphoneUnavailable: "Microphone unavailable — others cannot hear you",
     audioSuspended: "Audio paused by the browser",
     audioUnknown: "Not initialized",
     audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
@@ -1211,6 +1215,8 @@ translations.de = {
   notificationVolume: "Benachrichtigungslautstärke",
   audioStatus: "Audiostatus",
   audioReady: "Audio bereit",
+  audioUnavailable: "Audio nicht verfügbar (Mikrofonfehler)",
+  microphoneUnavailable: "Mikrofon nicht verfügbar – andere können dich nicht hören",
   audioSuspended: "Audio wurde vom Browser pausiert",
   audioUnknown: "Nicht initialisiert",
   audioPrivacy: "WebSpeak verarbeitet Audio im sicheren Browserkontext und speichert keine Aufnahmen.",
@@ -1295,7 +1301,7 @@ function localizedMessage(message: string) {
     "连接已断开": "The connection was closed",
     "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
-    "昵称长度不符合 TeamSpeak 服务器要求，请修改后重试": "The nickname length does not meet the TeamSpeak server requirements. Change it and try again",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "The nickname length does not meet the TeamSpeak server requirements (at least 3 characters). Change it and try again",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
     "找不到 TeamSpeak 服务器主机名，请检查地址": "The TeamSpeak server hostname could not be resolved. Check the address",
     "无法到达 TeamSpeak 服务器，请检查网络或地址": "The TeamSpeak server is unreachable. Check the network or address",
@@ -1334,6 +1340,20 @@ function localizedMessage(message: string) {
     "你没有执行此操作的权限": "You do not have permission to perform this action",
     "成员已离线": "This member is offline",
     "操作失败": "The operation failed",
+    "该昵称已被服务器上的其他用户占用，请更换昵称": "This nickname is already in use on the server. Choose another one",
+    "该昵称已被占用，请更换昵称": "This nickname is already in use. Choose another one",
+    "你的身份安全等级低于该服务器要求，请提升后重试": "Your identity security level is below what this server requires. Raise it and try again",
+    "该身份建立的连接数已达上限，请关闭其他连接后重试": "This identity reached its connection limit. Close the other connections and try again",
+    "客户端版本过旧，服务器拒绝连接，请升级后重试": "Your client version is outdated and the server rejected the connection. Update and try again",
+    "客户端版本过旧，服务器拒绝了该操作": "Your client version is outdated, so the server rejected this action",
+    "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Too many requests: the server flood protection rejected you temporarily. Try again shortly",
+    "操作过于频繁，请稍后重试": "Too many requests. Try again shortly",
+    "你已被该服务器封禁，无法连接": "You are banned from this server, so the connection is refused",
+    "你已被该服务器封禁": "You are banned from this server",
+    "你已被服务器移出": "You were removed from the server",
+    "TeamSpeak 服务器正在关闭，暂时无法连接": "The TeamSpeak server is shutting down and is unreachable right now",
+    "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "The TeamSpeak server could not finish initialising the connection. Check the address and port, or try again shortly",
+    "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "The TeamSpeak server rejected the parameters, usually because the nickname length or format is invalid",
   };
   if (language.value !== "de" && exact[message]) return exact[message];
   if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
@@ -1352,7 +1372,8 @@ function localizedMessage(message: string) {
       "TeamSpeak 连接已断开": "Die TeamSpeak-Verbindung wurde getrennt",
       "连接已断开": "Die Verbindung wurde getrennt",
       "TeamSpeak 服务器地址无效": "Die TeamSpeak-Serveradresse ist ungültig",
-      "昵称长度不符合 TeamSpeak 服务器要求，请修改后重试": "Die Länge des Spitznamens entspricht nicht den Anforderungen des TeamSpeak-Servers. Ändere ihn und versuche es erneut",
+      "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Die Länge des Spitznamens entspricht nicht den Anforderungen des TeamSpeak-Servers (mindestens 3 Zeichen). Ändere ihn und versuche es erneut",
+      "请输入有效的昵称": "Gib einen gültigen Nicknamen ein",
       "找不到 TeamSpeak 服务器主机名，请检查地址": "Der TeamSpeak-Servername konnte nicht aufgelöst werden. Prüfe die Adresse",
       "无法到达 TeamSpeak 服务器，请检查网络或地址": "Der TeamSpeak-Server ist nicht erreichbar. Prüfe Netzwerk und Adresse",
       "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Der TeamSpeak-Server hat die Verbindung abgelehnt. Prüfe Port und Serverstatus",
@@ -1364,8 +1385,56 @@ function localizedMessage(message: string) {
       "TeamSpeak 服务器拒绝了连接": "Der TeamSpeak-Server hat die Verbindung abgelehnt",
       "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "Die TeamSpeak-Verbindung ist fehlgeschlagen. Prüfe Adresse, Netzwerk und Serverstatus",
       "服务器当前已满或拒绝了连接，请稍后重试": "Der Server ist voll oder hat die Verbindung abgelehnt. Versuche es später erneut",
+      "服务器当前已满，请稍后重试": "Der Server ist derzeit voll. Versuche es später erneut",
+      "该昵称已被服务器上的其他用户占用，请更换昵称": "Dieser Spitzname wird auf dem Server bereits verwendet. Wähle einen anderen",
+      "该昵称已被占用，请更换昵称": "Dieser Spitzname wird bereits verwendet. Wähle einen anderen",
+      "你的身份安全等级低于该服务器要求，请提升后重试": "Deine Sicherheitsstufe liegt unter der Anforderung dieses Servers. Erhöhe sie und versuche es erneut",
+      "该身份建立的连接数已达上限，请关闭其他连接后重试": "Diese Identität hat ihr Verbindungslimit erreicht. Schließe die anderen Verbindungen und versuche es erneut",
+      "客户端版本过旧，服务器拒绝连接，请升级后重试": "Deine Client-Version ist veraltet und der Server hat die Verbindung abgelehnt. Aktualisiere und versuche es erneut",
+      "客户端版本过旧，服务器拒绝了该操作": "Deine Client-Version ist veraltet, daher hat der Server diese Aktion abgelehnt",
+      "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Zu viele Anfragen: Der Flood-Schutz des Servers hat dich vorübergehend abgewiesen. Versuche es gleich erneut",
+      "操作过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
+      "你已被该服务器封禁，无法连接": "Du wurdest von diesem Server gebannt und kannst nicht verbinden",
+      "你已被该服务器封禁": "Du wurdest von diesem Server gebannt",
+      "你已被服务器移出": "Du wurdest vom Server entfernt",
+      "TeamSpeak 服务器正在关闭，暂时无法连接": "Der TeamSpeak-Server wird heruntergefahren und ist derzeit nicht erreichbar",
+      "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "Der TeamSpeak-Server konnte die Verbindungsinitialisierung nicht abschließen. Prüfe Adresse und Port oder versuche es später erneut",
+      "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "Der TeamSpeak-Server hat die Parameter abgelehnt, meist wegen ungültiger Länge oder ungültigen Formats des Spitznamens",
+      "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "Diese TeamSpeak-Identität wird bereits in einem anderen Browser-Tab verwendet. Schließe die andere Verbindung oder deaktiviere „Identität merken“ und versuche es erneut",
+      "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "Der Sprachsitzungs-Token fehlt oder ist abgelaufen. Kehre zur Liste zurück und tritt dem Sprachraum erneut bei",
+      "语音网关拒绝了本次连接：身份无效，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig. Deaktiviere „Identität merken“ und tritt erneut bei",
+      "语音网关拒绝了本次连接：身份无效或无法在此页面使用，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig oder kann auf dieser Seite nicht verwendet werden. Deaktiviere „Identität merken“ und tritt erneut bei",
+      "当前中继加速不可用，请关闭加速后重试或联系管理员": "Der beschleunigte Relay-Modus ist nicht verfügbar. Deaktiviere ihn und versuche es erneut oder wende dich an den Administrator",
+      "与语音网关的网络连接异常中断（掉线或代理断开），并非 TeamSpeak 服务器拒绝连接，请检查网络后重新进入": "Die Verbindung zum Sprach-Gateway wurde unerwartet unterbrochen (Offline oder Proxy getrennt) – der TeamSpeak-Server hat die Verbindung nicht abgelehnt. Prüfe deine Netzwerkverbindung und tritt erneut bei",
+      "语音网关会话意外结束，请重新进入语音空间": "Die Sprach-Gateway-Sitzung wurde unerwartet beendet. Tritt dem Sprachraum erneut bei",
+      "语音网关未能创建 TeamSpeak 客户端（服务器可能已关闭或地址不可达），请确认服务器地址或稍后重试": "Das Sprach-Gateway konnte keinen TeamSpeak-Client erstellen (der Server ist möglicherweise aus oder nicht erreichbar). Prüfe die Serveradresse oder versuche es später erneut",
+      "消息格式无效": "Ungültiges Nachrichtenformat",
+      "请求标识无效": "Ungültige Anforderungs-ID",
+      "不支持的操作": "Nicht unterstützte Operation",
+      "操作参数无效": "Ungültige Operationsparameter",
+      "频道标识无效": "Ungültige Kanal-ID",
+      "频道密码无效": "Ungültiges Kanalpasswort",
+      "成员标识无效": "Ungültige Mitglieds-ID",
+      "文字消息无效": "Ungültige Textnachricht",
+      "戳一戳消息无效": "Ungültige Poke-Nachricht",
+      "离开状态无效": "Ungültiger Abwesenheitsstatus",
+      "音频帧格式无效": "Ungültiges Audio-Frame-Format",
+      "成员音量无效": "Ungültige Mitgliedslautstärke",
+      "私语目标无效": "Ungültige Flüsterziele",
+      "私语状态无效": "Ungültiger Flüsterstatus",
+      "请先选择私语目标": "Wähle zuerst ein Flüsterziel",
+      "TeamSpeak 会话尚未就绪": "Die TeamSpeak-Sitzung ist noch nicht bereit",
+      "频道切换失败": "Kanalwechsel fehlgeschlagen",
+      "该频道需要密码": "Dieser Kanal erfordert ein Passwort",
+      "该频道已满": "Dieser Kanal ist voll",
+      "你没有执行此操作的权限": "Du hast keine Berechtigung für diese Aktion",
+      "成员已离线": "Das Mitglied ist offline",
+      "操作失败": "Operation fehlgeschlagen",
     };
     if (german[message]) return german[message];
+    if (message.startsWith("麦克风访问失败：")) return `Mikrofonzugriff fehlgeschlagen: ${message.slice(8)}`;
+    if (message.startsWith("麦克风声音未能发送：")) return `Mikrofon-Audio konnte nicht gesendet werden: ${message.slice(10)}`;
+    if (message.startsWith("音频链路异常")) return message.replace("音频链路异常", "Audioverbindung fehlerhaft");
   }
   return message;
 }
@@ -2257,6 +2326,7 @@ function stopWhisperTalk(): void {
 .settings-footer { justify-content: flex-end; }
 .reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 14px auto 0; width: min(950px, calc(100% - 64px)); padding: 12px 16px; color: #6c5a2c; border: 1px solid #f0dfae; border-radius: 10px; background: #fff9e8; }
 .reconnect-banner.failed { color: #8f4540; border-color: #f2d1cd; background: #fff2f1; }
+.reconnect-banner.degraded { color: #7a4d1d; border-color: #f3d9a9; background: #fff7ec; } /* 降级/告警级提示（如音频链路降级） */
 .reconnect-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .reconnect-copy strong { font-size: 13px; }
 .reconnect-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }

@@ -17,6 +17,7 @@ export type SessionTeardownReason =
   | "websocket-error"
   | "protocol-error"
   | "teamSpeak-disconnect"
+  | "teamSpeak-kicked" // 会话被 TeamSpeak 服务器踢出/封禁时拆除
   | "teamSpeak-connect-failed"
   | "heartbeat-timeout"
   | "admin-terminated"
