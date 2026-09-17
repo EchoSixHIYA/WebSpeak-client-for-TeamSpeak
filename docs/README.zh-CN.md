@@ -19,6 +19,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 | 频道与成员 | 浏览频道树、查看实时成员状态并切换频道。 |
 | 实时语音 | 使用 Opus，支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
 | 音频控制 | 选择麦克风与扬声器、调节音量、测试麦克风、闭麦、VOX 和成员独立音量。 |
+| 浏览器端降噪 | 提供可开关的麦克风降噪，在浏览器采集端处理，不增加服务器端音频处理压力。 |
 | 消息与互动 | 支持频道消息、服务器消息、私聊、戳一戳和耳语目标。 |
 | 桌面端伴奏 | 在桌面浏览器选择带音频的窗口或标签页，将声音分享给当前频道。 |
 | 身份与访问 | 支持身份保持、访客自定义目标和可撤销、可过期的邀请链接。 |
@@ -137,7 +138,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
-| 未发布 | — | 增加俄语、日语界面和按语言独立配置的欢迎词；优化桌面音频控制，降噪开关移至麦克风悬浮菜单。 |
+| [v0.2.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.2) | 2026-09-17 | 提供浏览器端麦克风降噪、俄语和日语支持及按语言欢迎词配置；优化音量交互和 PR #2 基础上的错误提示与错误代码。 |
 | [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | 优化首页连接错误显示，保留并安全截断错误代码；默认支持 IPv6 TeamSpeak 目标。 |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | 2026-09-10 | 增加服务器密码提示、正式中继部署模式、多中继选择和管理员日志原因显示。 |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | 2026-09-08 | 简化 Docker 部署，支持同机 TeamSpeak，增加 15 秒连接超时和持续网络监测。 |

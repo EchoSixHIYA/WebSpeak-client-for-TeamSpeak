@@ -412,7 +412,7 @@ const welcomeTextEn = ref("");
 const welcomeTextDe = ref("");
 const welcomeTextRu = ref("");
 const welcomeTextJa = ref("");
-const appVersion = ref("0.2.1");
+const appVersion = ref("0.2.2");
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
 const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);

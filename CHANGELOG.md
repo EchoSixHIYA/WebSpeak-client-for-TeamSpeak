@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.2] — 2026-09-17
+
+### 中文
+
+- 提供可开关的浏览器端麦克风降噪功能。
+- 优化前端音量交互逻辑：桌面端悬停麦克风和整体音量按钮即可调整，降噪开关收纳在麦克风菜单中。
+- 在 PR #2 基础上优化错误提示和错误代码显示。
+- 提供俄语和日语界面支持，并支持按语言单独调整欢迎文字。
+
+### English
+
+- Added optional browser-side microphone noise suppression.
+- Refined volume interaction: desktop microphone and master-volume controls open on hover, with noise suppression in the microphone menu.
+- Improved error messages and error-code display on top of PR #2.
+- Added Russian and Japanese UI support and per-language welcome text configuration.
+
+### Deutsch
+
+- Optionale browserseitige Mikrofon-Geräuschunterdrückung hinzugefügt.
+- Lautstärkeinteraktion verbessert: Desktop-Mikrofon- und Gesamtlautstärkeregler öffnen sich beim Überfahren; die Geräuschunterdrückung befindet sich im Mikrofonmenü.
+- Fehlertexte und Fehlercodes auf Basis von PR #2 verbessert.
+- Russische und japanische Oberfläche sowie sprachabhängige Begrüßungstexte ergänzt.
+
+### Русский
+
+- Добавлено опциональное шумоподавление микрофона в браузере.
+- Улучшено управление громкостью: на компьютере регуляторы открываются при наведении, а шумоподавление находится в меню микрофона.
+- Улучшены сообщения и коды ошибок на основе PR #2.
+- Добавлены русский и японский интерфейсы и отдельная настройка приветствия для каждого языка.
+
+### 日本語
+
+- ブラウザ側で任意に使えるマイクノイズ抑制を追加しました。
+- 音量操作を改善し、デスクトップではマイクと全体音量のボタンにカーソルを合わせると調整画面を表示し、ノイズ抑制をマイクメニューにまとめました。
+- PR #2 を基にエラー表示とエラーコードを改善しました。
+- ロシア語・日本語 UI と言語別ウェルカム文の設定を追加しました。
+
 ## [0.2.1] — 2026-09-13
 
 ### 中文

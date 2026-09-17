@@ -19,6 +19,7 @@ The public demo is hosted in Hong Kong and its network conditions and load may b
 | Channels and members | Browse the channel tree, see live member states, and switch channels. |
 | Realtime voice | Opus audio with a compatibility transport and optional bundled WebRTC low-latency transport. |
 | Audio controls | Select microphones and speakers, adjust volume, test the microphone, mute, use VOX, and control member volume. |
+| Browser-side noise suppression | Optional microphone noise suppression runs at the browser capture stage, without adding server-side audio processing. |
 | Messaging and actions | Channel chat, server chat, private messages, poke actions, and whisper targets. |
 | Desktop accompaniment | Select an audio-enabled window or browser tab and share its sound with the current channel. |
 | Identity and access | Remembered identity, visitor-defined targets, and revocable expiring invite links. |
@@ -137,7 +138,7 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 | Version | Date | Summary |
 | --- | --- | --- |
-| Unreleased | — | Added Russian and Japanese UI with per-language welcome templates; refined desktop audio controls and moved noise suppression into the microphone popover. |
+| [v0.2.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.2) | 2026-09-17 | Added browser-side microphone noise suppression, Russian and Japanese UI, and per-language welcome text; refined volume interaction and error messages/codes on top of PR #2. |
 | [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | Improved welcome-page connection errors, preserved and safely truncated error codes, and added default IPv6 target support. |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | 2026-09-10 | Added server-password prompts, formal relay mode, multiple relay selection, and administrator connection-reason reporting. |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | 2026-09-08 | Simplified Docker deployment, supported local TeamSpeak targets, added a 15-second connection timeout, and made network monitoring continuous. |
