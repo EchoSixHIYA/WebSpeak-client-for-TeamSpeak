@@ -35,7 +35,7 @@
           <div class="page-heading"><div><h2>{{ tr('serverSettings') }}</h2><p>{{ tr('serverSettingsLead') }}</p></div><button class="primary-button" :disabled="submitting" @click="saveServerSettings">{{ submitting ? tr('saving') : tr('saveChanges') }}</button></div>
           <div class="settings-grid">
             <article class="settings-card"><h3>{{ tr('teamSpeakTarget') }}</h3><div class="target-fields"><label><span>{{ tr('serverAddress') }}</span><input v-model.trim="serverForm.address" :placeholder="tr('serverPlaceholder')" /></label><label><span>{{ tr('serverPort') }}</span><input v-model.trim="serverForm.port" inputmode="numeric" type="text" maxlength="5" :placeholder="tr('serverPortPlaceholder')" /></label></div><div class="password-row"><label><span>{{ tr('serverPassword') }}</span><input v-model="serverForm.serverPassword" type="password" autocomplete="off" :disabled="serverForm.passwordAction !== 'replace'" :placeholder="serverForm.hasPassword ? tr('passwordConfigured') : tr('optionalPassword')" /></label><div class="password-actions"><button type="button" :class="{ active: serverForm.passwordAction === 'replace' }" @click="serverForm.passwordAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasPassword" type="button" :class="{ danger: serverForm.passwordAction === 'remove' }" @click="serverForm.passwordAction = 'remove'">{{ tr('remove') }}</button></div></div><button class="secondary-button" type="button" :disabled="testing" @click="testServerConnection"><span v-if="testing" class="spinner small"></span><Icon v-else name="activity" :size="17" />{{ testing ? tr('testing') : tr('testConnection') }}</button><div v-if="testResult" :class="['test-result', testResult.ok ? 'success' : 'error']"><Icon :name="testResult.ok ? 'check' : 'close'" :size="18" /><div><strong>{{ testResultTitle }}</strong><small>{{ testResultText }}</small></div></div></article>
-            <article class="settings-card"><h3>{{ tr('accessAndIdentity') }}</h3><fieldset><legend>{{ tr('accessMode') }}</legend><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset><label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label><label><span>{{ tr('welcomeTextZh') }}</span><textarea v-model="serverForm.welcomeText" maxlength="500" rows="3"></textarea></label><label><span>{{ tr('welcomeTextEn') }}</span><textarea v-model="serverForm.welcomeTextEn" maxlength="500" rows="3"></textarea></label></article>
+            <article class="settings-card"><h3>{{ tr('accessAndIdentity') }}</h3><fieldset><legend>{{ tr('accessMode') }}</legend><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset><label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label><div class="welcome-editor"><div class="welcome-editor-heading"><label><span>{{ tr('welcomeLanguage') }}</span><select v-model="welcomeLanguage"><option v-for="option in welcomeLanguageOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><small>{{ tr('welcomeLanguageHint') }}</small></div><label><span>{{ tr('welcomeText') }} · {{ selectedWelcomeLanguageLabel }}</span><textarea v-model="selectedWelcomeText" maxlength="500" rows="4" :placeholder="selectedWelcomeDefault"></textarea></label><small class="field-help">{{ tr('welcomeFallbackHint') }}</small></div></article>
             <article class="settings-card advanced-card"><div><h3>{{ tr('advancedSettings') }}</h3><p class="card-help">{{ tr('advancedSettingsLead') }}</p></div><label class="choice toggle-choice"><input v-model="serverForm.webRtcEnabled" type="checkbox" @change="handleWebRtcToggle" /><span><strong>{{ tr('webrtcEnabled') }}</strong><small>{{ tr('webrtcEnabledLead') }}</small></span></label><div class="webrtc-port-fields"><div class="port-fields-heading"><strong>{{ tr('webrtcPortRange') }}</strong><small>{{ tr('webrtcPortRangeLead') }}</small></div><div class="port-inputs"><label><span>{{ tr('webrtcPortStart') }}</span><input v-model.number="serverForm.webRtcUdpStart" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label><label><span>{{ tr('webrtcPortEnd') }}</span><input v-model.number="serverForm.webRtcUdpEnd" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label></div></div><small class="field-help">{{ tr('webrtcApplyHint') }}</small></article>
             <article class="settings-card relay-card"><div><h3>{{ tr('relaySettings') }}</h3><p class="card-help">{{ tr('relaySettingsLead') }}</p></div><div v-if="!serverForm.relayNodes.length" class="relay-empty">{{ tr('relayNodeEmpty') }}</div><div class="relay-node-list"><div v-for="(relay, index) in serverForm.relayNodes" :key="relay.id" class="relay-node"><div class="relay-node-heading"><label class="relay-enabled"><input v-model="relay.enabled" type="checkbox" /><strong>{{ relay.name || tr('relayUnnamed') }}</strong></label><button class="text-danger" type="button" @click="removeRelayNode(index)">{{ tr('remove') }}</button></div><div class="relay-fields"><label><span>{{ tr('relayName') }}</span><input v-model.trim="relay.name" maxlength="80" :placeholder="tr('relayNamePlaceholder')" /></label><label><span>{{ tr('relayTarget') }}</span><input v-model.trim="relay.target" maxlength="300" :placeholder="tr('relayTargetPlaceholder')" /></label><div class="password-row"><label><span>{{ tr('relayToken') }}</span><input v-model="relay.token" type="password" autocomplete="off" :disabled="relay.tokenAction !== 'replace'" :placeholder="relay.hasToken ? tr('relayTokenConfigured') : tr('relayTokenPlaceholder')" /></label><div class="password-actions"><button type="button" :class="{ active: relay.tokenAction === 'replace' }" @click="relay.tokenAction = 'replace'">{{ tr('change') }}</button><button v-if="relay.hasToken" type="button" :class="{ danger: relay.tokenAction === 'remove' }" @click="relay.tokenAction = 'remove'">{{ tr('remove') }}</button></div></div></div></div></div><button class="secondary-button relay-add" type="button" @click="addRelayNode">{{ tr('relayAdd') }}</button><small class="field-help">{{ tr('relayManagedHint') }}</small></article>
           </div>
@@ -76,16 +76,26 @@ import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 
-type Language = "zh" | "en" | "de";
+type Language = "zh" | "en" | "de" | "ru" | "ja";
 type Screen = "login" | "change-password" | "admin";
 type AccessMode = "fixed" | "open";
 interface ProbeState { ok: boolean; checkType?: "network" | "protocol"; passwordVerified?: boolean; latencyMs?: number; serverName?: string | null; packetLossPercent?: number; attempts?: number; successfulAttempts?: number; code?: string; errorCode?: string }
 interface RelayNodeForm { id: string; name: string; enabled: boolean; target: string; token: string; tokenAction: "keep" | "replace" | "remove"; hasToken: boolean }
+type WelcomeLanguage = "zh" | "en" | "de" | "ru" | "ja";
+type WelcomeTextField = "welcomeText" | "welcomeTextEn" | "welcomeTextDe" | "welcomeTextRu" | "welcomeTextJa";
+
+const DEFAULT_WELCOME_TEXTS: Record<WelcomeLanguage, string> = {
+  zh: "无需安装 TeamSpeak 客户端，打开浏览器即可加入语音频道。低延迟、轻量、专注于每一次对话。",
+  en: "No TeamSpeak client installation required. Open your browser and join a voice channel with low-latency audio built for conversation.",
+  de: "Keine Installation des TeamSpeak-Clients nötig. Öffne den Browser und tritt einem Sprachkanal bei – leichtgewichtig und mit geringer Latenz.",
+  ru: "Устанавливать клиент TeamSpeak не нужно: откройте браузер и присоединитесь к голосовому каналу. Низкая задержка и удобное общение в каждом разговоре.",
+  ja: "TeamSpeak クライアントのインストールは不要です。ブラウザを開くだけで音声チャンネルに参加できます。低遅延で軽快な会話を楽しめます。",
+};
 
 const route = useRoute();
 const router = useRouter();
 const storedLanguage = localStorage.getItem("webspeak:language");
-const language = ref<Language>(storedLanguage === "en" || storedLanguage === "de" ? storedLanguage : "zh");
+const language = ref<Language>(storedLanguage === "en" || storedLanguage === "de" || storedLanguage === "ru" || storedLanguage === "ja" ? storedLanguage : typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ru") ? "ru" : typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ja") ? "ja" : "zh");
 const themeMode = ref<ThemeMode>(getStoredTheme());
 const themeIcon = computed(() => isDarkTheme(themeMode.value) ? "sun" : "moon");
 const themeLabel = computed(() => isDarkTheme(themeMode.value) ? tr("switchToLightTheme") : tr("switchToDarkTheme"));
@@ -102,7 +112,8 @@ const newPassword = ref("");
 const confirmNewPassword = ref("");
 const testResult = ref<ProbeState | null>(null);
 
-const serverForm = reactive({ address: "", port: "9987", serverPassword: "", passwordAction: "keep" as "keep" | "replace" | "remove", hasPassword: false, accessMode: "fixed" as AccessMode, siteName: "WebSpeak", welcomeText: "", welcomeTextEn: "", webRtcEnabled: false, webRtcUdpStart: 40000, webRtcUdpEnd: 40099, relayConfigured: false, relayEnabled: false, relayName: "", relayTarget: "", relayToken: "", relayTokenAction: "keep" as "keep" | "replace" | "remove", hasRelayToken: false, relaySettingsTouched: false, relayNodes: [] as RelayNodeForm[], lastTestAt: null as string | null, lastTestLatencyMs: null as number | null });
+const serverForm = reactive({ address: "", port: "9987", serverPassword: "", passwordAction: "keep" as "keep" | "replace" | "remove", hasPassword: false, accessMode: "fixed" as AccessMode, siteName: "WebSpeak", welcomeText: "", welcomeTextEn: "", welcomeTextDe: "", welcomeTextRu: "", welcomeTextJa: "", welcomeDefaults: { ...DEFAULT_WELCOME_TEXTS }, webRtcEnabled: false, webRtcUdpStart: 40000, webRtcUdpEnd: 40099, relayConfigured: false, relayEnabled: false, relayName: "", relayTarget: "", relayToken: "", relayTokenAction: "keep" as "keep" | "replace" | "remove", hasRelayToken: false, relaySettingsTouched: false, relayNodes: [] as RelayNodeForm[], lastTestAt: null as string | null, lastTestLatencyMs: null as number | null });
+const welcomeLanguage = ref<WelcomeLanguage>("zh");
 const overview = reactive({ gateway: { version: "", uptimeSeconds: 0 }, teamSpeak: { target: "", status: "unknown", lastTestAt: null as string | null, latencyMs: null as number | null }, sessions: { active: 0, peak: 0, limit: 100 }, recentEvents: [] as Array<{ event: string; createdAt: string }>, legacyConfigImported: false });
 interface AdminSession { id: string; nickname: string; target: string; state: string; createdAt: string; ageSeconds: number; tsClientId: number | null; channelId: string | null; memberCount: number }
 interface ManagedInvite { id: string; target: string; channel: string; expiresAt: string; maxUses: number; useCount: number; createdAt: string; revokedAt: string | null; status: "active" | "expired" | "exhausted" | "revoked" }
@@ -218,9 +229,10 @@ const copy = {
     openMode: "允许访客输入其他服务器",
     openModeLead: "访客可输入公网 TeamSpeak 地址；内网和保留地址会被阻止。",
     siteName: "站点显示名称",
-    welcomeText: "公告",
-    welcomeTextZh: "中文公告",
-    welcomeTextEn: "英文公告",
+    welcomeText: "欢迎词",
+    welcomeLanguage: "欢迎词语言",
+    welcomeLanguageHint: "切换语言编辑对应文本；留空时自动使用默认模板。",
+    welcomeFallbackHint: "留空将回退到该语言的默认欢迎词。",
     runtimeFacts: "运行时信息",
     lastTest: "最近测试",
     latency: "延迟",
@@ -421,9 +433,10 @@ const copy = {
     openMode: "Allow other TeamSpeak servers",
     openModeLead: "Guests may enter public TeamSpeak addresses; private and reserved networks are blocked.",
     siteName: "Site display name",
-    welcomeText: "Announcement",
-    welcomeTextZh: "Chinese announcement",
-    welcomeTextEn: "English announcement",
+    welcomeText: "Welcome message",
+    welcomeLanguage: "Welcome message language",
+    welcomeLanguageHint: "Switch languages to edit each message. Leave it blank to use the built-in template.",
+    welcomeFallbackHint: "An empty field falls back to the built-in template for this language.",
     runtimeFacts: "Runtime facts",
     lastTest: "Last test",
     latency: "Latency",
@@ -613,9 +626,10 @@ const germanCopy = {
   fixedMode: "Nur dieser TeamSpeak-Server",
   openMode: "Andere TeamSpeak-Server erlauben",
   siteName: "Anzeigename der Website",
-  welcomeText: "Ankündigung",
-  welcomeTextZh: "Chinesische Ankündigung",
-  welcomeTextEn: "Englische Ankündigung",
+  welcomeText: "Willkommenstext",
+  welcomeLanguage: "Sprache des Willkommenstexts",
+  welcomeLanguageHint: "Sprache auswählen und den jeweiligen Text bearbeiten. Leer lassen, um die Vorlage zu verwenden.",
+  welcomeFallbackHint: "Ein leeres Feld verwendet automatisch die Vorlage dieser Sprache.",
   runtimeFacts: "Laufzeitinformationen",
   lastTest: "Letzter Test",
   latency: "Latenz",
@@ -684,7 +698,268 @@ const germanCopy = {
   auditEmpty: "Keine Prüfereignisse.",
 } as const;
 
-function tr(key: keyof typeof copy.zh, vars: Record<string, string | number> = {}): string { let value: string = language.value === "zh" ? copy.zh[key] : language.value === "de" ? germanCopy[key] ?? copy.en[key] ?? copy.zh[key] : copy.en[key] ?? copy.zh[key]; for (const [name, replacement] of Object.entries(vars)) value = value.replaceAll(`{{${name}}}`, String(replacement)); return value; }
+const russianCopy = {
+  ...copy.en,
+  loading: "Загрузка панели администратора…",
+  adminConsole: "Панель администратора",
+  changePasswordTitle: "Измените пароль по умолчанию",
+  changePasswordLead: "Пароль по умолчанию используется только для первого входа. Задайте новый пароль длиной не менее 12 символов.",
+  savePassword: "Сохранить новый пароль",
+  languageMenu: "Язык",
+  welcomeAdmin: "С возвращением",
+  loginLead: "Войдите, чтобы управлять этим экземпляром WebSpeak.",
+  adminPassword: "Пароль администратора",
+  login: "Войти",
+  backHome: "На главную",
+  overview: "Обзор",
+  server: "Сервер",
+  operations: "Операции",
+  openGuest: "Открыть страницу гостя",
+  logout: "Выйти",
+  gatewayRunning: "Шлюз работает",
+  serverSettings: "Настройки сервера",
+  serverSettingsLead: "Управляйте целью TeamSpeak, политикой доступа и содержимым для гостей.",
+  saving: "Сохранение…",
+  saveChanges: "Сохранить изменения",
+  teamSpeakTarget: "Цель TeamSpeak по умолчанию",
+  serverAddress: "Адрес сервера TeamSpeak",
+  serverPlaceholder: "например, ts.example.com или 127.0.0.1",
+  serverPort: "Голосовой порт",
+  serverPassword: "Пароль сервера",
+  optional: "необязательно",
+  optionalPassword: "Оставьте пустым, если пароль не нужен",
+  passwordConfigured: "Пароль настроен (оставьте пустым, чтобы сохранить)",
+  change: "Изменить",
+  remove: "Удалить",
+  testConnection: "Проверить подключение",
+  testing: "Проверка…",
+  connectionReady: "Подключение установлено",
+  connectionFailed: "Подключение не удалось",
+  packetLoss: "Потери пакетов",
+  accessAndIdentity: "Доступ и данные сайта",
+  advancedSettings: "Расширенные настройки",
+  advancedSettingsLead: "Изменяйте расширенные параметры передачи только при необходимости.",
+  webrtcEnabled: "Включить WebRTC",
+  relaySettings: "Сервер ретрансляции",
+  relaySettingsLead: "Настройте узлы ретрансляции для ускоренных подключений.",
+  relayEnabled: "Включить ретрансляцию",
+  relayName: "Название ретранслятора",
+  relayTarget: "Адрес ретранслятора",
+  relayToken: "Токен ретранслятора",
+  relayAdd: "Добавить узел ретрансляции",
+  relayNodeEmpty: "Узлы ретрансляции не настроены.",
+  relayUnnamed: "Ретранслятор без названия",
+  accessMode: "Режим доступа гостей",
+  fixedMode: "Только этот сервер TeamSpeak",
+  openMode: "Разрешить другие серверы TeamSpeak",
+  siteName: "Отображаемое имя сайта",
+  welcomeText: "Приветственное сообщение",
+  welcomeLanguage: "Язык приветственного сообщения",
+  welcomeLanguageHint: "Переключайте язык, чтобы редактировать отдельное сообщение. Оставьте поле пустым для встроенного шаблона.",
+  welcomeFallbackHint: "Пустое поле автоматически использует шаблон выбранного языка.",
+  runtimeFacts: "Сведения о работе",
+  lastTest: "Последняя проверка",
+  latency: "Задержка",
+  internalPort: "Внутренний порт",
+  systemStatus: "СОСТОЯНИЕ СИСТЕМЫ",
+  everythingRunning: "WebSpeak работает",
+  running: "Работает",
+  gateway: "Шлюз",
+  activeSessions: "Активные сессии",
+  targetHealth: "Состояние цели",
+  status: "Состояние",
+  recentEvents: "Последние события",
+  noRecentEvents: "Нет последних событий",
+  reachable: "Доступен",
+  unreachable: "Недоступен",
+  notTested: "Не проверен",
+  requestFailed: "Запрос не выполнен. Проверьте поля и повторите попытку.",
+  refresh: "Обновить",
+  sessions: "Активные сессии",
+  sessionEmpty: "Нет активных сессий.",
+  nickname: "Имя",
+  sessionState: "Состояние",
+  age: "Длительность",
+  memberCount: "Участники",
+  endSession: "Отключить",
+  terminating: "Отключение…",
+  invites: "Управляемые приглашения",
+  inviteChannel: "Целевой канал",
+  expiresIn: "Срок действия (часы)",
+  maxUses: "Максимум использований",
+  createInvite: "Создать ссылку-приглашение",
+  inviteCreated: "Ссылка-приглашение создана",
+  copyLink: "Копировать ссылку",
+  copiedLink: "Ссылка-приглашение скопирована.",
+  revoke: "Отозвать",
+  active: "Активно",
+  expired: "Истекло",
+  exhausted: "Лимит исчерпан",
+  revoked: "Отозвано",
+  diagnostics: "Диагностика",
+  downloadReport: "Скачать отчёт диагностики",
+  exportBackup: "Экспортировать резервную копию",
+  logViewer: "Рабочие журналы",
+  connectionHistory: "История подключений пользователей",
+  connectionFromTo: "От {{ip}} к {{target}}",
+  connectionViaRelay: "Через ретранслятор {{relay}}",
+  connectionActive: "Подключён",
+  connectionConnecting: "Подключение",
+  connectionDisconnected: "Отключён",
+  connectedAt: "Подключён",
+  connectionAttemptedAt: "Попытка",
+  disconnectedAt: "Отключён",
+  duration: "Длительность",
+  noLogs: "Нет доступных журналов.",
+  operationFailed: "Операция не выполнена. Повторите позже.",
+  version: "Версия",
+  audit: "Журнал аудита",
+  auditEmpty: "Нет событий аудита.",
+} as const;
+
+const japaneseCopy = {
+  ...copy.en,
+  loading: "管理コンソールを読み込み中…",
+  adminConsole: "管理コンソール",
+  changePasswordTitle: "初期パスワードを変更",
+  changePasswordLead: "初期パスワードは初回ログイン専用です。12文字以上の新しい管理者パスワードを設定してください。",
+  savePassword: "新しいパスワードを保存",
+  languageMenu: "言語",
+  welcomeAdmin: "おかえりなさい",
+  loginLead: "ログインして WebSpeak を管理します。",
+  adminPassword: "管理者パスワード",
+  login: "ログイン",
+  backHome: "ホームに戻る",
+  overview: "概要",
+  server: "サーバー",
+  operations: "運用",
+  openGuest: "ゲストページを開く",
+  logout: "ログアウト",
+  gatewayRunning: "ゲートウェイ稼働中",
+  serverSettings: "サーバー設定",
+  serverSettingsLead: "TeamSpeak 接続先、アクセス方針、ゲスト向け内容を管理します。",
+  saving: "保存中…",
+  saveChanges: "変更を保存",
+  teamSpeakTarget: "デフォルト TeamSpeak 接続先",
+  serverAddress: "TeamSpeak サーバーアドレス",
+  serverPlaceholder: "例: ts.example.com または 127.0.0.1",
+  serverPort: "音声ポート",
+  serverPassword: "サーバーパスワード",
+  optional: "任意",
+  optionalPassword: "不要な場合は空欄",
+  passwordConfigured: "パスワード設定済み（変更しない場合は空欄）",
+  change: "変更",
+  remove: "削除",
+  testConnection: "接続をテスト",
+  testing: "テスト中…",
+  connectionReady: "接続準備完了",
+  connectionFailed: "接続に失敗しました",
+  packetLoss: "パケット損失",
+  accessAndIdentity: "アクセスとサイト情報",
+  advancedSettings: "詳細設定",
+  advancedSettingsLead: "必要な場合だけゲートウェイの詳細な転送設定を変更します。",
+  webrtcEnabled: "WebRTC を有効化",
+  relaySettings: "中継サーバー",
+  relaySettingsLead: "高速接続で使用する中継ノードを設定します。",
+  relayEnabled: "中継を有効化",
+  relayName: "中継名",
+  relayTarget: "中継サーバーアドレス",
+  relayToken: "中継トークン",
+  relayAdd: "中継ノードを追加",
+  relayNodeEmpty: "中継ノードは設定されていません。",
+  relayUnnamed: "名前のない中継",
+  accessMode: "ゲストアクセスモード",
+  fixedMode: "この TeamSpeak サーバーのみ",
+  openMode: "他の TeamSpeak サーバーを許可",
+  siteName: "サイト表示名",
+  welcomeText: "ウェルカムメッセージ",
+  welcomeLanguage: "ウェルカムメッセージの言語",
+  welcomeLanguageHint: "言語を切り替えて個別のメッセージを編集します。空欄の場合は組み込みテンプレートを使用します。",
+  welcomeFallbackHint: "空欄にすると選択した言語のデフォルトテンプレートに戻ります。",
+  runtimeFacts: "実行情報",
+  lastTest: "最終テスト",
+  latency: "遅延",
+  internalPort: "内部ポート",
+  systemStatus: "システム状態",
+  everythingRunning: "WebSpeak は稼働中です",
+  running: "稼働中",
+  gateway: "ゲートウェイ",
+  activeSessions: "アクティブセッション",
+  targetHealth: "接続先の状態",
+  status: "状態",
+  recentEvents: "最近のイベント",
+  noRecentEvents: "最近のイベントはありません",
+  reachable: "接続可能",
+  unreachable: "接続不可",
+  notTested: "未テスト",
+  requestFailed: "リクエストに失敗しました。入力を確認して再試行してください。",
+  refresh: "更新",
+  sessions: "アクティブセッション",
+  sessionEmpty: "アクティブなセッションはありません。",
+  nickname: "名前",
+  sessionState: "状態",
+  age: "経過時間",
+  memberCount: "メンバー",
+  endSession: "切断",
+  terminating: "切断中…",
+  invites: "管理済み招待",
+  inviteChannel: "参加先チャンネル",
+  expiresIn: "有効期間（時間）",
+  maxUses: "最大使用回数",
+  createInvite: "招待リンクを作成",
+  inviteCreated: "招待リンクを作成しました",
+  copyLink: "リンクをコピー",
+  copiedLink: "招待リンクをコピーしました。",
+  revoke: "取り消す",
+  active: "有効",
+  expired: "期限切れ",
+  exhausted: "上限到達",
+  revoked: "取り消し済み",
+  diagnostics: "診断情報",
+  downloadReport: "診断レポートをダウンロード",
+  exportBackup: "データベースをバックアップ",
+  logViewer: "実行ログ",
+  connectionHistory: "ユーザー接続履歴",
+  connectionFromTo: "{{ip}} から {{target}} へ",
+  connectionViaRelay: "中継 {{relay}} 経由",
+  connectionActive: "接続中",
+  connectionConnecting: "接続準備中",
+  connectionDisconnected: "切断済み",
+  connectedAt: "接続",
+  connectionAttemptedAt: "試行",
+  disconnectedAt: "切断",
+  duration: "時間",
+  noLogs: "表示できるログはありません。",
+  operationFailed: "操作に失敗しました。後でもう一度お試しください。",
+  version: "バージョン",
+  audit: "監査ログ",
+  auditEmpty: "監査イベントはありません。",
+} as const;
+
+const welcomeLanguageOptions: Array<{ value: WelcomeLanguage; label: string }> = [
+  { value: "zh", label: "中文" },
+  { value: "en", label: "English" },
+  { value: "de", label: "Deutsch" },
+  { value: "ru", label: "Русский" },
+  { value: "ja", label: "日本語" },
+];
+
+const welcomeTextFieldByLanguage: Record<WelcomeLanguage, WelcomeTextField> = {
+  zh: "welcomeText",
+  en: "welcomeTextEn",
+  de: "welcomeTextDe",
+  ru: "welcomeTextRu",
+  ja: "welcomeTextJa",
+};
+
+const selectedWelcomeText = computed<string>({
+  get: () => serverForm[welcomeTextFieldByLanguage[welcomeLanguage.value]],
+  set: (value: string) => { serverForm[welcomeTextFieldByLanguage[welcomeLanguage.value]] = value; },
+});
+const selectedWelcomeLanguageLabel = computed(() => welcomeLanguageOptions.find((option) => option.value === welcomeLanguage.value)?.label ?? "");
+const selectedWelcomeDefault = computed(() => serverForm.welcomeDefaults[welcomeLanguage.value] || DEFAULT_WELCOME_TEXTS[welcomeLanguage.value]);
+
+function tr(key: keyof typeof copy.zh, vars: Record<string, string | number> = {}): string { let value: string = language.value === "zh" ? copy.zh[key] : language.value === "de" ? germanCopy[key] ?? copy.en[key] ?? copy.zh[key] : language.value === "ru" ? russianCopy[key] ?? copy.en[key] ?? copy.zh[key] : language.value === "ja" ? japaneseCopy[key] ?? copy.en[key] ?? copy.zh[key] : copy.en[key] ?? copy.zh[key]; for (const [name, replacement] of Object.entries(vars)) value = value.replaceAll(`{{${name}}}`, String(replacement)); return value; }
 const passwordStrength = computed(() => Math.min(100, Math.max(8, newPassword.value.length * 5 + (/[\s\W]/.test(newPassword.value) ? 15 : 0))));
 const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : route.path === "/admin/operations" ? tr('operations') : tr('overview'));
 const testResultTitle = computed(() => {
@@ -732,7 +1007,7 @@ function mapRelayNodes(value: unknown): RelayNodeForm[] {
 function createRelayNode(): RelayNodeForm { return { id: `relay-new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: "", enabled: false, target: "", token: "", tokenAction: "replace", hasToken: false }; }
 function addRelayNode() { serverForm.relayNodes.push(createRelayNode()); serverForm.relaySettingsTouched = true; }
 function removeRelayNode(index: number) { serverForm.relayNodes.splice(index, 1); serverForm.relaySettingsTouched = true; }
-async function loadServerSettings() { const value = await getJson("/api/admin/server"); const target = splitTeamSpeakTarget(value.target); Object.assign(serverForm, value, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: value.webRtcEnabled === true, webRtcUdpStart: Number(value.webRtcUdpStart || 40000), webRtcUdpEnd: Number(value.webRtcUdpEnd || 40099), relayConfigured: value.relayConfigured === true, relayEnabled: value.relayEnabled === true, relayName: String(value.relayName || ""), relayTarget: String(value.relayTarget || ""), relayToken: "", relayTokenAction: "keep", hasRelayToken: value.hasRelayToken === true, relaySettingsTouched: false, relayNodes: mapRelayNodes(value.relayNodes) }); }
+async function loadServerSettings() { const value = await getJson("/api/admin/server"); const target = splitTeamSpeakTarget(value.target); Object.assign(serverForm, value, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", welcomeTextDe: String(value.welcomeTextDe || ""), welcomeTextRu: String(value.welcomeTextRu || ""), welcomeTextJa: String(value.welcomeTextJa || ""), welcomeDefaults: { ...DEFAULT_WELCOME_TEXTS, ...(value.welcomeDefaults && typeof value.welcomeDefaults === "object" ? value.welcomeDefaults : {}) }, webRtcEnabled: value.webRtcEnabled === true, webRtcUdpStart: Number(value.webRtcUdpStart || 40000), webRtcUdpEnd: Number(value.webRtcUdpEnd || 40099), relayConfigured: value.relayConfigured === true, relayEnabled: value.relayEnabled === true, relayName: String(value.relayName || ""), relayTarget: String(value.relayTarget || ""), relayToken: "", relayTokenAction: "keep", hasRelayToken: value.hasRelayToken === true, relaySettingsTouched: false, relayNodes: mapRelayNodes(value.relayNodes) }); }
 async function loadOperations() { operationsLoading.value = true; try { const [sessions, invites, diagnostics, logs, audit] = await Promise.all([getJson("/api/admin/sessions"), getJson("/api/admin/invites"), getJson("/api/admin/diagnostics"), getJson("/api/admin/logs?limit=100"), getJson("/api/admin/audit?limit=50")]); operations.sessions = Array.isArray(sessions.sessions) ? sessions.sessions : []; operations.invites = Array.isArray(invites.invites) ? invites.invites : []; operations.diagnostics = { version: String(diagnostics.gateway?.version || ""), node: String(diagnostics.gateway?.node || ""), platform: String(diagnostics.gateway?.platform || ""), arch: String(diagnostics.gateway?.arch || ""), schemaVersion: Number(diagnostics.database?.schemaVersion || 0), createdSessions: Number(diagnostics.sessions?.created || 0) }; operations.logs = { available: Boolean(logs.available), entries: Array.isArray(logs.entries) ? logs.entries : [], sessions: Array.isArray(logs.sessions) ? logs.sessions : [] }; operations.audit = Array.isArray(audit.events) ? audit.events : []; } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { operationsLoading.value = false; } }
 async function terminateSession(session: AdminSession) { if (!window.confirm(tr('confirmTerminate', { nickname: session.nickname }))) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
 async function createInvite() { submitting.value = true; errorMessage.value = ""; createdInvite.value = null; try { const result = await sendJson("/api/admin/invites", "POST", { channel: inviteForm.channel, expiresInHours: inviteForm.expiresInHours, maxUses: inviteForm.maxUses }); if (typeof result.token !== "string") throw new Error("INVITE_CREATE_FAILED"); createdInvite.value = { token: result.token, link: `${location.origin}/?invite=${encodeURIComponent(result.token)}` }; inviteForm.channel = ""; await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
@@ -740,18 +1015,18 @@ async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(tr('con
 async function copyInviteLink() { if (!createdInvite.value) return; try { await navigator.clipboard.writeText(createdInvite.value.link); showOperationNotice(tr('copiedLink')); } catch { errorMessage.value = tr('operationFailed'); } }
 function showOperationNotice(message: string) { errorMessage.value = message; window.setTimeout(() => { if (errorMessage.value === message) errorMessage.value = ""; }, 2200); }
 async function downloadBackup() { try { const response = await fetch("/api/admin/backup", { headers: { accept: "application/octet-stream" } }); if (!response.ok) throw new Error("BACKUP_FAILED"); const blob = await response.blob(); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `webspeak-backup-${new Date().toISOString().slice(0, 10)}.db`; anchor.click(); URL.revokeObjectURL(url); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
-async function saveServerSettings() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/server", "PUT", serverPayload()); const target = splitTeamSpeakTarget(result.settings?.target); Object.assign(serverForm, result.settings, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", webRtcEnabled: result.settings.webRtcEnabled === true, webRtcUdpStart: Number(result.settings.webRtcUdpStart || 40000), webRtcUdpEnd: Number(result.settings.webRtcUdpEnd || 40099), relayConfigured: result.settings.relayConfigured === true, relayEnabled: result.settings.relayEnabled === true, relayName: String(result.settings.relayName || ""), relayTarget: String(result.settings.relayTarget || ""), relayToken: "", relayTokenAction: "keep", hasRelayToken: result.settings.hasRelayToken === true, relaySettingsTouched: false, relayNodes: mapRelayNodes(result.settings.relayNodes) }); await loadOverview(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
+async function saveServerSettings() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/server", "PUT", serverPayload()); const target = splitTeamSpeakTarget(result.settings?.target); Object.assign(serverForm, result.settings, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", welcomeTextDe: String(result.settings.welcomeTextDe || ""), welcomeTextRu: String(result.settings.welcomeTextRu || ""), welcomeTextJa: String(result.settings.welcomeTextJa || ""), welcomeDefaults: { ...DEFAULT_WELCOME_TEXTS, ...(result.settings.welcomeDefaults && typeof result.settings.welcomeDefaults === "object" ? result.settings.welcomeDefaults : {}) }, webRtcEnabled: result.settings.webRtcEnabled === true, webRtcUdpStart: Number(result.settings.webRtcUdpStart || 40000), webRtcUdpEnd: Number(result.settings.webRtcUdpEnd || 40099), relayConfigured: result.settings.relayConfigured === true, relayEnabled: result.settings.relayEnabled === true, relayName: String(result.settings.relayName || ""), relayTarget: String(result.settings.relayTarget || ""), relayToken: "", relayTokenAction: "keep", hasRelayToken: result.settings.hasRelayToken === true, relaySettingsTouched: false, relayNodes: mapRelayNodes(result.settings.relayNodes) }); await loadOverview(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 function handleWebRtcToggle() { if (serverForm.webRtcEnabled) webrtcPortNoticeOpen.value = true; }
 async function testServerConnection() { await runTest("/api/admin/server/test", { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction }); if (testResult.value) { await loadOverview(); serverForm.lastTestAt = new Date().toISOString(); serverForm.lastTestLatencyMs = testResult.value.ok ? (testResult.value.latencyMs ?? null) : null; } }
 function touchRelaySettings() { serverForm.relaySettingsTouched = true; }
-function serverPayload() { return { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName, welcomeText: serverForm.welcomeText, welcomeTextEn: serverForm.welcomeTextEn, webRtcEnabled: serverForm.webRtcEnabled, webRtcUdpStart: serverForm.webRtcUdpStart, webRtcUdpEnd: serverForm.webRtcUdpEnd, relayNodes: serverForm.relayNodes.map((node) => ({ id: node.id, name: node.name, target: node.target, enabled: node.enabled, tokenAction: node.tokenAction, ...(node.tokenAction === "replace" ? { token: node.token } : {}) })) }; }
+function serverPayload() { return { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined, passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName, welcomeText: serverForm.welcomeText, welcomeTextEn: serverForm.welcomeTextEn, welcomeTextDe: serverForm.welcomeTextDe, welcomeTextRu: serverForm.welcomeTextRu, welcomeTextJa: serverForm.welcomeTextJa, webRtcEnabled: serverForm.webRtcEnabled, webRtcUdpStart: serverForm.webRtcUdpStart, webRtcUdpEnd: serverForm.webRtcUdpEnd, relayNodes: serverForm.relayNodes.map((node) => ({ id: node.id, name: node.name, target: node.target, enabled: node.enabled, tokenAction: node.tokenAction, ...(node.tokenAction === "replace" ? { token: node.token } : {}) })) }; }
 async function runTest(url: string, body: Record<string, unknown>) { testing.value = true; errorMessage.value = ""; testResult.value = null; try { testResult.value = await sendJson(url, "POST", body, url.includes("/server/test")); } catch (error) { testResult.value = { ok: false, code: (error as ApiError).code }; } finally { testing.value = false; } }
 async function dismissLegacyNotice() { await sendJson("/api/admin/legacy-import/dismiss", "POST", {}); overview.legacyConfigImported = false; }
 function persistLanguage() { localStorage.setItem("webspeak:language", language.value); }
 function cycleTheme() { themeMode.value = nextTheme(themeMode.value); saveTheme(themeMode.value); }
-function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat(language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
-function formatUptime(seconds: number) { const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); return language.value === "zh" ? `已运行 ${hours} 小时 ${minutes} 分钟` : language.value === "de" ? `${hours} Std. ${minutes} Min. aktiv` : `Up ${hours}h ${minutes}m`; }
-function formatAge(seconds: number | null) { if (seconds == null) return "—"; if (seconds < 60) return language.value === "zh" ? `${seconds} 秒` : language.value === "de" ? `${seconds} Sek.` : `${seconds}s`; const minutes = Math.floor(seconds / 60); if (minutes < 60) return language.value === "zh" ? `${minutes} 分钟` : language.value === "de" ? `${minutes} Min.` : `${minutes}m`; const hours = Math.floor(minutes / 60); return language.value === "zh" ? `${hours} 小时 ${minutes % 60} 分钟` : language.value === "de" ? `${hours} Std. ${minutes % 60} Min.` : `${hours}h ${minutes % 60}m`; }
+function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat(language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : language.value === "ru" ? "ru-RU" : language.value === "ja" ? "ja-JP" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
+function formatUptime(seconds: number) { const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); if (language.value === "zh") return `已运行 ${hours} 小时 ${minutes} 分钟`; if (language.value === "de") return `${hours} Std. ${minutes} Min. aktiv`; if (language.value === "ru") return `Работает ${hours} ч ${minutes} мин`; if (language.value === "ja") return `${hours}時間 ${minutes}分 稼働`; return `Up ${hours}h ${minutes}m`; }
+function formatAge(seconds: number | null) { if (seconds == null) return "—"; if (seconds < 60) { if (language.value === "zh") return `${seconds} 秒`; if (language.value === "de") return `${seconds} Sek.`; if (language.value === "ru") return `${seconds} с`; if (language.value === "ja") return `${seconds}秒`; return `${seconds}s`; } const minutes = Math.floor(seconds / 60); if (minutes < 60) { if (language.value === "zh") return `${minutes} 分钟`; if (language.value === "de") return `${minutes} Min.`; if (language.value === "ru") return `${minutes} мин`; if (language.value === "ja") return `${minutes}分`; return `${minutes}m`; } const hours = Math.floor(minutes / 60); const rest = minutes % 60; if (language.value === "zh") return `${hours} 小时 ${rest} 分钟`; if (language.value === "de") return `${hours} Std. ${rest} Min.`; if (language.value === "ru") return `${hours} ч ${rest} мин`; if (language.value === "ja") return `${hours}時間 ${rest}分`; return `${hours}h ${rest}m`; }
 function connectionStatusLabel(status: AdminConnectionRecord["status"]) { const names: Record<AdminConnectionRecord["status"], keyof typeof copy.zh> = { active: "connectionActive", connecting: "connectionConnecting", disconnected: "connectionDisconnected", failed: "connectionFailed" }; return tr(names[status]); }
 function connectionRoute(record: AdminConnectionRecord) {
   const route = tr("connectionFromTo", { ip: record.clientIp || "—", target: record.target || "—" });
@@ -759,11 +1034,48 @@ function connectionRoute(record: AdminConnectionRecord) {
   const relay = [record.relayName, record.relayTarget].filter(Boolean).join(" · ") || "—";
   return `${route} · ${tr("connectionViaRelay", { relay })}`;
 }
-function sessionStateLabel(state: string) { const names: Record<string, { zh: string; en: string; de: string }> = { connecting: { zh: "连接中", en: "Connecting", de: "Verbindung wird hergestellt" }, authenticating: { zh: "认证中", en: "Authenticating", de: "Authentifizierung" }, syncing: { zh: "同步中", en: "Syncing", de: "Synchronisierung" }, connected: { zh: "已连接", en: "Connected", de: "Verbunden" }, interrupted: { zh: "已中断", en: "Interrupted", de: "Unterbrochen" }, reconnecting: { zh: "重连中", en: "Reconnecting", de: "Wiederverbindung" }, disconnecting: { zh: "断开中", en: "Disconnecting", de: "Wird getrennt" }, failed: { zh: "失败", en: "Failed", de: "Fehlgeschlagen" }, idle: { zh: "空闲", en: "Idle", de: "Inaktiv" } }; return names[state]?.[language.value] ?? state; }
+function sessionStateLabel(state: string) { const names: Record<string, { zh: string; en: string; de: string }> = { connecting: { zh: "连接中", en: "Connecting", de: "Verbindung wird hergestellt" }, authenticating: { zh: "认证中", en: "Authenticating", de: "Authentifizierung" }, syncing: { zh: "同步中", en: "Syncing", de: "Synchronisierung" }, connected: { zh: "已连接", en: "Connected", de: "Verbunden" }, interrupted: { zh: "已中断", en: "Interrupted", de: "Unterbrochen" }, reconnecting: { zh: "重连中", en: "Reconnecting", de: "Wiederverbindung" }, disconnecting: { zh: "断开中", en: "Disconnecting", de: "Wird getrennt" }, failed: { zh: "失败", en: "Failed", de: "Fehlgeschlagen" }, idle: { zh: "空闲", en: "Idle", de: "Inaktiv" } }; const locale = language.value === "zh" ? "zh" : language.value === "de" ? "de" : "en"; return names[state]?.[locale] ?? state; }
 function inviteStatusLabel(status: ManagedInvite["status"]) { const names: Record<ManagedInvite["status"], keyof typeof copy.zh> = { active: "active", expired: "expired", exhausted: "exhausted", revoked: "revoked" }; return tr(names[status]); }
 function formatContext(context: Record<string, string | number | boolean>) { return Object.entries(context).map(([key, value]) => `${key}=${value}`).join(" · "); }
-function eventName(event: string) { if (event === "ADMIN_LOGIN_FAILED") return language.value === "zh" ? "管理员登录失败" : "Administrator login failed"; if (event === "CONNECTION_TEST_SUCCEEDED") return language.value === "zh" ? "连接测试成功" : "Connection test succeeded"; if (event === "CONNECTION_TEST_FAILED") return language.value === "zh" ? "连接测试失败" : "Connection test failed"; const names: Record<string, keyof typeof copy.zh> = { ADMIN_LOGIN_SUCCEEDED: "loginEvent", ADMIN_LOGOUT: "logoutEvent", SETTINGS_CHANGED: "settingsEvent", ADMIN_INITIALIZED: "initializedEvent", LEGACY_CONFIG_IMPORTED: "importedEvent", CONNECTION_TEST: "testEvent" }; return names[event] ? tr(names[event]) : language.value === "zh" ? "系统事件" : event.replaceAll("_", " "); }
-function errorText(code?: string) { if (code === "INVALID_PASSWORD") return tr('invalidPassword'); if (code === "INVALID_ADMIN_PASSWORD") return tr('setupPasswordShort'); if (code === "PASSWORD_CHANGE_REQUIRED") return tr('changePasswordLead'); if (code === "RATE_LIMITED") return tr('rateLimited'); if (code === "INVALID_WEBRTC_PORT_RANGE") return language.value === "zh" ? "WebRTC UDP 端口范围无效，请填写 1024–65535 且起始端口不能大于结束端口。" : language.value === "de" ? "Der WebRTC-UDP-Portbereich ist ungültig. Verwende 1024–65535; der Startport darf nicht größer als der Endport sein." : "The WebRTC UDP port range is invalid. Use 1024–65535 with the start no greater than the end."; if (code === "WEBRTC_PORT_LOCKED") return language.value === "zh" ? "WebRTC 已开启，请先关闭并保存后再修改端口范围。" : language.value === "de" ? "WebRTC ist aktiviert. Deaktiviere es und speichere zuerst, bevor du den Portbereich änderst." : "WebRTC is enabled. Turn it off and save before changing the port range."; const relayErrors: Record<string, { zh: string; en: string; de: string }> = { INVALID_RELAY_NAME: { zh: "中继名称无效或为空。", en: "The relay name is invalid or empty.", de: "Der Relay-Name ist ungültig oder leer." }, INVALID_RELAY_TARGET: { zh: "中继服务器地址无效。", en: "The relay server address is invalid.", de: "Die Relay-Serveradresse ist ungültig." }, INVALID_RELAY_TOKEN: { zh: "启用中继时必须填写令牌。", en: "A relay token is required when the relay is enabled.", de: "Beim Aktivieren des Relays ist ein Token erforderlich." } }; if (relayErrors[code || ""]) return relayErrors[code || ""][language.value]; const probe: Record<string, { zh: string; en: string; de: string }> = { INVALID_TARGET: { zh: "TeamSpeak 服务器地址格式无效。", en: "The TeamSpeak server address is invalid.", de: "Die TeamSpeak-Serveradresse ist ungültig." }, PING_UNAVAILABLE: { zh: "当前运行环境没有可用的 ICMP Ping 工具。", en: "The runtime does not provide an ICMP ping tool.", de: "In der Laufzeitumgebung ist kein ICMP-Ping-Tool verfügbar." }, HOST_NOT_FOUND: { zh: "找不到服务器主机名。", en: "The server hostname could not be resolved.", de: "Der Servername konnte nicht aufgelöst werden." }, UNREACHABLE: { zh: "无法连接 TeamSpeak 服务器。", en: "The TeamSpeak server is unreachable.", de: "Der TeamSpeak-Server ist nicht erreichbar." }, TIMEOUT: { zh: "连接 TeamSpeak 超时。", en: "The TeamSpeak connection timed out.", de: "Die Verbindung zu TeamSpeak ist abgelaufen." }, PROTOCOL_NEGOTIATION_FAILED: { zh: "无法识别 TeamSpeak 协议。", en: "TeamSpeak protocol negotiation failed.", de: "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen." }, SERVER_REJECTED: { zh: "TeamSpeak 服务器拒绝了连接。", en: "The TeamSpeak server rejected the connection.", de: "Der TeamSpeak-Server hat die Verbindung abgelehnt." }, TARGET_NOT_ALLOWED: { zh: "此地址不允许在开放模式中使用。", en: "This target is not allowed in open mode.", de: "Dieses Ziel ist im offenen Modus nicht erlaubt." } }; return probe[code || ""]?.[language.value] ?? tr('requestFailed'); }
+function eventName(event: string) { if (event === "ADMIN_LOGIN_FAILED") return language.value === "zh" ? "管理员登录失败" : language.value === "ru" ? "Ошибка входа администратора" : language.value === "ja" ? "管理者ログイン失敗" : language.value === "de" ? "Administrator-Anmeldung fehlgeschlagen" : "Administrator login failed"; if (event === "CONNECTION_TEST_SUCCEEDED") return language.value === "zh" ? "连接测试成功" : language.value === "ru" ? "Проверка подключения успешна" : language.value === "ja" ? "接続テスト成功" : language.value === "de" ? "Verbindungstest erfolgreich" : "Connection test succeeded"; if (event === "CONNECTION_TEST_FAILED") return language.value === "zh" ? "连接测试失败" : language.value === "ru" ? "Проверка подключения не удалась" : language.value === "ja" ? "接続テスト失敗" : language.value === "de" ? "Verbindungstest fehlgeschlagen" : "Connection test failed"; const names: Record<string, keyof typeof copy.zh> = { ADMIN_LOGIN_SUCCEEDED: "loginEvent", ADMIN_LOGOUT: "logoutEvent", SETTINGS_CHANGED: "settingsEvent", ADMIN_INITIALIZED: "initializedEvent", LEGACY_CONFIG_IMPORTED: "importedEvent", CONNECTION_TEST: "testEvent" }; return names[event] ? tr(names[event]) : language.value === "zh" ? "系统事件" : event.replaceAll("_", " "); }
+function errorText(code?: string) {
+  if (code === "INVALID_PASSWORD") return tr('invalidPassword');
+  if (code === "INVALID_ADMIN_PASSWORD") return tr('setupPasswordShort');
+  if (code === "PASSWORD_CHANGE_REQUIRED") return tr('changePasswordLead');
+  if (code === "RATE_LIMITED") return tr('rateLimited');
+  if (code === "INVALID_WEBRTC_PORT_RANGE") {
+    if (language.value === "zh") return "WebRTC UDP 端口范围无效，请填写 1024–65535 且起始端口不能大于结束端口。";
+    if (language.value === "de") return "Der WebRTC-UDP-Portbereich ist ungültig. Verwende 1024–65535; der Startport darf nicht größer als der Endport sein.";
+    if (language.value === "ru") return "Диапазон UDP-портов WebRTC некорректен. Используйте 1024–65535; начальный порт не может быть больше конечного.";
+    if (language.value === "ja") return "WebRTC UDP ポート範囲が正しくありません。1024–65535 の範囲で、開始ポートを終了ポート以下にしてください。";
+    return "The WebRTC UDP port range is invalid. Use 1024–65535 with the start no greater than the end.";
+  }
+  if (code === "WEBRTC_PORT_LOCKED") {
+    if (language.value === "zh") return "WebRTC 已开启，请先关闭并保存后再修改端口范围。";
+    if (language.value === "de") return "WebRTC ist aktiviert. Deaktiviere es und speichere zuerst, bevor du den Portbereich änderst.";
+    if (language.value === "ru") return "WebRTC включён. Сначала отключите его и сохраните настройки, затем изменяйте диапазон портов.";
+    if (language.value === "ja") return "WebRTC が有効です。ポート範囲を変更する前に無効にして保存してください。";
+    return "WebRTC is enabled. Turn it off and save before changing the port range.";
+  }
+  const locale = language.value === "zh" ? "zh" : language.value === "de" ? "de" : "en";
+  const relayErrors: Record<string, { zh: string; en: string; de: string }> = {
+    INVALID_RELAY_NAME: { zh: "中继名称无效或为空。", en: "The relay name is invalid or empty.", de: "Der Relay-Name ist ungültig oder leer." },
+    INVALID_RELAY_TARGET: { zh: "中继服务器地址无效。", en: "The relay server address is invalid.", de: "Die Relay-Serveradresse ist ungültig." },
+    INVALID_RELAY_TOKEN: { zh: "启用中继时必须填写令牌。", en: "A relay token is required when the relay is enabled.", de: "Beim Aktivieren des Relays ist ein Token erforderlich." },
+  };
+  if (relayErrors[code || ""]) return relayErrors[code || ""][locale];
+  const probe: Record<string, { zh: string; en: string; de: string }> = {
+    INVALID_TARGET: { zh: "TeamSpeak 服务器地址格式无效。", en: "The TeamSpeak server address is invalid.", de: "Die TeamSpeak-Serveradresse ist ungültig." },
+    PING_UNAVAILABLE: { zh: "当前运行环境没有可用的 ICMP Ping 工具。", en: "The runtime does not provide an ICMP ping tool.", de: "In der Laufzeitumgebung ist kein ICMP-Ping-Tool verfügbar." },
+    HOST_NOT_FOUND: { zh: "找不到服务器主机名。", en: "The server hostname could not be resolved.", de: "Der Servername konnte nicht aufgelöst werden." },
+    UNREACHABLE: { zh: "无法连接 TeamSpeak 服务器。", en: "The TeamSpeak server is unreachable.", de: "Der TeamSpeak-Server ist nicht erreichbar." },
+    TIMEOUT: { zh: "连接 TeamSpeak 超时。", en: "The TeamSpeak connection timed out.", de: "Die Verbindung zu TeamSpeak ist abgelaufen." },
+    PROTOCOL_NEGOTIATION_FAILED: { zh: "无法识别 TeamSpeak 协议。", en: "TeamSpeak protocol negotiation failed.", de: "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen." },
+    SERVER_REJECTED: { zh: "TeamSpeak 服务器拒绝了连接。", en: "The TeamSpeak server rejected the connection.", de: "Der TeamSpeak-Server hat die Verbindung abgelehnt." },
+    TARGET_NOT_ALLOWED: { zh: "此地址不允许在开放模式中使用。", en: "This target is not allowed in open mode.", de: "Dieses Ziel ist im offenen Modus nicht erlaubt." },
+  };
+  return probe[code || ""]?.[locale] ?? tr('requestFailed');
+}
 
 function connectionFailureText(code?: string) {
   const names: Record<string, keyof typeof copy.zh> = {
@@ -933,6 +1245,13 @@ async function parseResponse(response: Response) { const value = await response.
 .relay-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .relay-fields .password-row{grid-column:1 / -1}
 .relay-card .field-help{line-height:1.55}
+.welcome-editor{display:grid;gap:10px;padding:12px;background:#f6f9f8;border:1px solid #e4efeb;border-radius:10px}
+.welcome-editor-heading{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,1fr);align-items:end;gap:12px}
+.welcome-editor-heading label{min-width:0}
+.welcome-editor-heading>small{margin:0;color:#899792;font-size:10px;line-height:1.5}
+.welcome-editor select{width:100%;height:40px;padding:0 10px;color:#22332f;background:#fbfdfc;border:1px solid #dbe7e3;border-radius:9px;font:inherit;font-size:12px;outline:none}
+.welcome-editor select:focus{border-color:#54bdb2;box-shadow:0 0 0 3px rgba(84,189,178,.13)}
+.welcome-editor textarea{background:#fff}
 .webrtc-port-fields{display:grid;gap:10px;padding:14px;background:#f6f9f8;border:1px solid #e4efeb;border-radius:10px}
 .port-fields-heading strong,.port-fields-heading small{display:block}
 .port-fields-heading strong{font-size:11px}
@@ -949,10 +1268,14 @@ async function parseResponse(response: Response) { const value = await response.
 :global(html[data-theme="dark"] .webrtc-port-fields){background:#202f2c;border-color:#30413d}
 :global(html[data-theme="dark"] .port-fields-heading small){color:#9bb0aa}
 :global(html[data-theme="dark"] .port-inputs input:disabled){color:#9bb0aa;background:#263a35;border-color:#3a514b}
+:global(html[data-theme="dark"] .welcome-editor){background:#202f2c;border-color:#30413d}
+:global(html[data-theme="dark"] .welcome-editor select),:global(html[data-theme="dark"] .welcome-editor textarea){color:#e8f3f0;background:#172321;border-color:#30413d}
+:global(html[data-theme="dark"] .welcome-editor-heading>small){color:#9bb0aa}
 :global(html[data-theme="dark"] .modal-card){color:#e8f3f0;background:#172321;border-color:#30413d}
 :global(html[data-theme="dark"] .modal-card p){color:#9bb0aa}
 @media(max-width:850px){.relay-card{grid-column:auto}.relay-fields{grid-template-columns:1fr}.relay-fields .password-row{grid-column:auto}}
 @media(max-width:520px){.advanced-card{grid-column:auto}.port-inputs{grid-template-columns:1fr}}
+@media(max-width:520px){.welcome-editor-heading{grid-template-columns:1fr;gap:6px}}
 
 /* Server settings are a short form, not a set of independent data feeds.
    Let each card keep its natural height so a few extra pixels do not create

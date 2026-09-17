@@ -1,6 +1,6 @@
 # WebSpeak · English
 
-[Project home](../README.md) · [简体中文](./README.zh-CN.md) · [Deutsch](./README.de.md)
+[Project home](../README.md) · [简体中文](./README.zh-CN.md) · [Deutsch](./README.de.md) · [Русский](./README.ru.md) · [日本語](./README.ja.md)
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
@@ -23,7 +23,7 @@ The public demo is hosted in Hong Kong and its network conditions and load may b
 | Desktop accompaniment | Select an audio-enabled window or browser tab and share its sound with the current channel. |
 | Identity and access | Remembered identity, visitor-defined targets, and revocable expiring invite links. |
 | Administration | Manage targets, access policy, WebRTC, relays, invites, sessions, logs, diagnostics, and backups. |
-| User experience | Chinese, English, and German UI, light/dark themes, and responsive desktop/mobile layouts. |
+| User experience | Chinese, English, German, Russian, and Japanese UI, light/dark themes, and responsive desktop/mobile layouts. |
 | Self-hosting | Data stays with the operator; Docker, Windows x64, and Linux x64 deployment options are provided. |
 
 ## 🖼️ Screenshots
@@ -222,4 +222,3 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain.
 | Accompaniment | Desktop only and requires WebRTC. Enable audio sharing when selecting a window or tab. |
 | Data | Docker data is in `webspeak-data`; release packages and source installs use `data/`. Back up before upgrades. |
 | Session limit | One instance accepts up to 100 active browser sessions. |
-

@@ -6,13 +6,16 @@ import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE } from "../server/webrtc-config.js";
 
-export const DATABASE_SCHEMA_VERSION = 6;
+export const DATABASE_SCHEMA_VERSION = 7;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
   siteName: string;
   welcomeText: string;
   welcomeTextEn: string;
+  welcomeTextDe: string;
+  welcomeTextRu: string;
+  welcomeTextJa: string;
   accessMode: AccessMode;
   tsHost: string;
   tsPort: number;
@@ -37,6 +40,9 @@ export interface SettingsUpdate {
   siteName: string;
   welcomeText: string;
   welcomeTextEn?: string;
+  welcomeTextDe?: string;
+  welcomeTextRu?: string;
+  welcomeTextJa?: string;
   accessMode: AccessMode;
   tsHost: string;
   tsPort: number;
@@ -95,6 +101,9 @@ interface SettingsRow extends Record<string, unknown> {
   site_name: string;
   welcome_text: string;
   welcome_text_en: string;
+  welcome_text_de: string;
+  welcome_text_ru: string;
+  welcome_text_ja: string;
   access_mode: string;
   ts_host: string;
   ts_port: number;
@@ -187,6 +196,9 @@ export class WebSpeakDatabase {
       siteName: row.site_name,
       welcomeText: row.welcome_text,
       welcomeTextEn: row.welcome_text_en,
+      welcomeTextDe: row.welcome_text_de,
+      welcomeTextRu: row.welcome_text_ru,
+      welcomeTextJa: row.welcome_text_ja,
       accessMode: row.access_mode === "open" ? "open" : "fixed",
       tsHost: row.ts_host,
       tsPort: row.ts_port,
@@ -534,13 +546,24 @@ export class WebSpeakDatabase {
         }
         this.database.exec("PRAGMA user_version = 6");
       });
+      version = 6;
+    }
+    if (version === 6) {
+      this.transaction(() => {
+        this.database.exec(`
+          ALTER TABLE settings ADD COLUMN welcome_text_de TEXT NOT NULL DEFAULT '';
+          ALTER TABLE settings ADD COLUMN welcome_text_ru TEXT NOT NULL DEFAULT '';
+          ALTER TABLE settings ADD COLUMN welcome_text_ja TEXT NOT NULL DEFAULT '';
+        `);
+        this.database.exec("PRAGMA user_version = 7");
+      });
     }
   }
 
   private writeSettings(settings: SettingsUpdate, now: string): void {
     this.database.prepare(
       `UPDATE settings SET
-         site_name = ?, welcome_text = ?, welcome_text_en = ?, access_mode = ?, ts_host = ?, ts_port = ?,
+         site_name = ?, welcome_text = ?, welcome_text_en = ?, welcome_text_de = ?, welcome_text_ru = ?, welcome_text_ja = ?, access_mode = ?, ts_host = ?, ts_port = ?,
          ts_password_encrypted = ?, webrtc_enabled = ?, webrtc_udp_start = ?,
          webrtc_udp_end = ?, relay_configured = ?, relay_enabled = ?, relay_name = ?,
          relay_host = ?, relay_port = ?, relay_token_encrypted = ?, updated_at = ?
@@ -549,6 +572,9 @@ export class WebSpeakDatabase {
       settings.siteName,
       settings.welcomeText,
       settings.welcomeTextEn ?? "",
+      settings.welcomeTextDe ?? "",
+      settings.welcomeTextRu ?? "",
+      settings.welcomeTextJa ?? "",
       settings.accessMode,
       settings.tsHost,
       settings.tsPort,

@@ -1,6 +1,6 @@
 # WebSpeak · 简体中文
 
-[返回项目首页](../README.md) · [English](./README.en.md) · [Deutsch](./README.de.md)
+[返回项目首页](../README.md) · [English](./README.en.md) · [Deutsch](./README.de.md) · [Русский](./README.ru.md) · [日本語](./README.ja.md)
 
 WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户无需安装桌面客户端即可从浏览器加入频道，管理员可以在控制台管理目标服务器、访问方式和运行状态。
 
@@ -23,7 +23,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 | 桌面端伴奏 | 在桌面浏览器选择带音频的窗口或标签页，将声音分享给当前频道。 |
 | 身份与访问 | 支持身份保持、访客自定义目标和可撤销、可过期的邀请链接。 |
 | 管理控制台 | 管理目标、访问策略、WebRTC、中继、邀请、会话、日志、诊断和备份。 |
-| 界面体验 | 提供中文、English、Deutsch、浅色/深色主题及响应式桌面/移动布局。 |
+| 界面体验 | 提供中文、English、Deutsch、Русский、日本語、浅色/深色主题及响应式桌面/移动布局。 |
 | 自托管 | 数据由部署者保存，提供 Docker、Windows x64 和 Linux x64 方案。 |
 
 ## 🖼️ 界面截图
@@ -222,4 +222,3 @@ npm start
 | 伴奏 | 仅桌面端提供且要求 WebRTC；选择窗口或标签页时还要勾选共享音频。 |
 | 数据 | Docker 数据在 `webspeak-data` volume；发布包和源码运行数据在 `data/`。升级前建议备份。 |
 | 会话上限 | 单实例最多允许 100 个活动网页会话。 |
-

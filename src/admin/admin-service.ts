@@ -11,6 +11,7 @@ import { pingTeamSpeakHost } from "../server/network-probe.js";
 import type { WebRtcAudioOptions } from "../server/webrtc-audio.js";
 import { DEFAULT_ACCELERATION_RELAY_PORT, type ConfiguredAccelerationRelay } from "../server/acceleration-relay.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_MAX, WEBRTC_UDP_PORT_MIN } from "../server/webrtc-config.js";
+import { DEFAULT_WELCOME_TEXTS, resolveWelcomeTexts } from "../site-copy.js";
 
 export interface AdminSettingsInput {
   target: string;
@@ -20,6 +21,9 @@ export interface AdminSettingsInput {
   siteName: string;
   welcomeText: string;
   welcomeTextEn?: string;
+  welcomeTextDe?: string;
+  welcomeTextRu?: string;
+  welcomeTextJa?: string;
   webRtcEnabled: boolean;
   webRtcUdpStart?: number;
   webRtcUdpEnd?: number;
@@ -111,12 +115,22 @@ export class AdminService {
 
   getPublicConfig(): Record<string, unknown> {
     const settings = this.database.getSettings();
+    const welcomeTexts = resolveWelcomeTexts({
+      zh: settings.welcomeText,
+      en: settings.welcomeTextEn,
+      de: settings.welcomeTextDe,
+      ru: settings.welcomeTextRu,
+      ja: settings.welcomeTextJa,
+    });
     return {
       version: this.version,
       initialized: this.isInitialized(),
       siteName: settings.siteName,
-      welcomeText: settings.welcomeText,
-      welcomeTextEn: settings.welcomeTextEn,
+      // Keep the old fields for older clients, but return the complete,
+      // already-fallback-resolved map for current clients.
+      welcomeText: welcomeTexts.zh,
+      welcomeTextEn: welcomeTexts.en,
+      welcomeTexts,
       accessMode: settings.accessMode,
       target: formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }),
     };
@@ -131,6 +145,10 @@ export class AdminService {
       siteName: settings.siteName,
       welcomeText: settings.welcomeText,
       welcomeTextEn: settings.welcomeTextEn,
+      welcomeTextDe: settings.welcomeTextDe,
+      welcomeTextRu: settings.welcomeTextRu,
+      welcomeTextJa: settings.welcomeTextJa,
+      welcomeDefaults: DEFAULT_WELCOME_TEXTS,
       lastTestAt: settings.lastTestAt,
       lastTestLatencyMs: settings.lastTestLatencyMs,
       lastTestError: settings.lastTestError,
@@ -343,9 +361,15 @@ export class AdminService {
     const siteName = input.siteName.trim();
     const welcomeText = input.welcomeText.trim();
     const welcomeTextEn = typeof input.welcomeTextEn === "string" ? input.welcomeTextEn.trim() : current.welcomeTextEn;
+    const welcomeTextDe = typeof input.welcomeTextDe === "string" ? input.welcomeTextDe.trim() : current.welcomeTextDe;
+    const welcomeTextRu = typeof input.welcomeTextRu === "string" ? input.welcomeTextRu.trim() : current.welcomeTextRu;
+    const welcomeTextJa = typeof input.welcomeTextJa === "string" ? input.welcomeTextJa.trim() : current.welcomeTextJa;
     if (!siteName || siteName.length > 80) throw new AdminInputError("INVALID_SITE_NAME", "Site name must contain 1 to 80 characters");
     if (welcomeText.length > 500) throw new AdminInputError("INVALID_WELCOME_TEXT", "Welcome text cannot exceed 500 characters");
     if (welcomeTextEn.length > 500) throw new AdminInputError("INVALID_WELCOME_TEXT_EN", "English welcome text cannot exceed 500 characters");
+    if (welcomeTextDe.length > 500) throw new AdminInputError("INVALID_WELCOME_TEXT_DE", "German welcome text cannot exceed 500 characters");
+    if (welcomeTextRu.length > 500) throw new AdminInputError("INVALID_WELCOME_TEXT_RU", "Russian welcome text cannot exceed 500 characters");
+    if (welcomeTextJa.length > 500) throw new AdminInputError("INVALID_WELCOME_TEXT_JA", "Japanese welcome text cannot exceed 500 characters");
     if (input.accessMode !== "fixed" && input.accessMode !== "open") {
       throw new AdminInputError("INVALID_ACCESS_MODE", "Access mode is invalid");
     }
@@ -424,6 +448,9 @@ export class AdminService {
       siteName,
       welcomeText,
       welcomeTextEn,
+      welcomeTextDe,
+      welcomeTextRu,
+      welcomeTextJa,
       accessMode: input.accessMode,
       tsHost: target.host,
       tsPort: target.port,
@@ -538,6 +565,9 @@ export class AdminService {
       siteName: settings.siteName,
       welcomeText: settings.welcomeText,
       welcomeTextEn: settings.welcomeTextEn,
+      welcomeTextDe: settings.welcomeTextDe,
+      welcomeTextRu: settings.welcomeTextRu,
+      welcomeTextJa: settings.welcomeTextJa,
       accessMode: settings.accessMode,
       tsHost: settings.tsHost,
       tsPort: settings.tsPort,
@@ -563,6 +593,9 @@ export class AdminService {
         siteName: current.siteName,
         welcomeText: current.welcomeText,
         welcomeTextEn: current.welcomeTextEn,
+        welcomeTextDe: current.welcomeTextDe,
+        welcomeTextRu: current.welcomeTextRu,
+        welcomeTextJa: current.welcomeTextJa,
         accessMode: current.accessMode,
         tsHost: legacy.tsHost,
         tsPort: legacy.tsPort,

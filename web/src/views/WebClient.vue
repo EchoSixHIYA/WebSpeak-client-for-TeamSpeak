@@ -397,6 +397,9 @@ const initialized = ref(false);
 const siteName = ref("WebSpeak");
 const welcomeTextZh = ref("");
 const welcomeTextEn = ref("");
+const welcomeTextDe = ref("");
+const welcomeTextRu = ref("");
+const welcomeTextJa = ref("");
 const appVersion = ref("0.2.1");
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
@@ -435,12 +438,21 @@ let performanceTimer: number | null = null;
 let performanceMonitorGeneration = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-type Language = "zh" | "en" | "de";
+type Language = "zh" | "en" | "de" | "ru" | "ja";
 const language = ref<Language>(getInitialLanguage());
 const themeMode = ref<ThemeMode>(getStoredTheme());
 const themeIcon = computed(() => isDarkTheme(themeMode.value) ? "sun" : "moon");
 const themeLabel = computed(() => isDarkTheme(themeMode.value) ? t("switchToLightTheme") : t("switchToDarkTheme"));
-const localizedWelcomeText = computed(() => (language.value === "en" ? welcomeTextEn.value : welcomeTextZh.value) || t("joinDescription"));
+const localizedWelcomeText = computed(() => {
+  const customText = {
+    zh: welcomeTextZh.value,
+    en: welcomeTextEn.value,
+    de: welcomeTextDe.value,
+    ru: welcomeTextRu.value,
+    ja: welcomeTextJa.value,
+  }[language.value];
+  return customText || t("joinDescription");
+});
 applyTheme(themeMode.value);
 const translations: Record<string, Record<string, string>> = {
   zh: {
@@ -1272,7 +1284,139 @@ translations.de = {
     measureComplete: "Laufende Messung (alle 3 Sekunden)",
     measureNow: "Jetzt messen",
     measureUnavailable: "Nach der Verbindung verfügbar",
-    langSwitch: "中文",
+  langSwitch: "中文",
+};
+
+translations.ru = {
+  ...translations.en,
+  themeSystem: "Системная тема",
+  themeLight: "Светлая тема",
+  themeDark: "Тёмная тема",
+  switchToLightTheme: "Включить светлую тему",
+  switchToDarkTheme: "Включить тёмную тему",
+  browserWorkspace: "Голосовое пространство в браузере",
+  secureGateway: "Безопасный голосовой шлюз",
+  adminConsole: "Панель администратора",
+  currentVersion: "Текущая версия",
+  errorCode: "Код ошибки",
+  viewChangelog: "Открыть журнал изменений",
+  notConfigured: "Цель TeamSpeak ещё не настроена в WebSpeak.",
+  configureNow: "Открыть панель администратора",
+  privateAudio: "Приватное голосовое сообщество",
+  joinLine1: "Подключитесь к серверу,",
+  joinLine2: "и начните общение.",
+  joinDescription: "Клиент TeamSpeak устанавливать не нужно. Откройте браузер и присоединитесь к голосовому каналу с низкой задержкой.",
+  highQuality: "Качественный звук",
+  opusAudio: "Передача Opus с низкой задержкой",
+  secureJoin: "Безопасное подключение",
+  inviteProtected: "Сервер защищён ссылкой-приглашением",
+  realtime: "Синхронизация в реальном времени",
+  membersSync: "Участники каналов всегда синхронизированы",
+  privateServer: "Приватный голосовой сервер",
+  joinServer: "Войти на сервер",
+  welcomeBack: "С возвращением",
+  joinLead: "Выберите имя и канал для входа.",
+  serverAddress: "Адрес сервера TeamSpeak",
+  serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
+  serverPort: "Голосовой порт",
+  serverPortPlaceholder: "9987",
+  serverAddressHint: "Это адрес и порт TeamSpeak, к которым обращается шлюз, а не прямое подключение браузера.",
+  relayAcceleration: "Подключение через ретранслятор",
+  directConnection: "Прямое подключение к TeamSpeak",
+  relayAccelerationHint: "Выберите настроенный ретранслятор, если прямой маршрут нестабилен или заблокирован.",
+  nickname: "Ваше имя",
+  nicknamePlaceholder: "например, Alex Rivera",
+  targetChannel: "Целевой канал",
+  optional: "необязательно",
+  emptyDefault: "Оставьте пустым для канала по умолчанию",
+  rememberIdentity: "Запомнить личность TeamSpeak на этом устройстве",
+  rememberIdentityHint: "Хранится только на этом устройстве и используется при следующем подключении.",
+  rememberIdentityConcurrentWarning: "Одна личность может использоваться только одним подключением в этом браузере. Для второго подключения отключите эту опцию или используйте другой браузер.",
+  deviceIdentityOptions: "Настройки личности устройства",
+  enterVoiceSpace: "Войти в голосовое пространство",
+  connectionDetailsPrivate: "Данные подключения используются только для этой голосовой сессии",
+  recentServers: "Недавние серверы",
+  saveFavorite: "Сохранить в избранное",
+  savedFavoriteToast: "Сервер сохранён в избранное",
+  removedFavoriteToast: "Сервер удалён из избранного",
+  clearLocalData: "Очистить локальные данные",
+  clearLocalDataConfirm: "Удалить сохранённое имя, настройки и личность с этого устройства?",
+  localDataCleared: "Локальные данные очищены",
+  languageMenu: "Язык",
+  networkPerformance: "Сетевая производительность",
+  networkPerformanceHint: "Непрерывные измерения от браузера через WebSpeak к TeamSpeak",
+  packetLoss: "Потери пакетов",
+  measuring: "Измерение…",
+  measureComplete: "Мониторинг продолжается (обновление каждые 3 секунды)",
+  measureNow: "Измерить сейчас",
+  measureUnavailable: "Доступно после подключения",
+  langSwitch: "中文",
+};
+
+translations.ja = {
+  ...translations.en,
+  themeSystem: "システム設定",
+  themeLight: "ライトテーマ",
+  themeDark: "ダークテーマ",
+  switchToLightTheme: "ライトテーマに切り替え",
+  switchToDarkTheme: "ダークテーマに切り替え",
+  browserWorkspace: "ブラウザ音声ワークスペース",
+  secureGateway: "安全な音声ゲートウェイ",
+  adminConsole: "管理コンソール",
+  currentVersion: "現在のバージョン",
+  errorCode: "エラーコード",
+  viewChangelog: "更新履歴を見る",
+  notConfigured: "WebSpeak の TeamSpeak 接続先がまだ設定されていません。",
+  configureNow: "管理コンソールを開く",
+  privateAudio: "プライベートコミュニティ音声",
+  joinLine1: "サーバーに接続して、",
+  joinLine2: "すぐに会話を始めよう。",
+  joinDescription: "TeamSpeak クライアントのインストールは不要です。ブラウザから低遅延の音声チャンネルに参加できます。",
+  highQuality: "高品質な音声",
+  opusAudio: "低遅延 Opus 転送",
+  secureJoin: "安全に参加",
+  inviteProtected: "招待リンクでサーバーを保護",
+  realtime: "リアルタイムの同期",
+  membersSync: "チャンネルメンバーを常に同期",
+  privateServer: "プライベート音声サーバー",
+  joinServer: "サーバーに参加",
+  welcomeBack: "おかえりなさい",
+  joinLead: "名前と参加するチャンネルを選択してください。",
+  serverAddress: "TeamSpeak サーバーアドレス",
+  serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
+  serverPort: "音声ポート",
+  serverPortPlaceholder: "9987",
+  serverAddressHint: "ゲートウェイが接続する TeamSpeak のアドレスとポートです。ブラウザからの直接接続先ではありません。",
+  relayAcceleration: "中継接続",
+  directConnection: "TeamSpeak へ直接接続",
+  relayAccelerationHint: "直接接続が不安定またはブロックされている場合は、設定済みの中継を選択してください。",
+  nickname: "ニックネーム",
+  nicknamePlaceholder: "例: Alex Rivera",
+  targetChannel: "参加先チャンネル",
+  optional: "任意",
+  emptyDefault: "空欄にするとデフォルトチャンネルを使用します",
+  rememberIdentity: "この端末に TeamSpeak ID を保存",
+  rememberIdentityHint: "この端末だけに保存し、次回の接続で再利用します。",
+  rememberIdentityConcurrentWarning: "同じブラウザでは、この ID を同時に1接続だけ使用できます。2つ目の接続では無効にするか、別のブラウザを使ってください。",
+  deviceIdentityOptions: "端末 ID の設定",
+  enterVoiceSpace: "音声スペースに参加",
+  connectionDetailsPrivate: "接続情報は今回の音声セッションでのみ使用されます",
+  recentServers: "最近のサーバー",
+  saveFavorite: "お気に入りに保存",
+  savedFavoriteToast: "サーバーをお気に入りに保存しました",
+  removedFavoriteToast: "お気に入りから削除しました",
+  clearLocalData: "ローカルデータを消去",
+  clearLocalDataConfirm: "この端末に保存された名前、設定、IDを削除しますか？",
+  localDataCleared: "ローカルデータを消去しました",
+  languageMenu: "言語",
+  networkPerformance: "ネットワーク性能",
+  networkPerformanceHint: "ブラウザから WebSpeak を経由して TeamSpeak まで継続測定",
+  packetLoss: "パケット損失",
+  measuring: "測定中…",
+  measureComplete: "継続監視中（3秒ごとに更新）",
+  measureNow: "今すぐ測定",
+  measureUnavailable: "接続後に利用できます",
+  langSwitch: "中文",
 };
 
 function initialServerTarget() {
@@ -1285,9 +1429,11 @@ function initialServerTarget() {
 
 function getInitialLanguage(): Language {
   const stored = localStorage.getItem("webspeak:language");
-  if (stored === "zh" || stored === "en" || stored === "de") return stored;
+  if (stored === "zh" || stored === "en" || stored === "de" || stored === "ru" || stored === "ja") return stored;
   if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh")) return "zh";
   if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("de")) return "de";
+  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ru")) return "ru";
+  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ja")) return "ja";
   return "en";
 }
 
@@ -1305,12 +1451,34 @@ function processingStateLabel(value: boolean | null) {
 
 function localizedMessage(message: string) {
   if (language.value === "zh") return message;
+  const localizedExact: Record<string, string> = language.value === "ru" ? {
+    "该服务器需要密码，请输入密码后重试": "Для этого сервера требуется пароль. Введите его и повторите попытку",
+    "服务器密码错误，请重新输入": "Неверный пароль сервера. Введите его ещё раз",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Длина имени не соответствует требованиям TeamSpeak (не менее 3 символов). Измените имя и повторите попытку",
+    "TeamSpeak 服务器地址无效": "Неверный адрес сервера TeamSpeak",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "Не удалось найти сервер TeamSpeak. Проверьте адрес",
+    "无法到达 TeamSpeak 服务器，请检查网络或地址": "Сервер TeamSpeak недоступен. Проверьте сеть или адрес",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Сервер TeamSpeak отклонил подключение. Проверьте порт и состояние службы",
+    "连接 TeamSpeak 超时，请检查网络或服务器状态": "Истекло время подключения к TeamSpeak. Проверьте сеть и состояние сервера",
+  } : {
+    "该服务器需要密码，请输入密码后重试": "このサーバーにはパスワードが必要です。入力して再試行してください",
+    "服务器密码错误，请重新输入": "サーバーパスワードが正しくありません。もう一度入力してください",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "ニックネームの長さが TeamSpeak の要件を満たしていません（3文字以上）。変更して再試行してください",
+    "TeamSpeak 服务器地址无效": "TeamSpeak サーバーアドレスが正しくありません",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "TeamSpeak サーバーが見つかりません。アドレスを確認してください",
+    "无法到达 TeamSpeak 服务器，请检查网络或地址": "TeamSpeak サーバーに到達できません。ネットワークまたはアドレスを確認してください",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "TeamSpeak サーバーが接続を拒否しました。ポートとサービスの状態を確認してください",
+    "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
+  };
+  if (localizedExact[message]) return localizedExact[message];
   const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
   if (errorCodeMatch) {
     const code = errorCodeMatch[1];
     const detail = errorCodeMatch[2] ? `: ${errorCodeMatch[2]}` : "";
     const operation = message.startsWith("操作失败");
     if (language.value === "de") return `${operation ? "Vorgang" : "TeamSpeak-Verbindung"} fehlgeschlagen (Fehlercode: ${code})${detail}. Prüfe Eingaben, Netzwerk und Serverstatus`;
+    if (language.value === "ru") return `${operation ? "Операция" : "Подключение TeamSpeak"} не выполнена (код ошибки: ${code})${detail}. Проверьте ввод, сеть и состояние сервера`;
+    if (language.value === "ja") return `${operation ? "操作" : "TeamSpeak 接続"}に失敗しました（エラーコード: ${code}）${detail}。入力、ネットワーク、サーバーの状態を確認してください`;
     return `${operation ? "Operation" : "TeamSpeak connection"} failed (error code: ${code})${detail}. Check your input, network, and server status`;
   }
   const exact: Record<string, string> = {
@@ -1391,9 +1559,19 @@ function localizedMessage(message: string) {
     "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "The TeamSpeak server could not finish initialising the connection. Check the address and port, or try again shortly",
     "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "The TeamSpeak server rejected the parameters, usually because the nickname length or format is invalid",
   };
-  if (language.value !== "de" && exact[message]) return exact[message];
-  if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
-  if (message.startsWith("切换失败：")) return `Channel switch failed: ${message.slice(5)}`;
+  if (language.value === "en" && exact[message]) return exact[message];
+  if (message.startsWith("麦克风访问失败：")) {
+    const detail = message.slice(8);
+    if (language.value === "ru") return `Не удалось получить доступ к микрофону: ${detail}`;
+    if (language.value === "ja") return `マイクへのアクセスに失敗しました: ${detail}`;
+    return language.value === "de" ? `Mikrofonzugriff fehlgeschlagen: ${detail}` : `Microphone access failed: ${detail}`;
+  }
+  if (message.startsWith("切换失败：")) {
+    const detail = message.slice(5);
+    if (language.value === "ru") return `Не удалось переключить канал: ${detail}`;
+    if (language.value === "ja") return `チャンネルの切り替えに失敗しました: ${detail}`;
+    return language.value === "de" ? `Kanalwechsel fehlgeschlagen: ${detail}` : `Channel switch failed: ${detail}`;
+  }
   if (language.value === "de") {
     const german: Record<string, string> = {
       "语音功能需要 HTTPS 安全连接": "Für Sprachfunktionen ist eine sichere HTTPS-Verbindung erforderlich",
@@ -1472,35 +1650,48 @@ function localizedMessage(message: string) {
     if (message.startsWith("麦克风声音未能发送：")) return `Mikrofon-Audio konnte nicht gesendet werden: ${message.slice(10)}`;
     if (message.startsWith("音频链路异常")) return message.replace("音频链路异常", "Audioverbindung fehlerhaft");
   }
-  return message;
+  if (language.value === "ru") return exact[message] ?? "Не удалось выполнить операцию. Проверьте ввод, сеть и состояние сервера";
+  if (language.value === "ja") return exact[message] ?? "操作に失敗しました。入力、ネットワーク、サーバーの状態を確認してください";
+  return exact[message] ?? message;
 }
 
 function localizedAudioNotice(code: string, message: string) {
   if (language.value === "zh") return message;
   const normalizedCode = visibleErrorCode(code || "AUDIO_NOTICE");
-  const messages: Record<string, { en: string; de: string }> = {
+  const messages: Record<string, { en: string; de: string; ru: string; ja: string }> = {
     WEBRTC_FALLBACK: {
       en: `WebRTC realtime voice is unavailable (error code: ${normalizedCode}). Compatibility transport is active; latency and audio quality may be lower`,
       de: `Echtzeitstimme über WebRTC ist nicht verfügbar (Fehlercode: ${normalizedCode}). Der Kompatibilitätstransport ist aktiv; Latenz und Audioqualität können schlechter sein`,
+      ru: `Голосовая связь WebRTC недоступна (код ошибки: ${normalizedCode}). Используется совместимый транспорт; задержка и качество звука могут быть ниже`,
+      ja: `WebRTC のリアルタイム音声は利用できません（エラーコード: ${normalizedCode}）。互換トランスポートを使用するため、遅延や音質が低下する場合があります`,
     },
     PLAYBACK_BLOCKED: {
       en: "The browser blocked automatic audio playback. Click the page or allow audio playback for this site",
       de: "Der Browser hat die automatische Audiowiedergabe blockiert. Klicke auf die Seite oder erlaube die Audiowiedergabe für diese Website",
+      ru: "Браузер заблокировал автоматическое воспроизведение. Нажмите на страницу или разрешите воспроизведение для этого сайта",
+      ja: "ブラウザが自動再生をブロックしました。ページをクリックするか、このサイトの再生を許可してください",
     },
     DEVICE_LIST_UNAVAILABLE: {
       en: "Audio devices could not be listed. The browser default devices will be used",
       de: "Audiogeräte konnten nicht aufgelistet werden. Die Standardgeräte des Browsers werden verwendet",
+      ru: "Не удалось получить список аудиоустройств. Будут использованы устройства браузера по умолчанию",
+      ja: "オーディオデバイスを一覧表示できません。ブラウザのデフォルトデバイスを使用します",
     },
     AUDIO_CONTEXT_SUSPENDED: {
       en: "Browser audio processing is paused. Click the page once to resume microphone and speaker audio",
       de: "Die Audioverarbeitung des Browsers ist pausiert. Klicke einmal auf die Seite, um Mikrofon und Lautsprecher fortzusetzen",
+      ru: "Обработка звука браузером приостановлена. Нажмите на страницу, чтобы возобновить работу микрофона и динамиков",
+      ja: "ブラウザの音声処理が一時停止しています。ページを一度クリックしてマイクとスピーカーを再開してください",
     },
     AUDIO_ENCODER_UNAVAILABLE: {
       en: `Microphone audio could not be encoded (error code: ${normalizedCode}). Other members may not hear you`,
       de: `Mikrofon-Audio konnte nicht kodiert werden (Fehlercode: ${normalizedCode}). Andere Mitglieder hören dich möglicherweise nicht`,
+      ru: `Не удалось кодировать звук микрофона (код ошибки: ${normalizedCode}). Другие участники могут вас не слышать`,
+      ja: `マイク音声をエンコードできませんでした（エラーコード: ${normalizedCode}）。他のメンバーに音声が届かない可能性があります`,
     },
   };
-  return messages[code]?.[language.value === "de" ? "de" : "en"] ?? localizedMessage(message);
+  const locale = language.value === "de" ? "de" : language.value === "ru" ? "ru" : language.value === "ja" ? "ja" : "en";
+  return messages[code]?.[locale] ?? localizedMessage(message);
 }
 
 function visibleErrorCode(code: string): string {
@@ -1769,7 +1960,7 @@ onMounted(() => {
   browserError.value = checkSupport() ?? "";
   void loadPublicConfig();
   void loadLocalPreferences().then((preferences) => {
-    if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de")) language.value = preferences.language;
+    if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de" || preferences.language === "ru" || preferences.language === "ja")) language.value = preferences.language;
     if (!localStorage.getItem("webspeak:theme") && (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark")) {
       themeMode.value = preferences.theme;
       applyTheme(themeMode.value);
@@ -1945,12 +2136,20 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
     if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
     if (typeof config.welcomeTextEn === "string") welcomeTextEn.value = config.welcomeTextEn;
+    if (config.welcomeTexts && typeof config.welcomeTexts === "object" && !Array.isArray(config.welcomeTexts)) {
+      const welcomeTexts = config.welcomeTexts as Record<string, unknown>;
+      if (typeof welcomeTexts.zh === "string") welcomeTextZh.value = welcomeTexts.zh;
+      if (typeof welcomeTexts.en === "string") welcomeTextEn.value = welcomeTexts.en;
+      if (typeof welcomeTexts.de === "string") welcomeTextDe.value = welcomeTexts.de;
+      if (typeof welcomeTexts.ru === "string") welcomeTextRu.value = welcomeTexts.ru;
+      if (typeof welcomeTexts.ja === "string") welcomeTextJa.value = welcomeTexts.ja;
+    }
     accessMode.value = config.accessMode === "open" ? "open" : "fixed";
     accelerationRelays.value = Array.isArray(config.accelerationRelays)
       ? config.accelerationRelays.flatMap((value) => {
@@ -2069,7 +2268,7 @@ function memberDisplayName(member: ChannelMember): string {
 }
 
 function formatTime(timestamp: number) {
-  const locale = language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : "en-US";
+  const locale = language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : language.value === "ru" ? "ru-RU" : language.value === "ja" ? "ja-JP" : "en-US";
   return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(timestamp);
 }
 
