@@ -299,6 +299,7 @@ export function useVoiceWebSocket() {
   let testRecorder: MediaRecorder | null = null;
   let testRecorderTimer: ReturnType<typeof setTimeout> | null = null;
   const microphoneMuted = ref(false);
+  const noiseSuppressionEnabled = ref(true);
   const inputVolume = ref(1);
   const outputVolume = ref(1);
   const outputMuted = ref(false);
@@ -343,6 +344,7 @@ export function useVoiceWebSocket() {
       preferredInputDeviceId: selectedInputDeviceId.value,
       inputDeviceId: selectedInputDeviceId.value,
       microphoneMuted: microphoneMuted.value,
+      noiseSuppressionEnabled: noiseSuppressionEnabled.value,
       voxThreshold: voxThreshold.value,
       inputGain: inputVolume.value,
       outputVolume: outputVolume.value,
@@ -363,6 +365,7 @@ export function useVoiceWebSocket() {
   void loadLocalPreferences().then((preferences) => {
     if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
     if (typeof preferences.microphoneMuted === "boolean") microphoneMuted.value = preferences.microphoneMuted;
+    if (typeof preferences.noiseSuppressionEnabled === "boolean") noiseSuppressionEnabled.value = preferences.noiseSuppressionEnabled;
     if (typeof preferences.voxThreshold === "number") voxThreshold.value = clamp(preferences.voxThreshold, 0.001, 0.08);
     if (typeof preferences.inputGain === "number") inputVolume.value = Math.max(0, Math.min(1, preferences.inputGain));
     if (typeof preferences.outputVolume === "number") outputVolume.value = Math.max(0, Math.min(1, preferences.outputVolume));
@@ -536,7 +539,7 @@ export function useVoiceWebSocket() {
       sampleRate: { ideal: 48000 },
       channelCount: { ideal: 1 },
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression: noiseSuppressionEnabled.value,
       // Keep the microphone's natural dynamics. Browser AGC can make speech
       // pump in volume, especially while background noise changes.
       autoGainControl: false,
@@ -648,7 +651,8 @@ export function useVoiceWebSocket() {
     micStream = nextStream;
 
     micSource = ctx.createMediaStreamSource(micStream);
-    rnnoiseNode = await createRnnoiseNode(ctx);
+    rnnoiseNode = noiseSuppressionEnabled.value ? await createRnnoiseNode(ctx) : null;
+    if (!noiseSuppressionEnabled.value) microphoneProcessing.rnnoise = false;
     const processedSource: AudioNode = rnnoiseNode ?? micSource;
     if (rnnoiseNode) micSource.connect(rnnoiseNode);
     processedMicDestination = ctx.createMediaStreamDestination();
@@ -1951,6 +1955,21 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
+  async function setNoiseSuppressionEnabled(enabled: boolean): Promise<void> {
+    if (noiseSuppressionEnabled.value === enabled) return;
+    const shouldRestartWebRtc = webrtcActive.value && Boolean(ws.value);
+    noiseSuppressionEnabled.value = enabled;
+    void saveAudioPreferences();
+    if (!micStream) return;
+    try {
+      if (shouldRestartWebRtc) stopWebRtcTransport();
+      await startMicrophone();
+      if (shouldRestartWebRtc && ws.value) await startWebRtcTransport(connectionSequence, ws.value);
+    } catch (error) {
+      setMicrophoneError(error);
+    }
+  }
+
   function setOutputVolume(volume: number): void {
     outputVolume.value = Math.max(0, Math.min(1, volume));
     applyOutputVolume();
@@ -1981,6 +2000,7 @@ export function useVoiceWebSocket() {
     serverEvents,
     pokeNotifications,
     microphoneMuted,
+    noiseSuppressionEnabled,
     inputVolume,
     outputVolume,
     outputMuted,
@@ -2007,6 +2027,7 @@ export function useVoiceWebSocket() {
     accompanimentErrorCode,
     setVolume,
     setInputVolume,
+    setNoiseSuppressionEnabled,
     setOutputVolume,
     toggleOutputMute,
     setVoxThreshold,
