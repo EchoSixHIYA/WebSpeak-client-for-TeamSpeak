@@ -6,7 +6,7 @@ import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
-import { clientConnectionFailureCode, describeTeamSpeakError, normalizeTeamSpeakError } from "../errors.js";
+import { clientConnectionFailureCode, describeTeamSpeakError, normalizeTeamSpeakError, teamSpeakServerErrorCode, type WebSpeakError } from "../errors.js";
 import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { IdentityLeaseStore } from "./identity-lease.js";
@@ -141,6 +141,7 @@ interface WebClientEntry {
   members: Map<number, ChannelMember>;
   eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
+  opusEncoderWarnedAt: number; // Opus 编码器不可用告警的时间戳，用于限流避免反复刷屏
   whisperTargetIds: Set<number>;
   whisperActive: boolean;
   isAlive: boolean;
@@ -191,7 +192,10 @@ export class VoiceBridge {
       try {
         identity = connection.identity ? identityFromString(connection.identity) : undefined;
       } catch {
-        ws.close(4003, "Invalid identity");
+        // Send a structured failure before the close so the browser can tell
+        // an invalid remembered identity apart from a real connection failure.
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "connectionFailed", code: "IDENTITY_INVALID", detail: "Invalid identity" }));
+        ws.close(4003, "IDENTITY_INVALID");
         return;
       }
       const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -229,8 +233,11 @@ export class VoiceBridge {
       } catch (error: unknown) {
         if (identityLeaseKey) this.identityLeases.release(identityLeaseKey, entryId);
         this.logger.error({ err: error, entryId }, "Could not create TeamSpeak client");
-        void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
-        ws.close(4003, "TeamSpeak client unavailable");
+        // A 4003 with a bare close used to be reported as "identity rejected".
+        // Send a structured failure so the browser says the TeamSpeak client
+        // could not be created (server down / unreachable) instead.
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "connectionFailed", code: "TEAM_SPEAK_CLIENT_UNAVAILABLE", detail: "TeamSpeak client unavailable" }));
+        ws.close(4003, "TEAM_SPEAK_CLIENT_UNAVAILABLE");
         return;
       }
       entry = {
@@ -250,6 +257,7 @@ export class VoiceBridge {
         members: new Map(),
         eventLog: [],
         opusEncoder: null,
+        opusEncoderWarnedAt: 0,
         whisperTargetIds: new Set(),
         whisperActive: false,
         isAlive: true,
@@ -274,6 +282,10 @@ export class VoiceBridge {
       let audioReady = true;
       let realtimeReady = false;
       let hasConnectedOnce = false;
+      // Set when the server kicks or bans this client. The kick and the transport
+      // drop can arrive in either order, so the reason is parked here and consumed
+      // by whichever handler runs second.
+      let pendingKickReason: WebSpeakError | null = null;
       let reconnectStartedAt = 0;
       let reconnectAttempt = 0;
       const directory = new DirectorySynchronizer();
@@ -338,6 +350,8 @@ export class VoiceBridge {
         initialStateSent = true;
         const wasReconnecting = hasConnectedOnce;
         hasConnectedOnce = true;
+        // A previous kick reason never applies to a fresh, successful session.
+        pendingKickReason = null;
         reconnectAttempt = 0;
         reconnectStartedAt = 0;
         if (!wasReconnecting) {
@@ -602,10 +616,30 @@ export class VoiceBridge {
         addServerEvent("poke", `${event.invokerName || "用户"} 戳了你一下`);
       });
 
+      // 被踢/封禁对本会话是终态：把服务器给出的原因回放给浏览器并拆除会话，
+      // 而不是像以前那样因原因被丢弃而反复重连、再次撞上同一踢出。
+      // A kick or ban is terminal for this session: replay the reason the server
+      // sent instead of reconnecting, which is what used to happen once the reason
+      // message was dropped (the browser kept retrying straight into the kick).
+      tsClient.on("kicked", (kick: WebSpeakError) => {
+        if (!hasConnectedOnce || session.state !== "connected") return;
+        pendingKickReason = kick;
+        resetDirectoryForReconnect();
+        const failureCode = clientConnectionFailureCode(kick, serverPassword);
+        const failureDetail = publicFailureDetail(kick);
+        entry!.connectionFailureCode = failureCode;
+        this.logger.warn({ entryId, code: failureCode, normalizedCode: kick.code, failureDetail: describeTeamSpeakError(kick) }, "TeamSpeak session ended by kick/ban");
+        sendJson({ type: "connectionFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
+        void this.teardown(entryId, "teamSpeak-kicked");
+      });
+
       tsClient.on("disconnected", (error?: Error) => {
         if (!hasConnectedOnce || session.state !== "connected") return;
         resetDirectoryForReconnect();
-        const normalized = error ? normalizeTeamSpeakError(error) : null;
+        // Prefer a kick reason over the generic transport error that follows it,
+        // regardless of which of the two events arrives first.
+        const normalized = pendingKickReason ?? (error ? normalizeTeamSpeakError(error) : null);
+        pendingKickReason = null;
         sendJson({ type: "disconnected", recoverable: isRecoverable(normalized) });
         scheduleReconnect(normalized);
       });
@@ -637,6 +671,16 @@ export class VoiceBridge {
               entry!.audio.tsSendFirstAt ??= sentAt;
               entry!.audio.tsSendLastAt = sentAt;
               entry!.audio.tsSendFrames++;
+            } else {
+              // Opus 编码器不可用（初始化失败或销毁后仍有帧在途）：显式告知浏览器
+              // 而不是静默丢帧，5 秒限流避免高频告警刷屏。
+              // The Opus encoder is unavailable (init failed or torn down while
+              // frames are still in flight): say it instead of dropping silently.
+              const warnedAt = entry!.opusEncoderWarnedAt;
+              if (Date.now() - warnedAt > 5_000) {
+                entry!.opusEncoderWarnedAt = Date.now();
+                sendJson({ type: "audioError", code: "AUDIO_ENCODER_UNAVAILABLE", detail: "Opus encoder unavailable" });
+              }
             }
           } catch {
             // A frame arriving during shutdown is safe to discard.
@@ -1059,8 +1103,24 @@ async function handleCommand(
 function classifyOperationError(error: unknown, fallbackCode: string, fallbackMessage: string): { code: string; message: string } {
   const text = error instanceof Error ? error.message : String(error);
   const normalized = text.toLocaleLowerCase();
+  // A TeamSpeak server error id is authoritative when the SDK preserved it, so it
+  // is consulted before the keyword rules: 781 (channel password), 2568
+  // (permissions), 515/2817 (server or slot limit) and friends keep their exact
+  // meaning instead of being guessed from prose.
+  const serverCode =
+    teamSpeakServerErrorCode(isRecord(error) ? (error.id ?? error.code) : undefined) ??
+    teamSpeakServerErrorCode(/\bid[\s=:]*(\d{3,5})\b/.exec(normalized)?.[1]);
+  if (serverCode) {
+    if (serverCode === "identity_security_level_too_low") return { code: "PERMISSION_DENIED", message: "你没有执行此操作的权限" };
+    if (serverCode === "channel_password_required") return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
+    if (serverCode === "server_full") return { code: "CHANNEL_FULL", message: "该频道已满" };
+    if (serverCode === "client_version_outdated") return { code: "CLIENT_VERSION_OUTDATED", message: "客户端版本过旧，服务器拒绝了该操作" };
+    if (serverCode === "flooding") return { code: "FLOOD_PROTECTION", message: "操作过于频繁，请稍后重试" };
+    if (serverCode === "banned") return { code: "BANNED", message: "你已被该服务器封禁" };
+    if (serverCode === "connection_initialisation_failed") return { code: "CONNECTION_INITIALISATION_FAILED", message: "TeamSpeak 服务器未能完成连接初始化，请稍后重试" };
+  }
   if (/permission|not permitted|insufficient|i_permission|2568/.test(normalized)) return { code: "PERMISSION_DENIED", message: "你没有执行此操作的权限" };
-  if (/channel.*(password|password.*required)|invalid.*(channel|password)|i_channel_password|1794/.test(normalized)) return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
+  if (/channel.*(password|password.*required)|invalid.*(channel|password)|i_channel_password|781/.test(normalized)) return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
   if (/already member/.test(normalized)) return { code: "ALREADY_IN_CHANNEL", message: "你已经在该频道中" };
   if (/full|maximum.*clients/.test(normalized)) return { code: "CHANNEL_FULL", message: "该频道已满" };
   if (/not found|unknown client|invalid client/.test(normalized)) return { code: "CLIENT_NOT_FOUND", message: "成员已离线" };

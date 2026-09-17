@@ -114,9 +114,14 @@ function classifyProbeError(error: unknown): TeamSpeakPingErrorCode {
   if (/enoent|spawn\s+(?:ping(?:\.exe)?|ping)\s+.*not found|command not found/.test(lower)) return "PING_UNAVAILABLE";
   if (/enotfound|eai_again|getaddrinfo|host not found|unknown host|could not find host|name or service not known/.test(lower)) return "HOST_NOT_FOUND";
   if (/timeout|timed out|packet ack timeout|idle timeout/.test(lower)) return "TIMEOUT";
-  if (/password|authentication|invalid.*credential/.test(lower)) return "INVALID_PASSWORD";
-  if (/protocol|version|handshake|negotiat/.test(lower)) return "PROTOCOL_NEGOTIATION_FAILED";
-  if (/reject|full|denied/.test(lower)) return "SERVER_REJECTED";
+  // 关键词刻意收窄：裸的 password/version/denied 会出现在大量无关的 ping/传输
+  // 输出中，误判会把用户引向错误的排查方向，只把明确的短语视为证据。
+  // Keep the keywords narrow: a bare "password", "version" or "denied" appears in
+  // plenty of unrelated ping/transport output, and guessing here used to send the
+  // user to the wrong remedy. Only explicit phrases are treated as evidence.
+  if (/invalid password|password (?:required|incorrect|wrong|rejected)|authentication failed|invalid credential/.test(lower)) return "INVALID_PASSWORD";
+  if (/protocol (?:version )?(?:mismatch|not supported|error)|version (?:is )?(?:outdated|too old|not supported)|handshake (?:failed|error|timeout)|negotiation failed/.test(lower)) return "PROTOCOL_NEGOTIATION_FAILED";
+  if (/server (?:is )?full|slot limit|client protocol limit|banned?|flooding|server rejected|connection (?:denied|refused) by (?:the )?server/.test(lower)) return "SERVER_REJECTED";
   return "UNREACHABLE";
 }
 
