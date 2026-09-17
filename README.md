@@ -1,7 +1,7 @@
 <div align="center">
   <a id="readme-top"></a>
 
-  <img src="./仓库图标.png" alt="WebSpeak 项目图标" width="180" />
+  <img src="./image.png" alt="WebSpeak 项目横幅" width="100%" />
 
   <h1>WebSpeak</h1>
 
@@ -36,9 +36,7 @@
 | **WHY** | 无需安装桌面客户端，用户打开网页即可加入频道；部署者仍然掌控目标服务器、访问策略和数据。 | Users can join a voice channel from a browser without installing a desktop client, while the operator keeps control of servers, access, and data. |
 | **HOW** | 部署后在管理员控制台配置 TeamSpeak 目标和访问方式，浏览器负责交互与音频，WebSpeak 负责网关连接。 | Configure the TeamSpeak target and access policy in the administration console. The browser handles interaction and audio; WebSpeak provides the gateway connection. |
 
-## 文档语言 · Documentation
-
-详细的特性、截图、高级功能、部署方案、要求和更新日志已按语言拆分：
+## 文档
 
 - [简体中文](./docs/README.zh-CN.md)
 - [English](./docs/README.en.md)
@@ -70,12 +68,16 @@
 A multi-platform music bot for TeamSpeak 3/6 with Netease Cloud Music, QQ Music, and Bilibili playback, plus a web console.<br />
 Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Netease Cloud Music, QQ Music und Bilibili sowie Webkonsole.
 
-## 许可证 · License · Lizenz
+## 许可证 · License · Lizenz · Лицензия · ライセンス
 
 WebSpeak 使用 [GNU Affero General Public License v3.0 only](./LICENSE) 发布。你可以使用、研究、修改和再分发本项目；如果修改后的版本通过网络向用户提供服务，需要按照 AGPL-3.0 向这些用户提供对应源代码。
 
 WebSpeak is released under the [GNU Affero General Public License v3.0 only](./LICENSE). If a modified version is offered to users over a network, its corresponding source code must be offered under AGPL-3.0.
 
 WebSpeak wird unter der [GNU Affero General Public License v3.0 only](./LICENSE) veröffentlicht. Bei Bereitstellung einer veränderten Version über ein Netzwerk muss der entsprechende Quellcode unter AGPL-3.0 angeboten werden.
+
+WebSpeak распространяется по лицензии [GNU Affero General Public License v3.0 only](./LICENSE). Если изменённая версия предоставляется пользователям через сеть, соответствующий исходный код должен быть доступен этим пользователям на условиях AGPL-3.0.
+
+WebSpeak は [GNU Affero General Public License v3.0 only](./LICENSE) の下で公開されています。変更版をネットワーク経由でユーザーに提供する場合は、対応するソースコードを AGPL-3.0 に従ってユーザーに提供する必要があります。
 
 <div align="right"><a href="#readme-top">返回顶部 · Back to top ↑</a></div>
