@@ -1,10 +1,11 @@
-import type { ClientInfo } from "@echosixhiya/teamspeak-client";
+import type { ClientInfo, DirectoryClientInfo } from "@echosixhiya/teamspeak-client";
 import type { TSDirectorySnapshot } from "./ts-client.js";
 
 type DirectoryDelta =
   | { type: "clientEnter"; info: ClientInfo }
   | { type: "clientLeave"; id: number }
-  | { type: "clientMoved"; id: number; channelID: bigint };
+  | { type: "clientMoved"; id: number; channelID: bigint }
+  | { type: "clientUpdated"; info: DirectoryClientInfo };
 
 /**
  * Merges staged welcome snapshots with events received while the snapshot is
@@ -14,7 +15,7 @@ type DirectoryDelta =
  */
 export class DirectorySynchronizer {
   private snapshot: TSDirectorySnapshot | null = null;
-  private clients = new Map<number, ClientInfo>();
+  private clients = new Map<number, DirectoryClientInfo>();
   private pending: DirectoryDelta[] = [];
 
   get ready(): boolean {
@@ -41,6 +42,10 @@ export class DirectorySynchronizer {
 
   applyClientMoved(id: number, channelID: bigint): void {
     this.applyOrQueue({ type: "clientMoved", id, channelID });
+  }
+
+  applyClientUpdated(info: DirectoryClientInfo): void {
+    this.applyOrQueue({ type: "clientUpdated", info });
   }
 
   getSnapshot(): TSDirectorySnapshot | null {
@@ -72,6 +77,11 @@ export class DirectorySynchronizer {
     }
     if (delta.type === "clientLeave") {
       this.clients.delete(delta.id);
+      return;
+    }
+    if (delta.type === "clientUpdated") {
+      const current = this.clients.get(delta.info.id);
+      this.clients.set(delta.info.id, current ? { ...current, ...delta.info } : delta.info);
       return;
     }
     const current = this.clients.get(delta.id);
