@@ -293,6 +293,8 @@ export class VoiceBridge {
       let reconnectAttempt = 0;
       const directory = new DirectorySynchronizer();
       const avatarRequests = new Set<string>();
+      let avatarRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+      let avatarRefreshRunning = false;
 
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
@@ -341,35 +343,51 @@ export class VoiceBridge {
           sendJson({ type: "whisperTargets", targetIds: nextWhisperTargets, active: entry!.whisperActive });
         }
       };
+      const scheduleMemberAvatarRefresh = (delayMs = 0): void => {
+        if (!entry || !entry.isAlive || avatarRefreshTimer) return;
+        avatarRefreshTimer = setTimeout(() => {
+          avatarRefreshTimer = null;
+          void refreshMemberAvatars();
+        }, delayMs);
+        avatarRefreshTimer.unref?.();
+      };
       const refreshMemberAvatars = async (): Promise<void> => {
-        if (!entry || !tsReady || session.state !== "connected") return;
-        const candidates = [...entry.members.values()]
-          .filter((member) => member.uid && !entry!.avatarCache.has(member.uid) && !avatarRequests.has(member.uid))
-          .slice(0, 50);
-        for (const member of candidates) {
-          if (!entry || !entry.isAlive || !member.uid) return;
-          avatarRequests.add(member.uid);
-          try {
-            const loaded = await tsClient.getClientAvatar(member.id, member.uid);
-            const avatar = loaded ? avatarDataUrl(loaded.data) : null;
-            entry.avatarCache.set(member.uid, avatar);
-            const current = entry.members.get(member.id);
-            if (current && current.uid === member.uid && avatar) {
-              current.avatar = avatar;
-              sendJson({ type: "memberAvatar", id: member.id, uid: member.uid, avatar });
+        if (!entry || !entry.isAlive || !tsReady || session.state !== "connected" || avatarRefreshRunning) return;
+        avatarRefreshRunning = true;
+        try {
+          const candidates = [...entry.members.values()]
+            .filter((member) => member.uid && !entry!.avatarCache.has(member.uid) && !avatarRequests.has(member.uid))
+            .slice(0, 50);
+          for (const member of candidates) {
+            if (!entry || !entry.isAlive || !member.uid) return;
+            avatarRequests.add(member.uid);
+            try {
+              const loaded = await tsClient.getClientAvatar(member.id, member.uid);
+              const avatar = loaded ? avatarDataUrl(loaded.data) : null;
+              entry.avatarCache.set(member.uid, avatar);
+              const current = entry.members.get(member.id);
+              if (current && current.uid === member.uid && avatar) {
+                current.avatar = avatar;
+                sendJson({ type: "memberAvatar", id: member.id, uid: member.uid, avatar });
+              }
+            } catch (error: unknown) {
+              // Avatar access is optional. A permission or file-transfer failure
+              // must never affect joining, directory updates, or voice traffic.
+              entry.avatarCache.set(member.uid, null);
+              this.logger.debug({
+                entryId,
+                clientId: member.id,
+                uid: member.uid,
+                err: error instanceof Error ? error.message : String(error),
+              }, "TeamSpeak client avatar unavailable");
+            } finally {
+              avatarRequests.delete(member.uid);
             }
-          } catch (error: unknown) {
-            // Avatar access is optional. A permission or file-transfer failure
-            // must never affect joining, directory updates, or voice traffic.
-            entry.avatarCache.set(member.uid, null);
-            this.logger.debug({
-              entryId,
-              clientId: member.id,
-              uid: member.uid,
-              err: error instanceof Error ? error.message : String(error),
-            }, "TeamSpeak client avatar unavailable");
-          } finally {
-            avatarRequests.delete(member.uid);
+          }
+        } finally {
+          avatarRefreshRunning = false;
+          if (entry?.isAlive && tsReady && session.state === "connected" && [...entry.members.values()].some((member) => member.uid && !entry!.avatarCache.has(member.uid))) {
+            scheduleMemberAvatarRefresh(250);
           }
         }
       };
@@ -416,7 +434,7 @@ export class VoiceBridge {
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
         if (wasReconnecting) sendJson({ type: "reconnected" });
-        void refreshMemberAvatars();
+        scheduleMemberAvatarRefresh();
       };
 
       const resetDirectoryForReconnect = () => {
@@ -542,7 +560,7 @@ export class VoiceBridge {
         trackChannelEvents(previousChannels, entry!.channelTree);
         sendInitialState();
         if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
-        void refreshMemberAvatars();
+        scheduleMemberAvatarRefresh();
       });
 
       tsClient.on("clientEnter", (info) => {
@@ -558,7 +576,7 @@ export class VoiceBridge {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
           if (!wasKnown && info.id !== selfId) addServerEvent("joined", `${info.nickname || "未知用户"} 加入了服务器`);
-          void refreshMemberAvatars();
+          scheduleMemberAvatarRefresh();
         }
       });
 

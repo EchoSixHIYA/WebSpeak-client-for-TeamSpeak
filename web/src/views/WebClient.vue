@@ -176,7 +176,7 @@
                 <div v-else-if="!visibleChatMessages.length" class="chat-empty"><div class="chat-empty-icon"><Icon name="message" :size="24" /></div><strong>{{ chatTab === 'private' ? t('privateChatStart') : t('chatStart') }}</strong><span>{{ chatTab === 'private' ? t('privateChatStartLead') : t('chatStartLead') }}</span></div>
                 <template v-for="message in visibleChatMessages" :key="message.id">
                   <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]">
-                  <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf)">{{ avatarInitial(message.invokerName) }}</div>
+                <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf, messageAvatar(message))">{{ messageAvatar(message) ? '' : avatarInitial(message.invokerName) }}</div>
                   <div class="message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
                   </article>
                 </template>
@@ -318,7 +318,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
-import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type LatencyProbeResult } from "../composables/useVoiceWebSocket.js";
+import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -2284,6 +2284,14 @@ function avatarStyle(name: string, isSelf = false, avatar = "") {
     background: fallback || avatarColors[Math.abs(hash) % avatarColors.length],
     ...(avatar ? { backgroundImage: `url("${avatar}")`, backgroundPosition: "center", backgroundSize: "cover" } : {}),
   };
+}
+
+function messageAvatar(message: ChatMessage): string {
+  const member = members.find((candidate) =>
+    (typeof message.senderId === "number" && candidate.id === message.senderId) ||
+    (Boolean(message.senderUid) && candidate.uid === message.senderUid),
+  );
+  return member?.avatar ?? "";
 }
 
 function isSpeaking(member: ChannelMember) {
