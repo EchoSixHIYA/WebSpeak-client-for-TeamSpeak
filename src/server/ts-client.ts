@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { Writable } from "node:stream";
 import {
   Client as TS3FullClient,
   clientMove as tsClientMove,
@@ -34,6 +35,14 @@ export interface TSVoiceData {
   codec: number; // 4 = voice, 5 = music
   data: Buffer;
 }
+
+export interface TSClientAvatar {
+  /** TeamSpeak's avatar content marker, used to invalidate a cached avatar. */
+  cacheKey: string;
+  data: Buffer;
+}
+
+const MAX_CLIENT_AVATAR_BYTES = 120 * 1024;
 
 export type TSDirectorySnapshot = DirectorySnapshot;
 export type TSDirectoryClient = DirectoryClientInfo;
@@ -170,6 +179,46 @@ export class TSClient extends EventEmitter {
 
     this.logger.info({ clientId: this.clientId }, "Connected to TeamSpeak");
     this.emit("connected", this.clientId);
+  }
+
+  /**
+   * Load a visible client's TeamSpeak avatar through the client protocol.
+   *
+   * TeamSpeak does not include the avatar bytes in directory notifications.
+   * `clientinfo` exposes the avatar marker and the per-identity filename; the
+   * file itself is then read through the normal TeamSpeak file-transfer port.
+   * A missing permission, missing avatar, blocked file-transfer port, or an
+   * oversized image is intentionally reported as `null` so the web client can
+   * keep its generated initial avatar.
+   */
+  async getClientAvatar(clientId: number, expectedUid = ""): Promise<TSClientAvatar | null> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
+    const rows = await this.client.execCommandWithResponse(`clientinfo clid=${clientId}`, 5_000);
+    const info = rows.find((row) => {
+      if (expectedUid && row.client_unique_identifier !== expectedUid) return false;
+      return typeof row.client_flag_avatar === "string" && typeof row.client_base64HashClientUID === "string";
+    });
+    if (!info) return null;
+    const cacheKey = info.client_flag_avatar?.trim() ?? "";
+    const avatarFileKey = info.client_base64HashClientUID?.trim() ?? "";
+    if (!cacheKey || !/^[A-Za-z0-9+/=_-]{8,256}$/.test(avatarFileKey)) return null;
+
+    const transfer = await this.client.fileTransferInitDownload(0n, `/avatar_${avatarFileKey}`, "");
+    const size = Number(transfer.size);
+    if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_CLIENT_AVATAR_BYTES) return null;
+
+    const chunks: Buffer[] = [];
+    const destination = new Writable({
+      write(chunk: Buffer | string, _encoding, callback) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        callback();
+      },
+    });
+    await this.client.downloadFileData(this.options.target.host, transfer, destination);
+    const data = Buffer.concat(chunks);
+    if (data.length === 0 || data.length > MAX_CLIENT_AVATAR_BYTES) return null;
+    return { cacheKey, data };
   }
 
   private attachClientListeners(client: TS3FullClient): void {

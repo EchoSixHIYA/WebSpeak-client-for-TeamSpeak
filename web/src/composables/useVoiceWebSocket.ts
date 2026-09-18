@@ -33,6 +33,7 @@ export interface ChannelMember {
   id: number;
   nickname: string;
   uid?: string;
+  avatar?: string;
   isSelf?: boolean;
   away?: boolean;
   awayMessage?: string;
@@ -76,7 +77,7 @@ export interface ChannelInfo {
   order?: string;
   name: string;
   description?: string;
-  members?: { id: number; nickname: string; uid?: string; away?: boolean; awayMessage?: string; inputMuted?: boolean; outputMuted?: boolean; channelCommander?: boolean }[];
+  members?: { id: number; nickname: string; uid?: string; avatar?: string; away?: boolean; awayMessage?: string; inputMuted?: boolean; outputMuted?: boolean; channelCommander?: boolean }[];
 }
 
 export interface ChatMessage {
@@ -1636,7 +1637,7 @@ export function useVoiceWebSocket() {
         break;
       case "memberEnter":
         if (!members.some((member) => member.id === msg.id)) {
-          members.push({ id: msg.id, nickname: msg.nickname, uid: typeof msg.uid === "string" ? msg.uid : undefined, isSelf: Boolean(msg.isSelf) });
+          members.push({ id: msg.id, nickname: msg.nickname, uid: typeof msg.uid === "string" ? msg.uid : undefined, avatar: typeof msg.avatar === "string" ? msg.avatar : undefined, isSelf: Boolean(msg.isSelf) });
           syncKnownMemberVolumes();
         }
         break;
@@ -1658,6 +1659,18 @@ export function useVoiceWebSocket() {
       case "capabilities":
         state.canMoveClients = msg.canMoveClients === true;
         break;
+      case "memberAvatar": {
+        const clientId = Number(msg.id);
+        const uid = typeof msg.uid === "string" ? msg.uid : "";
+        const avatar = typeof msg.avatar === "string" ? msg.avatar : "";
+        const member = members.find((candidate) => candidate.id === clientId && (!uid || candidate.uid === uid));
+        if (member) member.avatar = avatar || undefined;
+        for (const channel of channels) {
+          const channelMember = channel.members?.find((candidate) => candidate.id === clientId && (!uid || candidate.uid === uid));
+          if (channelMember) channelMember.avatar = avatar || undefined;
+        }
+        break;
+      }
       case "chatMessage":
         if (Number(msg.invokerId) === state.tsClientId) break;
         const incomingScope = msg.scope === "private" || msg.scope === "server" || msg.scope === "channel" ? msg.scope : "system";
