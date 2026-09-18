@@ -1878,7 +1878,7 @@ export function useVoiceWebSocket() {
     accumLen = 0;
     if (webrtcActive.value) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
     if (webrtcMixMicGain) webrtcMixMicGain.gain.value = muted ? 0 : inputVolume.value;
-    if (webrtcActive.value) sendCmd("setMicrophoneMuted", { muted });
+    sendCmd("setMicrophoneMuted", { muted });
     if (muted && state.tsClientId) clearSpeaking(state.tsClientId);
     void saveAudioPreferences();
   }

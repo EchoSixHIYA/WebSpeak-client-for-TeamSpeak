@@ -240,6 +240,10 @@ export class TSClient extends EventEmitter {
       if (info.id === this.clientId && info.targetChannelID !== 0n) this.preferredChannelId = info.targetChannelID;
       this.emit("clientMoved", info);
     });
+
+    client.on("clientUpdated", (event) => {
+      this.emit("clientUpdated", event.info);
+    });
   }
 
   sendVoice(data: Buffer, codec: number = 4): void {
@@ -269,6 +273,11 @@ export class TSClient extends EventEmitter {
     if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
     const escaped = escapeTeamSpeakValue(message);
     await this.client.execCommand(`clientupdate client_away=${away ? 1 : 0} client_away_message=${escaped}`);
+  }
+
+  async setInputMuted(muted: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    await this.client.execCommand(`clientupdate client_input_muted=${muted ? 1 : 0}`);
   }
 
   async switchChannel(channelId: bigint, password?: string): Promise<void> {

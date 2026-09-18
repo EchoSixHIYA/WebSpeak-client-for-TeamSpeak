@@ -546,6 +546,12 @@ export class VoiceBridge {
         }
       });
 
+      tsClient.on("clientUpdated", (info) => {
+        directory.applyClientUpdated(info);
+        refreshDirectory();
+        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
+      });
+
       tsClient.on("voiceData", (data: TSVoiceData) => {
         const receivedAt = Date.now();
         if (entry!.audio.tsReceiveLastAt !== null) entry!.audio.tsReceiveMaxGapMs = Math.max(entry!.audio.tsReceiveMaxGapMs, receivedAt - entry!.audio.tsReceiveLastAt);
@@ -1086,7 +1092,9 @@ async function handleCommand(
       entry.whisperActive = active;
       sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
     } else if (command.type === "setMicrophoneMuted") {
-      entry.webrtc?.setMicrophoneMuted(command.payload.muted as boolean);
+      const muted = command.payload.muted as boolean;
+      await entry.tsClient.setInputMuted(muted);
+      entry.webrtc?.setMicrophoneMuted(muted);
     } else if (command.type === "setAccompanimentActive") {
       entry.webrtc?.setAccompanimentActive(command.payload.active as boolean);
     } else if (command.type === "setMemberVolume") {
