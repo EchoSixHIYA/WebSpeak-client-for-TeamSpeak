@@ -110,6 +110,7 @@ interface ChannelMember {
   id: number;
   nickname: string;
   uid: string;
+  avatar?: string;
   away?: boolean;
   awayMessage?: string;
   inputMuted?: boolean;
@@ -139,6 +140,7 @@ interface WebClientEntry {
   webrtcPublicHost?: string;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
+  avatarCache: Map<string, string | null>;
   eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
   opusEncoderWarnedAt: number; // Opus 编码器不可用告警的时间戳，用于限流避免反复刷屏
@@ -255,6 +257,7 @@ export class VoiceBridge {
         ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
         channelTree: [],
         members: new Map(),
+        avatarCache: new Map(),
         eventLog: [],
         opusEncoder: null,
         opusEncoderWarnedAt: 0,
@@ -289,6 +292,7 @@ export class VoiceBridge {
       let reconnectStartedAt = 0;
       let reconnectAttempt = 0;
       const directory = new DirectorySynchronizer();
+      const avatarRequests = new Set<string>();
 
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
@@ -312,13 +316,15 @@ export class VoiceBridge {
         const sdkChannelId = tsClient.getChannelId();
         if (selfChannelId === 0n && sdkChannelId !== 0n) selfChannelId = sdkChannelId;
         const normalizedSnapshot = normalizeDirectorySnapshot(snapshot, effectiveSelfId, selfChannelId, nickname, channelName);
-        entry!.channelTree = mapChannelTree(normalizedSnapshot);
+        entry!.channelTree = mapChannelTree(normalizedSnapshot, entry!.avatarCache);
         entry!.members.clear();
         for (const client of normalizedSnapshot.clients) {
+          const avatar = client.uid ? entry!.avatarCache.get(client.uid) : undefined;
           entry!.members.set(client.id, {
             id: client.id,
             nickname: client.nickname,
             uid: client.uid,
+            ...(avatar ? { avatar } : {}),
             away: client.away,
             awayMessage: client.awayMessage,
             inputMuted: client.inputMuted,
@@ -333,6 +339,38 @@ export class VoiceBridge {
         const nextWhisperTargets = [...entry!.whisperTargetIds].sort((a, b) => a - b);
         if (initialStateSent && (previousWhisperTargets.length !== nextWhisperTargets.length || previousWhisperTargets.some((clientId, index) => clientId !== nextWhisperTargets[index]))) {
           sendJson({ type: "whisperTargets", targetIds: nextWhisperTargets, active: entry!.whisperActive });
+        }
+      };
+      const refreshMemberAvatars = async (): Promise<void> => {
+        if (!entry || !tsReady || session.state !== "connected") return;
+        const candidates = [...entry.members.values()]
+          .filter((member) => member.uid && !entry!.avatarCache.has(member.uid) && !avatarRequests.has(member.uid))
+          .slice(0, 50);
+        for (const member of candidates) {
+          if (!entry || !entry.isAlive || !member.uid) return;
+          avatarRequests.add(member.uid);
+          try {
+            const loaded = await tsClient.getClientAvatar(member.id, member.uid);
+            const avatar = loaded ? avatarDataUrl(loaded.data) : null;
+            entry.avatarCache.set(member.uid, avatar);
+            const current = entry.members.get(member.id);
+            if (current && current.uid === member.uid && avatar) {
+              current.avatar = avatar;
+              sendJson({ type: "memberAvatar", id: member.id, uid: member.uid, avatar });
+            }
+          } catch (error: unknown) {
+            // Avatar access is optional. A permission or file-transfer failure
+            // must never affect joining, directory updates, or voice traffic.
+            entry.avatarCache.set(member.uid, null);
+            this.logger.debug({
+              entryId,
+              clientId: member.id,
+              uid: member.uid,
+              err: error instanceof Error ? error.message : String(error),
+            }, "TeamSpeak client avatar unavailable");
+          } finally {
+            avatarRequests.delete(member.uid);
+          }
         }
       };
       const trackChannelEvents = (previous: unknown[], next: unknown[]) => {
@@ -378,6 +416,7 @@ export class VoiceBridge {
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
         if (wasReconnecting) sendJson({ type: "reconnected" });
+        void refreshMemberAvatars();
       };
 
       const resetDirectoryForReconnect = () => {
@@ -503,6 +542,7 @@ export class VoiceBridge {
         trackChannelEvents(previousChannels, entry!.channelTree);
         sendInitialState();
         if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
+        void refreshMemberAvatars();
       });
 
       tsClient.on("clientEnter", (info) => {
@@ -518,6 +558,7 @@ export class VoiceBridge {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
           if (!wasKnown && info.id !== selfId) addServerEvent("joined", `${info.nickname || "未知用户"} 加入了服务器`);
+          void refreshMemberAvatars();
         }
       });
 
@@ -1219,7 +1260,7 @@ function snapshotAudioStats(entry: WebClientEntry): AudioFlowStats {
   return stats;
 }
 
-function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
+function mapChannelTree(snapshot: TSDirectorySnapshot, avatarCache = new Map<string, string | null>()): unknown[] {
   return snapshot.channels.map((channel) => ({
     id: String(channel.id),
     parentID: String(channel.parentID),
@@ -1227,17 +1268,29 @@ function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
     description: channel.description || "",
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
-      .map((client) => ({
-        id: client.id,
-        nickname: client.nickname || "未知用户",
-        uid: client.uid,
-        away: client.away,
-        awayMessage: client.awayMessage,
-        inputMuted: client.inputMuted,
-        outputMuted: client.outputMuted,
-        channelCommander: client.channelCommander,
-      })),
+      .map((client) => {
+        const avatar = client.uid ? avatarCache.get(client.uid) : undefined;
+        return {
+          id: client.id,
+          nickname: client.nickname || "未知用户",
+          uid: client.uid,
+          ...(avatar ? { avatar } : {}),
+          away: client.away,
+          awayMessage: client.awayMessage,
+          inputMuted: client.inputMuted,
+          outputMuted: client.outputMuted,
+          channelCommander: client.channelCommander,
+        };
+      }),
   }));
+}
+
+function avatarDataUrl(data: Buffer): string | null {
+  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return `data:image/png;base64,${data.toString("base64")}`;
+  if (data.length >= 3 && data.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return `data:image/jpeg;base64,${data.toString("base64")}`;
+  if (data.length >= 6 && (data.subarray(0, 6).toString("ascii") === "GIF87a" || data.subarray(0, 6).toString("ascii") === "GIF89a")) return `data:image/gif;base64,${data.toString("base64")}`;
+  if (data.length >= 12 && data.subarray(0, 4).toString("ascii") === "RIFF" && data.subarray(8, 12).toString("ascii") === "WEBP") return `data:image/webp;base64,${data.toString("base64")}`;
+  return null;
 }
 
 function normalizeDirectorySnapshot(
