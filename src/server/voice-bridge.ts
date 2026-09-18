@@ -1223,6 +1223,7 @@ function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
   return snapshot.channels.map((channel) => ({
     id: String(channel.id),
     parentID: String(channel.parentID),
+    order: String(channel.order),
     name: channel.name || "未命名频道",
     description: channel.description || "",
     members: snapshot.clients

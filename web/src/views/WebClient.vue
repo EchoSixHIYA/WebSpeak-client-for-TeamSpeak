@@ -1742,7 +1742,12 @@ const heroBars = [12, 24, 18, 35, 18, 28, 42, 23, 50, 34, 19, 28, 39, 22, 46, 25
 
 const channelTree = computed<TreeChannel[]>(() => {
   const source = [...channels];
-  const byId = new Map(source.map((item) => [item.id, item]));
+  const sourceIndex = new Map(source.map((item, index) => [item.id, index]));
+  const enriched = source.map((item) => ({
+    ...item,
+    members: (item.members ?? []).map((member) => ({ ...member, isSelf: member.id === voiceState.tsClientId })),
+  }));
+  const byId = new Map(enriched.map((item) => [item.id, item]));
   const depthCache = new Map<string, number>();
 
   function depthOf(item: ChannelInfo, visiting = new Set<string>()): number {
@@ -1754,13 +1759,59 @@ const channelTree = computed<TreeChannel[]>(() => {
     return depth;
   }
 
-  return source
-    .map((item) => ({
-      ...item,
-      depth: depthOf(item),
-      members: (item.members ?? []).map((member) => ({ ...member, isSelf: member.id === voiceState.tsClientId })),
-    }))
-    .sort((a, b) => `${a.parentID}/${a.id}`.localeCompare(`${b.parentID}/${b.id}`));
+  const childrenByParent = new Map<string, TreeChannel[]>();
+  for (const item of enriched) {
+    const channel = { ...item, depth: depthOf(item) };
+    const siblings = childrenByParent.get(channel.parentID) ?? [];
+    siblings.push(channel);
+    childrenByParent.set(channel.parentID, siblings);
+  }
+
+  function orderSiblings(siblings: TreeChannel[]): TreeChannel[] {
+    const bySiblingId = new Map(siblings.map((item) => [item.id, item]));
+    const successors = new Map<string, TreeChannel[]>();
+    const roots: TreeChannel[] = [];
+    const sourceOrder = (left: TreeChannel, right: TreeChannel) =>
+      (sourceIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (sourceIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+
+    for (const item of siblings) {
+      const predecessor = item.order && item.order !== "0" && bySiblingId.has(item.order) ? item.order : "";
+      if (!predecessor) roots.push(item);
+      else successors.set(predecessor, [...(successors.get(predecessor) ?? []), item]);
+    }
+
+    roots.sort(sourceOrder);
+    for (const items of successors.values()) items.sort(sourceOrder);
+
+    const ordered: TreeChannel[] = [];
+    const visited = new Set<string>();
+    const append = (item: TreeChannel) => {
+      if (visited.has(item.id)) return;
+      visited.add(item.id);
+      ordered.push(item);
+      for (const successor of successors.get(item.id) ?? []) append(successor);
+    };
+    for (const root of roots) append(root);
+    for (const item of [...siblings].sort(sourceOrder)) append(item);
+    return ordered;
+  }
+
+  const orderedTree: TreeChannel[] = [];
+  const visit = (parentID: string) => {
+    for (const channel of orderSiblings(childrenByParent.get(parentID) ?? [])) {
+      orderedTree.push(channel);
+      visit(channel.id);
+    }
+  };
+  visit("0");
+  for (const channel of enriched) {
+    if (!orderedTree.some((item) => item.id === channel.id)) {
+      const fallback = { ...channel, depth: depthOf(channel) };
+      orderedTree.push(fallback);
+      visit(channel.id);
+    }
+  }
+  return orderedTree;
 });
 
 const currentChannel = computed<TreeChannel | undefined>(() => {

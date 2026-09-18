@@ -72,6 +72,7 @@ type SinkAudioElement = HTMLAudioElement & {
 export interface ChannelInfo {
   id: string;
   parentID: string;
+  order?: string;
   name: string;
   description?: string;
   members?: { id: number; nickname: string; uid?: string; away?: boolean; awayMessage?: string; inputMuted?: boolean; outputMuted?: boolean; channelCommander?: boolean }[];
