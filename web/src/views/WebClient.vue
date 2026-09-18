@@ -265,6 +265,26 @@
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
+      <button type="button" @click="requestMoveMember(memberMenu.member); memberMenu = null"><Icon name="chevron-right" :size="15" /> {{ t('moveMember') }}</button>
+    </div>
+
+    <!-- Move another TeamSpeak client to a channel. TeamSpeak still performs the permission check. -->
+    <div v-if="moveMemberDialog.open" class="modal-backdrop channel-password-backdrop" @click.self="cancelMoveMember">
+      <section class="channel-password-modal member-move-modal" role="dialog" aria-modal="true" aria-labelledby="move-member-title" @click.stop>
+        <button type="button" class="qq-modal-close" :aria-label="t('close')" :title="t('close')" @click="cancelMoveMember"><Icon name="close" :size="19" /></button>
+        <div class="channel-password-icon"><Icon name="chevron-right" :size="22" /></div>
+        <span class="card-kicker">{{ t('moveMember') }}</span>
+        <h2 id="move-member-title">{{ t('moveMemberTitle', { member: moveMemberDialog.member?.nickname ?? '' }) }}</h2>
+        <p>{{ t('moveMemberLead') }}</p>
+        <form class="channel-password-form" @submit.prevent="submitMoveMember">
+          <label class="field-label" for="move-member-channel">{{ t('moveMemberTarget') }}</label>
+          <div class="field-wrap"><Icon name="volume" :size="17" /><select id="move-member-channel" v-model="moveMemberDialog.channelId" :disabled="moveMemberDialog.submitting || !moveTargetChannels.length"><option value="" disabled>{{ t('moveMemberChooseChannel') }}</option><option v-for="targetChannel in moveTargetChannels" :key="targetChannel.id" :value="targetChannel.id">{{ moveChannelLabel(targetChannel) }}</option></select></div>
+          <label class="field-label" for="move-member-password">{{ t('channelPasswordPrompt') }} <span>{{ t('optional') }}</span></label>
+          <div class="field-wrap"><Icon name="lock" :size="17" /><input id="move-member-password" v-model="moveMemberDialog.password" type="password" autocomplete="off" :placeholder="t('channelPasswordOptional')" :disabled="moveMemberDialog.submitting" /></div>
+          <div v-if="moveMemberDialog.error" class="notice error-notice channel-password-error"><span class="notice-symbol">!</span><span>{{ moveMemberDialog.error }}</span></div>
+          <div class="channel-password-actions"><button type="button" class="text-button" :disabled="moveMemberDialog.submitting" @click="cancelMoveMember">{{ t('channelPasswordCancel') }}</button><button type="submit" class="primary-button channel-password-submit" :disabled="moveMemberDialog.submitting || !moveMemberDialog.channelId"><span v-if="moveMemberDialog.submitting" class="button-spinner"></span><span>{{ t('moveMemberSubmit') }}</span><Icon v-if="!moveMemberDialog.submitting" name="chevron-right" :size="17" /></button></div>
+        </form>
+      </section>
     </div>
 
     <!-- Protected channel password modal -->
@@ -375,6 +395,7 @@ const {
   reconnectNow,
   disconnect,
   switchChannel,
+  moveClient,
   sendTextMessage,
   sendServerMessage,
   sendPrivateMessage,
@@ -436,6 +457,7 @@ const privateClientId = ref(0);
 const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
+const moveMemberDialog = reactive({ open: false, member: null as ChannelMember | null, channelId: "", password: "", submitting: false, error: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
 const whisperPttActive = ref(false);
@@ -613,6 +635,7 @@ const translations: Record<string, Record<string, string>> = {
     channelPasswordTitle: "进入加密频道",
     channelPasswordLead: "该频道需要密码才能进入。",
     channelPasswordPlaceholder: "输入频道密码",
+    channelPasswordOptional: "如目标频道有密码，请输入",
     channelPasswordSubmit: "进入频道",
     channelPasswordCancel: "取消",
     channelPasswordRetry: "密码不正确，请重试。",
@@ -630,6 +653,14 @@ const translations: Record<string, Record<string, string>> = {
     pokeMessagePrompt: "戳一戳消息（可选）",
     pokeSent: "已发送戳一戳",
     copyNickname: "复制昵称",
+    moveMember: "移动到频道",
+    moveMemberTitle: "移动 {{member}}",
+    moveMemberLead: "选择目标频道。TeamSpeak 会根据你的移动权限决定是否允许此操作。",
+    moveMemberTarget: "目标频道",
+    moveMemberChooseChannel: "请选择目标频道",
+    moveMemberSubmit: "确认移动",
+    moveMemberSuccess: "成员已移动",
+    movePermissionDenied: "你没有移动成员的权限",
     copiedNickname: "昵称已复制",
     attachmentUnavailable: "附件暂不可用",
     emojiUnavailable: "表情暂不可用",
@@ -891,6 +922,7 @@ const translations: Record<string, Record<string, string>> = {
     channelPasswordTitle: "Enter protected channel",
     channelPasswordLead: "This channel requires a password to join.",
     channelPasswordPlaceholder: "Channel password",
+    channelPasswordOptional: "Enter it if the target channel is protected",
     channelPasswordSubmit: "Enter channel",
     channelPasswordCancel: "Cancel",
     channelPasswordRetry: "That password was not accepted. Try again.",
@@ -908,6 +940,14 @@ const translations: Record<string, Record<string, string>> = {
     pokeMessagePrompt: "Poke message (optional)",
     pokeSent: "Poke sent",
     copyNickname: "Copy nickname",
+    moveMember: "Move to channel",
+    moveMemberTitle: "Move {{member}}",
+    moveMemberLead: "Choose a target channel. TeamSpeak will enforce your move permissions.",
+    moveMemberTarget: "Target channel",
+    moveMemberChooseChannel: "Choose a target channel",
+    moveMemberSubmit: "Move member",
+    moveMemberSuccess: "Member moved",
+    movePermissionDenied: "You do not have permission to move members",
     copiedNickname: "Nickname copied",
     attachmentUnavailable: "Attachments unavailable",
     emojiUnavailable: "Emoji unavailable",
@@ -1172,6 +1212,7 @@ translations.de = {
   channelPasswordTitle: "Geschützten Kanal betreten",
   channelPasswordLead: "Für diesen Kanal ist ein Passwort erforderlich.",
   channelPasswordPlaceholder: "Kanalpasswort",
+  channelPasswordOptional: "Falls der Zielkanal geschützt ist",
   channelPasswordSubmit: "Kanal betreten",
   channelPasswordCancel: "Abbrechen",
   channelPasswordRetry: "Das Passwort wurde abgelehnt. Bitte erneut versuchen.",
@@ -1189,6 +1230,14 @@ translations.de = {
   pokeMessagePrompt: "Anstupsnachricht (optional)",
   pokeSent: "Anstupser gesendet",
   copyNickname: "Namen kopieren",
+  moveMember: "In Kanal verschieben",
+  moveMemberTitle: "{{member}} verschieben",
+  moveMemberLead: "Wähle einen Zielkanal. TeamSpeak prüft deine Verschiebeberechtigung.",
+  moveMemberTarget: "Zielkanal",
+  moveMemberChooseChannel: "Zielkanal auswählen",
+  moveMemberSubmit: "Mitglied verschieben",
+  moveMemberSuccess: "Mitglied verschoben",
+  movePermissionDenied: "Du hast keine Berechtigung, Mitglieder zu verschieben",
   copiedNickname: "Name kopiert",
   attachmentUnavailable: "Anhänge nicht verfügbar",
   emojiUnavailable: "Emojis nicht verfügbar",
@@ -1325,6 +1374,15 @@ translations.ru = {
   joinLine2: "и начните общение.",
   joinDescription: "Клиент TeamSpeak устанавливать не нужно. Откройте браузер и присоединитесь к голосовому каналу с низкой задержкой.",
   overallVolume: "Общая громкость",
+  moveMember: "Переместить в канал",
+  moveMemberTitle: "Переместить: {{member}}",
+  moveMemberLead: "Выберите канал. TeamSpeak проверит ваши права на перемещение.",
+  moveMemberTarget: "Целевой канал",
+  moveMemberChooseChannel: "Выберите целевой канал",
+  moveMemberSubmit: "Переместить участника",
+  moveMemberSuccess: "Участник перемещён",
+  movePermissionDenied: "У вас нет права перемещать участников",
+  channelPasswordOptional: "Если целевой канал защищён паролем",
   inputVolume: "Громкость микрофона",
   desktopAudioControls: "Управление звуком",
   desktopAudioHint: "Наведите на значок, чтобы изменить громкость",
@@ -1397,6 +1455,15 @@ translations.ja = {
   joinLine2: "すぐに会話を始めよう。",
   joinDescription: "TeamSpeak クライアントのインストールは不要です。ブラウザから低遅延の音声チャンネルに参加できます。",
   overallVolume: "全体音量",
+  moveMember: "チャンネルへ移動",
+  moveMemberTitle: "{{member}}を移動",
+  moveMemberLead: "移動先を選択してください。TeamSpeak が権限を確認します。",
+  moveMemberTarget: "移動先チャンネル",
+  moveMemberChooseChannel: "移動先を選択",
+  moveMemberSubmit: "メンバーを移動",
+  moveMemberSuccess: "メンバーを移動しました",
+  movePermissionDenied: "メンバーを移動する権限がありません",
+  channelPasswordOptional: "移動先にパスワードがある場合",
   inputVolume: "マイク音量",
   desktopAudioControls: "音声コントロール",
   desktopAudioHint: "アイコンにカーソルを合わせて音量を調整",
@@ -1484,6 +1551,7 @@ function localizedMessage(message: string) {
     "无法到达 TeamSpeak 服务器，请检查网络或地址": "Сервер TeamSpeak недоступен. Проверьте сеть или адрес",
     "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Сервер TeamSpeak отклонил подключение. Проверьте порт и состояние службы",
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "Истекло время подключения к TeamSpeak. Проверьте сеть и состояние сервера",
+    "你没有执行此操作的权限": "У вас нет права выполнять это действие",
   } : {
     "该服务器需要密码，请输入密码后重试": "このサーバーにはパスワードが必要です。入力して再試行してください",
     "服务器密码错误，请重新输入": "サーバーパスワードが正しくありません。もう一度入力してください",
@@ -1493,6 +1561,7 @@ function localizedMessage(message: string) {
     "无法到达 TeamSpeak 服务器，请检查网络或地址": "TeamSpeak サーバーに到達できません。ネットワークまたはアドレスを確認してください",
     "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "TeamSpeak サーバーが接続を拒否しました。ポートとサービスの状態を確認してください",
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
+    "你没有执行此操作的权限": "この操作を実行する権限がありません",
   };
   if (localizedExact[message]) return localizedExact[message];
   const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
@@ -1559,6 +1628,9 @@ function localizedMessage(message: string) {
     "该频道需要密码": "This channel requires a password",
     "该频道已满": "This channel is full",
     "你没有执行此操作的权限": "You do not have permission to perform this action",
+    "不能移动自己的客户端": "You cannot move yourself",
+    "目标频道不可用": "The target channel is unavailable",
+    "成员已离线或当前不可见": "The member is offline or no longer visible",
     "成员已离线": "This member is offline",
     "操作失败": "The operation failed",
     "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "The voice session token is missing or expired. Return to the list and enter the voice space again",
@@ -1666,6 +1738,9 @@ function localizedMessage(message: string) {
       "该频道需要密码": "Dieser Kanal erfordert ein Passwort",
       "该频道已满": "Dieser Kanal ist voll",
       "你没有执行此操作的权限": "Du hast keine Berechtigung für diese Aktion",
+      "不能移动自己的客户端": "Du kannst dich nicht selbst verschieben",
+      "目标频道不可用": "Der Zielkanal ist nicht verfügbar",
+      "成员已离线或当前不可见": "Das Mitglied ist offline oder nicht mehr sichtbar",
       "成员已离线": "Das Mitglied ist offline",
       "操作失败": "Operation fehlgeschlagen",
     };
@@ -1836,6 +1911,11 @@ const filteredMemberChannels = computed(() => {
   const search = memberQuery.value.trim().toLowerCase();
   if (!search) return memberChannels.value;
   return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
+});
+const moveTargetChannels = computed(() => {
+  const member = moveMemberDialog.member;
+  const sourceChannelId = member ? memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id : "";
+  return memberChannels.value.filter((channel) => channel.id !== sourceChannelId && channel.id !== "__current__");
 });
 const whisperTargets = computed(() => [...whisperTargetIds].map((id) => members.find((member) => member.id === id)).filter((member): member is ChannelMember => Boolean(member)));
 
@@ -2275,6 +2355,54 @@ function openMemberMenu(member: ChannelMember, event: Event): void {
 function openMemberActions(member: ChannelMember): void {
   if (member.isSelf) return;
   memberMenu.value = { member, x: 0, y: 0 };
+}
+
+function moveChannelLabel(channel: TreeChannel): string {
+  return `${"　".repeat(Math.max(0, channel.depth))}${channel.name}`;
+}
+
+function openMoveMemberDialog(member: ChannelMember): void {
+  if (member.isSelf) return;
+  moveMemberDialog.member = member;
+  moveMemberDialog.channelId = moveTargetChannels.value[0]?.id ?? "";
+  moveMemberDialog.password = "";
+  moveMemberDialog.error = "";
+  moveMemberDialog.submitting = false;
+  moveMemberDialog.open = true;
+}
+
+function requestMoveMember(member: ChannelMember): void {
+  if (!voiceState.canMoveClients) {
+    showToast(t("movePermissionDenied"));
+    return;
+  }
+  openMoveMemberDialog(member);
+}
+
+function cancelMoveMember(): void {
+  if (moveMemberDialog.submitting) return;
+  moveMemberDialog.open = false;
+  moveMemberDialog.member = null;
+  moveMemberDialog.channelId = "";
+  moveMemberDialog.password = "";
+  moveMemberDialog.error = "";
+}
+
+async function submitMoveMember(): Promise<void> {
+  const member = moveMemberDialog.member;
+  const channelId = moveMemberDialog.channelId;
+  if (!member || !channelId || moveMemberDialog.submitting) return;
+  moveMemberDialog.submitting = true;
+  moveMemberDialog.error = "";
+  try {
+    await moveClient(member.id, channelId, moveMemberDialog.password.trim());
+    showToast(t("moveMemberSuccess"));
+    cancelMoveMember();
+  } catch (error: unknown) {
+    moveMemberDialog.error = localizedMessage(error instanceof Error ? error.message : "操作失败");
+  } finally {
+    moveMemberDialog.submitting = false;
+  }
 }
 
 function toggleWhisperTarget(member: ChannelMember): void {

@@ -14,6 +14,7 @@ export interface VoiceState {
   reconnectAttempt: number;
   reconnectFailed: boolean;
   tsClientId: number;
+  canMoveClients: boolean;
   error: string;
   errorCode: string;
   /**
@@ -232,7 +233,7 @@ const CONNECTION_FAILURE_MESSAGES: Record<string, string> = {
 
 export function useVoiceWebSocket() {
   const ws = ref<WebSocket | null>(null);
-  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
+  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, canMoveClients: false, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
@@ -242,6 +243,8 @@ export function useVoiceWebSocket() {
   let lastConnection: { target: string; channel: string; nickname: string; serverPassword: string; identity?: string; rememberIdentity: boolean; accelerated: boolean; accelerationRelayId: string } | null = null;
   let latencyProbeSequence = 0;
   const pendingLatencyProbes = new Map<string, { startedAt: number; resolve: (result: LatencyProbeResult | null) => void; timer: ReturnType<typeof setTimeout> }>();
+  let commandSequence = 0;
+  const pendingCommands = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   let webrtcPeer: RTCPeerConnection | null = null;
   let webrtcOutputElement: SinkAudioElement | null = null;
   let webrtcPlaybackStream: MediaStream | null = null;
@@ -1449,7 +1452,9 @@ export function useVoiceWebSocket() {
     socket.onclose = (event) => {
       if (sequence !== connectionSequence) return;
       clearLatencyProbes();
+      rejectPendingCommands(new Error("语音连接已关闭"));
       state.connected = false;
+      state.canMoveClients = false;
       state.connecting = false;
       state.reconnecting = false;
       // Prefer the close code over the generic WebSocket error event. The
@@ -1537,6 +1542,7 @@ export function useVoiceWebSocket() {
   function disconnect(preserveConnection = false): void {
     connectionSequence++;
     clearLatencyProbes();
+    rejectPendingCommands(new Error("语音连接已关闭"));
     const keepRememberedIdentity = lastConnection?.rememberIdentity === true;
     if (!preserveConnection) lastConnection = null;
     stopMicrophone();
@@ -1552,6 +1558,7 @@ export function useVoiceWebSocket() {
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
     state.tsClientId = 0;
+    state.canMoveClients = false;
     state.errorCode = "";
     state.channelSwitchedChannelId = "";
     if (!keepRememberedIdentity) identityMaterial.value = "";
@@ -1578,6 +1585,14 @@ export function useVoiceWebSocket() {
     }
   }
 
+  function rejectPendingCommands(error: Error): void {
+    for (const [requestId, pending] of pendingCommands) {
+      clearTimeout(pending.timer);
+      pendingCommands.delete(requestId);
+      pending.reject(error);
+    }
+  }
+
   function handleMessage(msg: any): void {
     switch (msg.type) {
       case "connected":
@@ -1591,6 +1606,7 @@ export function useVoiceWebSocket() {
         state.errorCode = "";
         state.channelSwitchedChannelId = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
+        state.canMoveClients = msg.canMoveClients === true;
         applyWhisperState(msg.whisperTargetIds, msg.whisperActive);
         if (Array.isArray(msg.members)) {
           members.length = 0;
@@ -1638,6 +1654,9 @@ export function useVoiceWebSocket() {
           for (const channel of msg.channels) channels.push(channel);
         }
         syncKnownMemberVolumes();
+        break;
+      case "capabilities":
+        state.canMoveClients = msg.canMoveClients === true;
         break;
       case "chatMessage":
         if (Number(msg.invokerId) === state.tsClientId) break;
@@ -1692,6 +1711,7 @@ export function useVoiceWebSocket() {
       }
       case "disconnected":
         state.connected = false;
+        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = Boolean(msg.recoverable !== false);
         state.reconnectFailed = false;
@@ -1703,6 +1723,7 @@ export function useVoiceWebSocket() {
         break;
       case "reconnecting":
         state.connected = false;
+        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = true;
         state.reconnectFailed = false;
@@ -1718,6 +1739,7 @@ export function useVoiceWebSocket() {
         break;
       case "reconnectFailed":
         state.connected = false;
+        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = false;
         state.reconnectFailed = true;
@@ -1728,6 +1750,7 @@ export function useVoiceWebSocket() {
         break;
       case "connectionFailed":
         state.connected = false;
+        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = false;
         // This is the first connection attempt, not a failed reconnect. Keep
@@ -1761,9 +1784,30 @@ export function useVoiceWebSocket() {
           }
         }
         break;
+      case "commandCompleted": {
+        const requestId = typeof msg.requestId === "string" ? msg.requestId : "";
+        const pending = requestId ? pendingCommands.get(requestId) : undefined;
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingCommands.delete(requestId);
+          pending.resolve();
+        }
+        break;
+      }
       case "error":
         state.errorCode = normalizedClientErrorCode(msg.error?.code, "OPERATION_FAILED");
         state.error = protocolErrorMessage(state.errorCode, String(msg.error?.message || msg.message || "操作失败"));
+        {
+          const requestId = typeof msg.requestId === "string" ? msg.requestId : "";
+          const pending = requestId ? pendingCommands.get(requestId) : undefined;
+          if (pending) {
+            clearTimeout(pending.timer);
+            pendingCommands.delete(requestId);
+            const error = new Error(state.error);
+            Object.assign(error, { code: state.errorCode });
+            pending.reject(error);
+          }
+        }
         break;
     }
   }
@@ -1780,8 +1824,21 @@ export function useVoiceWebSocket() {
     playAudioFrame(clientId, data.slice(3));
   }
 
-  function sendCmd(type: string, payload: Record<string, unknown> = {}): void {
-    if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify({ type, payload }));
+  function sendCmd(type: string, payload: Record<string, unknown> = {}, requestId = ""): void {
+    if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify({ type, payload, ...(requestId ? { requestId } : {}) }));
+  }
+
+  function sendCommandAndWait(type: string, payload: Record<string, unknown>, timeoutMs = 8_000): Promise<void> {
+    if (ws.value?.readyState !== WebSocket.OPEN) return Promise.reject(new Error("语音连接尚未就绪"));
+    const requestId = `command-${Date.now().toString(36)}-${(commandSequence++).toString(36)}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingCommands.delete(requestId);
+        reject(new Error("操作超时，请稍后重试"));
+      }, timeoutMs);
+      pendingCommands.set(requestId, { resolve, reject, timer });
+      sendCmd(type, payload, requestId);
+    });
   }
 
   function switchChannel(channelId: string, password = ""): void {
@@ -1789,6 +1846,10 @@ export function useVoiceWebSocket() {
     state.errorCode = "";
     state.channelSwitchedChannelId = "";
     sendCmd("switchChannel", { channelId, ...(password ? { password } : {}) });
+  }
+
+  function moveClient(clientId: number, channelId: string, password = ""): Promise<void> {
+    return sendCommandAndWait("moveClient", { clientId, channelId, ...(password ? { password } : {}) });
   }
 
   function measureLatency(timeoutMs = 2_200): Promise<LatencyProbeResult | null> {
@@ -1911,6 +1972,8 @@ export function useVoiceWebSocket() {
       CHANNEL_SWITCH_FAILED: "频道切换失败",
       CHANNEL_PASSWORD_REQUIRED: "该频道需要密码",
       CHANNEL_FULL: "该频道已满",
+      CANNOT_MOVE_SELF: "不能移动自己的客户端",
+      CHANNEL_NOT_FOUND: "目标频道不可用",
       NICKNAME_IN_USE: "该昵称已被占用，请更换昵称",
       CLIENT_VERSION_OUTDATED: "客户端版本过旧，服务器拒绝了该操作",
       FLOOD_PROTECTION: "操作过于频繁，请稍后重试",
@@ -2044,6 +2107,7 @@ export function useVoiceWebSocket() {
     reconnectNow,
     disconnect,
     switchChannel,
+    moveClient,
     sendTextMessage,
     sendServerMessage,
     sendPrivateMessage,
