@@ -1,11 +1,12 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
 import { createRequire } from "node:module";
+import { isIP } from "node:net";
 import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { DirectorySynchronizer } from "./directory-sync.js";
 import { TSClient, type TSDirectorySnapshot, type TSVoiceData } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
-import { clientConnectionFailureCode, normalizeTeamSpeakError } from "../errors.js";
+import { clientConnectionFailureCode, describeTeamSpeakError, normalizeTeamSpeakError, teamSpeakServerErrorCode, type WebSpeakError } from "../errors.js";
 import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore, type JoinTicketPayload } from "./join-ticket.js";
 import { IdentityLeaseStore } from "./identity-lease.js";
@@ -14,7 +15,7 @@ import { parseClientCommand, type ClientCommand } from "./voice-protocol.js";
 import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnect-policy.js";
 import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioStats, type WebRtcSessionDescription } from "./webrtc-audio.js";
 import { pingTeamSpeakSession } from "./network-probe.js";
-import type { AccelerationRelayOptions } from "./acceleration-relay.js";
+import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./acceleration-relay.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -22,6 +23,7 @@ const { OpusEncoder } = require("@discordjs/opus") as {
 };
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const MOVE_PERMISSION_PROBE_INTERVAL_MS = 30_000;
 const AUDIO_FRAME_BYTES = 1_920;
 // A browser audio frame is 20 ms of mono 48 kHz PCM. Keep the server-side
 // WebSocket egress queue small enough that a slow browser cannot turn old
@@ -31,10 +33,18 @@ const AUDIO_FRAME_BYTES = 1_920;
 // before scheduling decoded audio.
 const MAX_SERVER_AUDIO_BUFFERED_BYTES = 4_096;
 
+function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>): string | undefined {
+  const serverMessage = error.diagnostics.serverMessage?.trim();
+  const serverId = error.diagnostics.id?.trim();
+  const detail = [serverMessage, serverId ? `server error id=${serverId}` : ""].filter(Boolean).join("; ");
+  const safe = detail.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return safe || undefined;
+}
+
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
-  acceleration?: AccelerationRelayOptions | (() => AccelerationRelayOptions | undefined);
+  acceleration?: ConfiguredAccelerationRelay[] | (() => ConfiguredAccelerationRelay[]);
   accelerationName?: string | (() => string | undefined);
 }
 
@@ -101,6 +111,7 @@ interface ChannelMember {
   id: number;
   nickname: string;
   uid: string;
+  avatar?: string;
   away?: boolean;
   awayMessage?: string;
   inputMuted?: boolean;
@@ -122,14 +133,18 @@ interface WebClientEntry {
   ws: WebSocket;
   nickname: string;
   rememberIdentity: boolean;
+  clientIp: string;
   target: TeamSpeakTarget;
+  accelerationRelay?: { name: string; target: string };
   acceleration?: AccelerationRelayOptions;
   identityLeaseKey?: string;
   webrtcPublicHost?: string;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
+  avatarCache: Map<string, string | null>;
   eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
+  opusEncoderWarnedAt: number; // Opus 编码器不可用告警的时间戳，用于限流避免反复刷屏
   whisperTargetIds: Set<number>;
   whisperActive: boolean;
   isAlive: boolean;
@@ -137,6 +152,8 @@ interface WebClientEntry {
   audio: AudioFlowStats;
   webrtc: WebRtcAudioSession | null;
   lastLatencyProbeAt: number;
+  canMoveClients: boolean;
+  movePermissionProbeTimer: ReturnType<typeof setInterval> | null;
   connectionFailureCode?: string;
 }
 
@@ -169,17 +186,21 @@ export class VoiceBridge {
 
       const { target, serverPassword, nickname } = connection;
       const channelName = connection.channel;
-      const acceleration = connection.accelerated ? this.getAccelerationOptions() : undefined;
+      const acceleration = connection.accelerated ? this.getAccelerationOptions(connection.accelerationRelayId) : undefined;
       if (connection.accelerated && !acceleration) {
         ws.close(4006, "ACCELERATION_UNAVAILABLE");
         return;
       }
+      const clientIp = resolveClientIp(req);
       const webrtcPublicHost = resolveWebRtcPublicHost(req);
       let identity;
       try {
         identity = connection.identity ? identityFromString(connection.identity) : undefined;
       } catch {
-        ws.close(4003, "Invalid identity");
+        // Send a structured failure before the close so the browser can tell
+        // an invalid remembered identity apart from a real connection failure.
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "connectionFailed", code: "IDENTITY_INVALID", detail: "Invalid identity" }));
+        ws.close(4003, "IDENTITY_INVALID");
         return;
       }
       const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -203,15 +224,25 @@ export class VoiceBridge {
         return;
       }
 
-      this.logger.info({ entryId, nickname, channel: channelName, target: formatTeamSpeakTarget(target) }, "WebClient connecting");
+      this.logger.info({
+        entryId,
+        nickname,
+        clientIp,
+        channel: channelName,
+        target: formatTeamSpeakTarget(target),
+        ...(acceleration ? { relayName: acceleration.name, relayTarget: formatTeamSpeakTarget({ host: acceleration.relayHost, port: acceleration.relayPort }) } : {}),
+      }, "WebClient connecting");
       let tsClient: TSClient;
       try {
         tsClient = new TSClient({ target, nickname, serverPassword, defaultChannel: channelName, identity, ...(acceleration ? { acceleration } : {}) }, this.logger);
       } catch (error: unknown) {
         if (identityLeaseKey) this.identityLeases.release(identityLeaseKey, entryId);
         this.logger.error({ err: error, entryId }, "Could not create TeamSpeak client");
-        void this.sessionManager.teardown(entryId, "teamSpeak-connect-failed");
-        ws.close(4003, "TeamSpeak client unavailable");
+        // A 4003 with a bare close used to be reported as "identity rejected".
+        // Send a structured failure so the browser says the TeamSpeak client
+        // could not be created (server down / unreachable) instead.
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "connectionFailed", code: "TEAM_SPEAK_CLIENT_UNAVAILABLE", detail: "TeamSpeak client unavailable" }));
+        ws.close(4003, "TEAM_SPEAK_CLIENT_UNAVAILABLE");
         return;
       }
       entry = {
@@ -221,14 +252,18 @@ export class VoiceBridge {
         ws,
         nickname,
         rememberIdentity: connection.rememberIdentity === true,
+        clientIp,
         target,
+        ...(acceleration ? { accelerationRelay: { name: acceleration.name, target: formatTeamSpeakTarget({ host: acceleration.relayHost, port: acceleration.relayPort }) } } : {}),
         ...(acceleration ? { acceleration } : {}),
         ...(identityLeaseKey ? { identityLeaseKey } : {}),
         ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
         channelTree: [],
         members: new Map(),
+        avatarCache: new Map(),
         eventLog: [],
         opusEncoder: null,
+        opusEncoderWarnedAt: 0,
         whisperTargetIds: new Set(),
         whisperActive: false,
         isAlive: true,
@@ -236,6 +271,8 @@ export class VoiceBridge {
         audio: createAudioFlowStats(),
         webrtc: null,
         lastLatencyProbeAt: 0,
+        canMoveClients: false,
+        movePermissionProbeTimer: null,
       };
       this.entries.set(entryId, entry!);
       try {
@@ -253,9 +290,16 @@ export class VoiceBridge {
       let audioReady = true;
       let realtimeReady = false;
       let hasConnectedOnce = false;
+      // Set when the server kicks or bans this client. The kick and the transport
+      // drop can arrive in either order, so the reason is parked here and consumed
+      // by whichever handler runs second.
+      let pendingKickReason: WebSpeakError | null = null;
       let reconnectStartedAt = 0;
       let reconnectAttempt = 0;
       const directory = new DirectorySynchronizer();
+      const avatarRequests = new Set<string>();
+      let avatarRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+      let avatarRefreshRunning = false;
 
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
@@ -279,13 +323,15 @@ export class VoiceBridge {
         const sdkChannelId = tsClient.getChannelId();
         if (selfChannelId === 0n && sdkChannelId !== 0n) selfChannelId = sdkChannelId;
         const normalizedSnapshot = normalizeDirectorySnapshot(snapshot, effectiveSelfId, selfChannelId, nickname, channelName);
-        entry!.channelTree = mapChannelTree(normalizedSnapshot);
+        entry!.channelTree = mapChannelTree(normalizedSnapshot, entry!.avatarCache);
         entry!.members.clear();
         for (const client of normalizedSnapshot.clients) {
+          const avatar = client.uid ? entry!.avatarCache.get(client.uid) : undefined;
           entry!.members.set(client.id, {
             id: client.id,
             nickname: client.nickname,
             uid: client.uid,
+            ...(avatar ? { avatar } : {}),
             away: client.away,
             awayMessage: client.awayMessage,
             inputMuted: client.inputMuted,
@@ -300,6 +346,54 @@ export class VoiceBridge {
         const nextWhisperTargets = [...entry!.whisperTargetIds].sort((a, b) => a - b);
         if (initialStateSent && (previousWhisperTargets.length !== nextWhisperTargets.length || previousWhisperTargets.some((clientId, index) => clientId !== nextWhisperTargets[index]))) {
           sendJson({ type: "whisperTargets", targetIds: nextWhisperTargets, active: entry!.whisperActive });
+        }
+      };
+      const scheduleMemberAvatarRefresh = (delayMs = 0): void => {
+        if (!entry || !entry.isAlive || avatarRefreshTimer) return;
+        avatarRefreshTimer = setTimeout(() => {
+          avatarRefreshTimer = null;
+          void refreshMemberAvatars();
+        }, delayMs);
+        avatarRefreshTimer.unref?.();
+      };
+      const refreshMemberAvatars = async (): Promise<void> => {
+        if (!entry || !entry.isAlive || !tsReady || session.state !== "connected" || avatarRefreshRunning) return;
+        avatarRefreshRunning = true;
+        try {
+          const candidates = [...entry.members.values()]
+            .filter((member) => member.uid && !entry!.avatarCache.has(member.uid) && !avatarRequests.has(member.uid))
+            .slice(0, 50);
+          for (const member of candidates) {
+            if (!entry || !entry.isAlive || !member.uid) return;
+            avatarRequests.add(member.uid);
+            try {
+              const loaded = await tsClient.getClientAvatar(member.id, member.uid);
+              const avatar = loaded ? avatarDataUrl(loaded.data) : null;
+              entry.avatarCache.set(member.uid, avatar);
+              const current = entry.members.get(member.id);
+              if (current && current.uid === member.uid && avatar) {
+                current.avatar = avatar;
+                sendJson({ type: "memberAvatar", id: member.id, uid: member.uid, avatar });
+              }
+            } catch (error: unknown) {
+              // Avatar access is optional. A permission or file-transfer failure
+              // must never affect joining, directory updates, or voice traffic.
+              entry.avatarCache.set(member.uid, null);
+              this.logger.debug({
+                entryId,
+                clientId: member.id,
+                uid: member.uid,
+                err: error instanceof Error ? error.message : String(error),
+              }, "TeamSpeak client avatar unavailable");
+            } finally {
+              avatarRequests.delete(member.uid);
+            }
+          }
+        } finally {
+          avatarRefreshRunning = false;
+          if (entry?.isAlive && tsReady && session.state === "connected" && [...entry.members.values()].some((member) => member.uid && !entry!.avatarCache.has(member.uid))) {
+            scheduleMemberAvatarRefresh(250);
+          }
         }
       };
       const trackChannelEvents = (previous: unknown[], next: unknown[]) => {
@@ -317,11 +411,19 @@ export class VoiceBridge {
         initialStateSent = true;
         const wasReconnecting = hasConnectedOnce;
         hasConnectedOnce = true;
+        // A previous kick reason never applies to a fresh, successful session.
+        pendingKickReason = null;
         reconnectAttempt = 0;
         reconnectStartedAt = 0;
         if (!wasReconnecting) {
           entry!.eventLog.push({ id: `event-${Date.now().toString(36)}-connected`, kind: "connection", message: "已连接到服务器", timestamp: Date.now() });
-          this.logger.info({ entryId: entry!.id, nickname: entry!.nickname, target: formatTeamSpeakTarget(entry!.target) }, "Web client connected to TeamSpeak");
+          this.logger.info({
+            entryId: entry!.id,
+            nickname: entry!.nickname,
+            clientIp: entry!.clientIp,
+            target: formatTeamSpeakTarget(entry!.target),
+            ...(entry!.accelerationRelay ? { relayName: entry!.accelerationRelay.name, relayTarget: entry!.accelerationRelay.target } : {}),
+          }, "Web client connected to TeamSpeak");
         }
         session.transition("connected");
         sendJson({
@@ -333,17 +435,56 @@ export class VoiceBridge {
           whisperActive: entry!.whisperActive,
           webrtcAvailable: this.getWebRtcOptions()?.enabled === true,
           accelerated: Boolean(entry!.acceleration),
+          canMoveClients: entry!.canMoveClients,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
         if (wasReconnecting) sendJson({ type: "reconnected" });
+        scheduleMemberAvatarRefresh();
       };
+
+      let movePermissionProbeInFlight = false;
+      const refreshMoveCapability = async (): Promise<void> => {
+        if (!entry || !tsReady || session.state !== "connected" || movePermissionProbeInFlight) return;
+        const probeTarget = findMovePermissionProbeTarget(entry, selfId);
+        if (!probeTarget) return;
+        movePermissionProbeInFlight = true;
+        try {
+          // Probe by moving a visible client to the channel it is already in.
+          // A successful request has no observable state change, while the
+          // server still evaluates i_client_move_power and the target channel's
+          // i_client_needed_move_power. This avoids using ServerQuery-only
+          // `permget`, which is not available on the browser client protocol.
+          await tsClient.probeMovePermission(probeTarget.clientId, BigInt(probeTarget.channelId));
+          if (!entry.canMoveClients) {
+            entry.canMoveClients = true;
+            sendJson({ type: "capabilities", canMoveClients: true });
+          }
+        } catch (error: unknown) {
+          const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
+          if (operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
+            entry.canMoveClients = false;
+            sendJson({ type: "capabilities", canMoveClients: false });
+          }
+          this.logger.debug({
+            entryId,
+            clientId: probeTarget.clientId,
+            channelId: probeTarget.channelId,
+            code: operation.code,
+          }, "TeamSpeak move capability probe completed");
+        } finally {
+          movePermissionProbeInFlight = false;
+        }
+      };
+      entry!.movePermissionProbeTimer = setInterval(() => { void refreshMoveCapability(); }, MOVE_PERMISSION_PROBE_INTERVAL_MS);
+      entry!.movePermissionProbeTimer.unref?.();
 
       const resetDirectoryForReconnect = () => {
         tsReady = false;
         initialStateSent = false;
         selfId = 0;
         selfChannelId = 0n;
+        entry!.canMoveClients = false;
         directory.clear();
         entry!.channelTree = [];
         entry!.members.clear();
@@ -360,8 +501,9 @@ export class VoiceBridge {
           if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
         } catch { /* teardown below remains authoritative */ }
         const failureCode = clientConnectionFailureCode(normalized, serverPassword);
+        const failureDetail = publicFailureDetail(normalized);
         entry!.connectionFailureCode = failureCode;
-        sendJson({ type: "reconnectFailed", code: failureCode });
+        sendJson({ type: "reconnectFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
         void this.teardown(entryId, "teamSpeak-connect-failed");
       };
 
@@ -413,15 +555,29 @@ export class VoiceBridge {
             refreshDirectory();
           }
           sendInitialState();
+          void refreshMoveCapability();
         } catch (error: unknown) {
           const normalized = normalizeTeamSpeakError(error);
           const failureCode = clientConnectionFailureCode(normalized, serverPassword);
+          const failureDetail = publicFailureDetail(normalized);
           entry!.connectionFailureCode = failureCode;
-          this.logger.error({ code: failureCode, normalizedCode: normalized.code, entryId, reconnect: isReconnect, attempt: reconnectAttempt }, "TS connect failed");
+          this.logger.warn({
+            code: failureCode,
+            normalizedCode: normalized.code,
+            failureDetail: describeTeamSpeakError(normalized),
+            ...(Object.keys(normalized.diagnostics).length ? { failureDiagnostics: normalized.diagnostics } : {}),
+            entryId,
+            reconnect: isReconnect,
+            attempt: reconnectAttempt,
+          }, "TS connect failed");
           if (!isReconnect) {
             try {
               if (session.state !== "disconnecting" && session.state !== "idle") session.transition("failed");
             } catch { /* teardown below remains authoritative */ }
+            // Send the structured failure before closing. Some browsers and
+            // reverse proxies do not preserve a WebSocket close reason, which
+            // would otherwise collapse every failure into a generic message.
+            sendJson({ type: "connectionFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
             if (ws.readyState === WebSocket.OPEN) ws.close(4003, failureCode);
             void this.teardown(entryId, "teamSpeak-connect-failed");
             return;
@@ -448,6 +604,7 @@ export class VoiceBridge {
         trackChannelEvents(previousChannels, entry!.channelTree);
         sendInitialState();
         if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
+        scheduleMemberAvatarRefresh();
       });
 
       tsClient.on("clientEnter", (info) => {
@@ -463,6 +620,8 @@ export class VoiceBridge {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
           if (!wasKnown && info.id !== selfId) addServerEvent("joined", `${info.nickname || "未知用户"} 加入了服务器`);
+          scheduleMemberAvatarRefresh();
+          void refreshMoveCapability();
         }
       });
 
@@ -489,6 +648,12 @@ export class VoiceBridge {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (info.id !== selfId) addServerEvent("moved", `${movedMember?.nickname || "用户"} 移动到了其他频道`);
         }
+      });
+
+      tsClient.on("clientUpdated", (info) => {
+        directory.applyClientUpdated(info);
+        refreshDirectory();
+        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
       });
 
       tsClient.on("voiceData", (data: TSVoiceData) => {
@@ -561,10 +726,30 @@ export class VoiceBridge {
         addServerEvent("poke", `${event.invokerName || "用户"} 戳了你一下`);
       });
 
+      // 被踢/封禁对本会话是终态：把服务器给出的原因回放给浏览器并拆除会话，
+      // 而不是像以前那样因原因被丢弃而反复重连、再次撞上同一踢出。
+      // A kick or ban is terminal for this session: replay the reason the server
+      // sent instead of reconnecting, which is what used to happen once the reason
+      // message was dropped (the browser kept retrying straight into the kick).
+      tsClient.on("kicked", (kick: WebSpeakError) => {
+        if (!hasConnectedOnce || session.state !== "connected") return;
+        pendingKickReason = kick;
+        resetDirectoryForReconnect();
+        const failureCode = clientConnectionFailureCode(kick, serverPassword);
+        const failureDetail = publicFailureDetail(kick);
+        entry!.connectionFailureCode = failureCode;
+        this.logger.warn({ entryId, code: failureCode, normalizedCode: kick.code, failureDetail: describeTeamSpeakError(kick) }, "TeamSpeak session ended by kick/ban");
+        sendJson({ type: "connectionFailed", code: failureCode, ...(failureDetail ? { detail: failureDetail } : {}) });
+        void this.teardown(entryId, "teamSpeak-kicked");
+      });
+
       tsClient.on("disconnected", (error?: Error) => {
         if (!hasConnectedOnce || session.state !== "connected") return;
         resetDirectoryForReconnect();
-        const normalized = error ? normalizeTeamSpeakError(error) : null;
+        // Prefer a kick reason over the generic transport error that follows it,
+        // regardless of which of the two events arrives first.
+        const normalized = pendingKickReason ?? (error ? normalizeTeamSpeakError(error) : null);
+        pendingKickReason = null;
         sendJson({ type: "disconnected", recoverable: isRecoverable(normalized) });
         scheduleReconnect(normalized);
       });
@@ -596,6 +781,16 @@ export class VoiceBridge {
               entry!.audio.tsSendFirstAt ??= sentAt;
               entry!.audio.tsSendLastAt = sentAt;
               entry!.audio.tsSendFrames++;
+            } else {
+              // Opus 编码器不可用（初始化失败或销毁后仍有帧在途）：显式告知浏览器
+              // 而不是静默丢帧，5 秒限流避免高频告警刷屏。
+              // The Opus encoder is unavailable (init failed or torn down while
+              // frames are still in flight): say it instead of dropping silently.
+              const warnedAt = entry!.opusEncoderWarnedAt;
+              if (Date.now() - warnedAt > 5_000) {
+                entry!.opusEncoderWarnedAt = Date.now();
+                sendJson({ type: "audioError", code: "AUDIO_ENCODER_UNAVAILABLE", detail: "Opus encoder unavailable" });
+              }
             }
           } catch {
             // A frame arriving during shutdown is safe to discard.
@@ -737,6 +932,10 @@ export class VoiceBridge {
       clearTimeout(entry.reconnectTimer);
       entry.reconnectTimer = null;
     }
+    if (entry.movePermissionProbeTimer) {
+      clearInterval(entry.movePermissionProbeTimer);
+      entry.movePermissionProbeTimer = null;
+    }
     entry.opusEncoder = null;
     const webRtc = entry.webrtc;
     entry.webrtc = null;
@@ -759,7 +958,9 @@ export class VoiceBridge {
     this.logger.info({
       entryId: entry.id,
       nickname: entry.nickname,
+      clientIp: entry.clientIp,
       target: formatTeamSpeakTarget(entry.target),
+      ...(entry.accelerationRelay ? { relayName: entry.accelerationRelay.name, relayTarget: entry.accelerationRelay.target } : {}),
       reason,
       ...(entry.connectionFailureCode ? { failureCode: entry.connectionFailureCode } : {}),
       durationSeconds: Math.max(0, Math.floor((Date.now() - entry.session.createdAt) / 1000)),
@@ -794,9 +995,13 @@ export class VoiceBridge {
     return typeof configured === "function" ? configured() : configured;
   }
 
-  private getAccelerationOptions(): AccelerationRelayOptions | undefined {
+  private getAccelerationOptions(relayId = ""): ConfiguredAccelerationRelay | undefined {
     const configured = this.options.acceleration;
-    return typeof configured === "function" ? configured() : configured;
+    const relays = typeof configured === "function" ? configured() : configured;
+    if (!relays?.length) return undefined;
+    const selected = relayId ? relays.find((relay) => relay.id === relayId) : relays[0];
+    if (!selected) return undefined;
+    return selected;
   }
 
   private async handleWebRtcOffer(
@@ -869,6 +1074,30 @@ function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
   return undefined;
 }
 
+function resolveClientIp(request: IncomingMessage): string {
+  const candidates = [
+    firstHeader(request.headers["x-forwarded-for"])?.split(",", 1)[0],
+    firstHeader(request.headers["x-real-ip"]),
+    request.socket.remoteAddress,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeClientIp(candidate);
+    if (normalized) return normalized;
+  }
+  return "unknown";
+}
+
+function normalizeClientIp(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  let trimmed = value.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) trimmed = trimmed.slice(1, -1);
+  if (trimmed.toLowerCase().startsWith("::ffff:")) {
+    const mapped = trimmed.slice("::ffff:".length);
+    if (isIP(mapped) === 4) trimmed = mapped;
+  }
+  return isIP(trimmed) ? trimmed : undefined;
+}
+
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -929,7 +1158,29 @@ async function handleCommand(
   }
 
   try {
-    if (command.type === "sendTextMessage") {
+    if (command.type === "moveClient") {
+      const clientId = command.payload.clientId as number;
+      const channelId = command.payload.channelId as string;
+      const channelPassword = typeof command.payload.password === "string" ? command.payload.password : "";
+      if (clientId === entry.tsClient.getClientId()) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CANNOT_MOVE_SELF", message: "不能移动自己的客户端", recoverable: false } });
+        return;
+      }
+      if (!entry.members.has(clientId)) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CLIENT_NOT_FOUND", message: "成员已离线或当前不可见", recoverable: false } });
+        return;
+      }
+      const targetExists = entry.channelTree.some((channel) => isRecord(channel) && channel.id === channelId);
+      if (!targetExists) {
+        sendJson({ type: "error", requestId: command.requestId, error: { code: "CHANNEL_NOT_FOUND", message: "目标频道不可用", recoverable: false } });
+        return;
+      }
+      // TeamSpeak evaluates i_client_move_power against the target's
+      // i_client_needed_move_power inside clientmove. Do not duplicate that
+      // policy in the gateway; forwarding the authoritative command keeps TS3
+      // and TS6 permission behavior aligned.
+      await entry.tsClient.moveClient(clientId, BigInt(channelId), channelPassword || undefined);
+    } else if (command.type === "sendTextMessage") {
       const message = (command.payload.message as string).trim();
       if (message) await entry.tsClient.sendTextMessage("channel", message, entry.tsClient.getChannelId());
     } else if (command.type === "sendServerMessage") {
@@ -971,7 +1222,9 @@ async function handleCommand(
       entry.whisperActive = active;
       sendJson({ type: "whisperTargets", targetIds: [...entry.whisperTargetIds], active: entry.whisperActive });
     } else if (command.type === "setMicrophoneMuted") {
-      entry.webrtc?.setMicrophoneMuted(command.payload.muted as boolean);
+      const muted = command.payload.muted as boolean;
+      await entry.tsClient.setInputMuted(muted);
+      entry.webrtc?.setMicrophoneMuted(muted);
     } else if (command.type === "setAccompanimentActive") {
       entry.webrtc?.setAccompanimentActive(command.payload.active as boolean);
     } else if (command.type === "setMemberVolume") {
@@ -988,8 +1241,24 @@ async function handleCommand(
 function classifyOperationError(error: unknown, fallbackCode: string, fallbackMessage: string): { code: string; message: string } {
   const text = error instanceof Error ? error.message : String(error);
   const normalized = text.toLocaleLowerCase();
+  // A TeamSpeak server error id is authoritative when the SDK preserved it, so it
+  // is consulted before the keyword rules: 781 (channel password), 2568
+  // (permissions), 515/2817 (server or slot limit) and friends keep their exact
+  // meaning instead of being guessed from prose.
+  const serverCode =
+    teamSpeakServerErrorCode(isRecord(error) ? (error.id ?? error.code) : undefined) ??
+    teamSpeakServerErrorCode(/\bid[\s=:]*(\d{3,5})\b/.exec(normalized)?.[1]);
+  if (serverCode) {
+    if (serverCode === "identity_security_level_too_low") return { code: "PERMISSION_DENIED", message: "你没有执行此操作的权限" };
+    if (serverCode === "channel_password_required") return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
+    if (serverCode === "server_full") return { code: "CHANNEL_FULL", message: "该频道已满" };
+    if (serverCode === "client_version_outdated") return { code: "CLIENT_VERSION_OUTDATED", message: "客户端版本过旧，服务器拒绝了该操作" };
+    if (serverCode === "flooding") return { code: "FLOOD_PROTECTION", message: "操作过于频繁，请稍后重试" };
+    if (serverCode === "banned") return { code: "BANNED", message: "你已被该服务器封禁" };
+    if (serverCode === "connection_initialisation_failed") return { code: "CONNECTION_INITIALISATION_FAILED", message: "TeamSpeak 服务器未能完成连接初始化，请稍后重试" };
+  }
   if (/permission|not permitted|insufficient|i_permission|2568/.test(normalized)) return { code: "PERMISSION_DENIED", message: "你没有执行此操作的权限" };
-  if (/channel.*(password|password.*required)|invalid.*(channel|password)|i_channel_password|1794/.test(normalized)) return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
+  if (/channel.*(password|password.*required)|invalid.*(channel|password)|i_channel_password|781/.test(normalized)) return { code: "CHANNEL_PASSWORD_REQUIRED", message: "该频道需要密码" };
   if (/already member/.test(normalized)) return { code: "ALREADY_IN_CHANNEL", message: "你已经在该频道中" };
   if (/full|maximum.*clients/.test(normalized)) return { code: "CHANNEL_FULL", message: "该频道已满" };
   if (/not found|unknown client|invalid client/.test(normalized)) return { code: "CLIENT_NOT_FOUND", message: "成员已离线" };
@@ -1088,25 +1357,49 @@ function snapshotAudioStats(entry: WebClientEntry): AudioFlowStats {
   return stats;
 }
 
-function mapChannelTree(snapshot: TSDirectorySnapshot): unknown[] {
+function mapChannelTree(snapshot: TSDirectorySnapshot, avatarCache = new Map<string, string | null>()): unknown[] {
   return snapshot.channels.map((channel) => ({
     id: String(channel.id),
     parentID: String(channel.parentID),
+    order: String(channel.order),
     name: channel.name || "未命名频道",
     description: channel.description || "",
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
-      .map((client) => ({
-        id: client.id,
-        nickname: client.nickname || "未知用户",
-        uid: client.uid,
-        away: client.away,
-        awayMessage: client.awayMessage,
-        inputMuted: client.inputMuted,
-        outputMuted: client.outputMuted,
-        channelCommander: client.channelCommander,
-      })),
+      .map((client) => {
+        const avatar = client.uid ? avatarCache.get(client.uid) : undefined;
+        return {
+          id: client.id,
+          nickname: client.nickname || "未知用户",
+          uid: client.uid,
+          ...(avatar ? { avatar } : {}),
+          away: client.away,
+          awayMessage: client.awayMessage,
+          inputMuted: client.inputMuted,
+          outputMuted: client.outputMuted,
+          channelCommander: client.channelCommander,
+        };
+      }),
   }));
+}
+
+function findMovePermissionProbeTarget(entry: Pick<WebClientEntry, "channelTree" | "members">, selfId: number): { clientId: number; channelId: string } | null {
+  for (const rawChannel of entry.channelTree) {
+    if (!isRecord(rawChannel) || typeof rawChannel.id !== "string" || !Array.isArray(rawChannel.members)) continue;
+    for (const rawMember of rawChannel.members) {
+      if (!isRecord(rawMember) || typeof rawMember.id !== "number" || rawMember.id === selfId) continue;
+      if (entry.members.has(rawMember.id)) return { clientId: rawMember.id, channelId: rawChannel.id };
+    }
+  }
+  return null;
+}
+
+function avatarDataUrl(data: Buffer): string | null {
+  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return `data:image/png;base64,${data.toString("base64")}`;
+  if (data.length >= 3 && data.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return `data:image/jpeg;base64,${data.toString("base64")}`;
+  if (data.length >= 6 && (data.subarray(0, 6).toString("ascii") === "GIF87a" || data.subarray(0, 6).toString("ascii") === "GIF89a")) return `data:image/gif;base64,${data.toString("base64")}`;
+  if (data.length >= 12 && data.subarray(0, 4).toString("ascii") === "RIFF" && data.subarray(8, 12).toString("ascii") === "WEBP") return `data:image/webp;base64,${data.toString("base64")}`;
+  return null;
 }
 
 function normalizeDirectorySnapshot(

@@ -30,7 +30,7 @@
           <h2>{{ t('welcomeBack') }}</h2>
           <p class="card-lead">{{ t('joinLead') }}</p>
 
-          <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span>{{ localizedMessage(voiceState.error) }}</span></div>
+          <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span class="notice-content"><span>{{ localizedMessage(voiceState.error) }}</span><code v-if="voiceState.errorCode">{{ t('errorCode') }}: {{ visibleErrorCode(voiceState.errorCode) }}</code></span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
           <div v-if="!serverConfigLoading && !initialized" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('notConfigured') }} <a href="/admin">{{ t('configureNow') }}</a></span></div>
           <div v-if="!localPersistenceAvailable" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ t('localPersistenceUnavailable') }}</span></div>
@@ -41,7 +41,7 @@
               <label class="field-label" for="server-port"><span>{{ t('serverPort') }}</span><div class="field-wrap"><Icon name="hash" :size="17" /><input id="server-port" v-model="serverPort" inputmode="numeric" type="text" maxlength="5" :placeholder="t('serverPortPlaceholder')" /></div></label>
             </div>
             <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
-            <label v-if="accelerationAvailable" class="acceleration-choice"><input v-model="accelerationEnabled" type="checkbox" /><span><strong>{{ accelerationDisplayName }}</strong><small>{{ t('relayAccelerationHint') }}</small></span></label>
+            <div v-if="accelerationAvailable" class="acceleration-choice"><div class="acceleration-copy"><strong>{{ t('relayAcceleration') }}</strong><small>{{ t('relayAccelerationHint') }}</small></div><select v-model="accelerationRelayId" :aria-label="t('relayAcceleration')"><option value="">{{ t('directConnection') }}</option><option v-for="relay in accelerationRelays" :key="relay.id" :value="relay.id">{{ relay.name }}</option></select></div>
             <div v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)" class="local-servers">
               <div v-if="favoriteServers.length" class="local-server-group"><span>{{ t('favoriteServers') }}</span><button v-for="favorite in favoriteServers" :key="favorite.id" type="button" @click="selectLocalServer(favorite.address, favorite.nickname)">{{ favorite.label }}</button></div>
               <div v-if="recentServers.length" class="local-server-group"><span>{{ t('recentServers') }}</span><button v-for="recent in recentServers" :key="recent.id" type="button" @click="selectLocalServer(recent.address, recent.nickname)">{{ recent.address }}</button></div>
@@ -122,6 +122,7 @@
           <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
           <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectNow">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="doDisconnect">{{ t('back') }}</button></div>
         </div>
+        <div v-if="voiceState.audioNotice" class="reconnect-banner degraded" role="status"><div class="reconnect-copy"><strong>{{ t('audioStatus') }}</strong><span>{{ localizedAudioNotice(voiceState.audioNoticeCode, voiceState.audioNotice) }}</span></div></div>
         <div v-for="poke in visiblePokes" :key="poke.id" class="poke-banner" role="status"><Icon name="bell" :size="17" /><span><strong>{{ poke.invokerName }}</strong> {{ t('pokedYou') }}<small v-if="poke.message">：{{ poke.message }}</small></span><button type="button" @click="dismissPoke(poke.id)"><Icon name="close" :size="15" /></button></div>
 
         <div class="workspace-scroll">
@@ -142,7 +143,7 @@
               <div v-if="currentMembers.length" class="voice-grid">
                 <article v-for="member in roomMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]">
                   <button v-if="isMobileViewport && !member.isSelf" type="button" class="voice-member-action" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="17" /></button>
-                  <div class="voice-avatar-wrap"><div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}</div></div>
+                  <div class="voice-avatar-wrap"><div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}</div></div>
                   <strong>{{ member.isSelf ? t('you') : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
                 </article>
                 <article v-if="currentMembers.length > roomMembers.length" class="voice-card more-card"><div class="more-count">+{{ currentMembers.length - roomMembers.length }}</div><strong>{{ t('moreMembers') }}</strong><span>{{ t('viewLeft') }}</span></article>
@@ -175,7 +176,7 @@
                 <div v-else-if="!visibleChatMessages.length" class="chat-empty"><div class="chat-empty-icon"><Icon name="message" :size="24" /></div><strong>{{ chatTab === 'private' ? t('privateChatStart') : t('chatStart') }}</strong><span>{{ chatTab === 'private' ? t('privateChatStartLead') : t('chatStartLead') }}</span></div>
                 <template v-for="message in visibleChatMessages" :key="message.id">
                   <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]">
-                  <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf)">{{ avatarInitial(message.invokerName) }}</div>
+                <div class="message-avatar" :style="avatarStyle(message.invokerName, message.isSelf, messageAvatar(message))">{{ messageAvatar(message) ? '' : avatarInitial(message.invokerName) }}</div>
                   <div class="message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
                   </article>
                 </template>
@@ -202,7 +203,7 @@
             </button>
             <div v-if="channelItem.members.length" class="member-list">
               <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" class="member-row" @contextmenu.prevent="openMemberMenu(member, $event)">
-                <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf)">{{ avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
+                <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
@@ -214,12 +215,23 @@
         </div>
         <div v-if="!filteredMemberChannels.length" class="member-empty">{{ t('noMatchingMembers') }}</div>
         <div v-if="!isMobileViewport" class="desktop-audio-dock" role="toolbar" :aria-label="t('desktopAudioControls')">
-          <div class="desktop-audio-dock-copy"><strong>{{ t('desktopAudioControls') }}</strong><span>{{ accompanimentActive ? t('accompanimentActive') : t('volumeTip') }}</span></div>
+          <div class="desktop-audio-dock-copy"><strong>{{ t('desktopAudioControls') }}</strong><span>{{ accompanimentActive ? t('accompanimentActive') : t('desktopAudioHint') }}</span></div>
           <div class="desktop-audio-dock-actions">
-            <button type="button" class="dock-audio-button microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
-            <div class="dock-output-control">
-              <button type="button" class="dock-audio-button" :class="{ muted: outputMuted }" :title="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /></button>
-              <input class="dock-output-slider" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('overallVolume')" @input="onOutputVolume" />
+            <div class="dock-hover-control">
+              <button type="button" class="dock-audio-button microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" aria-haspopup="dialog" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
+              <div class="dock-hover-panel dock-microphone-panel" role="dialog" :aria-label="t('microphone')">
+                <div class="dock-slider-heading"><span>{{ t('inputVolume') }}</span><strong>{{ Math.round(inputVolume * 100) }}%</strong></div>
+                <input class="dock-slider" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" />
+                <div class="dock-panel-divider"></div>
+                <label class="dock-switch-row"><span><strong>{{ t('noiseSuppression') }}</strong></span><input type="checkbox" :checked="noiseSuppressionEnabled" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionToggle" /></label>
+              </div>
+            </div>
+            <div class="dock-hover-control">
+              <button type="button" class="dock-audio-button" :class="{ muted: outputMuted }" :title="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" aria-haspopup="dialog" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /></button>
+              <div class="dock-hover-panel dock-output-panel" role="dialog" :aria-label="t('overallVolume')">
+                <div class="dock-slider-heading"><span>{{ t('overallVolume') }}</span><strong>{{ Math.round(outputVolume * 100) }}%</strong></div>
+                <input class="dock-slider" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('overallVolume')" @input="onOutputVolume" />
+              </div>
             </div>
             <button type="button" class="dock-audio-button" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <button type="button" class="dock-audio-button accompaniment-toggle" :class="{ active: accompanimentActive }" :title="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-label="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-pressed="accompanimentActive" @click="toggleAccompaniment"><Icon name="music" :size="18" /></button>
@@ -253,6 +265,26 @@
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
+      <button type="button" @click="requestMoveMember(memberMenu.member); memberMenu = null"><Icon name="chevron-right" :size="15" /> {{ t('moveMember') }}</button>
+    </div>
+
+    <!-- Move another TeamSpeak client to a channel. TeamSpeak still performs the permission check. -->
+    <div v-if="moveMemberDialog.open" class="modal-backdrop channel-password-backdrop" @click.self="cancelMoveMember">
+      <section class="channel-password-modal member-move-modal" role="dialog" aria-modal="true" aria-labelledby="move-member-title" @click.stop>
+        <button type="button" class="qq-modal-close" :aria-label="t('close')" :title="t('close')" @click="cancelMoveMember"><Icon name="close" :size="19" /></button>
+        <div class="channel-password-icon"><Icon name="chevron-right" :size="22" /></div>
+        <span class="card-kicker">{{ t('moveMember') }}</span>
+        <h2 id="move-member-title">{{ t('moveMemberTitle', { member: moveMemberDialog.member?.nickname ?? '' }) }}</h2>
+        <p>{{ t('moveMemberLead') }}</p>
+        <form class="channel-password-form" @submit.prevent="submitMoveMember">
+          <label class="field-label" for="move-member-channel">{{ t('moveMemberTarget') }}</label>
+          <div class="field-wrap"><Icon name="volume" :size="17" /><select id="move-member-channel" v-model="moveMemberDialog.channelId" :disabled="moveMemberDialog.submitting || !moveTargetChannels.length"><option value="" disabled>{{ t('moveMemberChooseChannel') }}</option><option v-for="targetChannel in moveTargetChannels" :key="targetChannel.id" :value="targetChannel.id">{{ moveChannelLabel(targetChannel) }}</option></select></div>
+          <label class="field-label" for="move-member-password">{{ t('channelPasswordPrompt') }} <span>{{ t('optional') }}</span></label>
+          <div class="field-wrap"><Icon name="lock" :size="17" /><input id="move-member-password" v-model="moveMemberDialog.password" type="password" autocomplete="off" :placeholder="t('channelPasswordOptional')" :disabled="moveMemberDialog.submitting" /></div>
+          <div v-if="moveMemberDialog.error" class="notice error-notice channel-password-error"><span class="notice-symbol">!</span><span>{{ moveMemberDialog.error }}</span></div>
+          <div class="channel-password-actions"><button type="button" class="text-button" :disabled="moveMemberDialog.submitting" @click="cancelMoveMember">{{ t('channelPasswordCancel') }}</button><button type="submit" class="primary-button channel-password-submit" :disabled="moveMemberDialog.submitting || !moveMemberDialog.channelId"><span v-if="moveMemberDialog.submitting" class="button-spinner"></span><span>{{ t('moveMemberSubmit') }}</span><Icon v-if="!moveMemberDialog.submitting" name="chevron-right" :size="17" /></button></div>
+        </form>
+      </section>
     </div>
 
     <!-- Protected channel password modal -->
@@ -292,8 +324,8 @@
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
-          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
-          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? t('audioReady') : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
+          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><label v-if="isMobileViewport" class="mobile-noise-toggle"><span><strong>{{ t('noiseSuppression') }}</strong><small>{{ t('noiseSuppressionHint') }}</small></span><input type="checkbox" :checked="noiseSuppressionEnabled" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionToggle" /></label><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? (voiceState.microphoneError ? t('audioUnavailable') : t('audioReady')) : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><p v-if="voiceState.microphoneError" class="settings-error">{{ localizedMessage(voiceState.microphoneError) }}</p><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
     </div>
@@ -306,7 +338,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
-import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type LatencyProbeResult } from "../composables/useVoiceWebSocket.js";
+import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -324,6 +356,7 @@ const {
   serverEvents,
   pokeNotifications,
   microphoneMuted,
+  noiseSuppressionEnabled,
   inputVolume,
   outputVolume,
   outputMuted,
@@ -346,6 +379,7 @@ const {
   whisperActive,
   setVolume,
   setInputVolume,
+  setNoiseSuppressionEnabled,
   setOutputVolume,
   toggleOutputMute,
   setVoxThreshold,
@@ -361,6 +395,7 @@ const {
   reconnectNow,
   disconnect,
   switchChannel,
+  moveClient,
   sendTextMessage,
   sendServerMessage,
   sendPrivateMessage,
@@ -395,10 +430,13 @@ const initialized = ref(false);
 const siteName = ref("WebSpeak");
 const welcomeTextZh = ref("");
 const welcomeTextEn = ref("");
-const appVersion = ref("0.2.0-preview");
-const accelerationAvailable = ref(false);
-const accelerationName = ref("");
-const accelerationEnabled = ref(false);
+const welcomeTextDe = ref("");
+const welcomeTextRu = ref("");
+const welcomeTextJa = ref("");
+const appVersion = ref("0.2.2");
+const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
+const accelerationRelayId = ref("");
+const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
 const browserError = ref("");
 const serverConfigLoading = ref(true);
 const memberQuery = ref("");
@@ -419,6 +457,7 @@ const privateClientId = ref(0);
 const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
+const moveMemberDialog = reactive({ open: false, member: null as ChannelMember | null, channelId: "", password: "", submitting: false, error: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
 const whisperPttActive = ref(false);
@@ -433,13 +472,21 @@ let performanceTimer: number | null = null;
 let performanceMonitorGeneration = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-type Language = "zh" | "en" | "de";
+type Language = "zh" | "en" | "de" | "ru" | "ja";
 const language = ref<Language>(getInitialLanguage());
 const themeMode = ref<ThemeMode>(getStoredTheme());
 const themeIcon = computed(() => isDarkTheme(themeMode.value) ? "sun" : "moon");
 const themeLabel = computed(() => isDarkTheme(themeMode.value) ? t("switchToLightTheme") : t("switchToDarkTheme"));
-const localizedWelcomeText = computed(() => (language.value === "en" ? welcomeTextEn.value : welcomeTextZh.value) || t("joinDescription"));
-const accelerationDisplayName = computed(() => accelerationName.value || (language.value === "zh" ? "中继加速" : language.value === "de" ? "Relay-Beschleunigung" : "Relay acceleration"));
+const localizedWelcomeText = computed(() => {
+  const customText = {
+    zh: welcomeTextZh.value,
+    en: welcomeTextEn.value,
+    de: welcomeTextDe.value,
+    ru: welcomeTextRu.value,
+    ja: welcomeTextJa.value,
+  }[language.value];
+  return customText || t("joinDescription");
+});
 applyTheme(themeMode.value);
 const translations: Record<string, Record<string, string>> = {
   zh: {
@@ -452,6 +499,7 @@ const translations: Record<string, Record<string, string>> = {
     secureGateway: "安全语音网关",
     adminConsole: "管理控制台",
     currentVersion: "当前版本",
+    errorCode: "错误代码",
     viewChangelog: "查看更新日志",
     notConfigured: "WebSpeak 尚未配置 TeamSpeak 目标。",
     configureNow: "打开管理控制台",
@@ -476,7 +524,9 @@ const translations: Record<string, Record<string, string>> = {
     serverPort: "语音端口",
     serverPortPlaceholder: "9987",
     serverAddressHint: "这是网关服务器连接的 TeamSpeak 地址和端口，不是浏览器直接连接地址。",
-    relayAccelerationHint: "通过已配置的中继服务器转发，适合直连不稳定或被拒绝的服务器。",
+    relayAcceleration: "连接中继",
+    directConnection: "直连 TeamSpeak",
+    relayAccelerationHint: "选择一个已配置的中继节点，适合直连不稳定或被拒绝的服务器。",
     nickname: "你的昵称",
     nicknamePlaceholder: "例如：Alex Rivera",
     targetChannel: "目标频道",
@@ -521,6 +571,7 @@ const translations: Record<string, Record<string, string>> = {
     muteOutput: "临时静音",
     unmuteOutput: "恢复声音",
     desktopAudioControls: "音频控制",
+    desktopAudioHint: "悬停图标调整音量",
     startAccompaniment: "共享伴奏",
     stopAccompaniment: "停止伴奏",
     accompanimentStarted: "伴奏共享已开始",
@@ -584,6 +635,7 @@ const translations: Record<string, Record<string, string>> = {
     channelPasswordTitle: "进入加密频道",
     channelPasswordLead: "该频道需要密码才能进入。",
     channelPasswordPlaceholder: "输入频道密码",
+    channelPasswordOptional: "如目标频道有密码，请输入",
     channelPasswordSubmit: "进入频道",
     channelPasswordCancel: "取消",
     channelPasswordRetry: "密码不正确，请重试。",
@@ -601,6 +653,14 @@ const translations: Record<string, Record<string, string>> = {
     pokeMessagePrompt: "戳一戳消息（可选）",
     pokeSent: "已发送戳一戳",
     copyNickname: "复制昵称",
+    moveMember: "移动到频道",
+    moveMemberTitle: "移动 {{member}}",
+    moveMemberLead: "选择目标频道。TeamSpeak 会根据你的移动权限决定是否允许此操作。",
+    moveMemberTarget: "目标频道",
+    moveMemberChooseChannel: "请选择目标频道",
+    moveMemberSubmit: "确认移动",
+    moveMemberSuccess: "成员已移动",
+    movePermissionDenied: "你没有移动成员的权限",
     copiedNickname: "昵称已复制",
     attachmentUnavailable: "附件暂不可用",
     emojiUnavailable: "表情暂不可用",
@@ -672,6 +732,16 @@ const translations: Record<string, Record<string, string>> = {
     notificationVolume: "通知音量",
     audioStatus: "音频状态",
     audioReady: "音频已就绪",
+    noiseSuppression: "浏览器降噪",
+    noiseSuppressionHint: "在浏览器采集端处理",
+    rnnoise: "RNNoise 降噪",
+    echoCancellation: "回声消除",
+    autoGainControl: "自动增益",
+    processingEnabled: "已启用",
+    processingDisabled: "已关闭",
+    processingUnknown: "浏览器未报告",
+    audioUnavailable: "音频不可用（麦克风故障）",
+    microphoneUnavailable: "麦克风不可用，你暂时无法说话",
     audioSuspended: "音频被浏览器暂停",
     audioUnknown: "尚未初始化",
     audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
@@ -716,6 +786,7 @@ const translations: Record<string, Record<string, string>> = {
     secureGateway: "Secure voice gateway",
     adminConsole: "Admin console",
     currentVersion: "Current version",
+    errorCode: "Error code",
     viewChangelog: "View changelog",
     notConfigured: "The WebSpeak TeamSpeak target has not been configured.",
     configureNow: "Open admin console",
@@ -740,7 +811,9 @@ const translations: Record<string, Record<string, string>> = {
     serverPort: "Voice port",
     serverPortPlaceholder: "9987",
     serverAddressHint: "This is the TeamSpeak address and port reached by the gateway, not a direct browser connection.",
-    relayAccelerationHint: "Route this connection through the configured relay when a direct path is unstable or blocked.",
+    relayAcceleration: "Connection relay",
+    directConnection: "Direct TeamSpeak connection",
+    relayAccelerationHint: "Choose a configured relay when the direct path is unstable or blocked.",
     nickname: "Your nickname",
     nicknamePlaceholder: "e.g. Alex Rivera",
     targetChannel: "Target channel",
@@ -785,6 +858,7 @@ const translations: Record<string, Record<string, string>> = {
     muteOutput: "Mute all audio",
     unmuteOutput: "Restore audio",
     desktopAudioControls: "Audio controls",
+    desktopAudioHint: "Hover an icon to adjust volume",
     startAccompaniment: "Share accompaniment",
     stopAccompaniment: "Stop accompaniment",
     accompanimentStarted: "Accompaniment sharing started",
@@ -848,6 +922,7 @@ const translations: Record<string, Record<string, string>> = {
     channelPasswordTitle: "Enter protected channel",
     channelPasswordLead: "This channel requires a password to join.",
     channelPasswordPlaceholder: "Channel password",
+    channelPasswordOptional: "Enter it if the target channel is protected",
     channelPasswordSubmit: "Enter channel",
     channelPasswordCancel: "Cancel",
     channelPasswordRetry: "That password was not accepted. Try again.",
@@ -865,6 +940,14 @@ const translations: Record<string, Record<string, string>> = {
     pokeMessagePrompt: "Poke message (optional)",
     pokeSent: "Poke sent",
     copyNickname: "Copy nickname",
+    moveMember: "Move to channel",
+    moveMemberTitle: "Move {{member}}",
+    moveMemberLead: "Choose a target channel. TeamSpeak will enforce your move permissions.",
+    moveMemberTarget: "Target channel",
+    moveMemberChooseChannel: "Choose a target channel",
+    moveMemberSubmit: "Move member",
+    moveMemberSuccess: "Member moved",
+    movePermissionDenied: "You do not have permission to move members",
     copiedNickname: "Nickname copied",
     attachmentUnavailable: "Attachments unavailable",
     emojiUnavailable: "Emoji unavailable",
@@ -936,6 +1019,16 @@ const translations: Record<string, Record<string, string>> = {
     notificationVolume: "Notification volume",
     audioStatus: "Audio status",
     audioReady: "Audio ready",
+    noiseSuppression: "Browser noise suppression",
+    noiseSuppressionHint: "Process audio in the browser",
+    rnnoise: "RNNoise suppression",
+    echoCancellation: "Echo cancellation",
+    autoGainControl: "Automatic gain control",
+    processingEnabled: "Enabled",
+    processingDisabled: "Disabled",
+    processingUnknown: "Not reported by browser",
+    audioUnavailable: "Audio unavailable (microphone failure)",
+    microphoneUnavailable: "Microphone unavailable — others cannot hear you",
     audioSuspended: "Audio paused by the browser",
     audioUnknown: "Not initialized",
     audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
@@ -983,6 +1076,7 @@ translations.de = {
   secureGateway: "Sicheres Sprach-Gateway",
   adminConsole: "Administrationskonsole",
   currentVersion: "Aktuelle Version",
+  errorCode: "Fehlercode",
   viewChangelog: "Änderungsprotokoll ansehen",
   notConfigured: "Das TeamSpeak-Ziel von WebSpeak wurde noch nicht konfiguriert.",
   configureNow: "Administrationskonsole öffnen",
@@ -1007,7 +1101,9 @@ translations.de = {
   serverPort: "Sprachport",
   serverPortPlaceholder: "9987",
   serverAddressHint: "Dies ist die TeamSpeak-Adresse und der Port, die vom Gateway erreicht werden – keine direkte Browseradresse.",
-   relayAccelerationHint: "Leitet diese Verbindung über den konfigurierten Relay – für direkte Verbindungen mit Instabilität oder Ablehnung.",
+   relayAcceleration: "Verbindungs-Relay",
+   directConnection: "Direkte TeamSpeak-Verbindung",
+   relayAccelerationHint: "Wähle einen konfigurierten Relay, wenn die direkte Verbindung instabil ist oder abgelehnt wird.",
   nickname: "Dein Name",
   nicknamePlaceholder: "z. B. Alex Rivera",
   targetChannel: "Zielkanal",
@@ -1052,6 +1148,7 @@ translations.de = {
   muteOutput: "Alle Töne stummschalten",
   unmuteOutput: "Ton wiederherstellen",
   desktopAudioControls: "Audiosteuerung",
+  desktopAudioHint: "Bewege den Zeiger über ein Symbol, um die Lautstärke anzupassen",
   startAccompaniment: "Begleitung teilen",
   stopAccompaniment: "Begleitung stoppen",
   accompanimentStarted: "Begleitung wird geteilt",
@@ -1115,6 +1212,7 @@ translations.de = {
   channelPasswordTitle: "Geschützten Kanal betreten",
   channelPasswordLead: "Für diesen Kanal ist ein Passwort erforderlich.",
   channelPasswordPlaceholder: "Kanalpasswort",
+  channelPasswordOptional: "Falls der Zielkanal geschützt ist",
   channelPasswordSubmit: "Kanal betreten",
   channelPasswordCancel: "Abbrechen",
   channelPasswordRetry: "Das Passwort wurde abgelehnt. Bitte erneut versuchen.",
@@ -1132,6 +1230,14 @@ translations.de = {
   pokeMessagePrompt: "Anstupsnachricht (optional)",
   pokeSent: "Anstupser gesendet",
   copyNickname: "Namen kopieren",
+  moveMember: "In Kanal verschieben",
+  moveMemberTitle: "{{member}} verschieben",
+  moveMemberLead: "Wähle einen Zielkanal. TeamSpeak prüft deine Verschiebeberechtigung.",
+  moveMemberTarget: "Zielkanal",
+  moveMemberChooseChannel: "Zielkanal auswählen",
+  moveMemberSubmit: "Mitglied verschieben",
+  moveMemberSuccess: "Mitglied verschoben",
+  movePermissionDenied: "Du hast keine Berechtigung, Mitglieder zu verschieben",
   copiedNickname: "Name kopiert",
   attachmentUnavailable: "Anhänge nicht verfügbar",
   emojiUnavailable: "Emojis nicht verfügbar",
@@ -1203,6 +1309,16 @@ translations.de = {
   notificationVolume: "Benachrichtigungslautstärke",
   audioStatus: "Audiostatus",
   audioReady: "Audio bereit",
+  noiseSuppression: "Browser-Geräuschunterdrückung",
+  noiseSuppressionHint: "Verarbeitung bei der Aufnahme im Browser",
+  rnnoise: "RNNoise-Geräuschunterdrückung",
+  echoCancellation: "Echounterdrückung",
+  autoGainControl: "Automatische Verstärkungsregelung",
+  processingEnabled: "Aktiviert",
+  processingDisabled: "Deaktiviert",
+  processingUnknown: "Vom Browser nicht gemeldet",
+  audioUnavailable: "Audio nicht verfügbar (Mikrofonfehler)",
+  microphoneUnavailable: "Mikrofon nicht verfügbar – andere können dich nicht hören",
   audioSuspended: "Audio wurde vom Browser pausiert",
   audioUnknown: "Nicht initialisiert",
   audioPrivacy: "WebSpeak verarbeitet Audio im sicheren Browserkontext und speichert keine Aufnahmen.",
@@ -1235,7 +1351,169 @@ translations.de = {
     measureComplete: "Laufende Messung (alle 3 Sekunden)",
     measureNow: "Jetzt messen",
     measureUnavailable: "Nach der Verbindung verfügbar",
-    langSwitch: "中文",
+  langSwitch: "中文",
+};
+
+translations.ru = {
+  ...translations.en,
+  themeSystem: "Системная тема",
+  themeLight: "Светлая тема",
+  themeDark: "Тёмная тема",
+  switchToLightTheme: "Включить светлую тему",
+  switchToDarkTheme: "Включить тёмную тему",
+  browserWorkspace: "Голосовое пространство в браузере",
+  secureGateway: "Безопасный голосовой шлюз",
+  adminConsole: "Панель администратора",
+  currentVersion: "Текущая версия",
+  errorCode: "Код ошибки",
+  viewChangelog: "Открыть журнал изменений",
+  notConfigured: "Цель TeamSpeak ещё не настроена в WebSpeak.",
+  configureNow: "Открыть панель администратора",
+  privateAudio: "Приватное голосовое сообщество",
+  joinLine1: "Подключитесь к серверу,",
+  joinLine2: "и начните общение.",
+  joinDescription: "Клиент TeamSpeak устанавливать не нужно. Откройте браузер и присоединитесь к голосовому каналу с низкой задержкой.",
+  overallVolume: "Общая громкость",
+  moveMember: "Переместить в канал",
+  moveMemberTitle: "Переместить: {{member}}",
+  moveMemberLead: "Выберите канал. TeamSpeak проверит ваши права на перемещение.",
+  moveMemberTarget: "Целевой канал",
+  moveMemberChooseChannel: "Выберите целевой канал",
+  moveMemberSubmit: "Переместить участника",
+  moveMemberSuccess: "Участник перемещён",
+  movePermissionDenied: "У вас нет права перемещать участников",
+  channelPasswordOptional: "Если целевой канал защищён паролем",
+  inputVolume: "Громкость микрофона",
+  desktopAudioControls: "Управление звуком",
+  desktopAudioHint: "Наведите на значок, чтобы изменить громкость",
+  noiseSuppression: "Шумоподавление",
+  noiseSuppressionHint: "Обработка звука при захвате в браузере",
+  highQuality: "Качественный звук",
+  opusAudio: "Передача Opus с низкой задержкой",
+  secureJoin: "Безопасное подключение",
+  inviteProtected: "Сервер защищён ссылкой-приглашением",
+  realtime: "Синхронизация в реальном времени",
+  membersSync: "Участники каналов всегда синхронизированы",
+  privateServer: "Приватный голосовой сервер",
+  joinServer: "Войти на сервер",
+  welcomeBack: "С возвращением",
+  joinLead: "Выберите имя и канал для входа.",
+  serverAddress: "Адрес сервера TeamSpeak",
+  serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
+  serverPort: "Голосовой порт",
+  serverPortPlaceholder: "9987",
+  serverAddressHint: "Это адрес и порт TeamSpeak, к которым обращается шлюз, а не прямое подключение браузера.",
+  relayAcceleration: "Подключение через ретранслятор",
+  directConnection: "Прямое подключение к TeamSpeak",
+  relayAccelerationHint: "Выберите настроенный ретранслятор, если прямой маршрут нестабилен или заблокирован.",
+  nickname: "Ваше имя",
+  nicknamePlaceholder: "например, Alex Rivera",
+  targetChannel: "Целевой канал",
+  optional: "необязательно",
+  emptyDefault: "Оставьте пустым для канала по умолчанию",
+  rememberIdentity: "Запомнить личность TeamSpeak на этом устройстве",
+  rememberIdentityHint: "Хранится только на этом устройстве и используется при следующем подключении.",
+  rememberIdentityConcurrentWarning: "Одна личность может использоваться только одним подключением в этом браузере. Для второго подключения отключите эту опцию или используйте другой браузер.",
+  deviceIdentityOptions: "Настройки личности устройства",
+  enterVoiceSpace: "Войти в голосовое пространство",
+  connectionDetailsPrivate: "Данные подключения используются только для этой голосовой сессии",
+  recentServers: "Недавние серверы",
+  saveFavorite: "Сохранить в избранное",
+  savedFavoriteToast: "Сервер сохранён в избранное",
+  removedFavoriteToast: "Сервер удалён из избранного",
+  clearLocalData: "Очистить локальные данные",
+  clearLocalDataConfirm: "Удалить сохранённое имя, настройки и личность с этого устройства?",
+  localDataCleared: "Локальные данные очищены",
+  languageMenu: "Язык",
+  networkPerformance: "Сетевая производительность",
+  networkPerformanceHint: "Непрерывные измерения от браузера через WebSpeak к TeamSpeak",
+  packetLoss: "Потери пакетов",
+  measuring: "Измерение…",
+  measureComplete: "Мониторинг продолжается (обновление каждые 3 секунды)",
+  measureNow: "Измерить сейчас",
+  measureUnavailable: "Доступно после подключения",
+  langSwitch: "中文",
+};
+
+translations.ja = {
+  ...translations.en,
+  themeSystem: "システム設定",
+  themeLight: "ライトテーマ",
+  themeDark: "ダークテーマ",
+  switchToLightTheme: "ライトテーマに切り替え",
+  switchToDarkTheme: "ダークテーマに切り替え",
+  browserWorkspace: "ブラウザ音声ワークスペース",
+  secureGateway: "安全な音声ゲートウェイ",
+  adminConsole: "管理コンソール",
+  currentVersion: "現在のバージョン",
+  errorCode: "エラーコード",
+  viewChangelog: "更新履歴を見る",
+  notConfigured: "WebSpeak の TeamSpeak 接続先がまだ設定されていません。",
+  configureNow: "管理コンソールを開く",
+  privateAudio: "プライベートコミュニティ音声",
+  joinLine1: "サーバーに接続して、",
+  joinLine2: "すぐに会話を始めよう。",
+  joinDescription: "TeamSpeak クライアントのインストールは不要です。ブラウザから低遅延の音声チャンネルに参加できます。",
+  overallVolume: "全体音量",
+  moveMember: "チャンネルへ移動",
+  moveMemberTitle: "{{member}}を移動",
+  moveMemberLead: "移動先を選択してください。TeamSpeak が権限を確認します。",
+  moveMemberTarget: "移動先チャンネル",
+  moveMemberChooseChannel: "移動先を選択",
+  moveMemberSubmit: "メンバーを移動",
+  moveMemberSuccess: "メンバーを移動しました",
+  movePermissionDenied: "メンバーを移動する権限がありません",
+  channelPasswordOptional: "移動先にパスワードがある場合",
+  inputVolume: "マイク音量",
+  desktopAudioControls: "音声コントロール",
+  desktopAudioHint: "アイコンにカーソルを合わせて音量を調整",
+  noiseSuppression: "ノイズ抑制",
+  noiseSuppressionHint: "ブラウザ側で音声を処理",
+  highQuality: "高品質な音声",
+  opusAudio: "低遅延 Opus 転送",
+  secureJoin: "安全に参加",
+  inviteProtected: "招待リンクでサーバーを保護",
+  realtime: "リアルタイムの同期",
+  membersSync: "チャンネルメンバーを常に同期",
+  privateServer: "プライベート音声サーバー",
+  joinServer: "サーバーに参加",
+  welcomeBack: "おかえりなさい",
+  joinLead: "名前と参加するチャンネルを選択してください。",
+  serverAddress: "TeamSpeak サーバーアドレス",
+  serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
+  serverPort: "音声ポート",
+  serverPortPlaceholder: "9987",
+  serverAddressHint: "ゲートウェイが接続する TeamSpeak のアドレスとポートです。ブラウザからの直接接続先ではありません。",
+  relayAcceleration: "中継接続",
+  directConnection: "TeamSpeak へ直接接続",
+  relayAccelerationHint: "直接接続が不安定またはブロックされている場合は、設定済みの中継を選択してください。",
+  nickname: "ニックネーム",
+  nicknamePlaceholder: "例: Alex Rivera",
+  targetChannel: "参加先チャンネル",
+  optional: "任意",
+  emptyDefault: "空欄にするとデフォルトチャンネルを使用します",
+  rememberIdentity: "この端末に TeamSpeak ID を保存",
+  rememberIdentityHint: "この端末だけに保存し、次回の接続で再利用します。",
+  rememberIdentityConcurrentWarning: "同じブラウザでは、この ID を同時に1接続だけ使用できます。2つ目の接続では無効にするか、別のブラウザを使ってください。",
+  deviceIdentityOptions: "端末 ID の設定",
+  enterVoiceSpace: "音声スペースに参加",
+  connectionDetailsPrivate: "接続情報は今回の音声セッションでのみ使用されます",
+  recentServers: "最近のサーバー",
+  saveFavorite: "お気に入りに保存",
+  savedFavoriteToast: "サーバーをお気に入りに保存しました",
+  removedFavoriteToast: "お気に入りから削除しました",
+  clearLocalData: "ローカルデータを消去",
+  clearLocalDataConfirm: "この端末に保存された名前、設定、IDを削除しますか？",
+  localDataCleared: "ローカルデータを消去しました",
+  languageMenu: "言語",
+  networkPerformance: "ネットワーク性能",
+  networkPerformanceHint: "ブラウザから WebSpeak を経由して TeamSpeak まで継続測定",
+  packetLoss: "パケット損失",
+  measuring: "測定中…",
+  measureComplete: "継続監視中（3秒ごとに更新）",
+  measureNow: "今すぐ測定",
+  measureUnavailable: "接続後に利用できます",
+  langSwitch: "中文",
 };
 
 function initialServerTarget() {
@@ -1248,9 +1526,11 @@ function initialServerTarget() {
 
 function getInitialLanguage(): Language {
   const stored = localStorage.getItem("webspeak:language");
-  if (stored === "zh" || stored === "en" || stored === "de") return stored;
+  if (stored === "zh" || stored === "en" || stored === "de" || stored === "ru" || stored === "ja") return stored;
   if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh")) return "zh";
   if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("de")) return "de";
+  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ru")) return "ru";
+  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ja")) return "ja";
   return "en";
 }
 
@@ -1262,6 +1542,38 @@ function t(key: string, variables: Record<string, string | number> = {}) {
 
 function localizedMessage(message: string) {
   if (language.value === "zh") return message;
+  const localizedExact: Record<string, string> = language.value === "ru" ? {
+    "该服务器需要密码，请输入密码后重试": "Для этого сервера требуется пароль. Введите его и повторите попытку",
+    "服务器密码错误，请重新输入": "Неверный пароль сервера. Введите его ещё раз",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Длина имени не соответствует требованиям TeamSpeak (не менее 3 символов). Измените имя и повторите попытку",
+    "TeamSpeak 服务器地址无效": "Неверный адрес сервера TeamSpeak",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "Не удалось найти сервер TeamSpeak. Проверьте адрес",
+    "无法到达 TeamSpeak 服务器，请检查网络或地址": "Сервер TeamSpeak недоступен. Проверьте сеть или адрес",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Сервер TeamSpeak отклонил подключение. Проверьте порт и состояние службы",
+    "连接 TeamSpeak 超时，请检查网络或服务器状态": "Истекло время подключения к TeamSpeak. Проверьте сеть и состояние сервера",
+    "你没有执行此操作的权限": "У вас нет права выполнять это действие",
+  } : {
+    "该服务器需要密码，请输入密码后重试": "このサーバーにはパスワードが必要です。入力して再試行してください",
+    "服务器密码错误，请重新输入": "サーバーパスワードが正しくありません。もう一度入力してください",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "ニックネームの長さが TeamSpeak の要件を満たしていません（3文字以上）。変更して再試行してください",
+    "TeamSpeak 服务器地址无效": "TeamSpeak サーバーアドレスが正しくありません",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "TeamSpeak サーバーが見つかりません。アドレスを確認してください",
+    "无法到达 TeamSpeak 服务器，请检查网络或地址": "TeamSpeak サーバーに到達できません。ネットワークまたはアドレスを確認してください",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "TeamSpeak サーバーが接続を拒否しました。ポートとサービスの状態を確認してください",
+    "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
+    "你没有执行此操作的权限": "この操作を実行する権限がありません",
+  };
+  if (localizedExact[message]) return localizedExact[message];
+  const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
+  if (errorCodeMatch) {
+    const code = errorCodeMatch[1];
+    const detail = errorCodeMatch[2] ? `: ${errorCodeMatch[2]}` : "";
+    const operation = message.startsWith("操作失败");
+    if (language.value === "de") return `${operation ? "Vorgang" : "TeamSpeak-Verbindung"} fehlgeschlagen (Fehlercode: ${code})${detail}. Prüfe Eingaben, Netzwerk und Serverstatus`;
+    if (language.value === "ru") return `${operation ? "Операция" : "Подключение TeamSpeak"} не выполнена (код ошибки: ${code})${detail}. Проверьте ввод, сеть и состояние сервера`;
+    if (language.value === "ja") return `${operation ? "操作" : "TeamSpeak 接続"}に失敗しました（エラーコード: ${code}）${detail}。入力、ネットワーク、サーバーの状態を確認してください`;
+    return `${operation ? "Operation" : "TeamSpeak connection"} failed (error code: ${code})${detail}. Check your input, network, and server status`;
+  }
   const exact: Record<string, string> = {
     "语音功能需要 HTTPS 安全连接": "Voice requires a secure HTTPS connection",
     "当前浏览器不支持麦克风访问": "This browser does not support microphone access",
@@ -1270,12 +1582,21 @@ function localizedMessage(message: string) {
     "当前浏览器不支持扬声器设备选择，将使用默认输出设备": "Output device selection is not supported by this browser. Using the default output device",
     "所选扬声器当前不可用": "The selected speaker is not available",
     "连接服务器失败，请检查邀请链接或服务器状态": "Could not connect. Check the invite link or server status",
+    "请求来源不受信任，请从正确的网站入口重新打开": "The request origin is not trusted. Reopen the official WebSpeak page",
+    "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak has not been configured yet. Contact the administrator",
+    "请求过于频繁，请稍后重试": "Too many requests. Try again shortly",
+    "当前中继加速不可用，请关闭加速或联系管理员": "The selected relay is unavailable. Turn off relay mode or contact the administrator",
+    "邀请链接已失效或已被撤销": "The invite link is invalid, expired, or revoked",
     "TeamSpeak 连接已断开": "The TeamSpeak connection was closed",
     "连接已断开": "The connection was closed",
     "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
     "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
+    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "The nickname length does not meet the TeamSpeak server requirements (at least 3 characters). Change it and try again",
     "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
+    "找不到 TeamSpeak 服务器主机名，请检查地址": "The TeamSpeak server hostname could not be resolved. Check the address",
     "无法到达 TeamSpeak 服务器，请检查网络或地址": "The TeamSpeak server is unreachable. Check the network or address",
+    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "The TeamSpeak server refused the connection. Check the port and server status",
+    "TeamSpeak 连接被服务器或网络重置，请稍后重试": "The TeamSpeak connection was reset by the server or network. Try again shortly",
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "The TeamSpeak connection timed out. Check the network or server status",
     "该服务器需要密码，请输入密码后重试": "This server requires a password. Enter it and try again",
     "服务器密码错误，请重新输入": "The server password is incorrect. Enter it again",
@@ -1283,6 +1604,7 @@ function localizedMessage(message: string) {
     "TeamSpeak 服务器拒绝了连接": "The TeamSpeak server rejected the connection",
     "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "TeamSpeak connection failed. Check the address, network, or server status",
     "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
+    "服务器当前已满或拒绝了连接，请稍后重试": "The server is full or rejected the connection. Try again shortly",
     "WebSpeak 尚未配置 TeamSpeak 目标。": "The WebSpeak TeamSpeak target has not been configured",
     "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
     "请输入有效的昵称": "Enter a valid nickname",
@@ -1306,13 +1628,178 @@ function localizedMessage(message: string) {
     "该频道需要密码": "This channel requires a password",
     "该频道已满": "This channel is full",
     "你没有执行此操作的权限": "You do not have permission to perform this action",
+    "不能移动自己的客户端": "You cannot move yourself",
+    "目标频道不可用": "The target channel is unavailable",
+    "成员已离线或当前不可见": "The member is offline or no longer visible",
     "成员已离线": "This member is offline",
     "操作失败": "The operation failed",
+    "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "The voice session token is missing or expired. Return to the list and enter the voice space again",
+    "语音网关拒绝了本次连接：身份无效，请取消“保持身份”后重新进入": "The voice gateway rejected the connection because the identity is invalid. Clear ‘Remember identity’ and try again",
+    "语音网关拒绝了本次连接：身份无效或无法在此页面使用，请取消“保持身份”后重新进入": "The voice gateway rejected the connection because the identity is invalid or unavailable on this page. Clear ‘Remember identity’ and try again",
+    "当前中继加速不可用，请关闭加速后重试或联系管理员": "The selected relay is unavailable. Turn off relay mode and try again, or contact the administrator",
+    "与语音网关的网络连接异常中断（掉线或代理断开），并非 TeamSpeak 服务器拒绝连接，请检查网络后重新进入": "The voice gateway connection was interrupted (offline or proxy disconnected); the TeamSpeak server did not reject it. Check your network and enter again",
+    "语音网关会话意外结束，请重新进入语音空间": "The voice gateway session ended unexpectedly. Enter the voice space again",
+    "语音网关未能创建 TeamSpeak 客户端（服务器可能已关闭或地址不可达），请确认服务器地址或稍后重试": "The voice gateway could not create a TeamSpeak client. The server may be offline or unreachable; check the address and try again",
+    "该昵称已被服务器上的其他用户占用，请更换昵称": "This nickname is already in use on the server. Choose another one",
+    "该昵称已被占用，请更换昵称": "This nickname is already in use. Choose another one",
+    "你的身份安全等级低于该服务器要求，请提升后重试": "Your identity security level is below what this server requires. Raise it and try again",
+    "该身份建立的连接数已达上限，请关闭其他连接后重试": "This identity reached its connection limit. Close the other connections and try again",
+    "客户端版本过旧，服务器拒绝连接，请升级后重试": "Your client version is outdated and the server rejected the connection. Update and try again",
+    "客户端版本过旧，服务器拒绝了该操作": "Your client version is outdated, so the server rejected this action",
+    "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Too many requests: the server flood protection rejected you temporarily. Try again shortly",
+    "操作过于频繁，请稍后重试": "Too many requests. Try again shortly",
+    "你已被该服务器封禁，无法连接": "You are banned from this server, so the connection is refused",
+    "你已被该服务器封禁": "You are banned from this server",
+    "你已被服务器移出": "You were removed from the server",
+    "TeamSpeak 服务器正在关闭，暂时无法连接": "The TeamSpeak server is shutting down and is unreachable right now",
+    "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "The TeamSpeak server could not finish initialising the connection. Check the address and port, or try again shortly",
+    "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "The TeamSpeak server rejected the parameters, usually because the nickname length or format is invalid",
   };
-  if (exact[message]) return exact[message];
-  if (message.startsWith("麦克风访问失败：")) return `Microphone access failed: ${message.slice(8)}`;
-  if (message.startsWith("切换失败：")) return `Channel switch failed: ${message.slice(5)}`;
-  return message;
+  if (language.value === "en" && exact[message]) return exact[message];
+  if (message.startsWith("麦克风访问失败：")) {
+    const detail = message.slice(8);
+    if (language.value === "ru") return `Не удалось получить доступ к микрофону: ${detail}`;
+    if (language.value === "ja") return `マイクへのアクセスに失敗しました: ${detail}`;
+    return language.value === "de" ? `Mikrofonzugriff fehlgeschlagen: ${detail}` : `Microphone access failed: ${detail}`;
+  }
+  if (message.startsWith("切换失败：")) {
+    const detail = message.slice(5);
+    if (language.value === "ru") return `Не удалось переключить канал: ${detail}`;
+    if (language.value === "ja") return `チャンネルの切り替えに失敗しました: ${detail}`;
+    return language.value === "de" ? `Kanalwechsel fehlgeschlagen: ${detail}` : `Channel switch failed: ${detail}`;
+  }
+  if (language.value === "de") {
+    const german: Record<string, string> = {
+      "语音功能需要 HTTPS 安全连接": "Für Sprachfunktionen ist eine sichere HTTPS-Verbindung erforderlich",
+      "当前浏览器不支持麦克风访问": "Dieser Browser unterstützt keinen Mikrofonzugriff",
+      "当前浏览器不支持 Web Audio 音频处理": "Dieser Browser unterstützt keine Web-Audio-Verarbeitung",
+      "连接服务器失败，请检查邀请链接或服务器状态": "Verbindung fehlgeschlagen. Prüfe den Einladungslink oder den Serverstatus",
+      "请求来源不受信任，请从正确的网站入口重新打开": "Die Anfragequelle ist nicht vertrauenswürdig. Öffne die offizielle WebSpeak-Seite erneut",
+      "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak wurde noch nicht konfiguriert. Wende dich an den Administrator",
+      "请求过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
+      "当前中继加速不可用，请关闭加速或联系管理员": "Das ausgewählte Relay ist nicht verfügbar. Deaktiviere den Relay-Modus oder wende dich an den Administrator",
+      "邀请链接已失效或已被撤销": "Der Einladungslink ist ungültig, abgelaufen oder widerrufen",
+      "TeamSpeak 连接已断开": "Die TeamSpeak-Verbindung wurde getrennt",
+      "连接已断开": "Die Verbindung wurde getrennt",
+      "TeamSpeak 服务器地址无效": "Die TeamSpeak-Serveradresse ist ungültig",
+      "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Die Länge des Spitznamens entspricht nicht den Anforderungen des TeamSpeak-Servers (mindestens 3 Zeichen). Ändere ihn und versuche es erneut",
+      "请输入有效的昵称": "Gib einen gültigen Nicknamen ein",
+      "找不到 TeamSpeak 服务器主机名，请检查地址": "Der TeamSpeak-Servername konnte nicht aufgelöst werden. Prüfe die Adresse",
+      "无法到达 TeamSpeak 服务器，请检查网络或地址": "Der TeamSpeak-Server ist nicht erreichbar. Prüfe Netzwerk und Adresse",
+      "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Der TeamSpeak-Server hat die Verbindung abgelehnt. Prüfe Port und Serverstatus",
+      "TeamSpeak 连接被服务器或网络重置，请稍后重试": "Die TeamSpeak-Verbindung wurde vom Server oder Netzwerk zurückgesetzt. Versuche es später erneut",
+      "连接 TeamSpeak 超时，请检查网络或服务器状态": "Die TeamSpeak-Verbindung hat das Zeitlimit überschritten. Prüfe Netzwerk und Serverstatus",
+      "该服务器需要密码，请输入密码后重试": "Dieser Server benötigt ein Passwort. Gib es ein und versuche es erneut",
+      "服务器密码错误，请重新输入": "Das Serverpasswort ist falsch. Gib es erneut ein",
+      "TeamSpeak 协议协商失败": "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen",
+      "TeamSpeak 服务器拒绝了连接": "Der TeamSpeak-Server hat die Verbindung abgelehnt",
+      "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "Die TeamSpeak-Verbindung ist fehlgeschlagen. Prüfe Adresse, Netzwerk und Serverstatus",
+      "服务器当前已满或拒绝了连接，请稍后重试": "Der Server ist voll oder hat die Verbindung abgelehnt. Versuche es später erneut",
+      "服务器当前已满，请稍后重试": "Der Server ist derzeit voll. Versuche es später erneut",
+      "该昵称已被服务器上的其他用户占用，请更换昵称": "Dieser Spitzname wird auf dem Server bereits verwendet. Wähle einen anderen",
+      "该昵称已被占用，请更换昵称": "Dieser Spitzname wird bereits verwendet. Wähle einen anderen",
+      "你的身份安全等级低于该服务器要求，请提升后重试": "Deine Sicherheitsstufe liegt unter der Anforderung dieses Servers. Erhöhe sie und versuche es erneut",
+      "该身份建立的连接数已达上限，请关闭其他连接后重试": "Diese Identität hat ihr Verbindungslimit erreicht. Schließe die anderen Verbindungen und versuche es erneut",
+      "客户端版本过旧，服务器拒绝连接，请升级后重试": "Deine Client-Version ist veraltet und der Server hat die Verbindung abgelehnt. Aktualisiere und versuche es erneut",
+      "客户端版本过旧，服务器拒绝了该操作": "Deine Client-Version ist veraltet, daher hat der Server diese Aktion abgelehnt",
+      "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Zu viele Anfragen: Der Flood-Schutz des Servers hat dich vorübergehend abgewiesen. Versuche es gleich erneut",
+      "操作过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
+      "你已被该服务器封禁，无法连接": "Du wurdest von diesem Server gebannt und kannst nicht verbinden",
+      "你已被该服务器封禁": "Du wurdest von diesem Server gebannt",
+      "你已被服务器移出": "Du wurdest vom Server entfernt",
+      "TeamSpeak 服务器正在关闭，暂时无法连接": "Der TeamSpeak-Server wird heruntergefahren und ist derzeit nicht erreichbar",
+      "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "Der TeamSpeak-Server konnte die Verbindungsinitialisierung nicht abschließen. Prüfe Adresse und Port oder versuche es später erneut",
+      "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "Der TeamSpeak-Server hat die Parameter abgelehnt, meist wegen ungültiger Länge oder ungültigen Formats des Spitznamens",
+      "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "Diese TeamSpeak-Identität wird bereits in einem anderen Browser-Tab verwendet. Schließe die andere Verbindung oder deaktiviere „Identität merken“ und versuche es erneut",
+      "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "Der Sprachsitzungs-Token fehlt oder ist abgelaufen. Kehre zur Liste zurück und tritt dem Sprachraum erneut bei",
+      "语音网关拒绝了本次连接：身份无效，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig. Deaktiviere „Identität merken“ und tritt erneut bei",
+      "语音网关拒绝了本次连接：身份无效或无法在此页面使用，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig oder kann auf dieser Seite nicht verwendet werden. Deaktiviere „Identität merken“ und tritt erneut bei",
+      "当前中继加速不可用，请关闭加速后重试或联系管理员": "Der beschleunigte Relay-Modus ist nicht verfügbar. Deaktiviere ihn und versuche es erneut oder wende dich an den Administrator",
+      "与语音网关的网络连接异常中断（掉线或代理断开），并非 TeamSpeak 服务器拒绝连接，请检查网络后重新进入": "Die Verbindung zum Sprach-Gateway wurde unerwartet unterbrochen (Offline oder Proxy getrennt) – der TeamSpeak-Server hat die Verbindung nicht abgelehnt. Prüfe deine Netzwerkverbindung und tritt erneut bei",
+      "语音网关会话意外结束，请重新进入语音空间": "Die Sprach-Gateway-Sitzung wurde unerwartet beendet. Tritt dem Sprachraum erneut bei",
+      "语音网关未能创建 TeamSpeak 客户端（服务器可能已关闭或地址不可达），请确认服务器地址或稍后重试": "Das Sprach-Gateway konnte keinen TeamSpeak-Client erstellen (der Server ist möglicherweise aus oder nicht erreichbar). Prüfe die Serveradresse oder versuche es später erneut",
+      "消息格式无效": "Ungültiges Nachrichtenformat",
+      "请求标识无效": "Ungültige Anforderungs-ID",
+      "不支持的操作": "Nicht unterstützte Operation",
+      "操作参数无效": "Ungültige Operationsparameter",
+      "频道标识无效": "Ungültige Kanal-ID",
+      "频道密码无效": "Ungültiges Kanalpasswort",
+      "成员标识无效": "Ungültige Mitglieds-ID",
+      "文字消息无效": "Ungültige Textnachricht",
+      "戳一戳消息无效": "Ungültige Poke-Nachricht",
+      "离开状态无效": "Ungültiger Abwesenheitsstatus",
+      "音频帧格式无效": "Ungültiges Audio-Frame-Format",
+      "成员音量无效": "Ungültige Mitgliedslautstärke",
+      "私语目标无效": "Ungültige Flüsterziele",
+      "私语状态无效": "Ungültiger Flüsterstatus",
+      "请先选择私语目标": "Wähle zuerst ein Flüsterziel",
+      "TeamSpeak 会话尚未就绪": "Die TeamSpeak-Sitzung ist noch nicht bereit",
+      "频道切换失败": "Kanalwechsel fehlgeschlagen",
+      "该频道需要密码": "Dieser Kanal erfordert ein Passwort",
+      "该频道已满": "Dieser Kanal ist voll",
+      "你没有执行此操作的权限": "Du hast keine Berechtigung für diese Aktion",
+      "不能移动自己的客户端": "Du kannst dich nicht selbst verschieben",
+      "目标频道不可用": "Der Zielkanal ist nicht verfügbar",
+      "成员已离线或当前不可见": "Das Mitglied ist offline oder nicht mehr sichtbar",
+      "成员已离线": "Das Mitglied ist offline",
+      "操作失败": "Operation fehlgeschlagen",
+    };
+    if (german[message]) return german[message];
+    if (message.startsWith("麦克风访问失败：")) return `Mikrofonzugriff fehlgeschlagen: ${message.slice(8)}`;
+    if (message.startsWith("麦克风声音未能发送：")) return `Mikrofon-Audio konnte nicht gesendet werden: ${message.slice(10)}`;
+    if (message.startsWith("音频链路异常")) return message.replace("音频链路异常", "Audioverbindung fehlerhaft");
+  }
+  if (language.value === "ru") return exact[message] ?? "Не удалось выполнить операцию. Проверьте ввод, сеть и состояние сервера";
+  if (language.value === "ja") return exact[message] ?? "操作に失敗しました。入力、ネットワーク、サーバーの状態を確認してください";
+  return exact[message] ?? message;
+}
+
+function localizedAudioNotice(code: string, message: string) {
+  if (language.value === "zh") return message;
+  const normalizedCode = visibleErrorCode(code || "AUDIO_NOTICE");
+  const messages: Record<string, { en: string; de: string; ru: string; ja: string }> = {
+    WEBRTC_FALLBACK: {
+      en: `WebRTC realtime voice is unavailable (error code: ${normalizedCode}). Compatibility transport is active; latency and audio quality may be lower`,
+      de: `Echtzeitstimme über WebRTC ist nicht verfügbar (Fehlercode: ${normalizedCode}). Der Kompatibilitätstransport ist aktiv; Latenz und Audioqualität können schlechter sein`,
+      ru: `Голосовая связь WebRTC недоступна (код ошибки: ${normalizedCode}). Используется совместимый транспорт; задержка и качество звука могут быть ниже`,
+      ja: `WebRTC のリアルタイム音声は利用できません（エラーコード: ${normalizedCode}）。互換トランスポートを使用するため、遅延や音質が低下する場合があります`,
+    },
+    PLAYBACK_BLOCKED: {
+      en: "The browser blocked automatic audio playback. Click the page or allow audio playback for this site",
+      de: "Der Browser hat die automatische Audiowiedergabe blockiert. Klicke auf die Seite oder erlaube die Audiowiedergabe für diese Website",
+      ru: "Браузер заблокировал автоматическое воспроизведение. Нажмите на страницу или разрешите воспроизведение для этого сайта",
+      ja: "ブラウザが自動再生をブロックしました。ページをクリックするか、このサイトの再生を許可してください",
+    },
+    DEVICE_LIST_UNAVAILABLE: {
+      en: "Audio devices could not be listed. The browser default devices will be used",
+      de: "Audiogeräte konnten nicht aufgelistet werden. Die Standardgeräte des Browsers werden verwendet",
+      ru: "Не удалось получить список аудиоустройств. Будут использованы устройства браузера по умолчанию",
+      ja: "オーディオデバイスを一覧表示できません。ブラウザのデフォルトデバイスを使用します",
+    },
+    AUDIO_CONTEXT_SUSPENDED: {
+      en: "Browser audio processing is paused. Click the page once to resume microphone and speaker audio",
+      de: "Die Audioverarbeitung des Browsers ist pausiert. Klicke einmal auf die Seite, um Mikrofon und Lautsprecher fortzusetzen",
+      ru: "Обработка звука браузером приостановлена. Нажмите на страницу, чтобы возобновить работу микрофона и динамиков",
+      ja: "ブラウザの音声処理が一時停止しています。ページを一度クリックしてマイクとスピーカーを再開してください",
+    },
+    AUDIO_ENCODER_UNAVAILABLE: {
+      en: `Microphone audio could not be encoded (error code: ${normalizedCode}). Other members may not hear you`,
+      de: `Mikrofon-Audio konnte nicht kodiert werden (Fehlercode: ${normalizedCode}). Andere Mitglieder hören dich möglicherweise nicht`,
+      ru: `Не удалось кодировать звук микрофона (код ошибки: ${normalizedCode}). Другие участники могут вас не слышать`,
+      ja: `マイク音声をエンコードできませんでした（エラーコード: ${normalizedCode}）。他のメンバーに音声が届かない可能性があります`,
+    },
+  };
+  const locale = language.value === "de" ? "de" : language.value === "ru" ? "ru" : language.value === "ja" ? "ja" : "en";
+  return messages[code]?.[locale] ?? localizedMessage(message);
+}
+
+function visibleErrorCode(code: string): string {
+  const normalized = String(code || "CONNECTION_FAILED")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return (normalized || "CONNECTION_FAILED").slice(0, 64);
 }
 
 function persistLanguage() {
@@ -1330,7 +1817,12 @@ const heroBars = [12, 24, 18, 35, 18, 28, 42, 23, 50, 34, 19, 28, 39, 22, 46, 25
 
 const channelTree = computed<TreeChannel[]>(() => {
   const source = [...channels];
-  const byId = new Map(source.map((item) => [item.id, item]));
+  const sourceIndex = new Map(source.map((item, index) => [item.id, index]));
+  const enriched = source.map((item) => ({
+    ...item,
+    members: (item.members ?? []).map((member) => ({ ...member, isSelf: member.id === voiceState.tsClientId })),
+  }));
+  const byId = new Map(enriched.map((item) => [item.id, item]));
   const depthCache = new Map<string, number>();
 
   function depthOf(item: ChannelInfo, visiting = new Set<string>()): number {
@@ -1342,13 +1834,59 @@ const channelTree = computed<TreeChannel[]>(() => {
     return depth;
   }
 
-  return source
-    .map((item) => ({
-      ...item,
-      depth: depthOf(item),
-      members: (item.members ?? []).map((member) => ({ ...member, isSelf: member.id === voiceState.tsClientId })),
-    }))
-    .sort((a, b) => `${a.parentID}/${a.id}`.localeCompare(`${b.parentID}/${b.id}`));
+  const childrenByParent = new Map<string, TreeChannel[]>();
+  for (const item of enriched) {
+    const channel = { ...item, depth: depthOf(item) };
+    const siblings = childrenByParent.get(channel.parentID) ?? [];
+    siblings.push(channel);
+    childrenByParent.set(channel.parentID, siblings);
+  }
+
+  function orderSiblings(siblings: TreeChannel[]): TreeChannel[] {
+    const bySiblingId = new Map(siblings.map((item) => [item.id, item]));
+    const successors = new Map<string, TreeChannel[]>();
+    const roots: TreeChannel[] = [];
+    const sourceOrder = (left: TreeChannel, right: TreeChannel) =>
+      (sourceIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (sourceIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+
+    for (const item of siblings) {
+      const predecessor = item.order && item.order !== "0" && bySiblingId.has(item.order) ? item.order : "";
+      if (!predecessor) roots.push(item);
+      else successors.set(predecessor, [...(successors.get(predecessor) ?? []), item]);
+    }
+
+    roots.sort(sourceOrder);
+    for (const items of successors.values()) items.sort(sourceOrder);
+
+    const ordered: TreeChannel[] = [];
+    const visited = new Set<string>();
+    const append = (item: TreeChannel) => {
+      if (visited.has(item.id)) return;
+      visited.add(item.id);
+      ordered.push(item);
+      for (const successor of successors.get(item.id) ?? []) append(successor);
+    };
+    for (const root of roots) append(root);
+    for (const item of [...siblings].sort(sourceOrder)) append(item);
+    return ordered;
+  }
+
+  const orderedTree: TreeChannel[] = [];
+  const visit = (parentID: string) => {
+    for (const channel of orderSiblings(childrenByParent.get(parentID) ?? [])) {
+      orderedTree.push(channel);
+      visit(channel.id);
+    }
+  };
+  visit("0");
+  for (const channel of enriched) {
+    if (!orderedTree.some((item) => item.id === channel.id)) {
+      const fallback = { ...channel, depth: depthOf(channel) };
+      orderedTree.push(fallback);
+      visit(channel.id);
+    }
+  }
+  return orderedTree;
 });
 
 const currentChannel = computed<TreeChannel | undefined>(() => {
@@ -1373,6 +1911,11 @@ const filteredMemberChannels = computed(() => {
   const search = memberQuery.value.trim().toLowerCase();
   if (!search) return memberChannels.value;
   return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
+});
+const moveTargetChannels = computed(() => {
+  const member = moveMemberDialog.member;
+  const sourceChannelId = member ? memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id : "";
+  return memberChannels.value.filter((channel) => channel.id !== sourceChannelId && channel.id !== "__current__");
 });
 const whisperTargets = computed(() => [...whisperTargetIds].map((id) => members.find((member) => member.id === id)).filter((member): member is ChannelMember => Boolean(member)));
 
@@ -1572,7 +2115,7 @@ onMounted(() => {
   browserError.value = checkSupport() ?? "";
   void loadPublicConfig();
   void loadLocalPreferences().then((preferences) => {
-    if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de")) language.value = preferences.language;
+    if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de" || preferences.language === "ru" || preferences.language === "ja")) language.value = preferences.language;
     if (!localStorage.getItem("webspeak:theme") && (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark")) {
       themeMode.value = preferences.theme;
       applyTheme(themeMode.value);
@@ -1621,7 +2164,7 @@ function doConnect() {
   // Keep the password field available for a retry even when the target is
   // administrator-managed. The gateway still controls the target in fixed
   // mode and only accepts a non-empty retry password for that target.
-  connect(currentServerTarget(), channel.value.trim(), nickname.value, serverPassword.value, rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken, accelerationEnabled.value);
+  connect(currentServerTarget(), channel.value.trim(), nickname.value, serverPassword.value, rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken, Boolean(accelerationRelayId.value), accelerationRelayId.value);
 }
 
 function doDisconnect() {
@@ -1748,16 +2291,31 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationName?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
     if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
     if (typeof config.welcomeTextEn === "string") welcomeTextEn.value = config.welcomeTextEn;
+    if (config.welcomeTexts && typeof config.welcomeTexts === "object" && !Array.isArray(config.welcomeTexts)) {
+      const welcomeTexts = config.welcomeTexts as Record<string, unknown>;
+      if (typeof welcomeTexts.zh === "string") welcomeTextZh.value = welcomeTexts.zh;
+      if (typeof welcomeTexts.en === "string") welcomeTextEn.value = welcomeTexts.en;
+      if (typeof welcomeTexts.de === "string") welcomeTextDe.value = welcomeTexts.de;
+      if (typeof welcomeTexts.ru === "string") welcomeTextRu.value = welcomeTexts.ru;
+      if (typeof welcomeTexts.ja === "string") welcomeTextJa.value = welcomeTexts.ja;
+    }
     accessMode.value = config.accessMode === "open" ? "open" : "fixed";
-    accelerationAvailable.value = config.accelerationAvailable === true;
-    accelerationName.value = typeof config.accelerationName === "string" ? config.accelerationName.trim() : "";
-    if (!accelerationAvailable.value) accelerationEnabled.value = false;
+    accelerationRelays.value = Array.isArray(config.accelerationRelays)
+      ? config.accelerationRelays.flatMap((value) => {
+        if (!value || typeof value !== "object") return [];
+        const relay = value as { id?: unknown; name?: unknown };
+        return typeof relay.id === "string" && typeof relay.name === "string" && relay.id && relay.name
+          ? [{ id: relay.id, name: relay.name }]
+          : [];
+      })
+      : [];
+    if (!accelerationAvailable.value || !accelerationRelays.value.some((relay) => relay.id === accelerationRelayId.value)) accelerationRelayId.value = "";
     const hasInviteTarget = query.has("server") || query.has("target") || query.has("tsHost") || query.has("tsPort");
     if (!hasInviteTarget && typeof config.target === "string" && config.target.trim()) {
       const target = splitTeamSpeakTarget(config.target);
@@ -1797,6 +2355,54 @@ function openMemberMenu(member: ChannelMember, event: Event): void {
 function openMemberActions(member: ChannelMember): void {
   if (member.isSelf) return;
   memberMenu.value = { member, x: 0, y: 0 };
+}
+
+function moveChannelLabel(channel: TreeChannel): string {
+  return `${"　".repeat(Math.max(0, channel.depth))}${channel.name}`;
+}
+
+function openMoveMemberDialog(member: ChannelMember): void {
+  if (member.isSelf) return;
+  moveMemberDialog.member = member;
+  moveMemberDialog.channelId = moveTargetChannels.value[0]?.id ?? "";
+  moveMemberDialog.password = "";
+  moveMemberDialog.error = "";
+  moveMemberDialog.submitting = false;
+  moveMemberDialog.open = true;
+}
+
+function requestMoveMember(member: ChannelMember): void {
+  if (!voiceState.canMoveClients) {
+    showToast(t("movePermissionDenied"));
+    return;
+  }
+  openMoveMemberDialog(member);
+}
+
+function cancelMoveMember(): void {
+  if (moveMemberDialog.submitting) return;
+  moveMemberDialog.open = false;
+  moveMemberDialog.member = null;
+  moveMemberDialog.channelId = "";
+  moveMemberDialog.password = "";
+  moveMemberDialog.error = "";
+}
+
+async function submitMoveMember(): Promise<void> {
+  const member = moveMemberDialog.member;
+  const channelId = moveMemberDialog.channelId;
+  if (!member || !channelId || moveMemberDialog.submitting) return;
+  moveMemberDialog.submitting = true;
+  moveMemberDialog.error = "";
+  try {
+    await moveClient(member.id, channelId, moveMemberDialog.password.trim());
+    showToast(t("moveMemberSuccess"));
+    cancelMoveMember();
+  } catch (error: unknown) {
+    moveMemberDialog.error = localizedMessage(error instanceof Error ? error.message : "操作失败");
+  } finally {
+    moveMemberDialog.submitting = false;
+  }
 }
 
 function toggleWhisperTarget(member: ChannelMember): void {
@@ -1849,11 +2455,22 @@ function avatarInitial(name: string) {
 }
 
 const avatarColors = ["#9edbd4", "#b9d4c5", "#e8c6a8", "#c5c7e8", "#edd2d4", "#c8d9e9", "#e4d3b8"];
-function avatarStyle(name: string, isSelf = false) {
-  if (isSelf) return { background: "linear-gradient(135deg, #006a64, #2e9f96)" };
+function avatarStyle(name: string, isSelf = false, avatar = "") {
+  const fallback = isSelf ? "linear-gradient(135deg, #006a64, #2e9f96)" : "";
   let hash = 0;
   for (let index = 0; index < name.length; index++) hash = name.charCodeAt(index) + ((hash << 5) - hash);
-  return { background: avatarColors[Math.abs(hash) % avatarColors.length] };
+  return {
+    background: fallback || avatarColors[Math.abs(hash) % avatarColors.length],
+    ...(avatar ? { backgroundImage: `url("${avatar}")`, backgroundPosition: "center", backgroundSize: "cover" } : {}),
+  };
+}
+
+function messageAvatar(message: ChatMessage): string {
+  const member = members.find((candidate) =>
+    (typeof message.senderId === "number" && candidate.id === message.senderId) ||
+    (Boolean(message.senderUid) && candidate.uid === message.senderUid),
+  );
+  return member?.avatar ?? "";
 }
 
 function isSpeaking(member: ChannelMember) {
@@ -1865,7 +2482,7 @@ function memberDisplayName(member: ChannelMember): string {
 }
 
 function formatTime(timestamp: number) {
-  const locale = language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : "en-US";
+  const locale = language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : language.value === "ru" ? "ru-RU" : language.value === "ja" ? "ja-JP" : "en-US";
   return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(timestamp);
 }
 
@@ -1880,6 +2497,10 @@ function onVolInput(clientId: number, event: Event) {
 
 function onInputVolume(event: Event) {
   setInputVolume(Number((event.target as HTMLInputElement).value) / 100);
+}
+
+function onNoiseSuppressionToggle(event: Event) {
+  void setNoiseSuppressionEnabled((event.target as HTMLInputElement).checked);
 }
 
 function onOutputVolume(event: Event) {
@@ -2039,7 +2660,9 @@ function stopWhisperTalk(): void {
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
 .card-lead { margin: 0 0 18px; color: #7b8885; font-size: 13px; }
-.notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+.notice-content { min-width: 0; overflow-wrap: anywhere; }
+.notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
 .error-notice { color: #a53c38; background: #fff0ef; border: 1px solid #f7d4d1; }
 .warning-notice { color: #8a6537; background: #fff8e9; border: 1px solid #f2dfb3; }
 .notice-symbol { display: grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; color: #fff; background: currentColor; color: #fff; font-size: 10px; font-weight: 800; }
@@ -2184,14 +2807,16 @@ function stopWhisperTalk(): void {
 .settings-footer { justify-content: flex-end; }
 .reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 14px auto 0; width: min(950px, calc(100% - 64px)); padding: 12px 16px; color: #6c5a2c; border: 1px solid #f0dfae; border-radius: 10px; background: #fff9e8; }
 .reconnect-banner.failed { color: #8f4540; border-color: #f2d1cd; background: #fff2f1; }
+.reconnect-banner.degraded { color: #7a4d1d; border-color: #f3d9a9; background: #fff7ec; } /* 降级/告警级提示（如音频链路降级） */
 .reconnect-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .reconnect-copy strong { font-size: 13px; }
 .reconnect-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .reconnect-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .reconnect-actions .secondary-button { min-height: 34px; padding-inline: 13px; }
 .remember-identity { display: flex; align-items: flex-start; gap: 9px; margin-top: 8px; color: #465650; cursor: pointer; }
-.acceleration-choice { display: flex; align-items: flex-start; gap: 9px; margin: 8px 0 2px; padding: 10px 11px; color: #245f58; background: #edf9f5; border: 1px solid #c4e9df; border-radius: 10px; cursor: pointer; }
-.acceleration-choice input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: #087d74; }
+.acceleration-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 2px; padding: 10px 11px; color: #245f58; background: #edf9f5; border: 1px solid #c4e9df; border-radius: 10px; }
+.acceleration-choice select { min-width: 150px; max-width: 48%; padding: 8px 28px 8px 10px; color: #245f58; background: #fff; border: 1px solid #b9ded5; border-radius: 8px; font: inherit; font-size: 11px; font-weight: 700; }
+.acceleration-copy { min-width: 0; }
 .acceleration-choice strong, .acceleration-choice small { display: block; }
 .acceleration-choice strong { font-size: 11px; font-weight: 800; }
 .acceleration-choice small { margin-top: 3px; color: #6b8c85; font-size: 10px; line-height: 1.45; }
@@ -2202,6 +2827,7 @@ function stopWhisperTalk(): void {
 .identity-warning { margin: 8px 0 0; color: #9a6a32; font-size: 10px; line-height: 1.45; }
 :global(html[data-theme="dark"] .acceleration-choice) { color: #b8eee3; background: #183530; border-color: #2b645b; }
 :global(html[data-theme="dark"] .acceleration-choice small) { color: #91b9b0; }
+:global(html[data-theme="dark"] .acceleration-choice select) { color: #d9f8f1; background: #203f39; border-color: #3b766d; }
 .local-servers { display: grid; gap: 8px; margin: 1px 0 5px; }
 .local-server-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .local-server-group > span { width: 100%; color: #87958f; font-size: 10px; font-weight: 700; }
@@ -2312,12 +2938,6 @@ function stopWhisperTalk(): void {
 .desktop-audio-dock-copy strong { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .desktop-audio-dock-copy span { overflow: hidden; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .desktop-audio-dock-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
-.dock-output-control { display: flex; align-items: center; gap: 5px; width: 34px; overflow: hidden; transition: width .18s ease; }
-.dock-output-control:hover, .dock-output-control:focus-within { width: 115px; }
-.dock-output-slider { width: 0; min-width: 0; height: 5px; opacity: 0; appearance: none; border-radius: 999px; outline: none; pointer-events: none; cursor: pointer; transition: width .18s ease, opacity .14s ease; }
-.dock-output-control:hover .dock-output-slider, .dock-output-control:focus-within .dock-output-slider { width: 76px; opacity: 1; pointer-events: auto; }
-.dock-output-slider::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); cursor: pointer; }
-.dock-output-slider::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); cursor: pointer; }
 .dock-audio-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: 9px; cursor: pointer; transition: color .16s, background .16s, border-color .16s, transform .16s; }
 .dock-audio-button:hover, .dock-audio-button:focus-visible { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 32%, var(--border)); transform: translateY(-1px); }
 .dock-audio-button.microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-1)); }
@@ -2830,5 +3450,57 @@ function stopWhisperTalk(): void {
   .performance-panel { right: 8px; width: min(330px, calc(100vw - 16px)); padding: 13px; }
   .performance-route { gap: 3px; }
   .performance-route span { padding-inline: 4px; font-size: 8px; }
+}
+
+/* Desktop audio popovers: keep the rail compact and reveal each control's
+   adjustment surface only while the pointer or keyboard focus is on it. */
+@media (min-width: 741px) {
+  .app-shell .member-panel { overflow: visible; }
+  .desktop-audio-dock { position: relative; z-index: 6; }
+}
+
+.dock-hover-control { position: relative; flex: 0 0 34px; }
+.dock-hover-panel {
+  position: absolute;
+  z-index: 20;
+  right: 50%;
+  bottom: calc(100% + 10px);
+  width: min(224px, calc(100vw - 32px));
+  padding: 13px 14px;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 15px 34px color-mix(in srgb, var(--text-primary) 18%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(50%, 6px);
+  transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+}
+.dock-hover-panel::after { content: ""; position: absolute; right: auto; bottom: -6px; left: 50%; width: 10px; height: 10px; background: var(--surface-1); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: translateX(-50%) rotate(45deg); }
+.dock-hover-control:hover .dock-hover-panel,
+.dock-hover-control:focus-within .dock-hover-panel { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(50%, 0); }
+.dock-microphone-panel { width: min(246px, calc(100vw - 32px)); }
+.dock-slider-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dock-slider-heading span { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.dock-slider-heading strong { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
+.dock-slider { width: 100%; height: 5px; margin: 11px 0 1px; appearance: none; border-radius: 999px; outline: none; cursor: pointer; }
+.dock-slider::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); box-shadow: 0 2px 4px color-mix(in srgb, var(--text-primary) 14%, transparent); cursor: pointer; }
+.dock-slider::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); box-shadow: 0 2px 4px color-mix(in srgb, var(--text-primary) 14%, transparent); cursor: pointer; }
+.dock-panel-divider { height: 1px; margin: 12px 0; background: var(--border); }
+.dock-switch-row, .mobile-noise-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; }
+.dock-switch-row > span, .mobile-noise-toggle > span { min-width: 0; }
+.dock-switch-row strong, .mobile-noise-toggle strong { display: block; color: var(--text-primary); font-size: 11px; }
+.mobile-noise-toggle { margin-bottom: 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
+.mobile-noise-toggle small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.dock-switch-row input, .mobile-noise-toggle input { position: relative; width: 34px; height: 20px; flex: 0 0 34px; margin: 0; padding: 0; appearance: none; border: 2px solid var(--border); border-radius: 999px; outline: none; background: var(--surface-2); cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+.dock-switch-row input::before, .mobile-noise-toggle input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); transition: transform .16s ease, background .16s ease; }
+.dock-switch-row input:checked, .mobile-noise-toggle input:checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 72%, var(--surface-2)); }
+.dock-switch-row input:checked::before, .mobile-noise-toggle input:checked::before { background: var(--surface-1); transform: translateX(14px); }
+.dock-switch-row input:focus-visible, .mobile-noise-toggle input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-hover-panel, .dock-switch-row input, .mobile-noise-toggle input { transition-duration: .01ms; }
 }
 </style>

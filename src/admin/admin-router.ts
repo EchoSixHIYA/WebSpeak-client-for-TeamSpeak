@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import type { Logger } from "../logger.js";
-import { AdminInputError, AdminService, type AdminSettingsInput } from "./admin-service.js";
+import { AdminInputError, AdminService, type AdminSettingsInput, type RelayNodeInput } from "./admin-service.js";
 import { AdminSessionStore, isSecureRequest } from "./admin-session.js";
 import { AdminLoginRateLimiter, waitFor } from "./login-rate-limit.js";
 import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
@@ -10,13 +10,17 @@ import type { AdminSessionSummary } from "../server/voice-bridge.js";
 export interface AdminConnectionRecord {
   id: string;
   nickname: string;
+  clientIp: string;
   target: string;
+  relayName: string | null;
+  relayTarget: string | null;
   startedAt: string;
   connectedAt: string | null;
   disconnectedAt: string | null;
   durationSeconds: number | null;
   status: "active" | "connecting" | "disconnected" | "failed";
   reason: string | null;
+  failureDetail: string | null;
 }
 
 export interface AdminRouterOptions {
@@ -342,6 +346,19 @@ async function runProbe(
 }
 
 function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
+  const relayNodes = Array.isArray(body.relayNodes)
+    ? body.relayNodes.map((value): RelayNodeInput => {
+      const node = asRecord(value);
+      return {
+        id: typeof node.id === "string" ? node.id.slice(0, 110) : undefined,
+        name: typeof node.name === "string" ? node.name.slice(0, 80) : "",
+        target: typeof node.target === "string" ? node.target.slice(0, 300) : "",
+        enabled: node.enabled === true,
+        token: typeof node.token === "string" ? node.token.slice(0, 512) : undefined,
+        tokenAction: readPasswordAction(node.tokenAction),
+      };
+    })
+    : undefined;
   return {
     target: readString(body, "target", 300),
     serverPassword: typeof body.serverPassword === "string" ? body.serverPassword.slice(0, 512) : undefined,
@@ -350,6 +367,9 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
     siteName: readString(body, "siteName", 80),
     welcomeText: readOptionalString(body, "welcomeText", 500),
     welcomeTextEn: typeof body.welcomeTextEn === "string" ? body.welcomeTextEn.slice(0, 500) : undefined,
+    welcomeTextDe: typeof body.welcomeTextDe === "string" ? body.welcomeTextDe.slice(0, 500) : undefined,
+    welcomeTextRu: typeof body.welcomeTextRu === "string" ? body.welcomeTextRu.slice(0, 500) : undefined,
+    welcomeTextJa: typeof body.welcomeTextJa === "string" ? body.welcomeTextJa.slice(0, 500) : undefined,
     webRtcEnabled: body.webRtcEnabled === true,
     webRtcUdpStart: readOptionalInteger(body, "webRtcUdpStart"),
     webRtcUdpEnd: readOptionalInteger(body, "webRtcUdpEnd"),
@@ -359,6 +379,7 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
     relayTarget: typeof body.relayTarget === "string" ? body.relayTarget.slice(0, 300) : undefined,
     relayToken: typeof body.relayToken === "string" ? body.relayToken.slice(0, 512) : undefined,
     relayTokenAction: readPasswordAction(body.relayTokenAction),
+    relayNodes,
   };
 }
 
@@ -416,7 +437,7 @@ function readRecentLogs(logFile: string | undefined, limit: number): AdminLogEnt
       try {
         const raw = JSON.parse(line) as Record<string, unknown>;
         const context: Record<string, string | number | boolean> = {};
-        for (const key of ["component", "entryId", "code", "reason", "attempt", "target", "nickname", "channel", "reconnect", "port"]) {
+        for (const key of ["component", "entryId", "code", "reason", "attempt", "target", "nickname", "clientIp", "relayName", "relayTarget", "channel", "reconnect", "port"]) {
           const value = raw[key];
           if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") context[key] = value;
         }
@@ -446,13 +467,17 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
   const records = new Map<string, {
     id: string;
     nickname: string;
+    clientIp: string;
     target: string;
+    relayName: string;
+    relayTarget: string;
     startedAt: string | null;
     connectedAt: string | null;
     disconnectedAt: string | null;
     durationSeconds: number | null;
     status: AdminConnectionRecord["status"];
     reason: string | null;
+    failureDetail: string | null;
   }>();
   for (const log of readStructuredLogs(logFile)) {
     const entryId = typeof log.raw.entryId === "string" ? log.raw.entryId : "";
@@ -460,21 +485,35 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
     const current = records.get(entryId) ?? {
       id: entryId,
       nickname: "",
+      clientIp: "",
       target: "",
+      relayName: "",
+      relayTarget: "",
       startedAt: null,
       connectedAt: null,
       disconnectedAt: null,
       durationSeconds: null,
       status: "connecting" as const,
       reason: null,
+      failureDetail: null,
     };
     const nickname = typeof log.raw.nickname === "string" ? log.raw.nickname : "";
+    const clientIp = typeof log.raw.clientIp === "string" ? log.raw.clientIp : "";
     const target = typeof log.raw.target === "string" ? log.raw.target : "";
+    const relayName = typeof log.raw.relayName === "string" ? log.raw.relayName : "";
+    const relayTarget = typeof log.raw.relayTarget === "string" ? log.raw.relayTarget : "";
     if (nickname) current.nickname = nickname;
+    if (clientIp) current.clientIp = clientIp;
     if (target) current.target = target;
+    if (relayName) current.relayName = relayName;
+    if (relayTarget) current.relayTarget = relayTarget;
+    if (typeof log.raw.failureDetail === "string" && log.raw.failureDetail) current.failureDetail = log.raw.failureDetail;
     if (log.message === "WebClient connecting") {
       current.startedAt ??= log.timestamp;
       current.status = "connecting";
+    } else if (log.message === "TS connect failed") {
+      current.reason = typeof log.raw.code === "string" ? log.raw.code : current.reason;
+      current.status = "failed";
     } else if (log.message === "Web client connected to TeamSpeak") {
       current.startedAt ??= log.timestamp;
       current.connectedAt = log.timestamp;
@@ -487,10 +526,14 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
         : current.connectedAt
           ? Math.max(0, Math.floor((Date.parse(log.timestamp) - Date.parse(current.connectedAt)) / 1000))
           : null;
-      current.reason = typeof log.raw.failureCode === "string"
-        ? log.raw.failureCode
-        : typeof log.raw.reason === "string" ? log.raw.reason : null;
       current.status = current.connectedAt ? "disconnected" : "failed";
+      // `reason` is also used for ordinary lifecycle teardown (for example
+      // websocket-close when a user clicks Leave). Only preserve an explicit
+      // TeamSpeak failure code here; otherwise a normal disconnect would be
+      // rendered by the admin UI as the generic request-failed message.
+      current.reason = typeof log.raw.failureCode === "string" && log.raw.failureCode
+        ? log.raw.failureCode
+        : current.reason;
     }
     records.set(entryId, current);
   }
@@ -503,7 +546,10 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
       return {
         id: record.id,
         nickname: record.nickname || "—",
+        clientIp: record.clientIp || "—",
         target: record.target || "—",
+        relayName: record.relayName || null,
+        relayTarget: record.relayTarget || null,
         startedAt: record.startedAt,
         connectedAt: record.connectedAt,
         disconnectedAt: record.disconnectedAt,
@@ -516,6 +562,7 @@ export function readConnectionHistory(logFile: string | undefined, limit: number
         // an untraceable failed connection explicitly visible as the generic
         // request-failed message instead of implying a guessed cause.
         reason: record.reason ?? (record.status === "failed" ? "CONNECTION_FAILED" : null),
+        failureDetail: record.failureDetail,
       };
     })
     .sort((left, right) => Date.parse(right.disconnectedAt ?? right.startedAt) - Date.parse(left.disconnectedAt ?? left.startedAt))

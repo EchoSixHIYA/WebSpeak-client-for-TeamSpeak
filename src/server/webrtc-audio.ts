@@ -127,6 +127,7 @@ export class WebRtcAudioSession {
   private lastIngressRtpAt: number | null = null;
   private lastEgressRtpAt: number | null = null;
   private lastQueueEnqueuedAt: number | null = null;
+  private microphoneMuted: boolean;
   private accompanimentActive: boolean;
   private readonly stats: WebRtcAudioStats = {
     webrtcIngressRtpFrames: 0,
@@ -153,6 +154,7 @@ export class WebRtcAudioSession {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
     this.onVoiceFrame = options.onVoiceFrame;
     this.onVoiceActivity = options.onVoiceActivity;
+    this.microphoneMuted = options.microphoneMuted === true;
     this.accompanimentActive = options.accompanimentActive === true;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
@@ -179,6 +181,13 @@ export class WebRtcAudioSession {
         this.stats.webrtcIngressRtpFrames++;
         if (!this.opusPayloadTypes.has(rtp.header.payloadType)) return;
         const payload = Buffer.from(rtp.payload);
+        // A muted microphone must stop the browser user's TeamSpeak voice
+        // packets at the gateway. Browser-side track.enabled/gain changes
+        // still produce RTP comfort-silence on some browsers, and forwarding
+        // those packets makes TeamSpeak keep the user in the speaking state.
+        // When accompaniment is active, keep forwarding the mixed track: the
+        // browser has already removed only the microphone component.
+        if (this.microphoneMuted && !this.accompanimentActive) return;
         // Forward every valid negotiated Opus payload unchanged. Do not
         // decode it for RMS analysis or pass it through a speech/silence gate:
         // quiet frames are still part of the codec timeline and dropping them
@@ -406,10 +415,7 @@ export class WebRtcAudioSession {
   }
 
   setMicrophoneMuted(muted: boolean): void {
-    // The browser sends a mixed microphone/accompaniment track. The mute gain
-    // is applied before RTP encoding, so a server-side mute flag must not drop
-    // the whole packet and silence a still-playing accompaniment.
-    void muted;
+    this.microphoneMuted = muted;
   }
 
   setAccompanimentActive(active: boolean): void {

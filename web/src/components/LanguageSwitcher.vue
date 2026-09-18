@@ -42,7 +42,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Icon from "./Icon.vue";
 
-type Language = "zh" | "en" | "de";
+type Language = "zh" | "en" | "de" | "ru" | "ja";
 
 const props = withDefaults(defineProps<{
   modelValue: Language;
@@ -60,6 +60,8 @@ const options: Array<{ value: Language; code: string; label: string; flag: strin
   { value: "zh", code: "ZH", label: "中文", flag: "🇨🇳" },
   { value: "en", code: "EN", label: "English", flag: "🇬🇧" },
   { value: "de", code: "DE", label: "Deutsch", flag: "🇩🇪" },
+  { value: "ru", code: "RU", label: "Русский", flag: "🇷🇺" },
+  { value: "ja", code: "JA", label: "日本語", flag: "🇯🇵" },
 ];
 
 const root = ref<HTMLElement | null>(null);

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { Writable } from "node:stream";
 import {
   Client as TS3FullClient,
   clientMove as tsClientMove,
@@ -14,6 +15,7 @@ import {
   type TextMessage,
 } from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
+import { describeTeamSpeakError, normalizeTeamSpeakError, normalizeTeamSpeakKickedReason } from "../errors.js";
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { createAccelerationRelayClient, type AccelerationRelayClient, type AccelerationRelayOptions } from "./acceleration-relay.js";
@@ -33,6 +35,14 @@ export interface TSVoiceData {
   codec: number; // 4 = voice, 5 = music
   data: Buffer;
 }
+
+export interface TSClientAvatar {
+  /** TeamSpeak's avatar content marker, used to invalidate a cached avatar. */
+  cacheKey: string;
+  data: Buffer;
+}
+
+const MAX_CLIENT_AVATAR_BYTES = 120 * 1024;
 
 export type TSDirectorySnapshot = DirectorySnapshot;
 export type TSDirectoryClient = DirectoryClientInfo;
@@ -73,6 +83,10 @@ export class TSClient extends EventEmitter {
   private connected = false;
   private preferredChannelId = 0n;
   private accelerationClient: AccelerationRelayClient | null = null;
+  // Reason id of the most recent self leave, kept so the SDK `kicked` event can
+  // tell a plain kick (4) from a kick with ban (5). The SDK only forwards the
+  // reason message to its `kicked` handler, not the reason id.
+  private selfLeaveReasonId: number | null = null;
 
   constructor(private options: TSClientOptions, logger: Logger) {
     super();
@@ -81,6 +95,7 @@ export class TSClient extends EventEmitter {
   }
 
   async connect(): Promise<void> {
+    this.selfLeaveReasonId = null;
     if (!this.adapter || !this.client) {
       let transportTarget = this.options.target;
       if (this.options.acceleration && !this.accelerationClient) {
@@ -138,8 +153,9 @@ export class TSClient extends EventEmitter {
       this.emit("directorySnapshot", { channels, clients });
     } catch (error: unknown) {
       this.logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-      }, "Could not reconcile the TeamSpeak directory snapshot");
+        failureCode: "DIRECTORY_SNAPSHOT_UNAVAILABLE",
+        failureDetail: error instanceof Error ? error.message : String(error),
+      }, "TeamSpeak directory snapshot unavailable");
     }
 
     const connectedChannelId = client.channelID();
@@ -163,6 +179,46 @@ export class TSClient extends EventEmitter {
 
     this.logger.info({ clientId: this.clientId }, "Connected to TeamSpeak");
     this.emit("connected", this.clientId);
+  }
+
+  /**
+   * Load a visible client's TeamSpeak avatar through the client protocol.
+   *
+   * TeamSpeak does not include the avatar bytes in directory notifications.
+   * `clientinfo` exposes the avatar marker and the per-identity filename; the
+   * file itself is then read through the normal TeamSpeak file-transfer port.
+   * A missing permission, missing avatar, blocked file-transfer port, or an
+   * oversized image is intentionally reported as `null` so the web client can
+   * keep its generated initial avatar.
+   */
+  async getClientAvatar(clientId: number, expectedUid = ""): Promise<TSClientAvatar | null> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
+    const rows = await this.client.execCommandWithResponse(`clientinfo clid=${clientId}`, 5_000);
+    const info = rows.find((row) => {
+      if (expectedUid && row.client_unique_identifier !== expectedUid) return false;
+      return typeof row.client_flag_avatar === "string" && typeof row.client_base64HashClientUID === "string";
+    });
+    if (!info) return null;
+    const cacheKey = info.client_flag_avatar?.trim() ?? "";
+    const avatarFileKey = info.client_base64HashClientUID?.trim() ?? "";
+    if (!cacheKey || !/^[A-Za-z0-9+/=_-]{8,256}$/.test(avatarFileKey)) return null;
+
+    const transfer = await this.client.fileTransferInitDownload(0n, `/avatar_${avatarFileKey}`, "");
+    const size = Number(transfer.size);
+    if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_CLIENT_AVATAR_BYTES) return null;
+
+    const chunks: Buffer[] = [];
+    const destination = new Writable({
+      write(chunk: Buffer | string, _encoding, callback) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        callback();
+      },
+    });
+    await this.client.downloadFileData(this.options.target.host, transfer, destination);
+    const data = Buffer.concat(chunks);
+    if (data.length === 0 || data.length > MAX_CLIENT_AVATAR_BYTES) return null;
+    return { cacheKey, data };
   }
 
   private attachClientListeners(client: TS3FullClient): void {
@@ -193,7 +249,15 @@ export class TSClient extends EventEmitter {
     });
 
     client.on("disconnected", (err) => {
-      this.logger.warn({ err: err?.message }, "Disconnected from TS");
+      if (err) {
+        const normalized = normalizeTeamSpeakError(err);
+        this.logger.warn({
+          failureCode: normalized.code.toUpperCase(),
+          failureDetail: describeTeamSpeakError(normalized),
+        }, "TeamSpeak transport disconnected unexpectedly");
+      } else {
+        this.logger.info("TeamSpeak transport disconnected");
+      }
       this.connected = false;
       this.clientId = 0;
       this.emit("disconnected", err);
@@ -204,12 +268,30 @@ export class TSClient extends EventEmitter {
     });
 
     client.on("clientLeave", (info) => {
+      // 仅记录本客户端的踢出(4)/踢出并封禁(5)退出原因，供 kicked 事件区分普通踢出与封禁
+      if (info.id === this.clientId && (info.reasonID === 4 || info.reasonID === 5)) this.selfLeaveReasonId = info.reasonID;
       this.emit("clientLeave", info);
+    });
+
+    // 转发 SDK 的 kicked 事件：不转发的话管理员填写的踢出原因会被丢弃，浏览器
+    // 只能看到笼统的「连接失败」。这里把原因连同 reason id 一起归一化后向上抛。
+    // The SDK emits `kicked` only for a self leave with reason 4 (kick) or 5
+    // (kick with ban) and hands over the admin written reason message. Without
+    // this listener the reason was dropped, so the browser degraded to a generic
+    // "connection failed" right after the transport went away.
+    client.on("kicked", (reasonMsg) => {
+      const reasonId = this.selfLeaveReasonId;
+      this.selfLeaveReasonId = null;
+      this.emit("kicked", normalizeTeamSpeakKickedReason(reasonMsg, reasonId));
     });
 
     client.on("clientMoved", (info) => {
       if (info.id === this.clientId && info.targetChannelID !== 0n) this.preferredChannelId = info.targetChannelID;
       this.emit("clientMoved", info);
+    });
+
+    client.on("clientUpdated", (event) => {
+      this.emit("clientUpdated", event.info);
     });
   }
 
@@ -242,10 +324,37 @@ export class TSClient extends EventEmitter {
     await this.client.execCommand(`clientupdate client_away=${away ? 1 : 0} client_away_message=${escaped}`);
   }
 
+  async setInputMuted(muted: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    await this.client.execCommand(`clientupdate client_input_muted=${muted ? 1 : 0}`);
+  }
+
   async switchChannel(channelId: bigint, password?: string): Promise<void> {
     if (!this.client || !this.connected) return;
     await tsClientMove(this.client, this.clientId, channelId, password);
     this.preferredChannelId = channelId;
+  }
+
+  /** Move another visible TeamSpeak client; the server enforces both move powers. */
+  async moveClient(clientId: number, channelId: bigint, password?: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
+    await tsClientMove(this.client, clientId, channelId, password);
+  }
+
+  /**
+   * Probe whether this identity may move a visible client into a channel.
+   *
+   * The browser client protocol does not expose ServerQuery's `permget`, so
+   * the only authoritative capability check available through this session is
+   * the same `clientmove` operation the UI will use. The bridge calls this
+   * with the client's current channel, making the probe a no-op when accepted;
+   * TeamSpeak still evaluates both move-power permissions.
+   */
+  async probeMovePermission(clientId: number, channelId: bigint): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
+    await tsClientMove(this.client, clientId, channelId);
   }
 
   getClientId(): number {
@@ -280,6 +389,7 @@ export class TSClient extends EventEmitter {
 
   async disconnect(): Promise<void> {
     this.connected = false;
+    this.selfLeaveReasonId = null;
     try {
       if (this.adapter) await this.adapter.disconnect();
     } finally {
