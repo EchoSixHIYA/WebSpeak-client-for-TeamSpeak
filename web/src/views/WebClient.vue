@@ -195,14 +195,14 @@
         <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div><button type="button" class="status-button" :class="{ active: away }" @click="toggleAway"><span class="status-dot"></span>{{ away ? t('away') : t('available') }}</button></div>
         <div class="member-search"><Icon name="search" :size="15" /><input v-model="memberQuery" :placeholder="t('searchMembers')" :aria-label="t('searchMembers')" /></div>
         <div class="member-tree">
-          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id, 'drag-over': dragOverChannelId === channelItem.id }]" :style="{ marginLeft: `${channelItem.depth * 10}px` }" @dragover="onChannelDragOver(channelItem, $event)" @dragleave="onChannelDragLeave(channelItem, $event)" @drop="onChannelDrop(channelItem, $event)">
+          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id, 'drag-over': dragOverChannelId === channelItem.id }]" :data-member-channel-id="channelItem.id" :style="{ marginLeft: `${channelItem.depth * 10}px` }" @dragover="onChannelDragOver(channelItem, $event)" @dragleave="onChannelDragLeave(channelItem, $event)" @drop="onChannelDrop(channelItem, $event)">
             <button class="member-channel-heading" :title="t('switchChannel')" @click="selectChannel(channelItem)">
               <Icon name="volume" :size="16" />
               <span>{{ channelItem.name }}</span>
               <small>{{ channelItem.members.length }}</small>
             </button>
             <div v-if="channelItem.members.length" class="member-list">
-              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf && voiceState.canMoveClients" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @contextmenu.prevent="openMemberMenu(member, $event)">
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf && voiceState.canMoveClients" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
@@ -459,6 +459,7 @@ const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
 const draggedMember = ref<ChannelMember | null>(null);
 const dragOverChannelId = ref("");
+const memberPointerDrag = reactive({ member: null as ChannelMember | null, pointerId: null as number | null, startX: 0, startY: 0, active: false, targetChannelId: "" });
 const moveMemberDialog = reactive({ open: false, member: null as ChannelMember | null, channelId: "", password: "", submitting: false, error: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
@@ -2400,6 +2401,66 @@ function onMemberDragEnd(): void {
   dragOverChannelId.value = "";
 }
 
+function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
+  if (member.isSelf || !voiceState.canMoveClients || event.button !== 0) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest("input,button")) return;
+  memberPointerDrag.member = member;
+  memberPointerDrag.pointerId = event.pointerId;
+  memberPointerDrag.startX = event.clientX;
+  memberPointerDrag.startY = event.clientY;
+  memberPointerDrag.active = false;
+  memberPointerDrag.targetChannelId = "";
+  const currentTarget = event.currentTarget as HTMLElement | null;
+  currentTarget?.setPointerCapture?.(event.pointerId);
+}
+
+function onMemberPointerMove(event: PointerEvent): void {
+  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
+  const distance = Math.hypot(event.clientX - memberPointerDrag.startX, event.clientY - memberPointerDrag.startY);
+  if (!memberPointerDrag.active && distance < 6) return;
+  event.preventDefault();
+  memberPointerDrag.active = true;
+  draggedMember.value = memberPointerDrag.member;
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-member-channel-id]");
+  const targetChannelId = target?.dataset.memberChannelId ?? "";
+  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === memberPointerDrag.member?.id));
+  if (!sourceChannel || !targetChannelId || targetChannelId === sourceChannel.id) {
+    memberPointerDrag.targetChannelId = "";
+    dragOverChannelId.value = "";
+    return;
+  }
+  memberPointerDrag.targetChannelId = targetChannelId;
+  dragOverChannelId.value = targetChannelId;
+}
+
+function onMemberPointerUp(event: PointerEvent): void {
+  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
+  const member = memberPointerDrag.member;
+  const targetChannelId = memberPointerDrag.targetChannelId;
+  const currentTarget = event.currentTarget as HTMLElement | null;
+  currentTarget?.releasePointerCapture?.(event.pointerId);
+  memberPointerDrag.member = null;
+  memberPointerDrag.pointerId = null;
+  memberPointerDrag.active = false;
+  memberPointerDrag.targetChannelId = "";
+  draggedMember.value = null;
+  dragOverChannelId.value = "";
+  if (targetChannelId) requestMoveMember(member, targetChannelId);
+}
+
+function onMemberPointerCancel(event: PointerEvent): void {
+  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
+  const currentTarget = event.currentTarget as HTMLElement | null;
+  currentTarget?.releasePointerCapture?.(event.pointerId);
+  memberPointerDrag.member = null;
+  memberPointerDrag.pointerId = null;
+  memberPointerDrag.active = false;
+  memberPointerDrag.targetChannelId = "";
+  draggedMember.value = null;
+  dragOverChannelId.value = "";
+}
+
 function onChannelDragOver(channelItem: TreeChannel, event: DragEvent): void {
   const member = draggedMember.value;
   if (!member || channelItem.id === "__current__") return;
@@ -3546,7 +3607,7 @@ function stopWhisperTalk(): void {
 .dock-switch-row input:checked::before, .mobile-noise-toggle input:checked::before { background: var(--surface-1); transform: translateX(14px); }
 .dock-switch-row input:focus-visible, .mobile-noise-toggle input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
 
-.member-row[draggable="true"] { cursor: grab; }
+.member-row[draggable="true"] { cursor: grab; touch-action: none; }
 .member-row[draggable="true"]:active { cursor: grabbing; }
 .member-row.dragging { opacity: .45; }
 .member-channel-group.drag-over { padding: 6px 6px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
