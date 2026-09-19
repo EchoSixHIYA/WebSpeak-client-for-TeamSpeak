@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.3] — 2026-09-19
+
+### 中文
+
+- 修复有 TeamSpeak 权限时的成员移动：支持拖放和右键“调度到”，直接移动成员且无需重复输入频道密码，并保留“我所在的频道”快捷项。
+- 修复成员头像、麦克风静音状态同步和保持身份恢复；改善指针拖动兼容性及无权限操作的限制。
+- 更新中文、English、Deutsch、Русский、日本語五种语言的功能截图和文档页面。
+
+### English
+
+- Fixed permission-aware member moves: drag-and-drop and the context-menu “Move to” action now move clients directly without redundant channel-password prompts, with a “My channel” shortcut.
+- Restored client avatars, microphone mute-state synchronization, and remembered-identity recovery; improved pointer-drag compatibility and permission gating.
+- Refreshed feature screenshots and documentation pages for all five supported languages.
+
+### Deutsch
+
+- Mitgliederverschiebungen unter Beachtung der TeamSpeak-Berechtigungen repariert: Ziehen und Ablegen sowie „Verschieben nach“ im Kontextmenü verschieben Mitglieder direkt ohne erneute Kanalpasswortabfrage und bieten „Mein Kanal“.
+- Client-Avatare, Synchronisierung des Mikrofon-Stummschaltstatus und Wiederherstellung gespeicherter Identitäten repariert; Zeigerbedienung und Berechtigungsprüfung verbessert.
+- Funktionsscreenshots und Dokumentationsseiten für alle fünf unterstützten Sprachen aktualisiert.
+
+### Русский
+
+- Исправлено перемещение участников с учётом прав TeamSpeak: перетаскивание и пункт «Переместить в» в контекстном меню перемещают напрямую без повторного запроса пароля канала и содержат быстрый пункт «Мой канал».
+- Восстановлены аватары клиентов, синхронизация состояния отключения микрофона и сохранённой идентичности; улучшены перетаскивание указателем и проверка прав.
+- Обновлены функциональные скриншоты и страницы документации для всех пяти поддерживаемых языков.
+
+### 日本語
+
+- TeamSpeak 権限に対応したメンバー移動を修正しました。ドラッグ＆ドロップとコンテキストメニューの「移動先」がチャンネルパスワードを再入力せず直接移動し、「自分のチャンネル」も利用できます。
+- クライアントアバター、マイクミュート状態の同期、保存した ID の復元を修正し、ポインター操作と権限チェックを改善しました。
+- 対応する 5 言語すべての機能スクリーンショットとドキュメントページを更新しました。
+
 ## [0.2.2] — 2026-09-17
 
 ### 中文

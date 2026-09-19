@@ -32,6 +32,26 @@
 | 管理コンソール | 接続先、アクセス、WebRTC、中継、招待、セッション、ログ、診断、バックアップ。 |
 | インターフェース | 中文、English、Deutsch、Русский、日本語、ライト/ダークテーマ、レスポンシブ表示。 |
 
+## 🖼️ インターフェースのスクリーンショット
+
+日本語のホーム、音声ワークスペース、オーディオ設定、メンバー操作メニューを掲載しています。
+
+### ホーム
+
+<p align="center"><img src="./screenshots/webspeak-ja-home.png" alt="WebSpeak 日本語ホーム" width="100%" /></p>
+
+### 音声ワークスペース
+
+<p align="center"><img src="./screenshots/webspeak-ja.png" alt="WebSpeak 日本語音声ワークスペース" width="100%" /></p>
+
+### オーディオ設定
+
+<p align="center"><img src="./screenshots/webspeak-ja-audio.png" alt="WebSpeak 日本語オーディオ設定" width="100%" /></p>
+
+### メンバーメニュー
+
+<p align="center"><img src="./screenshots/webspeak-ja-menu.png" alt="WebSpeak 日本語メンバーメニュー" width="100%" /></p>
+
 ## 🧩 高度な機能
 
 ### WebRTC
@@ -99,6 +119,7 @@ npm start
 
 | バージョン | 内容 |
 | --- | --- |
+| [v0.2.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.3) | メンバー移動、権限チェック、アバター、ミュート状態の同期、保存 ID の復元を修正し、5 言語の機能スクリーンショットとドキュメントを更新しました。 |
 | [v0.2.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.2) | ブラウザ側マイクノイズ抑制、ロシア語・日本語 UI、言語別ウェルカム文を追加。音量操作と PR #2 を基にしたエラー表示・エラーコードを改善しました。 |
 | [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 接続エラー表示を改善し、IPv6 接続先を標準対応しました。 |
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | パスワード案内、正式な中継モード、複数中継選択、接続診断を追加しました。 |
