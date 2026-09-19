@@ -195,14 +195,14 @@
         <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div><button type="button" class="status-button" :class="{ active: away }" @click="toggleAway"><span class="status-dot"></span>{{ away ? t('away') : t('available') }}</button></div>
         <div class="member-search"><Icon name="search" :size="15" /><input v-model="memberQuery" :placeholder="t('searchMembers')" :aria-label="t('searchMembers')" /></div>
         <div class="member-tree">
-          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id }]" :style="{ marginLeft: `${channelItem.depth * 10}px` }">
+          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id, 'drag-over': dragOverChannelId === channelItem.id }]" :style="{ marginLeft: `${channelItem.depth * 10}px` }" @dragover="onChannelDragOver(channelItem, $event)" @dragleave="onChannelDragLeave(channelItem, $event)" @drop="onChannelDrop(channelItem, $event)">
             <button class="member-channel-heading" :title="t('switchChannel')" @click="selectChannel(channelItem)">
               <Icon name="volume" :size="16" />
               <span>{{ channelItem.name }}</span>
               <small>{{ channelItem.members.length }}</small>
             </button>
             <div v-if="channelItem.members.length" class="member-list">
-              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" class="member-row" @contextmenu.prevent="openMemberMenu(member, $event)">
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf && voiceState.canMoveClients" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
@@ -423,7 +423,7 @@ const serverHost = ref(initialTarget.address);
 const serverPort = ref(initialTarget.port);
 const serverPassword = ref("");
 const accessMode = ref<"fixed" | "open">("fixed");
-const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") === "1");
+const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") !== "0");
 const favoriteServers = ref<FavoriteServer[]>([]);
 const recentServers = ref<RecentServer[]>([]);
 const initialized = ref(false);
@@ -457,6 +457,8 @@ const privateClientId = ref(0);
 const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
+const draggedMember = ref<ChannelMember | null>(null);
+const dragOverChannelId = ref("");
 const moveMemberDialog = reactive({ open: false, member: null as ChannelMember | null, channelId: "", password: "", submitting: false, error: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
@@ -2361,22 +2363,66 @@ function moveChannelLabel(channel: TreeChannel): string {
   return `${"　".repeat(Math.max(0, channel.depth))}${channel.name}`;
 }
 
-function openMoveMemberDialog(member: ChannelMember): void {
+function openMoveMemberDialog(member: ChannelMember, targetChannelId = ""): void {
   if (member.isSelf) return;
   moveMemberDialog.member = member;
-  moveMemberDialog.channelId = moveTargetChannels.value[0]?.id ?? "";
+  moveMemberDialog.channelId = moveTargetChannels.value.some((channel) => channel.id === targetChannelId)
+    ? targetChannelId
+    : moveTargetChannels.value[0]?.id ?? "";
   moveMemberDialog.password = "";
   moveMemberDialog.error = "";
   moveMemberDialog.submitting = false;
   moveMemberDialog.open = true;
 }
 
-function requestMoveMember(member: ChannelMember): void {
+function requestMoveMember(member: ChannelMember, targetChannelId = ""): void {
   if (!voiceState.canMoveClients) {
     showToast(t("movePermissionDenied"));
     return;
   }
-  openMoveMemberDialog(member);
+  openMoveMemberDialog(member, targetChannelId);
+}
+
+function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
+  if (member.isSelf || !voiceState.canMoveClients) {
+    event.preventDefault();
+    if (!member.isSelf) showToast(t("movePermissionDenied"));
+    return;
+  }
+  draggedMember.value = member;
+  dragOverChannelId.value = "";
+  event.dataTransfer?.setData("text/plain", String(member.id));
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+function onMemberDragEnd(): void {
+  draggedMember.value = null;
+  dragOverChannelId.value = "";
+}
+
+function onChannelDragOver(channelItem: TreeChannel, event: DragEvent): void {
+  const member = draggedMember.value;
+  if (!member || channelItem.id === "__current__") return;
+  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
+  if (!sourceChannel || sourceChannel.id === channelItem.id) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  dragOverChannelId.value = channelItem.id;
+}
+
+function onChannelDragLeave(channelItem: TreeChannel, event: DragEvent): void {
+  const currentTarget = event.currentTarget;
+  const relatedTarget = event.relatedTarget;
+  if (currentTarget instanceof HTMLElement && relatedTarget instanceof Node && currentTarget.contains(relatedTarget)) return;
+  if (dragOverChannelId.value === channelItem.id) dragOverChannelId.value = "";
+}
+
+function onChannelDrop(channelItem: TreeChannel, event: DragEvent): void {
+  event.preventDefault();
+  const member = draggedMember.value;
+  onMemberDragEnd();
+  if (!member || channelItem.id === "__current__") return;
+  requestMoveMember(member, channelItem.id);
 }
 
 function cancelMoveMember(): void {
@@ -3499,6 +3545,12 @@ function stopWhisperTalk(): void {
 .dock-switch-row input:checked, .mobile-noise-toggle input:checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 72%, var(--surface-2)); }
 .dock-switch-row input:checked::before, .mobile-noise-toggle input:checked::before { background: var(--surface-1); transform: translateX(14px); }
 .dock-switch-row input:focus-visible, .mobile-noise-toggle input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+
+.member-row[draggable="true"] { cursor: grab; }
+.member-row[draggable="true"]:active { cursor: grabbing; }
+.member-row.dragging { opacity: .45; }
+.member-channel-group.drag-over { padding: 6px 6px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.member-channel-group.drag-over .member-channel-heading { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface-1)); }
 
 @media (prefers-reduced-motion: reduce) {
   .dock-hover-panel, .dock-switch-row input, .mobile-noise-toggle input { transition-duration: .01ms; }
