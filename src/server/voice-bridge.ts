@@ -1172,7 +1172,6 @@ async function handleCommand(
     if (command.type === "moveClient") {
       const clientId = command.payload.clientId as number;
       const channelId = command.payload.channelId as string;
-      const channelPassword = typeof command.payload.password === "string" ? command.payload.password : "";
       if (clientId === entry.tsClient.getClientId()) {
         sendJson({ type: "error", requestId: command.requestId, error: { code: "CANNOT_MOVE_SELF", message: "不能移动自己的客户端", recoverable: false } });
         return;
@@ -1190,7 +1189,9 @@ async function handleCommand(
       // i_client_needed_move_power inside clientmove. Do not duplicate that
       // policy in the gateway; forwarding the authoritative command keeps TS3
       // and TS6 permission behavior aligned.
-      await entry.tsClient.moveClient(clientId, BigInt(channelId), channelPassword || undefined);
+      // Moving another visible client is an administrator operation. It must
+      // not prompt for or depend on the target channel's join password.
+      await entry.tsClient.moveClient(clientId, BigInt(channelId));
     } else if (command.type === "sendTextMessage") {
       const message = (command.payload.message as string).trim();
       if (message) await entry.tsClient.sendTextMessage("channel", message, entry.tsClient.getChannelId());

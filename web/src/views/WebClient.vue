@@ -265,26 +265,15 @@
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
-      <button type="button" @click="requestMoveMember(memberMenu.member); memberMenu = null"><Icon name="chevron-right" :size="15" /> {{ t('moveMember') }}</button>
-    </div>
-
-    <!-- Move another TeamSpeak client to a channel. TeamSpeak still performs the permission check. -->
-    <div v-if="moveMemberDialog.open" class="modal-backdrop channel-password-backdrop" @click.self="cancelMoveMember">
-      <section class="channel-password-modal member-move-modal" role="dialog" aria-modal="true" aria-labelledby="move-member-title" @click.stop>
-        <button type="button" class="qq-modal-close" :aria-label="t('close')" :title="t('close')" @click="cancelMoveMember"><Icon name="close" :size="19" /></button>
-        <div class="channel-password-icon"><Icon name="chevron-right" :size="22" /></div>
-        <span class="card-kicker">{{ t('moveMember') }}</span>
-        <h2 id="move-member-title">{{ t('moveMemberTitle', { member: moveMemberDialog.member?.nickname ?? '' }) }}</h2>
-        <p>{{ t('moveMemberLead') }}</p>
-        <form class="channel-password-form" @submit.prevent="submitMoveMember">
-          <label class="field-label" for="move-member-channel">{{ t('moveMemberTarget') }}</label>
-          <div class="field-wrap"><Icon name="volume" :size="17" /><select id="move-member-channel" v-model="moveMemberDialog.channelId" :disabled="moveMemberDialog.submitting || !moveTargetChannels.length"><option value="" disabled>{{ t('moveMemberChooseChannel') }}</option><option v-for="targetChannel in moveTargetChannels" :key="targetChannel.id" :value="targetChannel.id">{{ moveChannelLabel(targetChannel) }}</option></select></div>
-          <label class="field-label" for="move-member-password">{{ t('channelPasswordPrompt') }} <span>{{ t('optional') }}</span></label>
-          <div class="field-wrap"><Icon name="lock" :size="17" /><input id="move-member-password" v-model="moveMemberDialog.password" type="password" autocomplete="off" :placeholder="t('channelPasswordOptional')" :disabled="moveMemberDialog.submitting" /></div>
-          <div v-if="moveMemberDialog.error" class="notice error-notice channel-password-error"><span class="notice-symbol">!</span><span>{{ moveMemberDialog.error }}</span></div>
-          <div class="channel-password-actions"><button type="button" class="text-button" :disabled="moveMemberDialog.submitting" @click="cancelMoveMember">{{ t('channelPasswordCancel') }}</button><button type="submit" class="primary-button channel-password-submit" :disabled="moveMemberDialog.submitting || !moveMemberDialog.channelId"><span v-if="moveMemberDialog.submitting" class="button-spinner"></span><span>{{ t('moveMemberSubmit') }}</span><Icon v-if="!moveMemberDialog.submitting" name="chevron-right" :size="17" /></button></div>
-        </form>
-      </section>
+      <div v-if="voiceState.canMoveClients" class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
+        <button type="button" class="member-menu-submenu-trigger" :aria-expanded="memberMoveMenuOpen" @click="toggleMemberMoveMenu"><Icon name="chevron-right" :size="15" /> <span>{{ t('moveMemberMenu') }}</span><Icon name="chevron-right" :size="13" class="member-menu-submenu-arrow" /></button>
+        <div v-if="memberMoveMenuOpen" class="member-submenu-panel" @click.stop>
+          <button v-if="memberMoveMenuCurrentChannel" type="button" @click="moveMemberDirect(memberMenu.member, memberMoveMenuCurrentChannel.id)"><Icon name="users" :size="15" /><span>{{ t('moveMemberMyChannel') }}</span><small>{{ memberMoveMenuCurrentChannel.name }}</small></button>
+          <button v-for="targetChannel in memberMoveMenuOtherChannels" :key="targetChannel.id" type="button" @click="moveMemberDirect(memberMenu.member, targetChannel.id)"><Icon name="volume" :size="15" /><span>{{ targetChannel.name }}</span></button>
+          <span v-if="!memberMoveMenuCurrentChannel && !memberMoveMenuOtherChannels.length" class="member-submenu-empty">{{ t('moveMemberNoChannels') }}</span>
+        </div>
+      </div>
+      <button v-else type="button" class="member-menu-disabled" disabled><Icon name="chevron-right" :size="15" /> {{ t('moveMemberMenu') }}</button>
     </div>
 
     <!-- Protected channel password modal -->
@@ -457,10 +446,10 @@ const privateClientId = ref(0);
 const away = ref(false);
 const awayMessage = ref("");
 const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
+const memberMoveMenuOpen = ref(false);
 const draggedMember = ref<ChannelMember | null>(null);
 const dragOverChannelId = ref("");
 const memberPointerDrag = reactive({ member: null as ChannelMember | null, pointerId: null as number | null, startX: 0, startY: 0, active: false, targetChannelId: "" });
-const moveMemberDialog = reactive({ open: false, member: null as ChannelMember | null, channelId: "", password: "", submitting: false, error: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
 const whisperPttActive = ref(false);
@@ -657,6 +646,9 @@ const translations: Record<string, Record<string, string>> = {
     pokeSent: "已发送戳一戳",
     copyNickname: "复制昵称",
     moveMember: "移动到频道",
+    moveMemberMenu: "调度到",
+    moveMemberMyChannel: "我所在的频道",
+    moveMemberNoChannels: "没有可移动的频道",
     moveMemberTitle: "移动 {{member}}",
     moveMemberLead: "选择目标频道。TeamSpeak 会根据你的移动权限决定是否允许此操作。",
     moveMemberTarget: "目标频道",
@@ -944,6 +936,9 @@ const translations: Record<string, Record<string, string>> = {
     pokeSent: "Poke sent",
     copyNickname: "Copy nickname",
     moveMember: "Move to channel",
+    moveMemberMenu: "Move to",
+    moveMemberMyChannel: "My channel",
+    moveMemberNoChannels: "No available channels",
     moveMemberTitle: "Move {{member}}",
     moveMemberLead: "Choose a target channel. TeamSpeak will enforce your move permissions.",
     moveMemberTarget: "Target channel",
@@ -1234,6 +1229,9 @@ translations.de = {
   pokeSent: "Anstupser gesendet",
   copyNickname: "Namen kopieren",
   moveMember: "In Kanal verschieben",
+  moveMemberMenu: "Verschieben nach",
+  moveMemberMyChannel: "Mein Kanal",
+  moveMemberNoChannels: "Keine verfügbaren Kanäle",
   moveMemberTitle: "{{member}} verschieben",
   moveMemberLead: "Wähle einen Zielkanal. TeamSpeak prüft deine Verschiebeberechtigung.",
   moveMemberTarget: "Zielkanal",
@@ -1378,6 +1376,9 @@ translations.ru = {
   joinDescription: "Клиент TeamSpeak устанавливать не нужно. Откройте браузер и присоединитесь к голосовому каналу с низкой задержкой.",
   overallVolume: "Общая громкость",
   moveMember: "Переместить в канал",
+  moveMemberMenu: "Переместить в",
+  moveMemberMyChannel: "Мой канал",
+  moveMemberNoChannels: "Нет доступных каналов",
   moveMemberTitle: "Переместить: {{member}}",
   moveMemberLead: "Выберите канал. TeamSpeak проверит ваши права на перемещение.",
   moveMemberTarget: "Целевой канал",
@@ -1459,6 +1460,9 @@ translations.ja = {
   joinDescription: "TeamSpeak クライアントのインストールは不要です。ブラウザから低遅延の音声チャンネルに参加できます。",
   overallVolume: "全体音量",
   moveMember: "チャンネルへ移動",
+  moveMemberMenu: "移動先",
+  moveMemberMyChannel: "自分のチャンネル",
+  moveMemberNoChannels: "移動できるチャンネルがありません",
   moveMemberTitle: "{{member}}を移動",
   moveMemberLead: "移動先を選択してください。TeamSpeak が権限を確認します。",
   moveMemberTarget: "移動先チャンネル",
@@ -1915,10 +1919,20 @@ const filteredMemberChannels = computed(() => {
   if (!search) return memberChannels.value;
   return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
 });
-const moveTargetChannels = computed(() => {
-  const member = moveMemberDialog.member;
-  const sourceChannelId = member ? memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id : "";
-  return memberChannels.value.filter((channel) => channel.id !== sourceChannelId && channel.id !== "__current__");
+const memberMoveMenuCurrentChannel = computed<TreeChannel | null>(() => {
+  const member = memberMenu.value?.member;
+  const currentId = currentChannel.value?.id;
+  if (!member || !currentId || currentId === "__current__") return null;
+  const sourceChannelId = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id ?? "";
+  if (sourceChannelId === currentId) return null;
+  return memberChannels.value.find((channel) => channel.id === currentId) ?? null;
+});
+const memberMoveMenuOtherChannels = computed<TreeChannel[]>(() => {
+  const member = memberMenu.value?.member;
+  if (!member) return [];
+  const sourceChannelId = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id ?? "";
+  const currentChannelId = memberMoveMenuCurrentChannel.value?.id;
+  return memberChannels.value.filter((channel) => channel.id !== "__current__" && channel.id !== sourceChannelId && channel.id !== currentChannelId);
 });
 const whisperTargets = computed(() => [...whisperTargetIds].map((id) => members.find((member) => member.id === id)).filter((member): member is ChannelMember => Boolean(member)));
 
@@ -2351,37 +2365,49 @@ function openPrivateChat(clientId: number): void {
 
 function openMemberMenu(member: ChannelMember, event: Event): void {
   if (member.isSelf) return;
+  memberMoveMenuOpen.value = false;
   const point = event instanceof MouseEvent ? event : undefined;
   memberMenu.value = { member, x: Math.min((point?.clientX ?? 20), Math.max(12, window.innerWidth - 210)), y: Math.min((point?.clientY ?? 20), Math.max(12, window.innerHeight - 170)) };
 }
 
 function openMemberActions(member: ChannelMember): void {
   if (member.isSelf) return;
+  memberMoveMenuOpen.value = false;
   memberMenu.value = { member, x: 0, y: 0 };
 }
 
-function moveChannelLabel(channel: TreeChannel): string {
-  return `${"　".repeat(Math.max(0, channel.depth))}${channel.name}`;
-}
-
-function openMoveMemberDialog(member: ChannelMember, targetChannelId = ""): void {
-  if (member.isSelf) return;
-  moveMemberDialog.member = member;
-  moveMemberDialog.channelId = moveTargetChannels.value.some((channel) => channel.id === targetChannelId)
-    ? targetChannelId
-    : moveTargetChannels.value[0]?.id ?? "";
-  moveMemberDialog.password = "";
-  moveMemberDialog.error = "";
-  moveMemberDialog.submitting = false;
-  moveMemberDialog.open = true;
-}
-
-function requestMoveMember(member: ChannelMember, targetChannelId = ""): void {
+function toggleMemberMoveMenu(): void {
   if (!voiceState.canMoveClients) {
     showToast(t("movePermissionDenied"));
     return;
   }
-  openMoveMemberDialog(member, targetChannelId);
+  memberMoveMenuOpen.value = true;
+}
+
+async function moveMemberDirect(member: ChannelMember, targetChannelId: string): Promise<void> {
+  if (member.isSelf || !targetChannelId || targetChannelId === "__current__") return;
+  if (!voiceState.canMoveClients) {
+    memberMenu.value = null;
+    memberMoveMenuOpen.value = false;
+    showToast(t("movePermissionDenied"));
+    return;
+  }
+  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
+  if (sourceChannel?.id === targetChannelId) {
+    memberMenu.value = null;
+    memberMoveMenuOpen.value = false;
+    return;
+  }
+  memberMenu.value = null;
+  memberMoveMenuOpen.value = false;
+  try {
+    // Moving a visible client is a server-admin operation; channel passwords
+    // must never be requested or forwarded for this action.
+    await moveClient(member.id, targetChannelId);
+    showToast(t("moveMemberSuccess"));
+  } catch (error: unknown) {
+    showToast(localizedMessage(error instanceof Error ? error.message : "操作失败"));
+  }
 }
 
 function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
@@ -2446,7 +2472,7 @@ function onMemberPointerUp(event: PointerEvent): void {
   memberPointerDrag.targetChannelId = "";
   draggedMember.value = null;
   dragOverChannelId.value = "";
-  if (targetChannelId) requestMoveMember(member, targetChannelId);
+  if (targetChannelId) void moveMemberDirect(member, targetChannelId);
 }
 
 function onMemberPointerCancel(event: PointerEvent): void {
@@ -2483,33 +2509,7 @@ function onChannelDrop(channelItem: TreeChannel, event: DragEvent): void {
   const member = draggedMember.value;
   onMemberDragEnd();
   if (!member || channelItem.id === "__current__") return;
-  requestMoveMember(member, channelItem.id);
-}
-
-function cancelMoveMember(): void {
-  if (moveMemberDialog.submitting) return;
-  moveMemberDialog.open = false;
-  moveMemberDialog.member = null;
-  moveMemberDialog.channelId = "";
-  moveMemberDialog.password = "";
-  moveMemberDialog.error = "";
-}
-
-async function submitMoveMember(): Promise<void> {
-  const member = moveMemberDialog.member;
-  const channelId = moveMemberDialog.channelId;
-  if (!member || !channelId || moveMemberDialog.submitting) return;
-  moveMemberDialog.submitting = true;
-  moveMemberDialog.error = "";
-  try {
-    await moveClient(member.id, channelId, moveMemberDialog.password.trim());
-    showToast(t("moveMemberSuccess"));
-    cancelMoveMember();
-  } catch (error: unknown) {
-    moveMemberDialog.error = localizedMessage(error instanceof Error ? error.message : "操作失败");
-  } finally {
-    moveMemberDialog.submitting = false;
-  }
+  void moveMemberDirect(member, channelItem.id);
 }
 
 function toggleWhisperTarget(member: ChannelMember): void {
@@ -3078,6 +3078,22 @@ function stopWhisperTalk(): void {
 .member-context-menu strong { padding: 4px 8px 7px; color: #2a3934; font-size: 12px; }
 .member-context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; color: #52625c; background: transparent; border-radius: 6px; font-size: 11px; text-align: left; cursor: pointer; }
 .member-context-menu button:hover { color: #006a64; background: #edf6f3; }
+.member-menu-submenu { position: relative; }
+.member-menu-submenu-trigger { width: 100%; }
+.member-menu-submenu-arrow { margin-left: auto; }
+.member-submenu-panel { position: absolute; z-index: 1; top: -8px; left: calc(100% + 6px); display: grid; min-width: 220px; max-height: min(420px, calc(100vh - 24px)); gap: 3px; padding: 8px; overflow-y: auto; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
+.member-submenu-panel button { width: 100%; min-width: 0; }
+.member-submenu-panel button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-submenu-panel button small { margin-left: auto; color: #83928c; font-size: 10px; white-space: nowrap; }
+.member-submenu-empty { display: block; padding: 8px; color: #83928c; font-size: 11px; }
+.member-menu-disabled { opacity: .55; cursor: not-allowed !important; }
+:global(html[data-theme="dark"]) .member-context-menu,
+:global(html[data-theme="dark"]) .member-submenu-panel { color: var(--text-primary); background: var(--surface-1); border-color: var(--border); box-shadow: 0 18px 42px color-mix(in srgb, #000 38%, transparent); }
+:global(html[data-theme="dark"]) .member-context-menu strong { color: var(--text-primary); }
+:global(html[data-theme="dark"]) .member-context-menu button { color: var(--text-muted); }
+:global(html[data-theme="dark"]) .member-context-menu button:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+:global(html[data-theme="dark"]) .member-submenu-panel button small,
+:global(html[data-theme="dark"]) .member-submenu-empty { color: var(--text-muted); }
 .menu-volume { display: grid; gap: 6px; padding: 4px 8px 8px; color: #71817c; font-size: 10px; }
 .menu-volume input { width: 100%; height: 5px; appearance: none; border-radius: 99px; outline: none; cursor: pointer; }
 .menu-volume input::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -3128,6 +3144,7 @@ function stopWhisperTalk(): void {
 .message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
 @media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; } }
 @media (max-width: 740px) { .member-context-menu { left: 12px !important; right: 12px; top: auto !important; bottom: env(safe-area-inset-bottom, 0px); min-width: 0; border-radius: 16px 16px 0 0; padding: 14px; } .member-context-menu button { min-height: 42px; font-size: 13px; } .member-context-menu strong { padding: 4px 8px 11px; font-size: 14px; } .menu-volume { font-size: 12px; } }
+@media (max-width: 740px) { .member-submenu-panel { position: static; min-width: 0; max-height: 190px; margin: 4px 0 0 24px; padding: 4px; border-radius: 10px; box-shadow: none; } .member-submenu-panel button { min-height: 42px; font-size: 13px; } }
 
 :global(html[data-theme="dark"] .join-page .brand-lockup strong) { color: var(--accent); }
 :global(html[data-theme="dark"] .join-page .brand-lockup strong span) { color: var(--text-primary); }
