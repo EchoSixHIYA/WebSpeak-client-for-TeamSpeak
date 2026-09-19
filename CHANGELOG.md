@@ -4,32 +4,37 @@
 
 ### 中文
 
-- 修复有 TeamSpeak 权限时的成员移动：支持拖放和右键“调度到”，直接移动成员且无需重复输入频道密码，并保留“我所在的频道”快捷项。
-- 修复成员头像、麦克风静音状态同步和保持身份恢复；改善指针拖动兼容性及无权限操作的限制。
+- 新增频道成员调度入口：保留拖放移动，并在右键菜单提供“调度到”二级菜单和“我所在的频道”快捷项。
+- 支持按 TeamSpeak 权限直接移动成员；具备权限时无需重复输入频道密码，无权限时不提供该操作。
+- 支持成员头像显示、麦克风静音状态同步和保存身份恢复，并增强指针拖动兼容性。
 - 更新中文、English、Deutsch、Русский、日本語五种语言的功能截图和文档页面。
 
 ### English
 
-- Fixed permission-aware member moves: drag-and-drop and the context-menu “Move to” action now move clients directly without redundant channel-password prompts, with a “My channel” shortcut.
-- Restored client avatars, microphone mute-state synchronization, and remembered-identity recovery; improved pointer-drag compatibility and permission gating.
+- Added member-management entry points: drag-and-drop remains available, while the context menu now provides a “Move to” submenu with a “My channel” shortcut.
+- Added permission-aware direct member moves: authorized users can move clients without redundant channel-password prompts, while the action is unavailable without the required TeamSpeak permission.
+- Added client-avatar display, microphone mute-state synchronization, and remembered-identity recovery, with improved pointer-drag compatibility.
 - Refreshed feature screenshots and documentation pages for all five supported languages.
 
 ### Deutsch
 
-- Mitgliederverschiebungen unter Beachtung der TeamSpeak-Berechtigungen repariert: Ziehen und Ablegen sowie „Verschieben nach“ im Kontextmenü verschieben Mitglieder direkt ohne erneute Kanalpasswortabfrage und bieten „Mein Kanal“.
-- Client-Avatare, Synchronisierung des Mikrofon-Stummschaltstatus und Wiederherstellung gespeicherter Identitäten repariert; Zeigerbedienung und Berechtigungsprüfung verbessert.
+- Neue Einstiege für die Mitgliederverwaltung: Ziehen und Ablegen bleibt verfügbar, zusätzlich bietet das Kontextmenü ein Untermenü „Verschieben nach“ mit dem Eintrag „Mein Kanal“.
+- Direkte, berechtigungsabhängige Mitgliederverschiebung ergänzt: Benutzer mit den erforderlichen TeamSpeak-Rechten benötigen keine erneute Kanalpasswortabfrage; ohne diese Rechte steht die Aktion nicht zur Verfügung.
+- Anzeige von Client-Avataren, Synchronisierung des Mikrofon-Stummschaltstatus und Wiederherstellung gespeicherter Identitäten ergänzt; Zeigerbedienung verbessert.
 - Funktionsscreenshots und Dokumentationsseiten für alle fünf unterstützten Sprachen aktualisiert.
 
 ### Русский
 
-- Исправлено перемещение участников с учётом прав TeamSpeak: перетаскивание и пункт «Переместить в» в контекстном меню перемещают напрямую без повторного запроса пароля канала и содержат быстрый пункт «Мой канал».
-- Восстановлены аватары клиентов, синхронизация состояния отключения микрофона и сохранённой идентичности; улучшены перетаскивание указателем и проверка прав.
+- Добавлены способы управления участниками: перетаскивание сохранено, а в контекстном меню появился пункт «Переместить в» с быстрым вариантом «Мой канал».
+- Добавлено прямое перемещение с учётом прав TeamSpeak: пользователям с нужными правами не нужно повторно вводить пароль канала, а без этих прав действие недоступно.
+- Добавлены отображение аватаров клиентов, синхронизация состояния микрофона и восстановление сохранённой идентичности; улучшено перетаскивание указателем.
 - Обновлены функциональные скриншоты и страницы документации для всех пяти поддерживаемых языков.
 
 ### 日本語
 
-- TeamSpeak 権限に対応したメンバー移動を修正しました。ドラッグ＆ドロップとコンテキストメニューの「移動先」がチャンネルパスワードを再入力せず直接移動し、「自分のチャンネル」も利用できます。
-- クライアントアバター、マイクミュート状態の同期、保存した ID の復元を修正し、ポインター操作と権限チェックを改善しました。
+- メンバー操作を追加しました。ドラッグ＆ドロップに加えて、コンテキストメニューに「移動先」サブメニューと「自分のチャンネル」ショートカットを用意しました。
+- TeamSpeak 権限に応じた直接移動を追加しました。必要な権限があればチャンネルパスワードを再入力せずに移動でき、権限がなければ操作は表示されません。
+- クライアントアバターの表示、マイクミュート状態の同期、保存した ID の復元に対応し、ポインター操作も改善しました。
 - 対応する 5 言語すべての機能スクリーンショットとドキュメントページを更新しました。
 
 ## [0.2.2] — 2026-09-17
