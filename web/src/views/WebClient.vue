@@ -195,7 +195,7 @@
         <div class="member-panel-heading"><div><span class="section-kicker">{{ t('people') }}</span><h2>{{ t('people') }}</h2></div><button type="button" class="status-button" :class="{ active: away }" @click="toggleAway"><span class="status-dot"></span>{{ away ? t('away') : t('available') }}</button></div>
         <div class="member-search"><Icon name="search" :size="15" /><input v-model="memberQuery" :placeholder="t('searchMembers')" :aria-label="t('searchMembers')" /></div>
         <div class="member-tree">
-          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id, 'drag-over': dragOverChannelId === channelItem.id }]" :data-member-channel-id="channelItem.id" :style="{ marginLeft: `${channelItem.depth * 10}px` }" @dragover="onChannelDragOver(channelItem, $event)" @dragleave="onChannelDragLeave(channelItem, $event)" @drop="onChannelDrop(channelItem, $event)">
+          <section v-for="channelItem in filteredMemberChannels" :key="channelItem.id" :class="['member-channel-group', { current: currentChannel?.id === channelItem.id, 'drag-over': dragOverChannelId === channelItem.id }]" :data-member-channel-id="channelItem.id" :style="{ marginLeft: `${channelItem.depth * 10}px` }" @dragover="onChannelDragOver(channelItem, $event)" @dragleave="onChannelDragLeave(channelItem, $event)" @drop="onChannelDrop(channelItem, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)">
             <button class="member-channel-heading" :title="t('switchChannel')" @click="selectChannel(channelItem)">
               <Icon name="volume" :size="16" />
               <span>{{ channelItem.name }}</span>
@@ -2436,6 +2436,7 @@ function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
   if (member.isSelf || !voiceState.canMoveClients || event.button !== 0) return;
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest("input,button")) return;
+  event.preventDefault();
   memberPointerDrag.member = member;
   memberPointerDrag.pointerId = event.pointerId;
   memberPointerDrag.startX = event.clientX;
