@@ -268,7 +268,7 @@
       <div v-if="voiceState.canMoveClients" class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
         <button type="button" class="member-menu-submenu-trigger" :aria-expanded="memberMoveMenuOpen" @click="toggleMemberMoveMenu"><Icon name="chevron-right" :size="15" /> <span>{{ t('moveMemberMenu') }}</span><Icon name="chevron-right" :size="13" class="member-menu-submenu-arrow" /></button>
         <div v-if="memberMoveMenuOpen" class="member-submenu-panel" @click.stop>
-          <button v-if="memberMoveMenuCurrentChannel" type="button" @click="moveMemberDirect(memberMenu.member, memberMoveMenuCurrentChannel.id)"><Icon name="users" :size="15" /><span>{{ t('moveMemberMyChannel') }}</span><small>{{ memberMoveMenuCurrentChannel.name }}</small></button>
+          <button v-if="memberMoveMenuCurrentChannel" type="button" :disabled="memberMoveMenuCurrentSameChannel" @click="moveMemberDirect(memberMenu.member, memberMoveMenuCurrentChannel.id)"><Icon name="users" :size="15" /><span>{{ t('moveMemberMyChannel') }}</span><small>{{ memberMoveMenuCurrentChannel.name }}</small></button>
           <button v-for="targetChannel in memberMoveMenuOtherChannels" :key="targetChannel.id" type="button" @click="moveMemberDirect(memberMenu.member, targetChannel.id)"><Icon name="volume" :size="15" /><span>{{ targetChannel.name }}</span></button>
           <span v-if="!memberMoveMenuCurrentChannel && !memberMoveMenuOtherChannels.length" class="member-submenu-empty">{{ t('moveMemberNoChannels') }}</span>
         </div>
@@ -1924,8 +1924,13 @@ const memberMoveMenuCurrentChannel = computed<TreeChannel | null>(() => {
   const currentId = currentChannel.value?.id;
   if (!member || !currentId || currentId === "__current__") return null;
   const sourceChannelId = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id ?? "";
-  if (sourceChannelId === currentId) return null;
   return memberChannels.value.find((channel) => channel.id === currentId) ?? null;
+});
+const memberMoveMenuCurrentSameChannel = computed(() => {
+  const member = memberMenu.value?.member;
+  const currentId = memberMoveMenuCurrentChannel.value?.id;
+  if (!member || !currentId) return false;
+  return memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id === currentId;
 });
 const memberMoveMenuOtherChannels = computed<TreeChannel[]>(() => {
   const member = memberMenu.value?.member;
@@ -3083,6 +3088,7 @@ function stopWhisperTalk(): void {
 .member-menu-submenu-arrow { margin-left: auto; }
 .member-submenu-panel { position: absolute; z-index: 1; top: -8px; left: calc(100% + 6px); display: grid; min-width: 220px; max-height: min(420px, calc(100vh - 24px)); gap: 3px; padding: 8px; overflow-y: auto; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
 .member-submenu-panel button { width: 100%; min-width: 0; }
+.member-submenu-panel button:disabled { opacity: .55; cursor: default; }
 .member-submenu-panel button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .member-submenu-panel button small { margin-left: auto; color: #83928c; font-size: 10px; white-space: nowrap; }
 .member-submenu-empty { display: block; padding: 8px; color: #83928c; font-size: 11px; }
