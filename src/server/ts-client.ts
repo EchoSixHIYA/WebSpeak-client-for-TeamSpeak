@@ -12,6 +12,7 @@ import {
   type VoiceData,
   type DirectoryClientInfo,
   type DirectorySnapshot,
+  type RawNotification,
   type TextMessage,
 } from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
@@ -46,6 +47,7 @@ const MAX_CLIENT_AVATAR_BYTES = 120 * 1024;
 
 export type TSDirectorySnapshot = DirectorySnapshot;
 export type TSDirectoryClient = DirectoryClientInfo;
+export type TSRawNotification = RawNotification;
 
 export type TSChatScope = "channel" | "server" | "private";
 
@@ -133,6 +135,22 @@ export class TSClient extends EventEmitter {
       this.logger.warn({
         err: error instanceof Error ? error.message : String(error),
       }, "Could not subscribe to all TeamSpeak channels");
+    }
+    // TS6 stream/screen-share notifications are delivered through the normal
+    // server notification channel. Keep this subscription in the same client
+    // session so a browser can participate in the native TS6 P2P signaling
+    // flow without a second query connection.
+    for (const event of ["server", "channel", "textchannel"] as const) {
+      try {
+        await client.execCommand(`servernotifyregister event=${event}`, 5_000);
+      } catch (error: unknown) {
+        // Older TeamSpeak servers may reject one of the newer event scopes.
+        // This is optional: voice and directory sync must remain available.
+        this.logger.debug({
+          event,
+          err: error instanceof Error ? error.message : String(error),
+        }, "Optional TeamSpeak notification scope unavailable");
+      }
     }
     // Directory snapshots are dispatched through two setImmediate layers in
     // the SDK. Let both flush before reconciling with a direct client-protocol
@@ -238,6 +256,13 @@ export class TSClient extends EventEmitter {
         channels: snapshot.channels.slice(),
         clients: snapshot.clients.slice(),
       });
+    });
+
+    client.on("rawNotification", (notification: RawNotification) => {
+      this.emit("rawNotification", {
+        name: notification.name,
+        params: { ...notification.params },
+      } satisfies TSRawNotification);
     });
 
     client.on("textMessage", (msg) => {
@@ -371,6 +396,16 @@ export class TSClient extends EventEmitter {
   async execCommandWithResponse(command: string, timeoutMs = 3000): Promise<Record<string, string>[]> {
     if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
     return this.client.execCommandWithResponse(command, timeoutMs);
+  }
+
+  /**
+   * Send a TeamSpeak protocol command whose response is delivered later as a
+   * notification (for example setupstream/streamsignaling). The command is
+   * assembled by the trusted server-side stream adapter, never by the browser.
+   */
+  async sendProtocolCommand(command: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    await this.client.sendCommandNoWait(command);
   }
 
   getIdentityString(): string {

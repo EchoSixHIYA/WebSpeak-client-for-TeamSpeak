@@ -29,6 +29,25 @@ export interface VoiceState {
   channelSwitchedChannelId: string;
 }
 
+export interface ScreenShareStream {
+  streamId: string;
+  source: "browser" | "teamspeak";
+  ownerPeerId: string;
+  ownerNickname: string;
+  name: string;
+  audio: boolean;
+  createdAt: number;
+  viewerCount: number;
+}
+
+export interface ScreenShareSignal {
+  kind: "offer" | "answer" | "iceCandidate" | "close";
+  sdp?: string;
+  candidate?: string;
+  sdpMid?: string | null;
+  sdpMLineIndex?: number | null;
+}
+
 export interface ChannelMember {
   id: number;
   nickname: string;
@@ -277,6 +296,18 @@ export function useVoiceWebSocket() {
   const accompanimentSupported = ref(typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia));
   const accompanimentErrorCode = ref<"" | "unsupported" | "needsWebRtc" | "noAudio" | "permission">("");
   let accompanimentStream: MediaStream | null = null;
+  const screenShareStreams = reactive<ScreenShareStream[]>([]);
+  const screenShareActive = ref(false);
+  const screenShareActiveStreamId = ref("");
+  const screenShareViewing = ref(false);
+  const screenShareViewingStreamId = ref("");
+  const screenShareRemoteStream = ref<MediaStream | null>(null);
+  const screenShareError = ref("");
+  const screenShareRemoteVolume = ref(1);
+  let screenShareLocalStream: MediaStream | null = null;
+  const screenSharePeers = new Map<string, RTCPeerConnection>();
+  const screenSharePendingIce = new Map<string, RTCIceCandidateInit[]>();
+  const screenSharePeerStreams = new Map<string, MediaStream>();
   let webrtcMixDestination: MediaStreamAudioDestinationNode | null = null;
   let webrtcMixMicSource: MediaStreamAudioSourceNode | null = null;
   let webrtcMixMicGain: GainNode | null = null;
@@ -1549,6 +1580,7 @@ export function useVoiceWebSocket() {
     stopMicrophone();
     clearMicrophoneError();
     clearAudioNotice();
+    stopScreenShareTransport(!preserveConnection);
     const socket = ws.value;
     ws.value = null;
     stopWebRtcTransport();
@@ -1594,6 +1626,257 @@ export function useVoiceWebSocket() {
     }
   }
 
+  function sendScreenShareMessage(message: Record<string, unknown>): void {
+    if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify(message));
+  }
+
+  function closeScreenSharePeer(peerId: string): void {
+    const peer = screenSharePeers.get(peerId);
+    screenSharePeers.delete(peerId);
+    screenSharePendingIce.delete(peerId);
+    screenSharePeerStreams.delete(peerId);
+    try { peer?.close(); } catch { /* closing an already closed peer is harmless */ }
+  }
+
+  function closeAllScreenSharePeers(): void {
+    for (const peerId of [...screenSharePeers.keys()]) closeScreenSharePeer(peerId);
+  }
+
+  function setScreenShareP2PError(message = "直连 P2P 失败，当前网络无法建立浏览器之间的直接连接") {
+    screenShareError.value = message;
+  }
+
+  function createScreenSharePeer(streamId: string, peerId: string, role: "owner" | "viewer"): RTCPeerConnection {
+    const existing = screenSharePeers.get(peerId);
+    if (existing) return existing;
+    // Deliberately no STUN/TURN: this feature is direct host-candidate P2P only.
+    const peer = new RTCPeerConnection({ iceServers: [] });
+    screenSharePeers.set(peerId, peer);
+    if (role === "owner") {
+      for (const track of screenShareLocalStream?.getTracks() ?? []) peer.addTrack(track, screenShareLocalStream!);
+    } else {
+      peer.addTransceiver("video", { direction: "recvonly" });
+      const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
+      if (stream?.audio) peer.addTransceiver("audio", { direction: "recvonly" });
+    }
+    peer.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      const candidate = event.candidate;
+      sendScreenShareMessage({
+        type: "screenShareSignal",
+        streamId,
+        targetPeerId: peerId,
+        signal: {
+          kind: "iceCandidate",
+          candidate: candidate.candidate,
+          sdpMid: candidate.sdpMid,
+          sdpMLineIndex: candidate.sdpMLineIndex,
+        },
+      });
+    };
+    peer.ontrack = (event) => {
+      if (role !== "viewer") return;
+      const remote = event.streams[0] ?? screenSharePeerStreams.get(peerId) ?? new MediaStream();
+      if (!event.streams[0]) remote.addTrack(event.track);
+      screenSharePeerStreams.set(peerId, remote);
+      screenShareRemoteStream.value = remote;
+      screenShareViewing.value = true;
+    };
+    peer.onconnectionstatechange = () => {
+      if (peer.connectionState === "failed" || peer.connectionState === "disconnected") {
+        setScreenShareP2PError();
+      }
+      if (peer.connectionState === "closed" && screenSharePeers.get(peerId) === peer) closeScreenSharePeer(peerId);
+    };
+    return peer;
+  }
+
+  async function flushScreenShareCandidates(peerId: string, peer: RTCPeerConnection): Promise<void> {
+    const pending = screenSharePendingIce.get(peerId) ?? [];
+    screenSharePendingIce.delete(peerId);
+    for (const candidate of pending) {
+      try { await peer.addIceCandidate(candidate); } catch { /* an obsolete candidate can be ignored */ }
+    }
+  }
+
+  async function startScreenShareViewer(stream: ScreenShareStream): Promise<void> {
+    closeAllScreenSharePeers();
+    screenShareRemoteStream.value = null;
+    screenShareViewing.value = true;
+    screenShareViewingStreamId.value = stream.streamId;
+    screenShareError.value = "";
+    const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
+    if (stream.source === "teamspeak") return;
+    try {
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      sendScreenShareMessage({
+        type: "screenShareSignal",
+        streamId: stream.streamId,
+        targetPeerId: stream.ownerPeerId,
+        signal: { kind: "offer", sdp: offer.sdp ?? "" },
+      });
+    } catch {
+      setScreenShareP2PError("无法创建屏幕共享直连请求，请重试");
+      closeScreenSharePeer(stream.ownerPeerId);
+    }
+  }
+
+  async function handleScreenShareSignal(streamId: string, fromPeerId: string, signal: ScreenShareSignal): Promise<void> {
+    const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
+    if (!stream) return;
+    if (signal.kind === "close") {
+      closeScreenSharePeer(fromPeerId);
+      if (screenShareViewingStreamId.value === streamId) {
+        screenShareViewing.value = false;
+        screenShareViewingStreamId.value = "";
+        screenShareRemoteStream.value = null;
+      }
+      return;
+    }
+    if (signal.kind === "iceCandidate") {
+      if (!signal.candidate) return;
+      const peer = screenSharePeers.get(fromPeerId);
+      const candidate: RTCIceCandidateInit = {
+        candidate: signal.candidate,
+        ...(signal.sdpMid !== undefined ? { sdpMid: signal.sdpMid } : {}),
+        ...(signal.sdpMLineIndex !== undefined ? { sdpMLineIndex: signal.sdpMLineIndex } : {}),
+      };
+      if (!peer?.remoteDescription) {
+        screenSharePendingIce.set(fromPeerId, [...(screenSharePendingIce.get(fromPeerId) ?? []), candidate]);
+        return;
+      }
+      try { await peer.addIceCandidate(candidate); } catch { /* stale ICE is not fatal */ }
+      return;
+    }
+
+    if (stream.source === "browser" && stream.ownerPeerId === fromPeerId && signal.kind === "answer") {
+      const peer = screenSharePeers.get(fromPeerId);
+      if (!peer || !signal.sdp) return;
+      try {
+        await peer.setRemoteDescription({ type: "answer", sdp: signal.sdp });
+        await flushScreenShareCandidates(fromPeerId, peer);
+      } catch {
+        setScreenShareP2PError("观看端无法完成屏幕共享直连协商");
+      }
+      return;
+    }
+
+    if (stream.source === "teamspeak" && screenShareViewingStreamId.value === streamId && signal.kind === "offer") {
+      const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "viewer");
+      if (!signal.sdp) return;
+      try {
+        await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
+        await flushScreenShareCandidates(fromPeerId, peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        sendScreenShareMessage({ type: "screenShareSignal", streamId, targetPeerId: fromPeerId, signal: { kind: "answer", sdp: answer.sdp ?? "" } });
+      } catch {
+        setScreenShareP2PError("无法回复 TeamSpeak 屏幕共享的直连请求");
+      }
+      return;
+    }
+
+    if (screenShareActiveStreamId.value === streamId && stream.ownerPeerId === screenShareLocalPeerId()) {
+      const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "owner");
+      if (signal.kind !== "offer" || !signal.sdp) return;
+      try {
+        await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
+        await flushScreenShareCandidates(fromPeerId, peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        sendScreenShareMessage({ type: "screenShareSignal", streamId, targetPeerId: fromPeerId, signal: { kind: "answer", sdp: answer.sdp ?? "" } });
+      } catch {
+        setScreenShareP2PError("共享端无法完成观看者的直连协商");
+      }
+    }
+  }
+
+  // The owner peer id is generated by the gateway and is returned in the
+  // screenShareStarted event; the active stream's owner id is therefore the
+  // only stable local-owner marker available to the browser.
+  function screenShareLocalPeerId(): string {
+    const active = screenShareStreams.find((stream) => stream.streamId === screenShareActiveStreamId.value);
+    return active?.ownerPeerId ?? "";
+  }
+
+  async function startScreenShare(audio = true): Promise<void> {
+    if (ws.value?.readyState !== WebSocket.OPEN || screenShareActive.value) return;
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      screenShareError.value = "当前浏览器不支持屏幕共享";
+      return;
+    }
+    screenShareError.value = "";
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio });
+      if (!stream.getVideoTracks().length) throw new Error("NO_VIDEO_TRACK");
+      screenShareLocalStream = stream;
+      screenShareActive.value = true;
+      for (const track of stream.getTracks()) track.addEventListener("ended", () => { void stopScreenShare(); }, { once: true });
+      sendScreenShareMessage({ type: "screenShareStart", audio: stream.getAudioTracks().length > 0, name: "我的屏幕" });
+    } catch (error: unknown) {
+      screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+      screenShareLocalStream = null;
+      if (error instanceof DOMException && error.name === "NotAllowedError") screenShareError.value = "你取消了屏幕共享或浏览器未授予权限";
+      else screenShareError.value = "无法开始屏幕共享，请检查浏览器权限";
+    }
+  }
+
+  function stopScreenShare(): void {
+    if (screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
+    closeAllScreenSharePeers();
+    screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+    screenShareLocalStream = null;
+    screenShareActive.value = false;
+    screenShareActiveStreamId.value = "";
+  }
+
+  function joinScreenShare(streamId: string): void {
+    screenShareError.value = "";
+    sendScreenShareMessage({ type: "screenShareJoin", streamId });
+  }
+
+  function leaveScreenShare(): void {
+    if (screenShareViewingStreamId.value) sendScreenShareMessage({ type: "screenShareLeave", streamId: screenShareViewingStreamId.value });
+    closeAllScreenSharePeers();
+    screenShareViewing.value = false;
+    screenShareViewingStreamId.value = "";
+    screenShareRemoteStream.value = null;
+  }
+
+  function stopScreenShareTransport(sendStop: boolean): void {
+    if (sendStop && screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
+    closeAllScreenSharePeers();
+    screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+    screenShareLocalStream = null;
+    screenShareActive.value = false;
+    screenShareActiveStreamId.value = "";
+    screenShareViewing.value = false;
+    screenShareViewingStreamId.value = "";
+    screenShareRemoteStream.value = null;
+    screenShareStreams.length = 0;
+  }
+
+  function upsertScreenShareStream(raw: unknown): ScreenShareStream | null {
+    if (!raw || typeof raw !== "object") return null;
+    const value = raw as Partial<ScreenShareStream>;
+    if (typeof value.streamId !== "string" || typeof value.ownerPeerId !== "string") return null;
+    const stream: ScreenShareStream = {
+      streamId: value.streamId,
+      source: value.source === "teamspeak" ? "teamspeak" : "browser",
+      ownerPeerId: value.ownerPeerId,
+      ownerNickname: typeof value.ownerNickname === "string" ? value.ownerNickname : "TeamSpeak 用户",
+      name: typeof value.name === "string" ? value.name : "屏幕共享",
+      audio: value.audio === true,
+      createdAt: typeof value.createdAt === "number" ? value.createdAt : Date.now(),
+      viewerCount: typeof value.viewerCount === "number" ? value.viewerCount : 0,
+    };
+    const index = screenShareStreams.findIndex((candidate) => candidate.streamId === stream.streamId);
+    if (index >= 0) screenShareStreams.splice(index, 1, stream);
+    else screenShareStreams.push(stream);
+    return stream;
+  }
+
   function handleMessage(msg: any): void {
     switch (msg.type) {
       case "connected":
@@ -1634,6 +1917,64 @@ export function useVoiceWebSocket() {
         } else {
           void ensureMicrophone().catch((error: unknown) => { setMicrophoneError(error); });
         }
+        sendScreenShareMessage({ type: "screenShareList" });
+        break;
+      case "screenShareList":
+        screenShareStreams.length = 0;
+        if (Array.isArray(msg.streams)) for (const raw of msg.streams) upsertScreenShareStream(raw);
+        break;
+      case "screenShareStarted": {
+        const stream = upsertScreenShareStream(msg.stream);
+        if (!stream) break;
+        if (msg.owner === true) {
+          screenShareActive.value = true;
+          screenShareActiveStreamId.value = stream.streamId;
+        }
+        break;
+      }
+      case "screenShareViewerCount": {
+        const stream = screenShareStreams.find((candidate) => candidate.streamId === String(msg.streamId || ""));
+        if (stream && typeof msg.viewerCount === "number") stream.viewerCount = Math.max(0, Math.floor(msg.viewerCount));
+        break;
+      }
+      case "screenShareStopped": {
+        const streamId = String(msg.streamId || "");
+        const index = screenShareStreams.findIndex((candidate) => candidate.streamId === streamId);
+        if (index >= 0) screenShareStreams.splice(index, 1);
+        if (screenShareActiveStreamId.value === streamId) {
+          closeAllScreenSharePeers();
+          screenShareActive.value = false;
+          screenShareActiveStreamId.value = "";
+          screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+          screenShareLocalStream = null;
+        }
+        if (screenShareViewingStreamId.value === streamId) {
+          closeAllScreenSharePeers();
+          screenShareViewing.value = false;
+          screenShareViewingStreamId.value = "";
+          screenShareRemoteStream.value = null;
+        }
+        break;
+      }
+      case "screenShareJoined": {
+        const stream = upsertScreenShareStream(msg.stream);
+        if (!stream) break;
+        void startScreenShareViewer(stream);
+        break;
+      }
+      case "screenShareSignal":
+        if (typeof msg.streamId === "string" && typeof msg.fromPeerId === "string" && msg.signal) {
+          void handleScreenShareSignal(msg.streamId, msg.fromPeerId, msg.signal as ScreenShareSignal);
+        }
+        break;
+      case "screenShareViewerLeft":
+        if (typeof msg.viewerPeerId === "string") closeScreenSharePeer(msg.viewerPeerId);
+        break;
+      case "screenShareLeft":
+        if (screenShareViewingStreamId.value === String(msg.streamId || "")) leaveScreenShare();
+        break;
+      case "screenShareError":
+        screenShareError.value = String(msg.message || "屏幕共享操作失败");
         break;
       case "memberEnter":
         if (!members.some((member) => member.id === msg.id)) {
@@ -1730,6 +2071,7 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = false;
         if (!state.reconnecting) state.error = "TeamSpeak 连接已断开";
         stopWebRtcTransport();
+        stopScreenShareTransport(false);
         stopMicrophone();
         whisperTargetIds.clear();
         whisperActive.value = false;
@@ -1742,6 +2084,7 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = false;
         state.reconnectAttempt = Number(msg.attempt) || state.reconnectAttempt + 1;
         stopWebRtcTransport();
+        stopScreenShareTransport(false);
         stopMicrophone();
         whisperTargetIds.clear();
         whisperActive.value = false;
@@ -1758,6 +2101,7 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = true;
         state.errorCode = normalizedClientErrorCode(msg.code);
         state.error = connectionFailureMessage(state.errorCode, msg.detail);
+        stopScreenShareTransport(false);
         whisperTargetIds.clear();
         whisperActive.value = false;
         break;
@@ -1771,6 +2115,7 @@ export function useVoiceWebSocket() {
         state.reconnectFailed = false;
         state.errorCode = normalizedClientErrorCode(msg.code);
         state.error = connectionFailureMessage(state.errorCode, msg.detail);
+        stopScreenShareTransport(false);
         whisperTargetIds.clear();
         whisperActive.value = false;
         break;
@@ -2102,6 +2447,14 @@ export function useVoiceWebSocket() {
     accompanimentActive,
     accompanimentSupported,
     accompanimentErrorCode,
+    screenShareStreams,
+    screenShareActive,
+    screenShareActiveStreamId,
+    screenShareViewing,
+    screenShareViewingStreamId,
+    screenShareRemoteStream,
+    screenShareError,
+    screenShareRemoteVolume,
     setVolume,
     setInputVolume,
     setNoiseSuppressionEnabled,
@@ -2132,6 +2485,10 @@ export function useVoiceWebSocket() {
     ensureMicrophone,
     startAccompaniment,
     stopAccompaniment,
+    startScreenShare,
+    stopScreenShare,
+    joinScreenShare,
+    leaveScreenShare,
     checkSupport,
     clearError,
     measureLatency,
