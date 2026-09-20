@@ -136,22 +136,6 @@ export class TSClient extends EventEmitter {
         err: error instanceof Error ? error.message : String(error),
       }, "Could not subscribe to all TeamSpeak channels");
     }
-    // TS6 stream/screen-share notifications are delivered through the normal
-    // server notification channel. Keep this subscription in the same client
-    // session so a browser can participate in the native TS6 P2P signaling
-    // flow without a second query connection.
-    for (const event of ["server", "channel", "textchannel"] as const) {
-      try {
-        await client.execCommand(`servernotifyregister event=${event}`, 5_000);
-      } catch (error: unknown) {
-        // Older TeamSpeak servers may reject one of the newer event scopes.
-        // This is optional: voice and directory sync must remain available.
-        this.logger.debug({
-          event,
-          err: error instanceof Error ? error.message : String(error),
-        }, "Optional TeamSpeak notification scope unavailable");
-      }
-    }
     // Directory snapshots are dispatched through two setImmediate layers in
     // the SDK. Let both flush before reconciling with a direct client-protocol
     // snapshot so the gateway's first connected state contains every member.

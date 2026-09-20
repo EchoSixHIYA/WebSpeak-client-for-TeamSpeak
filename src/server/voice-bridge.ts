@@ -168,6 +168,12 @@ interface ScreenStreamRecord extends ScreenShareStreamDescription {
   sourceClientId?: number;
 }
 
+// Stream ids are scoped to a TeamSpeak server. Keep the target in the key so
+// two unrelated servers cannot overwrite each other's native stream record.
+function screenStreamKey(targetKey: string, streamId: string): string {
+  return `${targetKey}\u0000${streamId}`;
+}
+
 export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
@@ -1064,7 +1070,7 @@ export class VoiceBridge {
         ownerEntryId: entry.id,
         viewerEntryIds: new Set(),
       };
-      this.screenStreams.set(stream.streamId, stream);
+      this.screenStreams.set(screenStreamKey(stream.targetKey, stream.streamId), stream);
       sendJson({ type: "screenShareStarted", stream: this.describeScreenStream(stream), owner: true });
       this.broadcastScreenMessage(stream, {
         type: "screenShareStarted",
@@ -1074,7 +1080,7 @@ export class VoiceBridge {
       return;
     }
 
-    const stream = this.screenStreams.get(message.streamId);
+    const stream = this.screenStreams.get(screenStreamKey(teamSpeakTargetKey(entry.target), message.streamId));
     if (!stream) {
       sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_NOT_FOUND", message: "屏幕共享已结束或不存在" });
       return;
@@ -1166,7 +1172,7 @@ export class VoiceBridge {
   }
 
   private stopScreenStream(stream: ScreenStreamRecord, reason: string): void {
-    if (!this.screenStreams.delete(stream.streamId)) return;
+    if (!this.screenStreams.delete(screenStreamKey(stream.targetKey, stream.streamId))) return;
     const message = { type: "screenShareStopped", streamId: stream.streamId, reason };
     this.broadcastScreenMessage(stream, message);
     for (const viewerEntryId of stream.viewerEntryIds) this.sendToEntry(viewerEntryId, message);
@@ -1256,7 +1262,14 @@ export class VoiceBridge {
     requestId?: string,
   ): Promise<void> {
     try {
-      await entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("joinstream", { id: stream.streamId }));
+      // TeamSpeak's native viewer request command is `joinstreamrequest`.
+      // `joinstream` is not a valid TS6 client-protocol command; accepting the
+      // browser request before sending it made the UI wait forever while the
+      // native source never received a request to create its peer connection.
+      await entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("joinstreamrequest", {
+        id: stream.streamId,
+        msg: "",
+      }));
       sendJson({ type: "screenShareNativeJoinPending", requestId, streamId: stream.streamId, directP2P: true });
     } catch (error: unknown) {
       stream.viewerEntryIds.delete(entry.id);
@@ -1272,7 +1285,9 @@ export class VoiceBridge {
       const sourceClientId = parseNumber(params.clid);
       if (!streamId || !sourceClientId) return;
       const sourceEntry = [...this.entries.values()].find((candidate) => candidate.tsClient.getClientId() === sourceClientId);
-      const current = this.screenStreams.get(streamId);
+      const targetKey = teamSpeakTargetKey(entry.target);
+      const key = screenStreamKey(targetKey, streamId);
+      const current = this.screenStreams.get(key);
       const stream: ScreenStreamRecord = current ?? {
         streamId,
         source: "teamspeak",
@@ -1282,7 +1297,7 @@ export class VoiceBridge {
         audio: params.audio === "1",
         createdAt: Date.now(),
         viewerCount: 0,
-        targetKey: teamSpeakTargetKey(entry.target),
+        targetKey,
         channelId: sourceEntry?.tsClient.getChannelId() ?? entry.tsClient.getChannelId(),
         ownerEntryId: "",
         viewerEntryIds: new Set(),
@@ -1292,19 +1307,24 @@ export class VoiceBridge {
       stream.ownerNickname = params.name || stream.ownerNickname;
       stream.name = params.name || stream.name;
       stream.audio = params.audio === "1";
-      this.screenStreams.set(streamId, stream);
-      this.broadcastScreenMessage(stream, { type: "screenShareStarted", stream: this.describeScreenStream(stream), owner: false });
+      this.screenStreams.set(key, stream);
+      // Every gateway session attached to the same TS target sees the same
+      // raw notification. Only the first one should announce a new stream to
+      // browsers; otherwise each connected user receives duplicate cards.
+      if (!current) {
+        this.broadcastScreenMessage(stream, { type: "screenShareStarted", stream: this.describeScreenStream(stream), owner: false });
+      }
       return;
     }
     if (notification.name === "notifystreamstopped") {
       const streamId = params.id || params.stream_id;
-      const stream = streamId ? this.screenStreams.get(streamId) : undefined;
+      const stream = streamId ? this.screenStreams.get(screenStreamKey(teamSpeakTargetKey(entry.target), streamId)) : undefined;
       if (stream) this.stopScreenStream(stream, "source-stopped");
       return;
     }
     if (notification.name === "notifyrespondjoinstreamrequest" || notification.name === "notifystreamsignaling") {
       const streamId = params.id || params.stream_id;
-      const stream = streamId ? this.screenStreams.get(streamId) : undefined;
+      const stream = streamId ? this.screenStreams.get(screenStreamKey(teamSpeakTargetKey(entry.target), streamId)) : undefined;
       if (!stream || stream.source !== "teamspeak" || !stream.viewerEntryIds.has(entry.id)) return;
       const payload = notification.name === "notifyrespondjoinstreamrequest"
         ? { cmd: "offer", args: { offer: params.offer || "" } }
