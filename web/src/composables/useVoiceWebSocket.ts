@@ -1645,8 +1645,7 @@ export function useVoiceWebSocket() {
     screenSharePeerTimers.set(peerId, setTimeout(() => {
       screenSharePeerTimers.delete(peerId);
       if (!screenSharePeers.has(peerId)) return;
-      closeScreenSharePeer(peerId);
-      setScreenShareP2PError("屏幕共享直连协商超时，请确认双方网络允许浏览器直连");
+      failScreenSharePeer(peerId, "屏幕共享直连协商超时，请确认双方网络允许浏览器直连");
     }, SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS));
   }
 
@@ -1665,6 +1664,17 @@ export function useVoiceWebSocket() {
 
   function setScreenShareP2PError(message = "直连 P2P 失败，当前网络无法建立浏览器之间的直接连接") {
     screenShareError.value = message;
+  }
+
+  function failScreenSharePeer(peerId: string, message?: string): void {
+    const viewingStream = screenShareStreams.find((stream) => stream.streamId === screenShareViewingStreamId.value && stream.ownerPeerId === peerId);
+    closeScreenSharePeer(peerId);
+    if (viewingStream) {
+      screenShareViewing.value = false;
+      screenShareViewingStreamId.value = "";
+      screenShareRemoteStream.value = null;
+    }
+    setScreenShareP2PError(message);
   }
 
   function createScreenSharePeer(streamId: string, peerId: string, role: "owner" | "viewer"): RTCPeerConnection {
@@ -1708,8 +1718,7 @@ export function useVoiceWebSocket() {
       if (peer.connectionState === "connected" || peer.connectionState === "completed") {
         clearScreenSharePeerTimer(peerId);
       } else if (peer.connectionState === "failed") {
-        clearScreenSharePeerTimer(peerId);
-        setScreenShareP2PError();
+        failScreenSharePeer(peerId);
       }
       if (peer.connectionState === "closed" && screenSharePeers.get(peerId) === peer) closeScreenSharePeer(peerId);
     };
@@ -1749,8 +1758,7 @@ export function useVoiceWebSocket() {
         signal: { kind: "offer", sdp: peer.localDescription?.sdp ?? offer.sdp ?? "" },
       });
     } catch {
-      setScreenShareP2PError("无法创建屏幕共享直连请求，请重试");
-      closeScreenSharePeer(stream.ownerPeerId);
+      failScreenSharePeer(stream.ownerPeerId, "无法创建屏幕共享直连请求，请重试");
     }
   }
 
@@ -1789,7 +1797,7 @@ export function useVoiceWebSocket() {
         await peer.setRemoteDescription({ type: "answer", sdp: signal.sdp });
         await flushScreenShareCandidates(fromPeerId, peer);
       } catch {
-        setScreenShareP2PError("观看端无法完成屏幕共享直连协商");
+        failScreenSharePeer(fromPeerId, "观看端无法完成屏幕共享直连协商");
       }
       return;
     }
@@ -1805,7 +1813,7 @@ export function useVoiceWebSocket() {
         await peer.setLocalDescription(answer);
         sendScreenShareMessage({ type: "screenShareSignal", streamId, targetPeerId: fromPeerId, signal: { kind: "answer", sdp: answer.sdp ?? "" } });
       } catch {
-        setScreenShareP2PError("无法回复 TeamSpeak 屏幕共享的直连请求");
+        failScreenSharePeer(fromPeerId, "无法回复 TeamSpeak 屏幕共享的直连请求");
       }
       return;
     }
