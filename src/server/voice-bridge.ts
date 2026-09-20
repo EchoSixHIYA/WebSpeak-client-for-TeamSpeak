@@ -178,6 +178,7 @@ export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
   private readonly screenStreams = new Map<string, ScreenStreamRecord>();
+  private readonly screenStreamDiscoveryTargets = new Set<string>();
   private readonly identityLeases = new IdentityLeaseStore();
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -585,6 +586,7 @@ export class VoiceBridge {
             refreshDirectory();
           }
           sendInitialState();
+          void this.discoverExistingTeamSpeakStreams(entry!);
           void refreshMoveCapability();
         } catch (error: unknown) {
           const normalized = normalizeTeamSpeakError(error);
@@ -1155,6 +1157,32 @@ export class VoiceBridge {
     return [...this.screenStreams.values()]
       .filter((stream) => stream.targetKey === targetKey)
       .map((stream) => this.describeScreenStream(stream));
+  }
+
+  /**
+   * A gateway session can connect after a native TeamSpeak stream has already
+   * started. TS6 does not replay that stream in the normal welcome snapshot;
+   * requeststreaminfo is the official client-protocol query for this case.
+   * Query each visible client once per TeamSpeak target, then let the normal
+   * raw notification path announce the discovered stream to web viewers.
+   */
+  private async discoverExistingTeamSpeakStreams(entry: WebClientEntry): Promise<void> {
+    const targetKey = teamSpeakTargetKey(entry.target);
+    if (this.screenStreamDiscoveryTargets.has(targetKey)) return;
+    this.screenStreamDiscoveryTargets.add(targetKey);
+    const clientIds = [...entry.members.keys()].filter((clientId) => Number.isInteger(clientId) && clientId > 0);
+    for (const clientId of clientIds) {
+      if (!entry.tsClient.isConnected()) return;
+      try {
+        await entry.tsClient.sendProtocolCommand(`requeststreaminfo clid=${clientId}`);
+      } catch (error: unknown) {
+        this.logger.debug({
+          target: formatTeamSpeakTarget(entry.target),
+          clientId,
+          err: error instanceof Error ? error.message : String(error),
+        }, "Could not query existing TeamSpeak screen stream");
+      }
+    }
   }
 
   private describeScreenStream(stream: ScreenStreamRecord): ScreenShareStreamDescription {
