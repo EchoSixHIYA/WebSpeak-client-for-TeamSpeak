@@ -6,6 +6,7 @@ import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.j
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
 const micCaptureWorkletUrl = "/mic-capture-worklet.js";
+const SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS = 15_000;
 
 export interface VoiceState {
   connected: boolean;
@@ -308,6 +309,8 @@ export function useVoiceWebSocket() {
   const screenSharePeers = new Map<string, RTCPeerConnection>();
   const screenSharePendingIce = new Map<string, RTCIceCandidateInit[]>();
   const screenSharePeerStreams = new Map<string, MediaStream>();
+  const screenSharePeerTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let screenShareRequestSequence = 0;
   let webrtcMixDestination: MediaStreamAudioDestinationNode | null = null;
   let webrtcMixMicSource: MediaStreamAudioSourceNode | null = null;
   let webrtcMixMicGain: GainNode | null = null;
@@ -1630,7 +1633,25 @@ export function useVoiceWebSocket() {
     if (ws.value?.readyState === WebSocket.OPEN) ws.value.send(JSON.stringify(message));
   }
 
+  function clearScreenSharePeerTimer(peerId: string): void {
+    const timer = screenSharePeerTimers.get(peerId);
+    if (!timer) return;
+    clearTimeout(timer);
+    screenSharePeerTimers.delete(peerId);
+  }
+
+  function armScreenSharePeerTimer(peerId: string): void {
+    clearScreenSharePeerTimer(peerId);
+    screenSharePeerTimers.set(peerId, setTimeout(() => {
+      screenSharePeerTimers.delete(peerId);
+      if (!screenSharePeers.has(peerId)) return;
+      closeScreenSharePeer(peerId);
+      setScreenShareP2PError("屏幕共享直连协商超时，请确认双方网络允许浏览器直连");
+    }, SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS));
+  }
+
   function closeScreenSharePeer(peerId: string): void {
+    clearScreenSharePeerTimer(peerId);
     const peer = screenSharePeers.get(peerId);
     screenSharePeers.delete(peerId);
     screenSharePendingIce.delete(peerId);
@@ -1676,6 +1697,7 @@ export function useVoiceWebSocket() {
     };
     peer.ontrack = (event) => {
       if (role !== "viewer") return;
+      clearScreenSharePeerTimer(peerId);
       const remote = event.streams[0] ?? screenSharePeerStreams.get(peerId) ?? new MediaStream();
       if (!event.streams[0]) remote.addTrack(event.track);
       screenSharePeerStreams.set(peerId, remote);
@@ -1683,7 +1705,10 @@ export function useVoiceWebSocket() {
       screenShareViewing.value = true;
     };
     peer.onconnectionstatechange = () => {
-      if (peer.connectionState === "failed" || peer.connectionState === "disconnected") {
+      if (peer.connectionState === "connected" || peer.connectionState === "completed") {
+        clearScreenSharePeerTimer(peerId);
+      } else if (peer.connectionState === "failed") {
+        clearScreenSharePeerTimer(peerId);
         setScreenShareP2PError();
       }
       if (peer.connectionState === "closed" && screenSharePeers.get(peerId) === peer) closeScreenSharePeer(peerId);
@@ -1706,15 +1731,22 @@ export function useVoiceWebSocket() {
     screenShareViewingStreamId.value = stream.streamId;
     screenShareError.value = "";
     const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
-    if (stream.source === "teamspeak") return;
+    if (stream.source === "teamspeak") {
+      // The gateway still has to wait for the native client to return its
+      // first SDP offer. Keep the same bounded lifecycle as browser P2P so a
+      // native-protocol failure cannot leave the UI stuck in "watching".
+      armScreenSharePeerTimer(stream.ownerPeerId);
+      return;
+    }
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
+      armScreenSharePeerTimer(stream.ownerPeerId);
       sendScreenShareMessage({
         type: "screenShareSignal",
         streamId: stream.streamId,
         targetPeerId: stream.ownerPeerId,
-        signal: { kind: "offer", sdp: offer.sdp ?? "" },
+        signal: { kind: "offer", sdp: peer.localDescription?.sdp ?? offer.sdp ?? "" },
       });
     } catch {
       setScreenShareP2PError("无法创建屏幕共享直连请求，请重试");
@@ -1765,6 +1797,7 @@ export function useVoiceWebSocket() {
     if (stream.source === "teamspeak" && screenShareViewingStreamId.value === streamId && signal.kind === "offer") {
       const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "viewer");
       if (!signal.sdp) return;
+      armScreenSharePeerTimer(fromPeerId);
       try {
         await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
         await flushScreenShareCandidates(fromPeerId, peer);
@@ -1780,6 +1813,7 @@ export function useVoiceWebSocket() {
     if (screenShareActiveStreamId.value === streamId && stream.ownerPeerId === screenShareLocalPeerId()) {
       const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "owner");
       if (signal.kind !== "offer" || !signal.sdp) return;
+      armScreenSharePeerTimer(fromPeerId);
       try {
         await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
         await flushScreenShareCandidates(fromPeerId, peer);
@@ -1833,7 +1867,9 @@ export function useVoiceWebSocket() {
 
   function joinScreenShare(streamId: string): void {
     screenShareError.value = "";
-    sendScreenShareMessage({ type: "screenShareJoin", streamId });
+    if (screenShareViewingStreamId.value && screenShareViewingStreamId.value !== streamId) leaveScreenShare();
+    screenShareRequestSequence = (screenShareRequestSequence + 1) % 1_000_000;
+    sendScreenShareMessage({ type: "screenShareJoin", streamId, requestId: `screen-join-${screenShareRequestSequence}` });
   }
 
   function leaveScreenShare(): void {
@@ -1975,6 +2011,12 @@ export function useVoiceWebSocket() {
         break;
       case "screenShareError":
         screenShareError.value = String(msg.message || "屏幕共享操作失败");
+        if (screenShareViewing.value) {
+          closeAllScreenSharePeers();
+          screenShareViewing.value = false;
+          screenShareViewingStreamId.value = "";
+          screenShareRemoteStream.value = null;
+        }
         break;
       case "memberEnter":
         if (!members.some((member) => member.id === msg.id)) {

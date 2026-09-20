@@ -1118,7 +1118,8 @@ export class VoiceBridge {
         sendJson({ type: "screenShareError", requestId: message.requestId, code: "SCREEN_SHARE_OWNER_CANNOT_JOIN", message: "共享者不能作为观看者加入自己的共享" });
         return;
       }
-      if (!stream.viewerEntryIds.has(entry.id)) stream.viewerEntryIds.add(entry.id);
+      const alreadyJoined = stream.viewerEntryIds.has(entry.id);
+      if (!alreadyJoined) stream.viewerEntryIds.add(entry.id);
       stream.viewerCount = stream.viewerEntryIds.size;
       sendJson({
         type: "screenShareJoined",
@@ -1127,17 +1128,19 @@ export class VoiceBridge {
         ownerPeerId: stream.ownerPeerId,
         mode: stream.source,
       });
-      if (stream.source === "browser") {
+      if (stream.source === "browser" && !alreadyJoined) {
         this.sendToEntry(stream.ownerEntryId, {
           type: "screenShareViewerJoined",
           streamId: stream.streamId,
           viewerPeerId: entry.screenPeerId,
           viewerNickname: entry.nickname,
         });
-      } else {
+      } else if (stream.source === "teamspeak" && !alreadyJoined) {
         void this.joinNativeScreenStream(entry, stream, sendJson, message.requestId);
       }
-      this.broadcastScreenMessage(stream, { type: "screenShareViewerCount", streamId: stream.streamId, viewerCount: stream.viewerCount });
+      if (!alreadyJoined) {
+        this.broadcastScreenMessage(stream, { type: "screenShareViewerCount", streamId: stream.streamId, viewerCount: stream.viewerCount });
+      }
       return;
     }
 
@@ -1214,7 +1217,6 @@ export class VoiceBridge {
     if (!this.screenStreams.delete(screenStreamKey(stream.targetKey, stream.streamId))) return;
     const message = { type: "screenShareStopped", streamId: stream.streamId, reason };
     this.broadcastScreenMessage(stream, message);
-    for (const viewerEntryId of stream.viewerEntryIds) this.sendToEntry(viewerEntryId, message);
     stream.viewerEntryIds.clear();
     stream.viewerCount = 0;
   }
@@ -1268,14 +1270,20 @@ export class VoiceBridge {
     }
 
     const owner = this.entries.get(stream.ownerEntryId);
-    const viewer = stream.viewerEntryIds.has(entry.id) ? entry : null;
-    if (!owner || (!viewer && entry.id !== stream.ownerEntryId)) {
+    const isOwner = entry.id === stream.ownerEntryId;
+    const isViewer = stream.viewerEntryIds.has(entry.id);
+    if (!owner || (!isOwner && !isViewer)) {
       sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FORBIDDEN", message: "无权发送该屏幕共享信令" });
       return;
     }
-    const targetEntry = targetPeerId === owner.screenPeerId
-      ? owner
-      : [...stream.viewerEntryIds].map((id) => this.entries.get(id)).find((candidate) => candidate?.screenPeerId === targetPeerId);
+    // Keep the browser P2P graph bipartite: the owner may signal only an
+    // active viewer, and a viewer may signal only the owner. Without this
+    // check one viewer could inject SDP/ICE into another viewer's peer.
+    const targetEntry = isOwner
+      ? [...stream.viewerEntryIds]
+        .map((id) => this.entries.get(id))
+        .find((candidate) => candidate?.screenPeerId === targetPeerId)
+      : targetPeerId === owner.screenPeerId ? owner : undefined;
     if (!targetEntry || targetEntry.id === entry.id) {
       sendJson({ type: "screenShareError", code: "SCREEN_SHARE_PEER_NOT_FOUND", message: "观看者已离开" });
       return;
