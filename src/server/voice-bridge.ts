@@ -1341,6 +1341,7 @@ export class VoiceBridge {
       // native source never received a request to create its peer connection.
       await entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("joinstreamrequest", {
         id: stream.streamId,
+        clid: String(entry.tsClient.getClientId()),
         msg: "",
       }));
       sendJson({ type: "screenShareNativeJoinPending", requestId, streamId: stream.streamId, directP2P: true });
