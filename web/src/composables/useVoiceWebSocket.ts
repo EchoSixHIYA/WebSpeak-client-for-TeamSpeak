@@ -306,6 +306,7 @@ export function useVoiceWebSocket() {
   let accompanimentStream: MediaStream | null = null;
   const screenShareStreams = reactive<ScreenShareStream[]>([]);
   const screenShareActive = ref(false);
+  const screenShareStarting = ref(false);
   const screenShareActiveStreamId = ref("");
   const screenShareViewing = ref(false);
   const screenShareViewingStreamId = ref("");
@@ -318,6 +319,8 @@ export function useVoiceWebSocket() {
   const screenSharePeerStreams = new Map<string, MediaStream>();
   const screenSharePeerTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let screenShareRequestSequence = 0;
+  let screenSharePendingStartId = "";
+  let screenShareStartCancelled = false;
   let webrtcMixDestination: MediaStreamAudioDestinationNode | null = null;
   let webrtcMixMicSource: MediaStreamAudioSourceNode | null = null;
   let webrtcMixMicGain: GainNode | null = null;
@@ -1854,7 +1857,7 @@ export function useVoiceWebSocket() {
   }
 
   async function startScreenShare(audio = true): Promise<void> {
-    if (ws.value?.readyState !== WebSocket.OPEN || screenShareActive.value) return;
+    if (ws.value?.readyState !== WebSocket.OPEN || screenShareActive.value || screenShareStarting.value) return;
     if (!navigator.mediaDevices?.getDisplayMedia) {
       screenShareError.value = "当前浏览器不支持屏幕共享";
       return;
@@ -1864,22 +1867,30 @@ export function useVoiceWebSocket() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio });
       if (!stream.getVideoTracks().length) throw new Error("NO_VIDEO_TRACK");
       screenShareLocalStream = stream;
-      screenShareActive.value = true;
+      screenShareStarting.value = true;
+      screenShareRequestSequence = (screenShareRequestSequence + 1) % 1_000_000;
+      screenSharePendingStartId = `screen-start-${screenShareRequestSequence}`;
+      screenShareStartCancelled = false;
       for (const track of stream.getTracks()) track.addEventListener("ended", () => { void stopScreenShare(); }, { once: true });
-      sendScreenShareMessage({ type: "screenShareStart", audio: stream.getAudioTracks().length > 0, name: "我的屏幕" });
+      sendScreenShareMessage({ type: "screenShareStart", requestId: screenSharePendingStartId, audio: stream.getAudioTracks().length > 0, name: "我的屏幕" });
     } catch (error: unknown) {
       screenShareLocalStream?.getTracks().forEach((track) => track.stop());
       screenShareLocalStream = null;
+      screenShareStarting.value = false;
+      screenSharePendingStartId = "";
+      screenShareStartCancelled = false;
       if (error instanceof DOMException && error.name === "NotAllowedError") screenShareError.value = "你取消了屏幕共享或浏览器未授予权限";
       else screenShareError.value = "无法开始屏幕共享，请检查浏览器权限";
     }
   }
 
   function stopScreenShare(): void {
+    if (screenShareStarting.value) screenShareStartCancelled = true;
     if (screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
     closeAllScreenSharePeers();
     screenShareLocalStream?.getTracks().forEach((track) => track.stop());
     screenShareLocalStream = null;
+    screenShareStarting.value = false;
     screenShareActive.value = false;
     screenShareActiveStreamId.value = "";
   }
@@ -1901,9 +1912,13 @@ export function useVoiceWebSocket() {
 
   function stopScreenShareTransport(sendStop: boolean): void {
     if (sendStop && screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
+    if (screenShareStarting.value) screenShareStartCancelled = true;
     closeAllScreenSharePeers();
     screenShareLocalStream?.getTracks().forEach((track) => track.stop());
     screenShareLocalStream = null;
+    screenShareStarting.value = false;
+    screenSharePendingStartId = "";
+    screenShareStartCancelled = false;
     screenShareActive.value = false;
     screenShareActiveStreamId.value = "";
     screenShareViewing.value = false;
@@ -1995,6 +2010,18 @@ export function useVoiceWebSocket() {
         const stream = upsertScreenShareStream(msg.stream);
         if (!stream) break;
         if (msg.owner === true) {
+          const requestId = typeof msg.requestId === "string" ? msg.requestId : "";
+          const isCurrentStart = Boolean(screenSharePendingStartId) && requestId === screenSharePendingStartId && !screenShareStartCancelled;
+          screenSharePendingStartId = "";
+          screenShareStarting.value = false;
+          if (!isCurrentStart) {
+            sendScreenShareMessage({ type: "screenShareStop", streamId: stream.streamId });
+            screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+            screenShareLocalStream = null;
+            const staleIndex = screenShareStreams.findIndex((candidate) => candidate.streamId === stream.streamId);
+            if (staleIndex >= 0) screenShareStreams.splice(staleIndex, 1);
+            break;
+          }
           screenShareActive.value = true;
           screenShareActiveStreamId.value = stream.streamId;
         }
@@ -2014,6 +2041,9 @@ export function useVoiceWebSocket() {
         if (index >= 0) screenShareStreams.splice(index, 1);
         if (screenShareActiveStreamId.value === streamId) {
           closeAllScreenSharePeers();
+          screenShareStarting.value = false;
+          screenSharePendingStartId = "";
+          screenShareStartCancelled = false;
           screenShareActive.value = false;
           screenShareActiveStreamId.value = "";
           screenShareLocalStream?.getTracks().forEach((track) => track.stop());
@@ -2046,6 +2076,13 @@ export function useVoiceWebSocket() {
         break;
       case "screenShareError":
         screenShareError.value = String(msg.message || "屏幕共享操作失败");
+        if (screenShareStarting.value) {
+          screenShareStarting.value = false;
+          screenSharePendingStartId = "";
+          screenShareStartCancelled = false;
+          screenShareLocalStream?.getTracks().forEach((track) => track.stop());
+          screenShareLocalStream = null;
+        }
         if (screenShareViewing.value) {
           closeAllScreenSharePeers();
           screenShareViewing.value = false;
@@ -2526,6 +2563,7 @@ export function useVoiceWebSocket() {
     accompanimentErrorCode,
     screenShareStreams,
     screenShareActive,
+    screenShareStarting,
     screenShareActiveStreamId,
     screenShareViewing,
     screenShareViewingStreamId,

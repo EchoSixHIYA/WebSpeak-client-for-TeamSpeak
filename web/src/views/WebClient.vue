@@ -139,8 +139,8 @@
               <div class="hero-visual" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="hero-wave"><i v-for="bar in heroBars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
             </section>
 
-            <section v-if="screenSharePanelOpen || screenShareStreams.length || screenShareActive || screenShareViewing" class="screen-share-section">
-              <header class="screen-share-header"><div><span class="section-kicker">{{ t('screenShare') }}</span><h2><Icon name="monitor" :size="20" /> {{ t('screenShareTitle') }}</h2></div><button v-if="screenShareActive" type="button" class="secondary-button" @click="stopScreenShare"><Icon name="close" :size="15" /> {{ t('stopScreenShare') }}</button><button v-else type="button" class="primary-button screen-share-start" @click="startScreenShare(true)"><Icon name="monitor" :size="15" /> {{ t('startScreenShare') }}</button></header>
+            <section v-if="screenSharePanelOpen || screenShareStreams.length || screenShareActive || screenShareStarting || screenShareViewing" class="screen-share-section">
+              <header class="screen-share-header"><div><span class="section-kicker">{{ t('screenShare') }}</span><h2><Icon name="monitor" :size="20" /> {{ t('screenShareTitle') }}</h2></div><button v-if="screenShareActive || screenShareStarting" type="button" class="secondary-button" :disabled="screenShareStarting" @click="stopScreenShare"><Icon name="close" :size="15" /> {{ t('stopScreenShare') }}</button><button v-else type="button" class="primary-button screen-share-start" @click="startScreenShare(true)"><Icon name="monitor" :size="15" /> {{ t('startScreenShare') }}</button></header>
               <div v-if="screenShareError" class="screen-share-error" role="status"><Icon name="info" :size="16" /> {{ screenShareError }}</div>
               <div v-if="screenShareViewing" class="screen-share-viewer-card">
                 <div class="screen-share-video-wrap"><video ref="screenVideoEl" class="screen-share-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video><div class="screen-share-viewer-badge"><Icon name="users" :size="14" /> {{ t('watchingScreenShare') }}</div><div v-if="screenShareFeaturedStream?.viewers.length" class="screen-share-viewer-stack" :aria-label="t('watchingScreenShare')"><span v-for="viewer in screenShareFeaturedStream.viewers.slice(0, 5)" :key="viewer.peerId" class="screen-share-viewer-avatar" :title="viewer.nickname"><img v-if="viewer.avatar" :src="viewer.avatar" alt="" /><span v-else>{{ avatarInitial(viewer.nickname) }}</span></span><span v-if="screenShareFeaturedStream.viewers.length > 5" class="screen-share-viewer-overflow">+{{ screenShareFeaturedStream.viewers.length - 5 }}</span></div></div>
@@ -409,6 +409,7 @@ const {
   accompanimentErrorCode,
   screenShareStreams,
   screenShareActive,
+  screenShareStarting,
   screenShareActiveStreamId,
   screenShareViewing,
   screenShareViewingStreamId,

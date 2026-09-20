@@ -1085,7 +1085,7 @@ export class VoiceBridge {
         viewerEntryIds: new Set(),
       };
       this.screenStreams.set(screenStreamKey(stream.targetKey, stream.streamId), stream);
-      sendJson({ type: "screenShareStarted", stream: this.describeScreenStream(stream), owner: true });
+      sendJson({ type: "screenShareStarted", requestId: message.requestId, stream: this.describeScreenStream(stream), owner: true });
       this.broadcastScreenMessage(stream, {
         type: "screenShareStarted",
         stream: this.describeScreenStream(stream),
