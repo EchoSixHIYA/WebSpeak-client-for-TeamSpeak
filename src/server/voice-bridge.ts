@@ -1692,6 +1692,17 @@ function parseStreamSignalPayload(raw: string): { cmd: string; args: Record<stri
 
 function toBrowserScreenSignal(payload: { cmd: string; args: Record<string, unknown> }): ScreenSharePeerSignal | null {
   const args = payload.args;
+  // TeamSpeak's native screen-share source wraps the initial SDP in a
+  // `joinResponse` message after it accepts a viewer's join request. The
+  // browser-side protocol uses the regular offer shape, so normalize it here
+  // before forwarding it. Without this mapping the native source can accept a
+  // viewer while the browser waits forever for its first SDP.
+  if (payload.cmd === "joinResponse") {
+    const decision = args.decision;
+    if (decision === false || decision === 0 || decision === "0") return { kind: "close" };
+    const sdp = typeof args.offer === "string" ? args.offer : typeof args.sdp === "string" ? args.sdp : "";
+    return sdp ? { kind: "offer", sdp } : null;
+  }
   if (payload.cmd === "offer" || payload.cmd === "reconnectOffer") {
     const sdp = typeof args.offer === "string" ? args.offer : typeof args.sdp === "string" ? args.sdp : "";
     return sdp ? { kind: "offer", sdp } : null;
