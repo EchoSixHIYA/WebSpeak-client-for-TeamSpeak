@@ -191,7 +191,9 @@ export class VoiceBridge {
   }
 
   attach(server: Server): void {
-    this.wss = new WebSocketServer({ server, path: "/ws/voice", maxPayload: 256 * 1024 });
+    // Avatar data is delivered as a data URL in a memberAvatar message. Keep
+    // the frame limit above the encoded avatar ceiling with room for JSON.
+    this.wss = new WebSocketServer({ server, path: "/ws/voice", maxPayload: 512 * 1024 });
     this.startHeartbeat();
 
     this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
@@ -481,7 +483,16 @@ export class VoiceBridge {
           }
         } catch (error: unknown) {
           const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
-          if (operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
+          // TeamSpeak rejects a no-op move with ALREADY_IN_CHANNEL after it
+          // has evaluated the caller's move power. That is still a positive
+          // permission result for this capability probe; treating it as a
+          // failed probe made server-admin clients look permanently disabled.
+          if (operation.code === "ALREADY_IN_CHANNEL") {
+            if (!entry.canMoveClients) {
+              entry.canMoveClients = true;
+              sendJson({ type: "capabilities", canMoveClients: true });
+            }
+          } else if (operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
             entry.canMoveClients = false;
             sendJson({ type: "capabilities", canMoveClients: false });
           }
@@ -1493,7 +1504,6 @@ async function handleCommand(
     if (command.type === "moveClient") {
       const clientId = command.payload.clientId as number;
       const channelId = command.payload.channelId as string;
-      const channelPassword = typeof command.payload.password === "string" ? command.payload.password : "";
       if (clientId === entry.tsClient.getClientId()) {
         sendJson({ type: "error", requestId: command.requestId, error: { code: "CANNOT_MOVE_SELF", message: "不能移动自己的客户端", recoverable: false } });
         return;
@@ -1511,7 +1521,9 @@ async function handleCommand(
       // i_client_needed_move_power inside clientmove. Do not duplicate that
       // policy in the gateway; forwarding the authoritative command keeps TS3
       // and TS6 permission behavior aligned.
-      await entry.tsClient.moveClient(clientId, BigInt(channelId), channelPassword || undefined);
+      // Moving another visible client is an administrator operation. It must
+      // not prompt for or depend on the target channel's join password.
+      await entry.tsClient.moveClient(clientId, BigInt(channelId));
     } else if (command.type === "sendTextMessage") {
       const message = (command.payload.message as string).trim();
       if (message) await entry.tsClient.sendTextMessage("channel", message, entry.tsClient.getChannelId());
@@ -1566,6 +1578,10 @@ async function handleCommand(
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {
     const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
+    if (command.type === "moveClient" && operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
+      entry.canMoveClients = false;
+      sendJson({ type: "capabilities", canMoveClients: false });
+    }
     sendJson({ type: "error", requestId: command.requestId, error: { code: operation.code, message: operation.message, recoverable: false } });
   }
 }

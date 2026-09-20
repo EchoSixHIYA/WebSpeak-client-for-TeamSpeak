@@ -43,7 +43,10 @@ export interface TSClientAvatar {
   data: Buffer;
 }
 
-const MAX_CLIENT_AVATAR_BYTES = 120 * 1024;
+// Keep enough room for avatars produced by the native client. The previous
+// 120 KiB limit rejected the 134 KiB PNG used by the Shanghai test account,
+// so every avatar silently fell back to its initial letter.
+const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
 
 export type TSDirectorySnapshot = DirectorySnapshot;
 export type TSDirectoryClient = DirectoryClientInfo;
