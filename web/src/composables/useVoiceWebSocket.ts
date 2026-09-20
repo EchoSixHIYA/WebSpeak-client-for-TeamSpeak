@@ -321,6 +321,7 @@ export function useVoiceWebSocket() {
   let screenShareRequestSequence = 0;
   let screenSharePendingStartId = "";
   let screenShareStartCancelled = false;
+  let screenShareStartGeneration = 0;
   let webrtcMixDestination: MediaStreamAudioDestinationNode | null = null;
   let webrtcMixMicSource: MediaStreamAudioSourceNode | null = null;
   let webrtcMixMicGain: GainNode | null = null;
@@ -1863,17 +1864,23 @@ export function useVoiceWebSocket() {
       return;
     }
     screenShareError.value = "";
+    const startGeneration = ++screenShareStartGeneration;
+    screenShareStarting.value = true;
+    screenShareStartCancelled = false;
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio });
+      if (startGeneration !== screenShareStartGeneration || !screenShareStarting.value || screenShareStartCancelled) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       if (!stream.getVideoTracks().length) throw new Error("NO_VIDEO_TRACK");
       screenShareLocalStream = stream;
-      screenShareStarting.value = true;
       screenShareRequestSequence = (screenShareRequestSequence + 1) % 1_000_000;
       screenSharePendingStartId = `screen-start-${screenShareRequestSequence}`;
-      screenShareStartCancelled = false;
       for (const track of stream.getTracks()) track.addEventListener("ended", () => { void stopScreenShare(); }, { once: true });
       sendScreenShareMessage({ type: "screenShareStart", requestId: screenSharePendingStartId, audio: stream.getAudioTracks().length > 0, name: "我的屏幕" });
     } catch (error: unknown) {
+      if (startGeneration !== screenShareStartGeneration) return;
       screenShareLocalStream?.getTracks().forEach((track) => track.stop());
       screenShareLocalStream = null;
       screenShareStarting.value = false;
@@ -1885,12 +1892,15 @@ export function useVoiceWebSocket() {
   }
 
   function stopScreenShare(): void {
+    screenShareStartGeneration += 1;
     if (screenShareStarting.value) screenShareStartCancelled = true;
     if (screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
     closeAllScreenSharePeers();
     screenShareLocalStream?.getTracks().forEach((track) => track.stop());
     screenShareLocalStream = null;
     screenShareStarting.value = false;
+    screenSharePendingStartId = "";
+    screenShareStartCancelled = false;
     screenShareActive.value = false;
     screenShareActiveStreamId.value = "";
   }
@@ -1911,6 +1921,7 @@ export function useVoiceWebSocket() {
   }
 
   function stopScreenShareTransport(sendStop: boolean): void {
+    screenShareStartGeneration += 1;
     if (sendStop && screenShareActive.value && screenShareActiveStreamId.value) sendScreenShareMessage({ type: "screenShareStop", streamId: screenShareActiveStreamId.value });
     if (screenShareStarting.value) screenShareStartCancelled = true;
     closeAllScreenSharePeers();
