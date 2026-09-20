@@ -1362,4 +1362,19 @@ async function parseResponse(response: Response) { const value = await response.
 .home-link:hover{background:#d8eee9}
 .language-link{margin-top:20px!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
 .login-actions .language-link{margin-top:0!important}
+
+/* Desktop server settings must keep their own scroll surface. The admin shell
+   is viewport-locked, so an unconstrained flex item can otherwise push the
+   relay card below the clipped page-content area. */
+.settings-card,.relay-card,.relay-node,.relay-fields,.relay-node-heading,.relay-enabled,.relay-fields>label,.password-row,.password-row>label{min-width:0}
+.relay-enabled strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.relay-fields input{min-width:0}
+.password-actions{flex:0 0 auto}
+
+@media(min-width:851px){
+  .server-page{flex:1 1 auto;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto}
+  .server-page .settings-grid{min-width:0}
+  .settings-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .relay-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
 </style>
