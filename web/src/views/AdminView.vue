@@ -1377,4 +1377,13 @@ async function parseResponse(response: Response) { const value = await response.
   .settings-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .relay-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
+
+/* The application is zoomed up on large displays so the 1920×1080 layout
+   stays readable. Compensate viewport heights for that zoom; otherwise a
+   2K viewport becomes a 1920px-tall admin shell and clips its lower cards. */
+@media(min-width:851px){
+  :global(html),:global(body),:global(#app){height:calc(100dvh / var(--ui-scale));max-height:calc(100dvh / var(--ui-scale))}
+  .admin-root,.admin-shell,.admin-sidebar{height:calc(100dvh / var(--ui-scale));min-height:calc(100dvh / var(--ui-scale));max-height:calc(100dvh / var(--ui-scale))}
+  .admin-main{height:100%;min-height:0}
+}
 </style>
