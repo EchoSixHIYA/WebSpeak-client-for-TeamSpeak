@@ -1715,7 +1715,11 @@ export function useVoiceWebSocket() {
       screenShareViewing.value = true;
     };
     peer.onconnectionstatechange = () => {
-      if (peer.connectionState === "connected" || peer.connectionState === "completed") {
+      // `completed` belongs to RTCIceConnectionState, not the aggregate
+      // RTCPeerConnection.connectionState. Treating it as a connection state
+      // both trips the type checker and can hide the actual failed/closed
+      // transitions we need to handle here.
+      if (peer.connectionState === "connected") {
         clearScreenSharePeerTimer(peerId);
       } else if (peer.connectionState === "failed") {
         failScreenSharePeer(peerId);
