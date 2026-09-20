@@ -17,7 +17,7 @@ import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnec
 import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioStats, type WebRtcSessionDescription } from "./webrtc-audio.js";
 import { pingTeamSpeakSession } from "./network-probe.js";
 import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./acceleration-relay.js";
-import { parseScreenShareMessage, type ScreenShareClientMessage, type ScreenSharePeerSignal, type ScreenShareStreamDescription } from "./screen-share.js";
+import { parseScreenShareMessage, type ScreenShareClientMessage, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -1078,6 +1078,7 @@ export class VoiceBridge {
         audio: message.audio === true,
         createdAt: Date.now(),
         viewerCount: 0,
+        viewers: [],
         targetKey: teamSpeakTargetKey(entry.target),
         channelId: entry.tsClient.getChannelId(),
         ownerEntryId: entry.id,
@@ -1098,8 +1099,8 @@ export class VoiceBridge {
       sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_NOT_FOUND", message: "屏幕共享已结束或不存在" });
       return;
     }
-    if (stream.targetKey !== teamSpeakTargetKey(entry.target)) {
-      sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_TARGET_MISMATCH", message: "屏幕共享不属于当前服务器" });
+    if (stream.targetKey !== teamSpeakTargetKey(entry.target) || stream.channelId !== entry.tsClient.getChannelId()) {
+      sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_TARGET_MISMATCH", message: "屏幕共享不属于当前服务器或频道" });
       return;
     }
 
@@ -1139,7 +1140,7 @@ export class VoiceBridge {
         void this.joinNativeScreenStream(entry, stream, sendJson, message.requestId);
       }
       if (!alreadyJoined) {
-        this.broadcastScreenMessage(stream, { type: "screenShareViewerCount", streamId: stream.streamId, viewerCount: stream.viewerCount });
+        this.broadcastScreenMessage(stream, this.screenShareViewerCountMessage(stream));
       }
       return;
     }
@@ -1158,7 +1159,7 @@ export class VoiceBridge {
   private listScreenStreamsFor(entry: WebClientEntry): ScreenShareStreamDescription[] {
     const targetKey = teamSpeakTargetKey(entry.target);
     return [...this.screenStreams.values()]
-      .filter((stream) => stream.targetKey === targetKey)
+      .filter((stream) => stream.targetKey === targetKey && stream.channelId === entry.tsClient.getChannelId())
       .map((stream) => this.describeScreenStream(stream));
   }
 
@@ -1198,6 +1199,31 @@ export class VoiceBridge {
       audio: stream.audio,
       createdAt: stream.createdAt,
       viewerCount: stream.viewerCount,
+      viewers: this.describeScreenViewers(stream),
+    };
+  }
+
+  private describeScreenViewers(stream: ScreenStreamRecord): ScreenShareViewerDescription[] {
+    return [...stream.viewerEntryIds]
+      .map((entryId) => this.entries.get(entryId))
+      .filter((entry): entry is WebClientEntry => Boolean(entry))
+      .slice(0, 64)
+      .map((entry) => {
+        const avatar = entry.members.get(entry.tsClient.getClientId())?.avatar;
+        return {
+          peerId: entry.screenPeerId,
+          nickname: entry.nickname,
+          ...(avatar && avatar.length <= 128 * 1024 ? { avatar } : {}),
+        };
+      });
+  }
+
+  private screenShareViewerCountMessage(stream: ScreenStreamRecord): Record<string, unknown> {
+    return {
+      type: "screenShareViewerCount",
+      streamId: stream.streamId,
+      viewerCount: stream.viewerCount,
+      viewers: this.describeScreenViewers(stream),
     };
   }
 
@@ -1232,7 +1258,7 @@ export class VoiceBridge {
       })).catch(() => undefined);
     }
     this.sendToEntry(entry.id, { type: "screenShareLeft", streamId: stream.streamId });
-    this.broadcastScreenMessage(stream, { type: "screenShareViewerCount", streamId: stream.streamId, viewerCount: stream.viewerCount });
+    this.broadcastScreenMessage(stream, this.screenShareViewerCountMessage(stream));
   }
 
   private relayScreenShareSignal(
@@ -1344,6 +1370,7 @@ export class VoiceBridge {
         audio: params.audio === "1",
         createdAt: Date.now(),
         viewerCount: 0,
+        viewers: [],
         targetKey,
         channelId: sourceEntry?.tsClient.getChannelId() ?? entry.tsClient.getChannelId(),
         ownerEntryId: "",

@@ -39,6 +39,13 @@ export interface ScreenShareStream {
   audio: boolean;
   createdAt: number;
   viewerCount: number;
+  viewers: ScreenShareViewer[];
+}
+
+export interface ScreenShareViewer {
+  peerId: string;
+  nickname: string;
+  avatar?: string;
 }
 
 export interface ScreenShareSignal {
@@ -1918,11 +1925,24 @@ export function useVoiceWebSocket() {
       audio: value.audio === true,
       createdAt: typeof value.createdAt === "number" ? value.createdAt : Date.now(),
       viewerCount: typeof value.viewerCount === "number" ? value.viewerCount : 0,
+      viewers: normalizeScreenShareViewers(value.viewers),
     };
     const index = screenShareStreams.findIndex((candidate) => candidate.streamId === stream.streamId);
     if (index >= 0) screenShareStreams.splice(index, 1, stream);
     else screenShareStreams.push(stream);
     return stream;
+  }
+
+  function normalizeScreenShareViewers(raw: unknown): ScreenShareViewer[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((viewer): viewer is ScreenShareViewer => Boolean(viewer) && typeof viewer === "object" && typeof (viewer as ScreenShareViewer).peerId === "string" && typeof (viewer as ScreenShareViewer).nickname === "string")
+      .slice(0, 64)
+      .map((viewer) => ({
+        peerId: viewer.peerId.slice(0, 128),
+        nickname: viewer.nickname.slice(0, 120),
+        ...(typeof viewer.avatar === "string" && viewer.avatar.length <= 128 * 1024 ? { avatar: viewer.avatar } : {}),
+      }));
   }
 
   function handleMessage(msg: any): void {
@@ -1982,7 +2002,10 @@ export function useVoiceWebSocket() {
       }
       case "screenShareViewerCount": {
         const stream = screenShareStreams.find((candidate) => candidate.streamId === String(msg.streamId || ""));
-        if (stream && typeof msg.viewerCount === "number") stream.viewerCount = Math.max(0, Math.floor(msg.viewerCount));
+        if (stream) {
+          if (typeof msg.viewerCount === "number") stream.viewerCount = Math.max(0, Math.floor(msg.viewerCount));
+          if (Array.isArray(msg.viewers)) stream.viewers = normalizeScreenShareViewers(msg.viewers);
+        }
         break;
       }
       case "screenShareStopped": {

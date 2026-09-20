@@ -20,7 +20,13 @@ export type ScreenSharePeerSignal =
     }
   | {
       kind: "close";
-    };
+  };
+
+export interface ScreenShareViewerDescription {
+  peerId: string;
+  nickname: string;
+  avatar?: string;
+}
 
 export interface ScreenShareStreamDescription {
   streamId: string;
@@ -31,6 +37,7 @@ export interface ScreenShareStreamDescription {
   audio: boolean;
   createdAt: number;
   viewerCount: number;
+  viewers: ScreenShareViewerDescription[];
 }
 
 export type ScreenShareClientMessage =

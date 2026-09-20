@@ -143,10 +143,10 @@
               <header class="screen-share-header"><div><span class="section-kicker">{{ t('screenShare') }}</span><h2><Icon name="monitor" :size="20" /> {{ t('screenShareTitle') }}</h2></div><button v-if="screenShareActive" type="button" class="secondary-button" @click="stopScreenShare"><Icon name="close" :size="15" /> {{ t('stopScreenShare') }}</button><button v-else type="button" class="primary-button screen-share-start" @click="startScreenShare(true)"><Icon name="monitor" :size="15" /> {{ t('startScreenShare') }}</button></header>
               <div v-if="screenShareError" class="screen-share-error" role="status"><Icon name="info" :size="16" /> {{ screenShareError }}</div>
               <div v-if="screenShareViewing" class="screen-share-viewer-card">
-                <div class="screen-share-video-wrap"><video ref="screenVideoEl" class="screen-share-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video><div class="screen-share-viewer-badge"><Icon name="users" :size="14" /> {{ t('watchingScreenShare') }}</div></div>
+                <div class="screen-share-video-wrap"><video ref="screenVideoEl" class="screen-share-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video><div class="screen-share-viewer-badge"><Icon name="users" :size="14" /> {{ t('watchingScreenShare') }}</div><div v-if="screenShareFeaturedStream?.viewers.length" class="screen-share-viewer-stack" :aria-label="t('watchingScreenShare')"><span v-for="viewer in screenShareFeaturedStream.viewers.slice(0, 5)" :key="viewer.peerId" class="screen-share-viewer-avatar" :title="viewer.nickname"><img v-if="viewer.avatar" :src="viewer.avatar" alt="" /><span v-else>{{ avatarInitial(viewer.nickname) }}</span></span><span v-if="screenShareFeaturedStream.viewers.length > 5" class="screen-share-viewer-overflow">+{{ screenShareFeaturedStream.viewers.length - 5 }}</span></div></div>
                 <div class="screen-share-viewer-controls"><span>{{ t('screenShareVolume') }}</span><input type="range" min="0" max="100" :value="screenShareRemoteVolume * 100" :aria-label="t('screenShareVolume')" @input="onScreenShareVolume" /><strong>{{ Math.round(screenShareRemoteVolume * 100) }}%</strong><button type="button" class="text-button" @click="leaveScreenShare">{{ t('leaveScreenShare') }}</button></div>
               </div>
-              <div v-if="screenShareActive" class="screen-share-owner-status"><span class="live-pill"><i></i> {{ t('sharingScreen') }}</span><span>{{ t('directP2POnly') }}</span></div>
+              <div v-if="screenShareActive" class="screen-share-owner-status"><span class="live-pill"><i></i> {{ t('sharingScreen') }}</span><span>{{ t('directP2POnly') }}</span><div v-if="screenShareFeaturedStream?.viewers.length" class="screen-share-viewer-stack" :aria-label="t('watchingScreenShare')"><span v-for="viewer in screenShareFeaturedStream.viewers.slice(0, 5)" :key="viewer.peerId" class="screen-share-viewer-avatar" :title="viewer.nickname"><img v-if="viewer.avatar" :src="viewer.avatar" alt="" /><span v-else>{{ avatarInitial(viewer.nickname) }}</span></span><span v-if="screenShareFeaturedStream.viewers.length > 5" class="screen-share-viewer-overflow">+{{ screenShareFeaturedStream.viewers.length - 5 }}</span></div></div>
               <div v-if="screenShareStreams.length" class="screen-share-stream-list"><article v-for="stream in screenShareStreams" :key="stream.streamId" class="screen-share-stream-item"><div class="screen-share-stream-icon"><Icon name="monitor" :size="18" /></div><div class="screen-share-stream-copy"><strong>{{ stream.name }}</strong><span>{{ stream.ownerNickname }} · {{ stream.source === 'teamspeak' ? t('teamSpeakSource') : t('browserSource') }}<small v-if="stream.audio"> · {{ t('sharedAudio') }}</small></span></div><button v-if="!screenShareViewing && stream.streamId !== screenShareActiveStreamId" type="button" class="secondary-button" @click="joinScreenShare(stream.streamId)">{{ t('watchScreenShare') }}</button><span v-else-if="stream.streamId === screenShareViewingStreamId" class="screen-share-watching-label">{{ t('watching') }}</span></article></div><div v-else-if="!screenShareActive" class="screen-share-empty"><Icon name="monitor" :size="18" /> {{ t('noScreenShares') }}</div>
             </section>
 
@@ -1961,6 +1961,10 @@ const currentChannel = computed<TreeChannel | undefined>(() => {
 });
 const currentChannelName = computed(() => (currentChannel.value?.name ?? channel.value) || t("voiceLobby"));
 const currentChannelDescription = computed(() => currentChannel.value?.description ?? "");
+const screenShareFeaturedStream = computed(() => {
+  const streamId = screenShareViewingStreamId.value || screenShareActiveStreamId.value;
+  return screenShareStreams.find((stream) => stream.streamId === streamId) ?? null;
+});
 const currentMembers = computed<ChannelMember[]>(() => {
   const source = currentChannel.value ? currentChannel.value.members : members;
   return source.map((member) => ({ ...member, isSelf: member.isSelf || member.id === voiceState.tsClientId }));
@@ -3734,6 +3738,12 @@ function stopWhisperTalk(): void {
 .screen-share-video-wrap { position: relative; display: grid; min-height: 220px; place-items: center; background: #0a1011; }
 .screen-share-video { display: block; width: 100%; max-height: min(58vh, 560px); object-fit: contain; background: #0a1011; }
 .screen-share-viewer-badge { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; color: #eefefd; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); font-size: 10px; }
+.screen-share-viewer-stack { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; padding: 3px 5px 3px 3px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); }
+.screen-share-owner-status .screen-share-viewer-stack { position: static; margin-left: auto; }
+.screen-share-viewer-avatar { display: grid; place-items: center; width: 26px; height: 26px; overflow: hidden; color: #0d3734; border: 2px solid #172321; border-radius: 50%; background: #a6e6dc; font-size: 10px; font-weight: 800; }
+.screen-share-viewer-avatar + .screen-share-viewer-avatar { margin-left: -7px; }
+.screen-share-viewer-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.screen-share-viewer-overflow { display: grid; place-items: center; min-width: 25px; height: 25px; margin-left: 4px; padding: 0 5px; color: #eefefd; font-size: 10px; font-weight: 700; }
 .screen-share-viewer-controls { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #e4f1ef; font-size: 10px; }
 .screen-share-viewer-controls input { width: min(180px, 35vw); accent-color: #75d7cd; }
 .screen-share-viewer-controls strong { min-width: 34px; color: #9beee5; font-size: 10px; }
