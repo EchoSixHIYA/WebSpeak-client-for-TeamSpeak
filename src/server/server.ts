@@ -23,12 +23,15 @@ export interface WebServerOptions {
   voiceBridgeOptions: VoiceBridgeOptions;
   adminService: AdminService;
   logger: Logger;
+  nextVisitorNumber?: () => number;
 }
 
 export interface WebServer {
   start(): Promise<void>;
   stop(): Promise<void>;
 }
+
+const VISITOR_NUMBER_COOKIE = "webspeak_visitor_number";
 
 export function createWebServer(options: WebServerOptions): WebServer {
   const app = express();
@@ -58,11 +61,24 @@ export function createWebServer(options: WebServerOptions): WebServer {
   app.get("/health", healthHandler);
   app.get("/api/health", healthHandler);
 
-  app.get("/api/public-config", (_request, response) => {
+  app.get("/api/public-config", (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     const acceleration = resolveAccelerationOptions(options.voiceBridgeOptions.acceleration);
+    let visitorNumber = readVisitorNumberCookie(request.header("cookie"));
+    if (visitorNumber === null && options.nextVisitorNumber) {
+      try {
+        visitorNumber = options.nextVisitorNumber();
+        response.setHeader(
+          "Set-Cookie",
+          `${VISITOR_NUMBER_COOKIE}=${visitorNumber}; Max-Age=31536000; Path=/; SameSite=Lax${options.certDir ? "; Secure" : ""}`,
+        );
+      } catch (error: unknown) {
+        logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Visitor number could not be assigned");
+      }
+    }
     response.json({
       ...options.adminService.getPublicConfig(),
+      ...(visitorNumber === null ? {} : { visitorNumber }),
       accelerationAvailable: acceleration.length > 0,
       accelerationRelays: acceleration.map((relay) => ({ id: relay.id, name: relay.name })),
     });
@@ -209,6 +225,20 @@ function resolveAccelerationOptions(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readVisitorNumberCookie(header: string | undefined): number | null {
+  if (!header) return null;
+  for (const entry of header.split(";")) {
+    const separator = entry.indexOf("=");
+    if (separator < 0) continue;
+    const name = entry.slice(0, separator).trim();
+    if (name !== VISITOR_NUMBER_COOKIE) continue;
+    const rawValue = entry.slice(separator + 1).trim();
+    const number = Number.parseInt(rawValue, 10);
+    return Number.isSafeInteger(number) && number > 0 ? number : null;
+  }
+  return null;
 }
 
 function isSameOrigin(request: express.Request): boolean {

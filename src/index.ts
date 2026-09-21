@@ -68,6 +68,7 @@ async function main() {
     },
     adminService,
     logger,
+    nextVisitorNumber: () => database.nextVisitorNumber(),
   });
 
   await webServer.start();

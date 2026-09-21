@@ -29,6 +29,7 @@
           <div class="card-kicker">{{ t('joinServer') }}</div>
           <h2>{{ t('welcomeBack') }}</h2>
           <p class="card-lead">{{ t('joinLead') }}</p>
+          <p v-if="visitorNumber !== null" class="visitor-count">{{ t('visitorCount', { count: visitorNumber }) }}</p>
 
           <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span class="notice-content"><span>{{ localizedMessage(voiceState.error) }}</span><code v-if="voiceState.errorCode">{{ t('errorCode') }}: {{ visibleErrorCode(voiceState.errorCode) }}</code></span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
@@ -449,6 +450,7 @@ const welcomeTextDe = ref("");
 const welcomeTextRu = ref("");
 const welcomeTextJa = ref("");
 const appVersion = ref("0.2.2");
+const visitorNumber = ref<number | null>(null);
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
 const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
@@ -539,6 +541,7 @@ const translations: Record<string, Record<string, string>> = {
     joinServer: "加入你的服务器",
     welcomeBack: "欢迎回来",
     joinLead: "输入一个昵称，选择进入的频道。",
+    visitorCount: "你是第 {{count}} 个访客",
     serverAddress: "TeamSpeak 服务器地址",
     serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
     serverPort: "语音端口",
@@ -845,6 +848,7 @@ const translations: Record<string, Record<string, string>> = {
     joinServer: "JOIN YOUR SERVER",
     welcomeBack: "Welcome back",
     joinLead: "Choose a nickname and the channel to enter.",
+    visitorCount: "You are visitor No. {{count}}",
     serverAddress: "TeamSpeak server address",
     serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
     serverPort: "Voice port",
@@ -1154,6 +1158,7 @@ translations.de = {
   joinServer: "DEINEM SERVER BEITRETEN",
   welcomeBack: "Willkommen zurück",
   joinLead: "Wähle einen Namen und den Kanal, dem du beitreten möchtest.",
+  visitorCount: "Du bist Besucher Nr. {{count}}",
   serverAddress: "TeamSpeak-Serveradresse",
   serverAddressPlaceholder: "z. B. ts.example.com oder 127.0.0.1",
   serverPort: "Sprachport",
@@ -1464,6 +1469,7 @@ translations.ru = {
   joinServer: "Войти на сервер",
   welcomeBack: "С возвращением",
   joinLead: "Выберите имя и канал для входа.",
+  visitorCount: "Вы {{count}}-й посетитель",
   serverAddress: "Адрес сервера TeamSpeak",
   serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
   serverPort: "Голосовой порт",
@@ -1549,6 +1555,7 @@ translations.ja = {
   joinServer: "サーバーに参加",
   welcomeBack: "おかえりなさい",
   joinLead: "名前と参加するチャンネルを選択してください。",
+  visitorCount: "あなたは{{count}}人目の訪問者です",
   serverAddress: "TeamSpeak サーバーアドレス",
   serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
   serverPort: "音声ポート",
@@ -2393,8 +2400,9 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; visitorNumber?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
     if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
+    visitorNumber.value = Number.isSafeInteger(config.visitorNumber) && Number(config.visitorNumber) > 0 ? Number(config.visitorNumber) : null;
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
@@ -2856,7 +2864,8 @@ function stopWhisperTalk(): void {
 .join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
-.card-lead { margin: 0 0 18px; color: #7b8885; font-size: 13px; }
+.card-lead { margin: 0 0 7px; color: #7b8885; font-size: 13px; }
+.visitor-count { margin: 0 0 18px; color: #8a9894; font-size: 11px; letter-spacing: .02em; }
 .notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
 .notice-content { min-width: 0; overflow-wrap: anywhere; }
 .notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
@@ -3221,7 +3230,7 @@ function stopWhisperTalk(): void {
 .room-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--surface-1)), var(--surface-1) 75%); }
 .voice-card, .member-panel, .settings-modal { box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
 .section-heading h2, .room-hero h1, .join-card h2, .member-panel-heading h2, .message-meta strong, .member-copy strong { color: var(--text-primary); }
-.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead { color: var(--text-muted); }
+.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead, .visitor-count { color: var(--text-muted); }
 .chat-panel, .chat-heading, .settings-header, .settings-footer, .settings-separator { border-color: var(--border); }
 .message-bubble { color: var(--text-primary); background: var(--surface-2); }
 .settings-content, .settings-nav { background: var(--surface-1); }
@@ -3244,6 +3253,7 @@ function stopWhisperTalk(): void {
 :global(html[data-theme="dark"] .join-page .join-description),
 :global(html[data-theme="dark"] .join-page .promise-item small),
 :global(html[data-theme="dark"] .join-page .card-lead),
+:global(html[data-theme="dark"] .join-page .visitor-count),
 :global(html[data-theme="dark"] .join-page .field-hint),
 :global(html[data-theme="dark"] .join-page .join-meta),
 :global(html[data-theme="dark"] .join-page .join-footer) { color: var(--text-muted); }
