@@ -2,6 +2,7 @@ import path from "node:path";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createAccelerationRelayServer } from "./server/acceleration-relay.js";
+import { normalizeScreenShareIceServers, type ScreenShareIceServer } from "./server/screen-share.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -13,6 +14,7 @@ const DATA_DIR = process.env.WEBSPEAK_DATA_DIR?.trim() || path.join(ROOT_DIR, "d
 const LOG_DIR = path.join(DATA_DIR, "logs");
 const STATIC_DIR = path.join(ROOT_DIR, "web", "dist");
 const APP_VERSION = readPackageVersion();
+const SCREEN_SHARE_ICE_SERVERS = readScreenShareIceServers(process.env.WEBSPEAK_SCREEN_SHARE_ICE_SERVERS);
 
 async function main() {
   if (process.env.WEBSPEAK_MODE?.trim().toLowerCase() === "relay") {
@@ -56,6 +58,7 @@ async function main() {
     voiceBridgeOptions: {
       joinTickets,
       webRtc: () => adminService.getWebRtcAudioOptions(),
+      screenShareIceServers: () => SCREEN_SHARE_ICE_SERVERS,
       // The public gateway only uses the relay configuration explicitly
       // saved in the admin console. Environment variables belong to the
       // standalone relay process and must never make the relay option appear
@@ -121,6 +124,18 @@ function parsePort(value: string | undefined, fallback: number): number {
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
+}
+
+function readScreenShareIceServers(value: string | undefined): ScreenShareIceServer[] {
+  const raw = value?.trim();
+  if (!raw) return normalizeScreenShareIceServers();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeScreenShareIceServers(Array.isArray(parsed) ? parsed : undefined);
+  } catch {
+    // A simple comma/space-separated list is convenient for STUN-only setups.
+    return normalizeScreenShareIceServers(raw.split(/[\s,]+/).filter(Boolean).map((urls) => ({ urls })));
+  }
 }
 
 main().catch((err) => {

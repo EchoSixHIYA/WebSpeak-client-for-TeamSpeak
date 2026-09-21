@@ -7,6 +7,40 @@ import { loadLocalPreferences, saveLocalPreferences } from "../services/local-pe
 
 const micCaptureWorkletUrl = "/mic-capture-worklet.js";
 const SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS = 15_000;
+const DEFAULT_SCREEN_SHARE_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:turn.teamspeak.com:3478" },
+  { urls: "stun:turn2.teamspeak.com:3478" },
+];
+let screenShareIceServers: RTCIceServer[] = DEFAULT_SCREEN_SHARE_ICE_SERVERS;
+
+function normalizeScreenShareIceServers(raw: unknown): RTCIceServer[] {
+  if (!Array.isArray(raw)) return DEFAULT_SCREEN_SHARE_ICE_SERVERS;
+  const normalized: RTCIceServer[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const value = item as Record<string, unknown>;
+    const rawUrls = value.urls;
+    const urls = (Array.isArray(rawUrls) ? rawUrls : [rawUrls])
+      .filter((url): url is string => typeof url === "string" && /^(?:stun|stuns|turn|turns):/i.test(url.trim()))
+      .map((url) => url.trim())
+      .filter(Boolean);
+    const uniqueUrls = [...new Set(urls)];
+    if (!uniqueUrls.length) continue;
+    const username = typeof value.username === "string" ? value.username : undefined;
+    const credential = typeof value.credential === "string" ? value.credential : undefined;
+    const key = JSON.stringify([uniqueUrls, username ?? ""]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({
+      urls: uniqueUrls.length === 1 ? uniqueUrls[0] : uniqueUrls,
+      ...(username !== undefined ? { username } : {}),
+      ...(credential !== undefined ? { credential } : {}),
+    });
+    if (normalized.length >= 8) break;
+  }
+  return normalized.length ? normalized : DEFAULT_SCREEN_SHARE_ICE_SERVERS;
+}
 
 export interface VoiceState {
   connected: boolean;
@@ -1694,8 +1728,10 @@ export function useVoiceWebSocket() {
   function createScreenSharePeer(streamId: string, peerId: string, role: "owner" | "viewer"): RTCPeerConnection {
     const existing = screenSharePeers.get(peerId);
     if (existing) return existing;
-    // Deliberately no STUN/TURN: this feature is direct host-candidate P2P only.
-    const peer = new RTCPeerConnection({ iceServers: [] });
+    // STUN discovers server-reflexive candidates; it does not carry media.
+    // TURN is accepted only when explicitly configured by the deployment, and
+    // would use that external TURN service rather than the WebSpeak gateway.
+    const peer = new RTCPeerConnection({ iceServers: screenShareIceServers });
     screenSharePeers.set(peerId, peer);
     if (role === "owner") {
       for (const track of screenShareLocalStream?.getTracks() ?? []) peer.addTrack(track, screenShareLocalStream!);
@@ -2031,6 +2067,7 @@ export function useVoiceWebSocket() {
         state.channelSwitchedChannelId = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
         state.canMoveClients = msg.canMoveClients === true;
+        screenShareIceServers = normalizeScreenShareIceServers(msg.screenShareIceServers);
         applyWhisperState(msg.whisperTargetIds, msg.whisperActive);
         if (Array.isArray(msg.members)) {
           members.length = 0;

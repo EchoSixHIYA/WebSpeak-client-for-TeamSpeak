@@ -62,6 +62,16 @@ WebRTC verwendet für Browser-Sprache einen Echtzeit-Medienpfad und ermöglicht 
 
 Der Portbereich ist bei aktiviertem WebRTC gesperrt. Zum Ändern WebRTC zuerst deaktivieren und speichern, danach die Firewall-Regeln anpassen. Für öffentliche Bereitstellungen ist HTTPS erforderlich.
 
+### ICE-Kandidaten für Bildschirmfreigabe
+
+Die Medien der Bildschirmfreigabe versuchen weiterhin eine direkte Browser-zu-Browser-Verbindung; WebSpeak leitet nur die Signalisierung weiter. Standardmäßig werden die öffentlichen TeamSpeak-STUN-Dienste zur Ermittlung öffentlicher Kandidaten verwendet. STUN überträgt keine Medien. Ein autorisierter externer TURN-Dienst kann über `WEBSPEAK_SCREEN_SHARE_ICE_SERVERS` als JSON-Array konfiguriert werden, zum Beispiel:
+
+```json
+[{"urls":"stun:turn.teamspeak.com:3478"},{"urls":"turns:turn.example.com:5349","username":"<username>","credential":"<credential>"}]
+```
+
+Mit TURN kann die Medienübertragung diesen externen Dienst verwenden, aber niemals das WebSpeak-Gateway. Ohne TURN werden nur direkte ICE-Pfade und STUN verwendet.
+
 ### 2. Relay-Modus
 
 Ein Relay hilft, wenn ein TeamSpeak-Server Verbindungen aus einer anderen Region ablehnt oder der direkte Weg instabil ist. Es ist kein VPN, sondern leitet nur den TeamSpeak-Verkehr der aktuellen WebSpeak-Sitzung weiter.

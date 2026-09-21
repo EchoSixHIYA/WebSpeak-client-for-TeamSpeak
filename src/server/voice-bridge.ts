@@ -17,7 +17,7 @@ import { isRecoverable, reconnectDelayMs, reconnectWindowOpen } from "./reconnec
 import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioStats, type WebRtcSessionDescription } from "./webrtc-audio.js";
 import { pingTeamSpeakSession } from "./network-probe.js";
 import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./acceleration-relay.js";
-import { parseScreenShareMessage, type ScreenShareClientMessage, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
+import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenShareClientMessage, type ScreenShareIceServer, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -46,6 +46,7 @@ function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>):
 export interface VoiceBridgeOptions {
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
+  screenShareIceServers?: ScreenShareIceServer[] | (() => ScreenShareIceServer[]);
   acceleration?: ConfiguredAccelerationRelay[] | (() => ConfiguredAccelerationRelay[]);
   accelerationName?: string | (() => string | undefined);
 }
@@ -462,6 +463,7 @@ export class VoiceBridge {
           whisperTargetIds: [...entry!.whisperTargetIds],
           whisperActive: entry!.whisperActive,
           webrtcAvailable: this.getWebRtcOptions()?.enabled === true,
+          screenShareIceServers: this.getScreenShareIceServers(),
           accelerated: Boolean(entry!.acceleration),
           canMoveClients: entry!.canMoveClients,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
@@ -1051,6 +1053,12 @@ export class VoiceBridge {
   private getWebRtcOptions(): WebRtcAudioOptions | undefined {
     const configured = this.options.webRtc;
     return typeof configured === "function" ? configured() : configured;
+  }
+
+  private getScreenShareIceServers(): ScreenShareIceServer[] {
+    const configured = this.options.screenShareIceServers;
+    const servers = typeof configured === "function" ? configured() : configured;
+    return normalizeScreenShareIceServers(servers);
   }
 
   private getAccelerationOptions(relayId = ""): ConfiguredAccelerationRelay | undefined {

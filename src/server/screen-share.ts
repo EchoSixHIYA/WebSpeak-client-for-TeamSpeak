@@ -2,10 +2,66 @@
  * Screen-share signaling for browser peers and native TeamSpeak peers.
  *
  * Media never passes through this module. The gateway only authenticates the
- * connected TeamSpeak session and relays SDP/ICE messages. The browser peers
- * are deliberately created without STUN/TURN servers; a failed host-candidate
- * connection is reported to the user instead of silently becoming a relay.
+ * connected TeamSpeak session and relays SDP/ICE messages. Browser peers use
+ * the configured ICE servers only for candidate discovery/negotiation; this
+ * module never handles the resulting media packets.
  */
+
+export interface ScreenShareIceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+/** TeamSpeak's public ICE services are STUN-only, so media remains peer-to-peer. */
+export const DEFAULT_SCREEN_SHARE_ICE_SERVERS: readonly ScreenShareIceServer[] = [
+  { urls: "stun:turn.teamspeak.com:3478" },
+  { urls: "stun:turn2.teamspeak.com:3478" },
+];
+
+const SCREEN_SHARE_ICE_URL_PATTERN = /^(?:stun|stuns|turn|turns):/i;
+const MAX_ICE_SERVER_COUNT = 8;
+const MAX_ICE_URL_LENGTH = 512;
+const MAX_ICE_CREDENTIAL_LENGTH = 512;
+
+/**
+ * Keep ICE configuration server-owned and bounded before exposing it to a
+ * browser. TURN is accepted only as an explicitly configured external server;
+ * the WebSpeak gateway is never inserted into this list.
+ */
+export function normalizeScreenShareIceServers(value?: readonly unknown[]): ScreenShareIceServer[] {
+  const source: readonly unknown[] = value ?? DEFAULT_SCREEN_SHARE_ICE_SERVERS;
+  const normalized: ScreenShareIceServer[] = [];
+  const seen = new Set<string>();
+  for (const raw of source) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const candidate = raw as Record<string, unknown>;
+    const rawUrls = candidate.urls;
+    const urls = (Array.isArray(rawUrls) ? rawUrls : [rawUrls])
+      .filter((url): url is string => typeof url === "string" && url.trim().length > 0 && url.trim().length <= MAX_ICE_URL_LENGTH)
+      .map((url) => url.trim())
+      .filter((url) => SCREEN_SHARE_ICE_URL_PATTERN.test(url));
+    const uniqueUrls = [...new Set(urls)];
+    if (!uniqueUrls.length) continue;
+    const username = typeof candidate.username === "string" && candidate.username.length <= MAX_ICE_CREDENTIAL_LENGTH
+      ? candidate.username
+      : undefined;
+    const credential = typeof candidate.credential === "string" && candidate.credential.length <= MAX_ICE_CREDENTIAL_LENGTH
+      ? candidate.credential
+      : undefined;
+    const key = JSON.stringify([uniqueUrls, username ?? ""]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({
+      urls: uniqueUrls.length === 1 ? uniqueUrls[0] : uniqueUrls,
+      ...(username !== undefined ? { username } : {}),
+      ...(credential !== undefined ? { credential } : {}),
+    });
+    if (normalized.length >= MAX_ICE_SERVER_COUNT) break;
+  }
+  if (normalized.length) return normalized;
+  return DEFAULT_SCREEN_SHARE_ICE_SERVERS.map((server) => ({ ...server }));
+}
 
 export type ScreenSharePeerSignal =
   | {
