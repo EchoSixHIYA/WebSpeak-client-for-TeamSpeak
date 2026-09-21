@@ -1704,6 +1704,7 @@ export function useVoiceWebSocket() {
       const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
       if (stream?.audio) peer.addTransceiver("audio", { direction: "recvonly" });
     }
+    preferScreenShareCodecs(peer);
     peer.onicecandidate = (event) => {
       if (!event.candidate) return;
       const candidate = event.candidate;
@@ -1743,6 +1744,16 @@ export function useVoiceWebSocket() {
     return peer;
   }
 
+  function preferScreenShareCodecs(peer: RTCPeerConnection): void {
+    const transceiver = peer.getTransceivers().find((candidate) => candidate.sender.track?.kind === "video" || candidate.receiver.track?.kind === "video");
+    const capabilities = typeof RTCRtpReceiver !== "undefined" ? RTCRtpReceiver.getCapabilities?.("video") : null;
+    if (!transceiver?.setCodecPreferences || !capabilities?.codecs?.length) return;
+    const vp8 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/vp8");
+    if (!vp8.length) return;
+    const remaining = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() !== "video/vp8");
+    try { transceiver.setCodecPreferences([...vp8, ...remaining]); } catch { /* older browsers may reject codec preference changes */ }
+  }
+
   async function flushScreenShareCandidates(peerId: string, peer: RTCPeerConnection): Promise<void> {
     const pending = screenSharePendingIce.get(peerId) ?? [];
     screenSharePendingIce.delete(peerId);
@@ -1758,15 +1769,11 @@ export function useVoiceWebSocket() {
     screenShareViewingStreamId.value = stream.streamId;
     screenShareErrorCode.value = "";
     screenShareError.value = "";
+    const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
     if (stream.source === "teamspeak") {
-      screenShareViewing.value = false;
-      screenShareViewingStreamId.value = "";
-      screenShareRemoteStream.value = null;
-      screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
-      screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
+      armScreenSharePeerTimer(stream.ownerPeerId);
       return;
     }
-    const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -1779,6 +1786,26 @@ export function useVoiceWebSocket() {
       });
     } catch {
       failScreenSharePeer(stream.ownerPeerId, "无法创建屏幕共享直连请求，请重试");
+    }
+  }
+
+  async function startNativeScreenShareViewer(streamId: string, peerId: string): Promise<void> {
+    const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
+    if (!stream || stream.source !== "browser" || screenShareActiveStreamId.value !== streamId || stream.ownerPeerId !== screenShareLocalPeerId()) return;
+    closeScreenSharePeer(peerId);
+    const peer = createScreenSharePeer(streamId, peerId, "owner");
+    try {
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      armScreenSharePeerTimer(peerId);
+      sendScreenShareMessage({
+        type: "screenShareSignal",
+        streamId,
+        targetPeerId: peerId,
+        signal: { kind: "offer", sdp: peer.localDescription?.sdp ?? offer.sdp ?? "" },
+      });
+    } catch {
+      failScreenSharePeer(peerId, "无法为 TeamSpeak 观看端创建屏幕共享直连");
     }
   }
 
@@ -1807,6 +1834,34 @@ export function useVoiceWebSocket() {
         return;
       }
       try { await peer.addIceCandidate(candidate); } catch { /* stale ICE is not fatal */ }
+      return;
+    }
+
+    if (stream.source === "teamspeak" && screenShareViewingStreamId.value === streamId && fromPeerId === stream.ownerPeerId && signal.kind === "offer") {
+      const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "viewer");
+      if (!signal.sdp) return;
+      armScreenSharePeerTimer(fromPeerId);
+      try {
+        await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
+        await flushScreenShareCandidates(fromPeerId, peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        sendScreenShareMessage({ type: "screenShareSignal", streamId, targetPeerId: fromPeerId, signal: { kind: "answer", sdp: answer.sdp ?? "" } });
+      } catch {
+        failScreenSharePeer(fromPeerId, "无法回复 TeamSpeak 屏幕共享的直连请求");
+      }
+      return;
+    }
+
+    if (stream.source === "browser" && screenShareActiveStreamId.value === streamId && stream.ownerPeerId === screenShareLocalPeerId() && fromPeerId.startsWith("ts-viewer-") && signal.kind === "answer") {
+      const peer = screenSharePeers.get(fromPeerId);
+      if (!peer || !signal.sdp) return;
+      try {
+        await peer.setRemoteDescription({ type: "answer", sdp: signal.sdp });
+        await flushScreenShareCandidates(fromPeerId, peer);
+      } catch {
+        failScreenSharePeer(fromPeerId, "TeamSpeak 观看端无法完成屏幕共享直连协商");
+      }
       return;
     }
 
@@ -1896,12 +1951,6 @@ export function useVoiceWebSocket() {
   }
 
   function joinScreenShare(streamId: string): void {
-    const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
-    if (stream?.source === "teamspeak") {
-      screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
-      screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
-      return;
-    }
     screenShareErrorCode.value = "";
     screenShareError.value = "";
     if (screenShareViewingStreamId.value && screenShareViewingStreamId.value !== streamId) leaveScreenShare();
@@ -2068,14 +2117,14 @@ export function useVoiceWebSocket() {
       case "screenShareJoined": {
         const stream = upsertScreenShareStream(msg.stream);
         if (!stream) break;
-        if (stream.source === "teamspeak") {
-          screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
-          screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
-          break;
-        }
         void startScreenShareViewer(stream);
         break;
       }
+      case "screenShareNativeViewerJoined":
+        if (typeof msg.streamId === "string" && typeof msg.viewerPeerId === "string") {
+          void startNativeScreenShareViewer(msg.streamId, msg.viewerPeerId);
+        }
+        break;
       case "screenShareSignal":
         if (typeof msg.streamId === "string" && typeof msg.fromPeerId === "string" && msg.signal) {
           void handleScreenShareSignal(msg.streamId, msg.fromPeerId, msg.signal as ScreenShareSignal);

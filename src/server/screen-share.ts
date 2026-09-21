@@ -1,5 +1,5 @@
 /**
- * Browser ↔ browser screen-share signaling.
+ * Screen-share signaling for browser peers and native TeamSpeak peers.
  *
  * Media never passes through this module. The gateway only authenticates the
  * connected TeamSpeak session and relays SDP/ICE messages. The browser peers
