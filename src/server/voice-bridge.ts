@@ -1428,15 +1428,18 @@ export class VoiceBridge {
     sendJson: (message: Record<string, unknown>) => void,
     requestId?: string,
   ): Promise<void> {
-    const viewerClientId = entry.tsClient.getClientId();
-    if (!viewerClientId || !stream.sourceClientId) {
+    const sourceClientId = stream.sourceClientId;
+    if (!entry.tsClient.getClientId() || !sourceClientId) {
       sendJson({ type: "screenShareError", requestId, code: "SCREEN_SHARE_SOURCE_UNAVAILABLE", message: "共享来源暂不可用" });
       return;
     }
     try {
       await entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("joinstreamrequest", {
         id: stream.streamId,
-        clid: String(viewerClientId),
+        // TS6 uses the source client id on joinstreamrequest. The requesting
+        // gateway session is identified later by the response/signaling
+        // notification delivered to this TS connection.
+        clid: String(sourceClientId),
         msg: "",
         is_remove: "0",
         muted: "0",
