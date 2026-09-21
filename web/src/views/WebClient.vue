@@ -3749,8 +3749,8 @@ function stopWhisperTalk(): void {
 .screen-share-viewer-card { margin-top: 14px; overflow: hidden; border: 1px solid var(--border); border-radius: 13px; background: #0e1516; }
 .screen-share-video-wrap { position: relative; display: grid; min-height: 220px; place-items: center; background: #0a1011; }
 .screen-share-video { display: block; width: 100%; max-height: min(58vh, 560px); object-fit: contain; background: #0a1011; }
-.screen-share-viewer-badge { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; color: #eefefd; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); font-size: 10px; }
-.screen-share-viewer-stack { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; padding: 3px 5px 3px 3px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); }
+.screen-share-viewer-badge { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; color: #eefefd; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); font-size: 10px; }
+.screen-share-viewer-stack { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; padding: 3px 5px 3px 3px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(0,0,0,.5); }
 .screen-share-owner-status .screen-share-viewer-stack { position: static; margin-left: auto; }
 .screen-share-viewer-avatar { display: grid; place-items: center; width: 26px; height: 26px; overflow: hidden; color: #0d3734; border: 2px solid #172321; border-radius: 50%; background: #a6e6dc; font-size: 10px; font-weight: 800; }
 .screen-share-viewer-avatar + .screen-share-viewer-avatar { margin-left: -7px; }
