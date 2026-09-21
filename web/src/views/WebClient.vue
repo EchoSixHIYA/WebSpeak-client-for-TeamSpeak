@@ -141,13 +141,13 @@
 
             <section v-if="screenSharePanelOpen || screenShareStreams.length || screenShareActive || screenShareStarting || screenShareViewing" class="screen-share-section">
               <header class="screen-share-header"><div><span class="section-kicker">{{ t('screenShare') }}</span><h2><Icon name="monitor" :size="20" /> {{ t('screenShareTitle') }}</h2></div><button v-if="screenShareActive || screenShareStarting" type="button" class="secondary-button" @click="stopScreenShare"><Icon name="close" :size="15" /> {{ t('stopScreenShare') }}</button><button v-else type="button" class="primary-button screen-share-start" @click="startScreenShare(true)"><Icon name="monitor" :size="15" /> {{ t('startScreenShare') }}</button></header>
-              <div v-if="screenShareError" class="screen-share-error" role="status"><Icon name="info" :size="16" /> {{ screenShareError }}</div>
+              <div v-if="screenShareError" class="screen-share-error" role="status"><Icon name="info" :size="16" /> {{ screenShareErrorText }}</div>
               <div v-if="screenShareViewing" class="screen-share-viewer-card">
                 <div class="screen-share-video-wrap"><video ref="screenVideoEl" class="screen-share-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video><div class="screen-share-viewer-badge"><Icon name="users" :size="14" /> {{ t('watchingScreenShare') }}</div><div v-if="screenShareFeaturedStream?.viewers.length" class="screen-share-viewer-stack" :aria-label="t('watchingScreenShare')"><span v-for="viewer in screenShareFeaturedStream.viewers.slice(0, 5)" :key="viewer.peerId" class="screen-share-viewer-avatar" :title="viewer.nickname"><img v-if="viewer.avatar" :src="viewer.avatar" alt="" /><span v-else>{{ avatarInitial(viewer.nickname) }}</span></span><span v-if="screenShareFeaturedStream.viewers.length > 5" class="screen-share-viewer-overflow">+{{ screenShareFeaturedStream.viewers.length - 5 }}</span></div></div>
                 <div class="screen-share-viewer-controls"><span>{{ t('screenShareVolume') }}</span><input type="range" min="0" max="100" :value="screenShareRemoteVolume * 100" :aria-label="t('screenShareVolume')" @input="onScreenShareVolume" /><strong>{{ Math.round(screenShareRemoteVolume * 100) }}%</strong><button type="button" class="text-button" @click="leaveScreenShare">{{ t('leaveScreenShare') }}</button></div>
               </div>
               <div v-if="screenShareActive" class="screen-share-owner-status"><span class="live-pill"><i></i> {{ t('sharingScreen') }}</span><span>{{ t('directP2POnly') }}</span><div v-if="screenShareFeaturedStream?.viewers.length" class="screen-share-viewer-stack" :aria-label="t('watchingScreenShare')"><span v-for="viewer in screenShareFeaturedStream.viewers.slice(0, 5)" :key="viewer.peerId" class="screen-share-viewer-avatar" :title="viewer.nickname"><img v-if="viewer.avatar" :src="viewer.avatar" alt="" /><span v-else>{{ avatarInitial(viewer.nickname) }}</span></span><span v-if="screenShareFeaturedStream.viewers.length > 5" class="screen-share-viewer-overflow">+{{ screenShareFeaturedStream.viewers.length - 5 }}</span></div></div>
-              <div v-if="screenShareStreams.length" class="screen-share-stream-list"><article v-for="stream in screenShareStreams" :key="stream.streamId" class="screen-share-stream-item"><div class="screen-share-stream-icon"><Icon name="monitor" :size="18" /></div><div class="screen-share-stream-copy"><strong>{{ stream.name }}</strong><span>{{ stream.ownerNickname }} · {{ stream.source === 'teamspeak' ? t('teamSpeakSource') : t('browserSource') }}<small v-if="stream.audio"> · {{ t('sharedAudio') }}</small></span></div><button v-if="!screenShareViewing && stream.streamId !== screenShareActiveStreamId" type="button" class="secondary-button" @click="joinScreenShare(stream.streamId)">{{ t('watchScreenShare') }}</button><span v-else-if="stream.streamId === screenShareViewingStreamId" class="screen-share-watching-label">{{ t('watching') }}</span></article></div><div v-else-if="!screenShareActive" class="screen-share-empty"><Icon name="monitor" :size="18" /> {{ t('noScreenShares') }}</div>
+              <div v-if="screenShareStreams.length" class="screen-share-stream-list"><article v-for="stream in screenShareStreams" :key="stream.streamId" class="screen-share-stream-item"><div class="screen-share-stream-icon"><Icon name="monitor" :size="18" /></div><div class="screen-share-stream-copy"><strong>{{ stream.name }}</strong><span>{{ stream.ownerNickname }} · {{ stream.source === 'teamspeak' ? t('teamSpeakSource') : t('browserSource') }}<small v-if="stream.audio"> · {{ t('sharedAudio') }}</small></span></div><button v-if="stream.source === 'browser' && !screenShareViewing && stream.streamId !== screenShareActiveStreamId" type="button" class="secondary-button" @click="joinScreenShare(stream.streamId)">{{ t('watchScreenShare') }}</button><span v-else-if="stream.source === 'teamspeak'" class="screen-share-unavailable-label">{{ t('screenShareNativeUnavailable') }}</span><span v-else-if="stream.streamId === screenShareViewingStreamId" class="screen-share-watching-label">{{ t('watching') }}</span></article></div><div v-else-if="!screenShareActive" class="screen-share-empty"><Icon name="monitor" :size="18" /> {{ t('noScreenShares') }}</div>
             </section>
 
             <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]">
@@ -415,6 +415,7 @@ const {
   screenShareViewingStreamId,
   screenShareRemoteStream,
   screenShareError,
+  screenShareErrorCode,
   screenShareRemoteVolume,
   startAccompaniment,
   stopAccompaniment,
@@ -614,6 +615,7 @@ const translations: Record<string, Record<string, string>> = {
     sharedAudio: "含共享音频",
     noScreenShares: "当前没有正在进行的屏幕共享",
     directP2POnly: "直连 P2P · 不使用 STUN/TURN",
+    screenShareNativeUnavailable: "原生 TeamSpeak 屏幕共享暂不支持网页观看",
     watching: "观看中",
     serverPassword: "服务器密码",
     optionalPassword: "没有密码可留空",
@@ -919,6 +921,7 @@ const translations: Record<string, Record<string, string>> = {
     sharedAudio: "with shared audio",
     noScreenShares: "No active screen shares",
     directP2POnly: "Direct P2P · no STUN/TURN",
+    screenShareNativeUnavailable: "Native TeamSpeak screen sharing is not available to web viewers yet",
     watching: "Watching",
     serverPassword: "Server password",
     optionalPassword: "Leave blank if not required",
@@ -1213,6 +1216,7 @@ translations.de = {
   accompanimentNoAudio: "Die ausgewählte Quelle enthält kein teilbares Audio. Wähle sie erneut und aktiviere die Audiofreigabe.",
   accompanimentPermissionDenied: "Begleitungs-Audio konnte nicht abgerufen werden. Erlaube die Bildschirmfreigabe und aktiviere die Audiofreigabe.",
   accompanimentUnsupported: "Dieser Browser unterstützt das Teilen von Begleitung nicht.",
+  screenShareNativeUnavailable: "Native TeamSpeak-Bildschirmfreigabe ist für Web-Zuschauer noch nicht verfügbar",
   serverPassword: "Serverpasswort",
   optionalPassword: "Leer lassen, wenn kein Passwort erforderlich ist",
   serverPasswordTitle: "Serverpasswort erforderlich",
@@ -1447,6 +1451,7 @@ translations.ru = {
   inputVolume: "Громкость микрофона",
   desktopAudioControls: "Управление звуком",
   desktopAudioHint: "Наведите на значок, чтобы изменить громкость",
+  screenShareNativeUnavailable: "Демонстрация экрана TeamSpeak пока недоступна для веб-просмотра",
   noiseSuppression: "Шумоподавление",
   noiseSuppressionHint: "Обработка звука при захвате в браузере",
   highQuality: "Качественный звук",
@@ -1531,6 +1536,7 @@ translations.ja = {
   inputVolume: "マイク音量",
   desktopAudioControls: "音声コントロール",
   desktopAudioHint: "アイコンにカーソルを合わせて音量を調整",
+  screenShareNativeUnavailable: "TeamSpeak のネイティブ画面共有は現在ウェブで視聴できません",
   noiseSuppression: "ノイズ抑制",
   noiseSuppressionHint: "ブラウザ側で音声を処理",
   highQuality: "高品質な音声",
@@ -1965,6 +1971,10 @@ const currentChannelDescription = computed(() => currentChannel.value?.descripti
 const screenShareFeaturedStream = computed(() => {
   const streamId = screenShareViewingStreamId.value || screenShareActiveStreamId.value;
   return screenShareStreams.find((stream) => stream.streamId === streamId) ?? null;
+});
+const screenShareErrorText = computed(() => {
+  if (screenShareErrorCode.value === "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED") return t("screenShareNativeUnavailable");
+  return screenShareError.value;
 });
 const currentMembers = computed<ChannelMember[]>(() => {
   const source = currentChannel.value ? currentChannel.value.members : members;
@@ -3734,6 +3744,7 @@ function stopWhisperTalk(): void {
 .screen-share-stream-copy small { font-size: inherit; }
 .screen-share-stream-item .secondary-button { min-height: 30px; padding-inline: 11px; font-size: 10px; }
 .screen-share-watching-label { flex: 0 0 auto; color: var(--accent); font-size: 10px; font-weight: 700; }
+.screen-share-unavailable-label { flex: 0 0 auto; max-width: 220px; color: var(--text-muted); font-size: 10px; line-height: 1.35; text-align: right; }
 .screen-share-empty { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 13px; color: var(--text-muted); border: 1px dashed var(--border); border-radius: 10px; font-size: 11px; }
 .screen-share-viewer-card { margin-top: 14px; overflow: hidden; border: 1px solid var(--border); border-radius: 13px; background: #0e1516; }
 .screen-share-video-wrap { position: relative; display: grid; min-height: 220px; place-items: center; background: #0a1011; }

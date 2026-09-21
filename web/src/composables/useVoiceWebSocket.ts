@@ -312,6 +312,7 @@ export function useVoiceWebSocket() {
   const screenShareViewingStreamId = ref("");
   const screenShareRemoteStream = ref<MediaStream | null>(null);
   const screenShareError = ref("");
+  const screenShareErrorCode = ref("");
   const screenShareRemoteVolume = ref(1);
   let screenShareLocalStream: MediaStream | null = null;
   const screenSharePeers = new Map<string, RTCPeerConnection>();
@@ -1674,11 +1675,13 @@ export function useVoiceWebSocket() {
   }
 
   function setScreenShareP2PError(message = "直连 P2P 失败，当前网络无法建立浏览器之间的直接连接") {
+    screenShareErrorCode.value = "";
     screenShareError.value = message;
   }
 
   function failScreenSharePeer(peerId: string, message?: string): void {
     const viewingStream = screenShareStreams.find((stream) => stream.streamId === screenShareViewingStreamId.value && stream.ownerPeerId === peerId);
+    if (viewingStream) sendScreenShareMessage({ type: "screenShareLeave", streamId: viewingStream.streamId });
     closeScreenSharePeer(peerId);
     if (viewingStream) {
       screenShareViewing.value = false;
@@ -1753,15 +1756,17 @@ export function useVoiceWebSocket() {
     screenShareRemoteStream.value = null;
     screenShareViewing.value = true;
     screenShareViewingStreamId.value = stream.streamId;
+    screenShareErrorCode.value = "";
     screenShareError.value = "";
-    const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
     if (stream.source === "teamspeak") {
-      // The gateway still has to wait for the native client to return its
-      // first SDP offer. Keep the same bounded lifecycle as browser P2P so a
-      // native-protocol failure cannot leave the UI stuck in "watching".
-      armScreenSharePeerTimer(stream.ownerPeerId);
+      screenShareViewing.value = false;
+      screenShareViewingStreamId.value = "";
+      screenShareRemoteStream.value = null;
+      screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
+      screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
       return;
     }
+    const peer = createScreenSharePeer(stream.streamId, stream.ownerPeerId, "viewer");
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -1817,22 +1822,6 @@ export function useVoiceWebSocket() {
       return;
     }
 
-    if (stream.source === "teamspeak" && screenShareViewingStreamId.value === streamId && signal.kind === "offer") {
-      const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "viewer");
-      if (!signal.sdp) return;
-      armScreenSharePeerTimer(fromPeerId);
-      try {
-        await peer.setRemoteDescription({ type: "offer", sdp: signal.sdp });
-        await flushScreenShareCandidates(fromPeerId, peer);
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-        sendScreenShareMessage({ type: "screenShareSignal", streamId, targetPeerId: fromPeerId, signal: { kind: "answer", sdp: answer.sdp ?? "" } });
-      } catch {
-        failScreenSharePeer(fromPeerId, "无法回复 TeamSpeak 屏幕共享的直连请求");
-      }
-      return;
-    }
-
     if (screenShareActiveStreamId.value === streamId && stream.ownerPeerId === screenShareLocalPeerId()) {
       const peer = screenSharePeers.get(fromPeerId) ?? createScreenSharePeer(streamId, fromPeerId, "owner");
       if (signal.kind !== "offer" || !signal.sdp) return;
@@ -1863,6 +1852,7 @@ export function useVoiceWebSocket() {
       screenShareError.value = "当前浏览器不支持屏幕共享";
       return;
     }
+    screenShareErrorCode.value = "";
     screenShareError.value = "";
     const startGeneration = ++screenShareStartGeneration;
     screenShareStarting.value = true;
@@ -1906,6 +1896,13 @@ export function useVoiceWebSocket() {
   }
 
   function joinScreenShare(streamId: string): void {
+    const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
+    if (stream?.source === "teamspeak") {
+      screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
+      screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
+      return;
+    }
+    screenShareErrorCode.value = "";
     screenShareError.value = "";
     if (screenShareViewingStreamId.value && screenShareViewingStreamId.value !== streamId) leaveScreenShare();
     screenShareRequestSequence = (screenShareRequestSequence + 1) % 1_000_000;
@@ -2071,6 +2068,11 @@ export function useVoiceWebSocket() {
       case "screenShareJoined": {
         const stream = upsertScreenShareStream(msg.stream);
         if (!stream) break;
+        if (stream.source === "teamspeak") {
+          screenShareErrorCode.value = "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED";
+          screenShareError.value = "TeamSpeak 原生屏幕共享暂不支持网页直连观看";
+          break;
+        }
         void startScreenShareViewer(stream);
         break;
       }
@@ -2086,6 +2088,7 @@ export function useVoiceWebSocket() {
         if (screenShareViewingStreamId.value === String(msg.streamId || "")) leaveScreenShare();
         break;
       case "screenShareError":
+        screenShareErrorCode.value = typeof msg.code === "string" ? msg.code : "";
         screenShareError.value = String(msg.message || "屏幕共享操作失败");
         if (screenShareStarting.value) {
           screenShareStarting.value = false;
@@ -2095,6 +2098,7 @@ export function useVoiceWebSocket() {
           screenShareLocalStream = null;
         }
         if (screenShareViewing.value) {
+          if (screenShareViewingStreamId.value) sendScreenShareMessage({ type: "screenShareLeave", streamId: screenShareViewingStreamId.value });
           closeAllScreenSharePeers();
           screenShareViewing.value = false;
           screenShareViewingStreamId.value = "";
@@ -2580,6 +2584,7 @@ export function useVoiceWebSocket() {
     screenShareViewingStreamId,
     screenShareRemoteStream,
     screenShareError,
+    screenShareErrorCode,
     screenShareRemoteVolume,
     setVolume,
     setInputVolume,

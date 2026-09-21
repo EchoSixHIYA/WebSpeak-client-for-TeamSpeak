@@ -658,6 +658,7 @@ export class VoiceBridge {
       });
 
       tsClient.on("clientLeave", (info) => {
+        this.reconcileNativeScreenShareAfterClientLeave(entry!, info.id);
         const wasKnown = entry!.members.has(info.id);
         const leavingMember = entry!.members.get(info.id);
         entry!.webrtc?.setMemberVolume(info.id, 1);
@@ -672,6 +673,7 @@ export class VoiceBridge {
 
       tsClient.on("clientMoved", (info) => {
         if (info.targetChannelID === undefined || info.targetChannelID === 0n) return;
+        this.reconcileScreenShareAfterClientMove(entry!, info.id, info.targetChannelID);
         const movedMember = entry!.members.get(info.id);
         if (info.id === selfId) selfChannelId = info.targetChannelID;
         directory.applyClientMoved(info.id, info.targetChannelID);
@@ -1119,6 +1121,20 @@ export class VoiceBridge {
         sendJson({ type: "screenShareError", requestId: message.requestId, code: "SCREEN_SHARE_OWNER_CANNOT_JOIN", message: "共享者不能作为观看者加入自己的共享" });
         return;
       }
+      // Native TS6 screen-share media is not browser-compatible. The native
+      // client uses its own encrypted media framing and does not expose a
+      // standard browser-consumable DTLS-SRTP track. Do not add the viewer to
+      // the stream or send a fake `screenShareJoined` response: that used to
+      // leave the browser stuck in a pending viewer state.
+      if (stream.source === "teamspeak") {
+        sendJson({
+          type: "screenShareError",
+          requestId: message.requestId,
+          code: "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED",
+          message: "TeamSpeak 原生屏幕共享暂不支持网页直连观看",
+        });
+        return;
+      }
       const alreadyJoined = stream.viewerEntryIds.has(entry.id);
       if (!alreadyJoined) stream.viewerEntryIds.add(entry.id);
       stream.viewerCount = stream.viewerEntryIds.size;
@@ -1136,8 +1152,6 @@ export class VoiceBridge {
           viewerPeerId: entry.screenPeerId,
           viewerNickname: entry.nickname,
         });
-      } else if (stream.source === "teamspeak" && !alreadyJoined) {
-        void this.joinNativeScreenStream(entry, stream, sendJson, message.requestId);
       }
       if (!alreadyJoined) {
         this.broadcastScreenMessage(stream, this.screenShareViewerCountMessage(stream));
@@ -1230,6 +1244,16 @@ export class VoiceBridge {
   private broadcastScreenMessage(stream: ScreenStreamRecord, message: Record<string, unknown>, excludeEntryId?: string): void {
     for (const candidate of this.entries.values()) {
       if (candidate.id === excludeEntryId || candidate.target && teamSpeakTargetKey(candidate.target) !== stream.targetKey) continue;
+      // A stream is scoped to the source channel. Do not leak its card or
+      // viewer roster to users who are connected to another channel on the
+      // same TeamSpeak target.
+      if (candidate.id !== stream.ownerEntryId) {
+        try {
+          if (candidate.tsClient.getChannelId() !== stream.channelId) continue;
+        } catch {
+          continue;
+        }
+      }
       this.sendToEntry(candidate.id, message);
     }
   }
@@ -1269,28 +1293,10 @@ export class VoiceBridge {
     sendJson: (message: Record<string, unknown>) => void,
   ): void {
     if (stream.source === "teamspeak") {
-      if (!stream.viewerEntryIds.has(entry.id) || targetPeerId !== stream.ownerPeerId) {
-        sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FORBIDDEN", message: "无权发送该屏幕共享信令" });
-        return;
-      }
-      const targetClientId = stream.sourceClientId;
-      if (!targetClientId) {
-        sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SOURCE_UNAVAILABLE", message: "共享来源暂不可用" });
-        return;
-      }
-      if (signal.kind === "close") {
-        void entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("removeclientfromstream", { id: stream.streamId, clid: String(entry.tsClient.getClientId()) })).catch(() => undefined);
-        return;
-      }
-      const payload = signal.kind === "iceCandidate"
-        ? { cmd: "iceCandidate", args: { sdp: signal.candidate, ...(signal.sdpMid !== undefined ? { mid: signal.sdpMid } : {}), ...(signal.sdpMLineIndex !== undefined ? { mLine: signal.sdpMLineIndex } : {}) } }
-        : { cmd: signal.kind, args: signal.kind === "offer" ? { offer: signal.sdp } : { answer: signal.sdp } };
-      void entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("streamsignaling", {
-        id: stream.streamId,
-        clid: String(targetClientId),
-        json: JSON.stringify(payload),
-      })).catch((error: unknown) => {
-        sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FAILED", message: error instanceof Error ? error.message : "屏幕共享信令发送失败" });
+      sendJson({
+        type: "screenShareError",
+        code: "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED",
+        message: "TeamSpeak 原生屏幕共享暂不支持网页直连观看",
       });
       return;
     }
@@ -1328,27 +1334,36 @@ export class VoiceBridge {
     }
   }
 
-  private async joinNativeScreenStream(
-    entry: WebClientEntry,
-    stream: ScreenStreamRecord,
-    sendJson: (message: Record<string, unknown>) => void,
-    requestId?: string,
-  ): Promise<void> {
-    try {
-      // TeamSpeak's native viewer request command is `joinstreamrequest`.
-      // `joinstream` is not a valid TS6 client-protocol command; accepting the
-      // browser request before sending it made the UI wait forever while the
-      // native source never received a request to create its peer connection.
-      await entry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("joinstreamrequest", {
-        id: stream.streamId,
-        clid: String(entry.tsClient.getClientId()),
-        msg: "",
-      }));
-      sendJson({ type: "screenShareNativeJoinPending", requestId, streamId: stream.streamId, directP2P: true });
-    } catch (error: unknown) {
-      stream.viewerEntryIds.delete(entry.id);
-      stream.viewerCount = stream.viewerEntryIds.size;
-      sendJson({ type: "screenShareError", requestId, code: "SCREEN_SHARE_JOIN_FAILED", message: error instanceof Error ? error.message : "无法加入屏幕共享" });
+  private reconcileScreenShareAfterClientMove(entry: WebClientEntry, movedClientId: number, targetChannelId: bigint): void {
+    const targetKey = teamSpeakTargetKey(entry.target);
+    for (const stream of [...this.screenStreams.values()]) {
+      if (stream.targetKey !== targetKey) continue;
+      // A browser share belongs to the gateway user's current channel. Stop
+      // it when that user moves so existing viewers cannot keep a cross-
+      // channel peer alive.
+      if (stream.source === "browser" && stream.ownerEntryId === entry.id && stream.channelId !== targetChannelId) {
+        this.stopScreenStream(stream, "owner-moved-channel");
+        continue;
+      }
+      // Native TS6 shares are channel-scoped as well. The notification is
+      // observed by every gateway session, so stop the shared record once the
+      // native source changes channels.
+      if (stream.source === "teamspeak" && stream.sourceClientId === movedClientId) {
+        this.stopScreenStream(stream, "source-moved-channel");
+        continue;
+      }
+      if (stream.viewerEntryIds.has(entry.id) && stream.channelId !== targetChannelId) {
+        this.leaveScreenStream(entry, stream);
+      }
+    }
+  }
+
+  private reconcileNativeScreenShareAfterClientLeave(entry: WebClientEntry, clientId: number): void {
+    const targetKey = teamSpeakTargetKey(entry.target);
+    for (const stream of [...this.screenStreams.values()]) {
+      if (stream.targetKey === targetKey && stream.source === "teamspeak" && stream.sourceClientId === clientId) {
+        this.stopScreenStream(stream, "source-left");
+      }
     }
   }
 
