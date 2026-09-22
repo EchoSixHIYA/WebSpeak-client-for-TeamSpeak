@@ -12,6 +12,7 @@ import {
   type VoiceData,
   type DirectoryClientInfo,
   type DirectorySnapshot,
+  type RawNotification,
   type TextMessage,
 } from "@echosixhiya/teamspeak-client";
 import type { Logger } from "../logger.js";
@@ -49,6 +50,7 @@ const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
 
 export type TSDirectorySnapshot = DirectorySnapshot;
 export type TSDirectoryClient = DirectoryClientInfo;
+export type TSRawNotification = RawNotification;
 
 export type TSChatScope = "channel" | "server" | "private";
 
@@ -243,6 +245,13 @@ export class TSClient extends EventEmitter {
       });
     });
 
+    client.on("rawNotification", (notification: RawNotification) => {
+      this.emit("rawNotification", {
+        name: notification.name,
+        params: { ...notification.params },
+      } satisfies TSRawNotification);
+    });
+
     client.on("textMessage", (msg) => {
       this.emit("textMessage", toTSChatMessage(msg));
     });
@@ -345,21 +354,6 @@ export class TSClient extends EventEmitter {
     await tsClientMove(this.client, clientId, channelId, password);
   }
 
-  /**
-   * Probe whether this identity may move a visible client into a channel.
-   *
-   * The browser client protocol does not expose ServerQuery's `permget`, so
-   * the only authoritative capability check available through this session is
-   * the same `clientmove` operation the UI will use. The bridge calls this
-   * with the client's current channel, making the probe a no-op when accepted;
-   * TeamSpeak still evaluates both move-power permissions.
-   */
-  async probeMovePermission(clientId: number, channelId: bigint): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
-    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
-    await tsClientMove(this.client, clientId, channelId);
-  }
-
   getClientId(): number {
     // The SDK learns the real client id during the welcome sequence, before
     // TSClient.connect() resumes. Reading it from the SDK prevents the first
@@ -374,6 +368,16 @@ export class TSClient extends EventEmitter {
   async execCommandWithResponse(command: string, timeoutMs = 3000): Promise<Record<string, string>[]> {
     if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
     return this.client.execCommandWithResponse(command, timeoutMs);
+  }
+
+  /**
+   * Send a TeamSpeak protocol command whose response is delivered later as a
+   * notification (for example setupstream/streamsignaling). The command is
+   * assembled by the trusted server-side stream adapter, never by the browser.
+   */
+  async sendProtocolCommand(command: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    await this.client.sendCommandNoWait(command);
   }
 
   getIdentityString(): string {

@@ -23,10 +23,15 @@
             <div class="promise-item"><span class="promise-icon mint"><Icon name="shield" :size="16" /></span><span><b>{{ t('secureJoin') }}</b><small>{{ t('inviteProtected') }}</small></span></div>
             <div class="promise-item"><span class="promise-icon sand"><Icon name="users" :size="16" /></span><span><b>{{ t('realtime') }}</b><small>{{ t('membersSync') }}</small></span></div>
           </div>
+          <div v-if="visitorNumber !== null" class="visitor-count" role="status" aria-live="polite">
+            <span class="visitor-count-orbit" aria-hidden="true"></span>
+            <span class="visitor-count-icon"><Icon name="users" :size="15" /></span>
+            <span class="visitor-count-label">{{ t('visitorCount', { count: visitorNumber }) }}</span>
+            <span class="visitor-count-spark" aria-hidden="true">✦</span>
+          </div>
         </div>
 
         <div class="join-card">
-          <div class="card-kicker">{{ t('joinServer') }}</div>
           <h2>{{ t('welcomeBack') }}</h2>
           <p class="card-lead">{{ t('joinLead') }}</p>
 
@@ -40,7 +45,6 @@
               <label class="field-label" for="server-address"><span>{{ t('serverAddress') }}</span><div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverHost" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div></label>
               <label class="field-label" for="server-port"><span>{{ t('serverPort') }}</span><div class="field-wrap"><Icon name="hash" :size="17" /><input id="server-port" v-model="serverPort" inputmode="numeric" type="text" maxlength="5" :placeholder="t('serverPortPlaceholder')" /></div></label>
             </div>
-            <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
             <div v-if="accelerationAvailable" class="acceleration-choice"><div class="acceleration-copy"><strong>{{ t('relayAcceleration') }}</strong><small>{{ t('relayAccelerationHint') }}</small></div><select v-model="accelerationRelayId" :aria-label="t('relayAcceleration')"><option value="">{{ t('directConnection') }}</option><option v-for="relay in accelerationRelays" :key="relay.id" :value="relay.id">{{ relay.name }}</option></select></div>
             <div v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)" class="local-servers">
               <div v-if="favoriteServers.length" class="local-server-group"><span>{{ t('favoriteServers') }}</span><button v-for="favorite in favoriteServers" :key="favorite.id" type="button" @click="selectLocalServer(favorite.address, favorite.nickname)">{{ favorite.label }}</button></div>
@@ -107,6 +111,15 @@
                 <div class="performance-route"><span>{{ t('browser') }}</span><i></i><span>{{ t('webSpeakGateway') }}</span><i></i><span>{{ t('teamSpeakServer') }}</span></div>
                 <div class="performance-metrics"><article><small>{{ t('browserToGateway') }}</small><strong>{{ performanceStats.gatewayLatencyMs == null ? '—' : `${performanceStats.gatewayLatencyMs} ms` }}</strong><span>{{ t('packetLoss') }} {{ performanceStats.gatewayLossPercent == null ? '—' : `${performanceStats.gatewayLossPercent}%` }}</span></article><article><small>{{ t('gatewayToTeamSpeak') }}</small><strong>{{ performanceStats.teamSpeakLatencyMs == null ? '—' : `${performanceStats.teamSpeakLatencyMs} ms` }}</strong><span>{{ t('packetLoss') }} {{ performanceStats.teamSpeakLossPercent == null ? '—' : `${performanceStats.teamSpeakLossPercent}%` }}</span></article></div>
                 <p class="performance-status">{{ performanceRunning ? t('measuring') : performanceStats.ready ? t('measureComplete') : t('measureUnavailable') }}</p>
+                <section v-if="screenShareWebRtcStats.peers.length" class="webrtc-stats" aria-live="polite">
+                  <header><div><strong>{{ t('webrtcStats') }}</strong><small>{{ t('webrtcStatsHint') }}</small></div></header>
+                  <div v-if="screenShareWebRtcStats.capture" class="webrtc-stats-capture"><span>{{ t('screenShareCapture') }}</span><strong>{{ screenShareWebRtcStats.capture.width ?? '—' }} × {{ screenShareWebRtcStats.capture.height ?? '—' }}</strong><small>{{ screenShareWebRtcStats.capture.frameRate == null ? '—' : `${screenShareWebRtcStats.capture.frameRate.toFixed(1)} FPS` }}</small></div>
+                  <div v-for="peer in screenShareWebRtcStats.peers" :key="peer.peerId" class="webrtc-stats-peer">
+                    <div class="webrtc-stats-peer-heading"><strong>{{ peer.direction === 'outbound' ? t('screenShareSending') : t('screenShareReceiving') }}</strong><small>{{ peer.connectionState }} · {{ peer.candidateType ?? '—' }}</small></div>
+                    <div class="webrtc-stats-values"><span>{{ peer.frameRate == null ? '—' : `${peer.frameRate.toFixed(1)} FPS` }}</span><span>{{ peer.bitrateKbps == null ? '—' : `${Math.round(peer.bitrateKbps)} kbps` }}</span><span>{{ peer.lossPercent == null ? '—' : `${peer.lossPercent.toFixed(2)}%` }} {{ t('packetLoss') }}</span><span>{{ peer.framesDropped == null ? '—' : peer.framesDropped }} {{ t('screenShareDroppedFrames') }}</span><span>{{ peer.jitterMs == null ? '—' : `${Math.round(peer.jitterMs)} ms` }} {{ t('screenShareJitter') }}</span><span>{{ peer.roundTripTimeMs == null ? '—' : `${Math.round(peer.roundTripTimeMs)} ms` }} {{ t('screenShareRtt') }}</span></div>
+                    <small v-if="peer.codec || peer.qualityLimitationReason" class="webrtc-stats-detail">{{ peer.codec ?? '—' }}<template v-if="peer.qualityLimitationReason"> · {{ peer.qualityLimitationReason }}</template></small>
+                  </div>
+                </section>
               </section>
             </div>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
@@ -118,6 +131,19 @@
           </div>
         </header>
 
+        <div v-if="screenShareSettingsOpen" class="modal-backdrop screen-share-settings-backdrop" @click.self="screenShareSettingsOpen = false">
+          <section class="screen-share-settings-modal" role="dialog" aria-modal="true" aria-labelledby="screen-share-settings-title" @click.stop>
+            <button type="button" class="screen-share-settings-close" :aria-label="t('close')" :title="t('close')" @click="screenShareSettingsOpen = false"><Icon name="close" :size="17" /></button>
+            <div class="screen-share-settings-heading"><span class="card-kicker">{{ t('screenShare') }}</span><h2 id="screen-share-settings-title">{{ t('screenShareSettings') }}</h2><p>{{ t('screenShareSettingsHint') }}</p></div>
+            <div class="screen-share-settings-fields">
+              <label><span>{{ t('screenShareResolution') }}</span><select v-model="screenShareResolutionPreset" :aria-label="t('screenShareResolution')"><option v-for="option in screenShareResolutionOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select></label>
+              <label><span>{{ t('screenShareFrameRate') }}</span><select v-model.number="screenShareFrameRate" :aria-label="t('screenShareFrameRate')"><option v-for="fps in screenShareFrameRateOptions" :key="fps" :value="fps">{{ fps }} FPS</option></select></label>
+            </div>
+            <p class="screen-share-settings-note">{{ t('screenShareSettingsNote') }}</p>
+            <footer class="screen-share-settings-footer"><button type="button" class="text-button" @click="screenShareSettingsOpen = false">{{ t('cancel') }}</button><button type="button" class="primary-button screen-share-settings-start" @click="startScreenShareWithSettings"><Icon name="monitor" :size="14" /> {{ t('startScreenShare') }}</button></footer>
+          </section>
+        </div>
+
         <div v-if="voiceState.reconnecting || voiceState.reconnectFailed" :class="['reconnect-banner', { failed: voiceState.reconnectFailed }]" role="status">
           <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
           <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectNow">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="doDisconnect">{{ t('back') }}</button></div>
@@ -127,24 +153,44 @@
 
         <div class="workspace-scroll">
           <div class="workspace-content">
-            <section :class="['room-hero', { 'mobile-section-hidden': mobileSection !== 'channels' && mobileSection !== 'voice' }]">
-              <div class="hero-decoration one"></div><div class="hero-decoration two"></div>
-              <div class="room-hero-content">
-                <div class="room-eyebrow"><span class="live-pill"><i></i> {{ t('live') }}</span><span>{{ t('voiceSpace') }}</span></div>
-                <h1><Icon name="volume" :size="24" /> {{ currentChannelName }}</h1>
-                <p>{{ currentChannelDescription || t('roomDescription') }}</p>
-                <div class="room-stats"><span><Icon name="users" :size="15" /> {{ t('membersOnline', { count: currentMembers.length }) }}</span><span class="stat-divider"></span><span><Icon name="shield" :size="14" /> {{ t('encrypted') }}</span></div>
-              </div>
-              <div class="hero-visual" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="hero-wave"><i v-for="bar in heroBars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
-            </section>
-
             <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]">
               <div class="section-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2>{{ t('speakingNow') }}</h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
+              <div v-if="screenShareError" class="screen-share-inline-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
+              <section v-if="screenShareViewing" ref="screenSharePlayerEl" class="screen-share-player" role="region" :aria-label="t('screenShare')">
+                <div class="screen-share-player-stage">
+                  <video v-if="screenShareRemoteStream" :ref="setScreenVideoElement" class="screen-share-player-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video>
+                  <div v-else class="screen-share-player-placeholder"><span class="screen-share-player-placeholder-icon"><Icon name="monitor" :size="28" /></span><strong>{{ t('screenShareConnecting') }}</strong><span>{{ screenShareError ? screenShareErrorText : t('directP2POnly') }}</span></div>
+                  <button type="button" class="screen-share-player-exit" :aria-label="t('screenShareExit')" :title="t('screenShareExit')" @click="leaveScreenShare"><Icon name="close" :size="22" /></button>
+                  <div class="screen-share-player-viewers" :aria-label="t('screenShareViewers')">
+                    <span class="screen-share-player-viewer-label"><Icon name="users" :size="14" /> {{ screenSharePlayerViewerCount }}</span>
+                    <span class="screen-share-player-viewer-avatars"><span v-for="viewer in screenSharePlayerViewers" :key="viewer.peerId" class="screen-share-player-viewer-avatar" :style="screenShareViewerStyle(viewer)" :title="viewer.nickname">{{ viewer.avatar ? '' : avatarInitial(viewer.nickname) }}</span></span>
+                  </div>
+                  <span class="screen-share-player-live"><i></i>{{ t('watchingScreenShare') }}</span>
+                  <span class="screen-share-player-source">{{ screenSharePlayerOwnerName }}</span>
+                  <div class="screen-share-player-controls">
+                    <label :title="t('screenShareVolume')"><Icon :name="screenShareRemoteVolume === 0 ? 'volume-off' : 'volume'" :size="18" /><input type="range" min="0" max="100" :value="screenShareRemoteVolume * 100" :aria-label="t('screenShareVolume')" @input="onScreenShareVolume" /></label>
+                    <button type="button" :aria-label="screenShareFullscreen ? t('screenShareExitFullscreen') : t('screenShareFullscreen')" :title="screenShareFullscreen ? t('screenShareExitFullscreen') : t('screenShareFullscreen')" @click="toggleScreenShareFullscreen"><Icon :name="screenShareFullscreen ? 'fullscreen-exit' : 'fullscreen'" :size="19" /></button>
+                  </div>
+                </div>
+              </section>
               <div v-if="currentMembers.length" class="voice-grid">
                 <article v-for="member in roomMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]">
                   <button v-if="isMobileViewport && !member.isSelf" type="button" class="voice-member-action" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="17" /></button>
-                  <div class="voice-avatar-wrap"><div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}</div></div>
+                  <div :class="['voice-avatar-wrap', { 'screen-share-avatar-wrap': screenShareStreamForMember(member) }]">
+                    <div :class="['voice-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}</div>
+                    <span v-if="screenShareStreamForMember(member)" class="screen-share-live-indicator"><span class="screen-share-wave" aria-hidden="true"><i v-for="bar in screenShareIndicatorBars" :key="bar" :style="{ height: `${bar}px` }"></i></span><span>{{ t('sharingScreen') }}</span></span>
+                    <button v-if="member.isSelf && (screenShareActive || screenShareStarting)" type="button" class="screen-share-stop-button" :aria-label="t('stopScreenShare')" :title="t('stopScreenShare')" @click.stop="stopScreenShare"><Icon name="close" :size="14" /></button>
+                  </div>
                   <strong>{{ member.isSelf ? t('you') : member.nickname }}</strong><span>{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
+                  <div v-if="member.isSelf || screenShareStreamForMember(member)" class="screen-share-card-actions">
+                    <template v-if="member.isSelf && !screenShareActive && !screenShareStarting">
+                      <div class="screen-share-start-actions">
+                        <button type="button" class="screen-share-card-button" @click.stop="startScreenShareWithSettings"><Icon name="monitor" :size="13" /> {{ t('startScreenShare') }}</button>
+                        <button type="button" class="screen-share-settings-button" :aria-label="t('screenShareSettings')" :aria-expanded="screenShareSettingsOpen" :title="t('screenShareSettings')" @click.stop="screenShareSettingsOpen = !screenShareSettingsOpen"><Icon name="settings" :size="13" /></button>
+                      </div>
+                    </template>
+                    <button v-else-if="!member.isSelf" type="button" :class="['screen-share-card-button', { viewing: screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId }]" @click.stop="toggleScreenShareForMember(member)"><Icon name="monitor" :size="13" /> {{ screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId ? t('watching') : t('watchScreenShare') }}</button>
+                  </div>
                 </article>
                 <article v-if="currentMembers.length > roomMembers.length" class="voice-card more-card"><div class="more-count">+{{ currentMembers.length - roomMembers.length }}</div><strong>{{ t('moreMembers') }}</strong><span>{{ t('viewLeft') }}</span></article>
               </div>
@@ -202,7 +248,7 @@
               <small>{{ channelItem.members.length }}</small>
             </button>
             <div v-if="channelItem.members.length" class="member-list">
-              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf && voiceState.canMoveClients" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
@@ -265,7 +311,7 @@
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
-      <div v-if="voiceState.canMoveClients" class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
+      <div class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
         <button type="button" class="member-menu-submenu-trigger" :aria-expanded="memberMoveMenuOpen" @click="toggleMemberMoveMenu"><Icon name="chevron-right" :size="15" /> <span>{{ t('moveMemberMenu') }}</span><Icon name="chevron-right" :size="13" class="member-menu-submenu-arrow" /></button>
         <div v-if="memberMoveMenuOpen" class="member-submenu-panel" @click.stop>
           <button v-if="memberMoveMenuCurrentChannel" type="button" :disabled="memberMoveMenuCurrentSameChannel" @click="moveMemberDirect(memberMenu.member, memberMoveMenuCurrentChannel.id)"><Icon name="users" :size="15" /><span>{{ t('moveMemberMyChannel') }}</span><small>{{ memberMoveMenuCurrentChannel.name }}</small></button>
@@ -273,7 +319,6 @@
           <span v-if="!memberMoveMenuCurrentChannel && !memberMoveMenuOtherChannels.length" class="member-submenu-empty">{{ t('moveMemberNoChannels') }}</span>
         </div>
       </div>
-      <button v-else type="button" class="member-menu-disabled" disabled><Icon name="chevron-right" :size="15" /> {{ t('moveMemberMenu') }}</button>
     </div>
 
     <!-- Protected channel password modal -->
@@ -327,7 +372,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
-import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult } from "../composables/useVoiceWebSocket.js";
+import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult, type ScreenShareCaptureSettings, type ScreenShareStream } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -395,8 +440,22 @@ const {
   setMicrophoneMuted,
   accompanimentActive,
   accompanimentErrorCode,
+  screenShareStreams,
+  screenShareActive,
+  screenShareStarting,
+  screenShareViewing,
+  screenShareViewingStreamId,
+  screenShareRemoteStream,
+  screenShareError,
+  screenShareErrorCode,
+  screenShareRemoteVolume,
+  screenShareWebRtcStats,
   startAccompaniment,
   stopAccompaniment,
+  startScreenShare,
+  stopScreenShare,
+  joinScreenShare,
+  leaveScreenShare,
   checkSupport,
   clearError,
   measureLatency,
@@ -422,7 +481,8 @@ const welcomeTextEn = ref("");
 const welcomeTextDe = ref("");
 const welcomeTextRu = ref("");
 const welcomeTextJa = ref("");
-const appVersion = ref("0.2.2");
+const appVersion = ref("0.2.4");
+const visitorNumber = ref<number | null>(null);
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
 const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
@@ -439,6 +499,24 @@ const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWU
 const audioSettingsError = ref("");
 const toast = ref("");
 const chatListEl = ref<HTMLElement | null>(null);
+const screenVideoEl = ref<HTMLVideoElement | null>(null);
+const screenSharePlayerEl = ref<HTMLElement | null>(null);
+const screenShareFullscreen = ref(false);
+type ScreenShareResolutionPreset = "source" | "720p" | "1080p";
+const screenShareResolutionOptions: Array<{ value: ScreenShareResolutionPreset; width?: number; height?: number; label: string }> = [
+  { value: "source", label: "screenShareResolutionSource" },
+  { value: "720p", width: 1280, height: 720, label: "screenShareResolution720p" },
+  { value: "1080p", width: 1920, height: 1080, label: "screenShareResolution1080p" },
+];
+const screenShareFrameRateOptions = [5, 10, 15, 24, 30, 60];
+const storedScreenShareResolution = localStorage.getItem("webspeak:screen-share-resolution") as ScreenShareResolutionPreset | null;
+const screenShareResolutionPreset = ref<ScreenShareResolutionPreset>(screenShareResolutionOptions.some((option) => option.value === storedScreenShareResolution) ? storedScreenShareResolution! : "1080p");
+const storedScreenShareFrameRate = Number(localStorage.getItem("webspeak:screen-share-framerate"));
+const screenShareFrameRate = ref(screenShareFrameRateOptions.includes(storedScreenShareFrameRate) ? storedScreenShareFrameRate : 15);
+const screenShareSettingsOpen = ref(false);
+function setScreenVideoElement(element: unknown): void {
+  screenVideoEl.value = element instanceof HTMLVideoElement ? element : null;
+}
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
 const chatTab = ref<"channel" | "server" | "private" | "events">("channel");
@@ -511,6 +589,7 @@ const translations: Record<string, Record<string, string>> = {
     joinServer: "加入你的服务器",
     welcomeBack: "欢迎回来",
     joinLead: "输入一个昵称，选择进入的频道。",
+    visitorCount: "你是第 {{count}} 个访客",
     serverAddress: "TeamSpeak 服务器地址",
     serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
     serverPort: "语音端口",
@@ -573,6 +652,36 @@ const translations: Record<string, Record<string, string>> = {
     accompanimentNoAudio: "所选来源没有可共享音频，请重新选择并勾选共享音频",
     accompanimentPermissionDenied: "无法获取伴奏音频，请允许屏幕共享并勾选共享音频",
     accompanimentUnsupported: "当前浏览器不支持伴奏共享",
+    screenShare: "屏幕共享",
+    screenShareTitle: "屏幕共享",
+    startScreenShare: "共享屏幕",
+    screenShareStarting: "正在启动直播",
+    stopScreenShare: "停止共享",
+    sharingScreen: "直播中",
+    watchingScreenShare: "正在观看",
+    watchScreenShare: "观看屏幕共享",
+    leaveScreenShare: "停止观看",
+    screenShareVolume: "共享音量",
+    browserSource: "浏览器来源",
+    teamSpeakSource: "TeamSpeak 客户端来源",
+    sharedAudio: "含共享音频",
+    noScreenShares: "当前没有正在进行的屏幕共享",
+    directP2POnly: "直连 P2P · STUN 仅用于发现公网地址",
+    screenShareNativeUnavailable: "原生 TeamSpeak 屏幕共享暂不支持网页观看",
+    screenShareExit: "退出观看",
+    screenShareConnecting: "正在连接屏幕共享",
+    screenShareViewers: "正在观看的观众",
+    screenShareFullscreen: "全屏",
+    screenShareExitFullscreen: "退出全屏",
+    screenShareSettings: "共享设置",
+    screenShareSettingsHint: "共享前调整输出质量",
+    screenShareResolution: "输出分辨率",
+    screenShareResolutionSource: "原始分辨率",
+    screenShareResolution720p: "720p（最高 1280 × 720）",
+    screenShareResolution1080p: "1080p（最高 1920 × 1080）",
+    screenShareFrameRate: "帧率上限",
+    screenShareSettingsNote: "设置会在下一次开始共享时生效",
+    watching: "观看中",
     serverPassword: "服务器密码",
     optionalPassword: "没有密码可留空",
     serverPasswordTitle: "服务器需要密码",
@@ -769,6 +878,14 @@ const translations: Record<string, Record<string, string>> = {
     measureComplete: "持续监测中（每 3 秒更新）",
     measureNow: "立即测量",
     measureUnavailable: "连接后可测量",
+    webrtcStats: "屏幕共享 WebRTC",
+    webrtcStatsHint: "每秒采样实际媒体状态",
+    screenShareCapture: "采集",
+    screenShareSending: "发送给观看者",
+    screenShareReceiving: "从共享者接收",
+    screenShareDroppedFrames: "丢帧",
+    screenShareJitter: "抖动",
+    screenShareRtt: "RTT",
     langSwitch: "English",
   },
   en: {
@@ -801,6 +918,7 @@ const translations: Record<string, Record<string, string>> = {
     joinServer: "JOIN YOUR SERVER",
     welcomeBack: "Welcome back",
     joinLead: "Choose a nickname and the channel to enter.",
+    visitorCount: "You are visitor No. {{count}}",
     serverAddress: "TeamSpeak server address",
     serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
     serverPort: "Voice port",
@@ -863,6 +981,36 @@ const translations: Record<string, Record<string, string>> = {
     accompanimentNoAudio: "The selected source has no shareable audio. Select it again and enable audio sharing",
     accompanimentPermissionDenied: "Could not access accompaniment audio. Allow screen sharing and enable audio sharing",
     accompanimentUnsupported: "This browser does not support accompaniment sharing",
+    screenShare: "Screen sharing",
+    screenShareTitle: "Screen sharing",
+    startScreenShare: "Share screen",
+    screenShareStarting: "Starting live stream",
+    stopScreenShare: "Stop sharing",
+    sharingScreen: "Live",
+    watchingScreenShare: "Watching",
+    watchScreenShare: "Watch screen",
+    leaveScreenShare: "Stop watching",
+    screenShareVolume: "Share volume",
+    browserSource: "Browser source",
+    teamSpeakSource: "TeamSpeak client source",
+    sharedAudio: "with shared audio",
+    noScreenShares: "No active screen shares",
+    directP2POnly: "Direct P2P · STUN for public candidate discovery",
+    screenShareNativeUnavailable: "Native TeamSpeak screen sharing is not available to web viewers yet",
+    screenShareExit: "Exit viewer",
+    screenShareConnecting: "Connecting to screen share",
+    screenShareViewers: "Current viewers",
+    screenShareFullscreen: "Fullscreen",
+    screenShareExitFullscreen: "Exit fullscreen",
+    screenShareSettings: "Share settings",
+    screenShareSettingsHint: "Adjust output quality before sharing",
+    screenShareResolution: "Output resolution",
+    screenShareResolutionSource: "Source resolution",
+    screenShareResolution720p: "720p (up to 1280 × 720)",
+    screenShareResolution1080p: "1080p (up to 1920 × 1080)",
+    screenShareFrameRate: "Frame rate limit",
+    screenShareSettingsNote: "These settings apply the next time you start sharing",
+    watching: "Watching",
     serverPassword: "Server password",
     optionalPassword: "Leave blank if not required",
     serverPasswordTitle: "Server password required",
@@ -1059,6 +1207,14 @@ const translations: Record<string, Record<string, string>> = {
     measureComplete: "Monitoring continuously (updates every 3s)",
     measureNow: "Measure now",
     measureUnavailable: "Available after connecting",
+    webrtcStats: "Screen-share WebRTC",
+    webrtcStatsHint: "Actual media state sampled every second",
+    screenShareCapture: "Capture",
+    screenShareSending: "Sending to viewer",
+    screenShareReceiving: "Receiving from sharer",
+    screenShareDroppedFrames: "dropped",
+    screenShareJitter: "jitter",
+    screenShareRtt: "RTT",
     langSwitch: "中文",
   },
 };
@@ -1094,6 +1250,7 @@ translations.de = {
   joinServer: "DEINEM SERVER BEITRETEN",
   welcomeBack: "Willkommen zurück",
   joinLead: "Wähle einen Namen und den Kanal, dem du beitreten möchtest.",
+  visitorCount: "Du bist Besucher Nr. {{count}}",
   serverAddress: "TeamSpeak-Serveradresse",
   serverAddressPlaceholder: "z. B. ts.example.com oder 127.0.0.1",
   serverPort: "Sprachport",
@@ -1156,6 +1313,27 @@ translations.de = {
   accompanimentNoAudio: "Die ausgewählte Quelle enthält kein teilbares Audio. Wähle sie erneut und aktiviere die Audiofreigabe.",
   accompanimentPermissionDenied: "Begleitungs-Audio konnte nicht abgerufen werden. Erlaube die Bildschirmfreigabe und aktiviere die Audiofreigabe.",
   accompanimentUnsupported: "Dieser Browser unterstützt das Teilen von Begleitung nicht.",
+  startScreenShare: "Bildschirm teilen",
+  screenShareStarting: "Live-Stream wird gestartet",
+  stopScreenShare: "Freigabe beenden",
+  sharingScreen: "LIVE",
+  watchScreenShare: "Bildschirm ansehen",
+  watching: "Wird angesehen",
+  screenShareVolume: "Freigabelautstärke",
+  screenShareNativeUnavailable: "Native TeamSpeak-Bildschirmfreigabe ist für Web-Zuschauer noch nicht verfügbar",
+  screenShareExit: "Ansicht verlassen",
+  screenShareConnecting: "Bildschirmfreigabe wird verbunden",
+  screenShareViewers: "Aktuelle Zuschauer",
+  screenShareFullscreen: "Vollbild",
+  screenShareExitFullscreen: "Vollbild verlassen",
+  screenShareSettings: "Freigabeeinstellungen",
+  screenShareSettingsHint: "Ausgabequalität vor dem Teilen anpassen",
+  screenShareResolution: "Ausgabeauflösung",
+  screenShareResolutionSource: "Quellauflösung",
+  screenShareResolution720p: "720p (max. 1280 × 720)",
+  screenShareResolution1080p: "1080p (max. 1920 × 1080)",
+  screenShareFrameRate: "Bildratenlimit",
+  screenShareSettingsNote: "Die Einstellungen gelten beim nächsten Start der Freigabe",
   serverPassword: "Serverpasswort",
   optionalPassword: "Leer lassen, wenn kein Passwort erforderlich ist",
   serverPasswordTitle: "Serverpasswort erforderlich",
@@ -1352,6 +1530,14 @@ translations.de = {
     measureComplete: "Laufende Messung (alle 3 Sekunden)",
     measureNow: "Jetzt messen",
     measureUnavailable: "Nach der Verbindung verfügbar",
+    webrtcStats: "WebRTC der Bildschirmfreigabe",
+    webrtcStatsHint: "Tatsächlicher Medienstatus, jede Sekunde erfasst",
+    screenShareCapture: "Aufnahme",
+    screenShareSending: "An Zuschauer senden",
+    screenShareReceiving: "Vom Freigebenden empfangen",
+    screenShareDroppedFrames: "verloren",
+    screenShareJitter: "Jitter",
+    screenShareRtt: "RTT",
   langSwitch: "中文",
 };
 
@@ -1390,6 +1576,27 @@ translations.ru = {
   inputVolume: "Громкость микрофона",
   desktopAudioControls: "Управление звуком",
   desktopAudioHint: "Наведите на значок, чтобы изменить громкость",
+  startScreenShare: "Начать трансляцию",
+  screenShareStarting: "Запуск трансляции",
+  stopScreenShare: "Остановить трансляцию",
+  sharingScreen: "В эфире",
+  watchScreenShare: "Смотреть трансляцию экрана",
+  watching: "Смотрю",
+  screenShareVolume: "Громкость трансляции",
+  screenShareNativeUnavailable: "Демонстрация экрана TeamSpeak пока недоступна для веб-просмотра",
+  screenShareExit: "Выйти из просмотра",
+  screenShareConnecting: "Подключение к трансляции экрана",
+  screenShareViewers: "Текущие зрители",
+  screenShareFullscreen: "На весь экран",
+  screenShareExitFullscreen: "Выйти из полноэкранного режима",
+  screenShareSettings: "Настройки трансляции",
+  screenShareSettingsHint: "Настройте качество перед началом трансляции",
+  screenShareResolution: "Выходное разрешение",
+  screenShareResolutionSource: "Исходное разрешение",
+  screenShareResolution720p: "720p (до 1280 × 720)",
+  screenShareResolution1080p: "1080p (до 1920 × 1080)",
+  screenShareFrameRate: "Ограничение FPS",
+  screenShareSettingsNote: "Настройки применятся при следующем запуске трансляции",
   noiseSuppression: "Шумоподавление",
   noiseSuppressionHint: "Обработка звука при захвате в браузере",
   highQuality: "Качественный звук",
@@ -1402,6 +1609,7 @@ translations.ru = {
   joinServer: "Войти на сервер",
   welcomeBack: "С возвращением",
   joinLead: "Выберите имя и канал для входа.",
+  visitorCount: "Вы {{count}}-й посетитель",
   serverAddress: "Адрес сервера TeamSpeak",
   serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
   serverPort: "Голосовой порт",
@@ -1436,6 +1644,14 @@ translations.ru = {
   measureComplete: "Мониторинг продолжается (обновление каждые 3 секунды)",
   measureNow: "Измерить сейчас",
   measureUnavailable: "Доступно после подключения",
+  webrtcStats: "WebRTC трансляции экрана",
+  webrtcStatsHint: "Фактическое состояние медиапотока, замер каждую секунду",
+  screenShareCapture: "Захват",
+  screenShareSending: "Отправка зрителю",
+  screenShareReceiving: "Получение от ведущего",
+  screenShareDroppedFrames: "пропуски",
+  screenShareJitter: "джиттер",
+  screenShareRtt: "RTT",
   langSwitch: "中文",
 };
 
@@ -1474,6 +1690,27 @@ translations.ja = {
   inputVolume: "マイク音量",
   desktopAudioControls: "音声コントロール",
   desktopAudioHint: "アイコンにカーソルを合わせて音量を調整",
+  startScreenShare: "画面を共有",
+  screenShareStarting: "配信を開始中",
+  stopScreenShare: "共有を停止",
+  sharingScreen: "ライブ中",
+  watchScreenShare: "画面共有を見る",
+  watching: "視聴中",
+  screenShareVolume: "共有音量",
+  screenShareNativeUnavailable: "TeamSpeak のネイティブ画面共有は現在ウェブで視聴できません",
+  screenShareExit: "視聴を終了",
+  screenShareConnecting: "画面共有に接続中",
+  screenShareViewers: "現在の視聴者",
+  screenShareFullscreen: "全画面",
+  screenShareExitFullscreen: "全画面を終了",
+  screenShareSettings: "共有設定",
+  screenShareSettingsHint: "共有前に出力品質を調整",
+  screenShareResolution: "出力解像度",
+  screenShareResolutionSource: "元の解像度",
+  screenShareResolution720p: "720p（最大 1280 × 720）",
+  screenShareResolution1080p: "1080p（最大 1920 × 1080）",
+  screenShareFrameRate: "フレームレート上限",
+  screenShareSettingsNote: "次回の共有開始時に適用されます",
   noiseSuppression: "ノイズ抑制",
   noiseSuppressionHint: "ブラウザ側で音声を処理",
   highQuality: "高品質な音声",
@@ -1486,6 +1723,7 @@ translations.ja = {
   joinServer: "サーバーに参加",
   welcomeBack: "おかえりなさい",
   joinLead: "名前と参加するチャンネルを選択してください。",
+  visitorCount: "あなたは{{count}}人目の訪問者です",
   serverAddress: "TeamSpeak サーバーアドレス",
   serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
   serverPort: "音声ポート",
@@ -1520,6 +1758,14 @@ translations.ja = {
   measureComplete: "継続監視中（3秒ごとに更新）",
   measureNow: "今すぐ測定",
   measureUnavailable: "接続後に利用できます",
+  webrtcStats: "画面共有 WebRTC",
+  webrtcStatsHint: "実際のメディア状態を1秒ごとに測定",
+  screenShareCapture: "キャプチャ",
+  screenShareSending: "視聴者へ送信",
+  screenShareReceiving: "共有者から受信",
+  screenShareDroppedFrames: "ドロップ",
+  screenShareJitter: "ジッター",
+  screenShareRtt: "RTT",
   langSwitch: "中文",
 };
 
@@ -1570,7 +1816,7 @@ function localizedMessage(message: string) {
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
     "你没有执行此操作的权限": "この操作を実行する権限がありません",
   };
-  if (localizedExact[message]) return localizedExact[message];
+  if ((language.value === "ru" || language.value === "ja") && localizedExact[message]) return localizedExact[message];
   const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
   if (errorCodeMatch) {
     const code = errorCodeMatch[1];
@@ -1820,7 +2066,7 @@ function cycleTheme() {
   void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value });
 }
 
-const heroBars = [12, 24, 18, 35, 18, 28, 42, 23, 50, 34, 19, 28, 39, 22, 46, 25, 17, 31, 14];
+const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
 
 const channelTree = computed<TreeChannel[]>(() => {
   const source = [...channels];
@@ -1905,10 +2151,34 @@ const currentChannel = computed<TreeChannel | undefined>(() => {
 });
 const currentChannelName = computed(() => (currentChannel.value?.name ?? channel.value) || t("voiceLobby"));
 const currentChannelDescription = computed(() => currentChannel.value?.description ?? "");
+const screenShareErrorText = computed(() => {
+  if (screenShareErrorCode.value === "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED") return t("screenShareNativeUnavailable");
+  return screenShareError.value;
+});
 const currentMembers = computed<ChannelMember[]>(() => {
   const source = currentChannel.value ? currentChannel.value.members : members;
   return source.map((member) => ({ ...member, isSelf: member.isSelf || member.id === voiceState.tsClientId }));
 });
+const activeScreenShareStream = computed<ScreenShareStream | null>(() => screenShareStreams.find((stream) => stream.streamId === screenShareViewingStreamId.value) ?? null);
+const screenSharePlayerViewers = computed(() => activeScreenShareStream.value?.viewers.slice(-5) ?? []);
+const screenSharePlayerViewerCount = computed(() => activeScreenShareStream.value?.viewerCount ?? activeScreenShareStream.value?.viewers.length ?? 0);
+const screenSharePlayerOwnerName = computed(() => activeScreenShareStream.value?.ownerNickname ?? t("screenShare"));
+function screenShareStreamForMember(member: ChannelMember): ScreenShareStream | null {
+  return screenShareStreams.find((stream) => {
+    if (typeof stream.ownerClientId === "number" && stream.ownerClientId === member.id) return true;
+    if (stream.source === "teamspeak" && stream.ownerPeerId === `ts-${member.id}`) return true;
+    return stream.ownerNickname === member.nickname;
+  }) ?? null;
+}
+function toggleScreenShareForMember(member: ChannelMember): void {
+  const stream = screenShareStreamForMember(member);
+  if (!stream) return;
+  if (screenShareViewingStreamId.value === stream.streamId) leaveScreenShare();
+  else joinScreenShare(stream.streamId);
+}
+function screenShareViewerStyle(viewer: { nickname: string; avatar?: string }) {
+  return avatarStyle(viewer.nickname, viewer.nickname === nickname.value, viewer.avatar ?? "");
+}
 const roomMembers = computed(() => currentMembers.value.slice(0, 4));
 const memberChannels = computed<TreeChannel[]>(() => {
   if (channelTree.value.length) return channelTree.value;
@@ -2040,6 +2310,18 @@ watch(settingsOpen, (open) => {
     stopMicrophoneTest();
   }
 });
+watch([screenShareRemoteStream, screenShareRemoteVolume], ([stream, volume]) => {
+  void nextTick(() => {
+    const video = screenVideoEl.value;
+    if (!video) return;
+    if (video.srcObject !== stream) video.srcObject = stream;
+    video.volume = Math.max(0, Math.min(1, volume ?? 1));
+    if (stream) void video.play().catch(() => undefined);
+  });
+});
+watch(screenShareViewing, (viewing) => {
+  if (!viewing && document.fullscreenElement === screenSharePlayerEl.value) void document.exitFullscreen().catch(() => undefined);
+});
 watch(rememberIdentity, (remember) => {
   localStorage.setItem("webspeak:remember-identity", remember ? "1" : "0");
   if (!remember) {
@@ -2132,6 +2414,7 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 let deviceChangeHandler: (() => void) | undefined;
 let viewportMediaQuery: MediaQueryList | undefined;
 let viewportChangeHandler: (() => void) | undefined;
+let fullscreenChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   browserError.value = checkSupport() ?? "";
@@ -2163,12 +2446,15 @@ onMounted(() => {
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
+  fullscreenChangeHandler = syncScreenShareFullscreen;
+  document.addEventListener("fullscreenchange", fullscreenChangeHandler);
 });
 onUnmounted(() => {
   stopPerformanceMonitoring();
   disconnect();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
+  if (fullscreenChangeHandler) document.removeEventListener("fullscreenchange", fullscreenChangeHandler);
   if (toastTimer) clearTimeout(toastTimer);
 });
 
@@ -2313,8 +2599,9 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; visitorNumber?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
     if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
+    visitorNumber.value = Number.isSafeInteger(config.visitorNumber) && Number(config.visitorNumber) > 0 ? Number(config.visitorNumber) : null;
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
@@ -2382,21 +2669,11 @@ function openMemberActions(member: ChannelMember): void {
 }
 
 function toggleMemberMoveMenu(): void {
-  if (!voiceState.canMoveClients) {
-    showToast(t("movePermissionDenied"));
-    return;
-  }
   memberMoveMenuOpen.value = true;
 }
 
 async function moveMemberDirect(member: ChannelMember, targetChannelId: string): Promise<void> {
   if (member.isSelf || !targetChannelId || targetChannelId === "__current__") return;
-  if (!voiceState.canMoveClients) {
-    memberMenu.value = null;
-    memberMoveMenuOpen.value = false;
-    showToast(t("movePermissionDenied"));
-    return;
-  }
   const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
   if (sourceChannel?.id === targetChannelId) {
     memberMenu.value = null;
@@ -2416,9 +2693,8 @@ async function moveMemberDirect(member: ChannelMember, targetChannelId: string):
 }
 
 function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
-  if (member.isSelf || !voiceState.canMoveClients) {
+  if (member.isSelf) {
     event.preventDefault();
-    if (!member.isSelf) showToast(t("movePermissionDenied"));
     return;
   }
   draggedMember.value = member;
@@ -2433,7 +2709,7 @@ function onMemberDragEnd(): void {
 }
 
 function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
-  if (member.isSelf || !voiceState.canMoveClients || event.button !== 0) return;
+  if (member.isSelf || event.button !== 0) return;
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest("input,button")) return;
   event.preventDefault();
@@ -2680,6 +2956,37 @@ function toggleMicrophone(): void {
   showToast(microphoneMuted.value ? t("microphoneMuted") : t("microphoneActive"));
 }
 
+function onScreenShareVolume(event: Event): void {
+  screenShareRemoteVolume.value = Math.max(0, Math.min(1, Number((event.target as HTMLInputElement).value) / 100));
+}
+
+function syncScreenShareFullscreen(): void {
+  screenShareFullscreen.value = document.fullscreenElement === screenSharePlayerEl.value;
+}
+
+async function toggleScreenShareFullscreen(): Promise<void> {
+  const player = screenSharePlayerEl.value;
+  if (!player) return;
+  try {
+    if (document.fullscreenElement === player) await document.exitFullscreen();
+    else if (player.requestFullscreen) await player.requestFullscreen();
+  } catch {
+    screenShareFullscreen.value = false;
+  }
+}
+
+async function startScreenShareWithSettings(): Promise<void> {
+  const preset = screenShareResolutionOptions.find((option) => option.value === screenShareResolutionPreset.value);
+  const settings: ScreenShareCaptureSettings = {
+    ...(preset?.width && preset.height ? { maxWidth: preset.width, maxHeight: preset.height } : {}),
+    maxFrameRate: screenShareFrameRate.value,
+  };
+  localStorage.setItem("webspeak:screen-share-resolution", screenShareResolutionPreset.value);
+  localStorage.setItem("webspeak:screen-share-framerate", String(screenShareFrameRate.value));
+  screenShareSettingsOpen.value = false;
+  await startScreenShare(true, settings);
+}
+
 async function toggleAccompaniment(): Promise<void> {
   try {
     if (accompanimentActive.value) {
@@ -2769,10 +3076,16 @@ function stopWhisperTalk(): void {
 .promise-item b, .promise-item small { display: block; }
 .promise-item b { color: #283431; font-size: 12px; }
 .promise-item small { margin-top: 3px; color: #87938f; font-size: 10px; }
+.visitor-count { position: relative; display: inline-flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; min-height: 42px; margin: 30px 0 0; padding: 7px 14px 7px 9px; overflow: hidden; color: #006a64; border: 1px solid rgba(86, 202, 185, .42); border-radius: 999px; background: linear-gradient(110deg, rgba(225, 250, 245, .94), rgba(244, 255, 252, .78)); box-shadow: 0 10px 24px rgba(0, 106, 100, .1), inset 0 0 0 1px rgba(255, 255, 255, .55); font-size: 12px; font-weight: 700; letter-spacing: .035em; }
+.visitor-count::before { position: absolute; top: 0; bottom: 0; left: -45%; width: 38%; background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .62), transparent); content: ""; pointer-events: none; transform: skewX(-18deg); animation: visitor-shimmer 3.6s 1.5s ease-in-out infinite; }
+.visitor-count-orbit { position: absolute; top: -20px; right: 12px; width: 51px; height: 51px; border: 1px solid rgba(71, 194, 174, .32); border-radius: 50%; pointer-events: none; animation: visitor-orbit 4s ease-in-out infinite; }
+.visitor-count-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 auto; color: #fff; border-radius: 50%; background: linear-gradient(135deg, #006a64, #32cdb7); box-shadow: 0 0 0 4px rgba(55, 205, 182, .12), 0 0 18px rgba(55, 205, 182, .24); }
+.visitor-count-label { position: relative; z-index: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-count-spark { position: relative; z-index: 1; color: #35bea7; font-size: 15px; line-height: 1; animation: visitor-spark 2.1s ease-in-out infinite; }
 .join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
-.card-lead { margin: 0 0 18px; color: #7b8885; font-size: 13px; }
+.card-lead { margin: 0 0 7px; color: #7b8885; font-size: 13px; }
 .notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
 .notice-content { min-width: 0; overflow-wrap: anywhere; }
 .notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
@@ -2864,6 +3177,9 @@ function stopWhisperTalk(): void {
 @keyframes join-accent-breathe { 0%, 100% { transform: translateY(0); text-shadow: 0 0 0 rgba(0, 106, 100, 0); } 50% { transform: translateY(-2px); text-shadow: 0 5px 18px rgba(0, 106, 100, .16); } }
 @keyframes join-accent-breathe-dark { 0%, 100% { transform: translateY(0); text-shadow: 0 0 8px rgba(125, 255, 174, .28), 0 0 18px rgba(105, 210, 199, .14); } 50% { transform: translateY(-2px); text-shadow: 0 0 13px rgba(125, 255, 174, .5), 0 0 26px rgba(105, 210, 199, .22); } }
 @keyframes join-dot-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(144, 246, 145, .28); } 50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(144, 246, 145, 0); } }
+@keyframes visitor-shimmer { 0%, 42% { left: -45%; } 72%, 100% { left: 130%; } }
+@keyframes visitor-spark { 0%, 100% { opacity: .58; transform: scale(.88) rotate(0deg); } 50% { opacity: 1; transform: scale(1.14) rotate(12deg); } }
+@keyframes visitor-orbit { 0%, 100% { transform: rotate(-8deg) scale(.96); opacity: .48; } 50% { transform: rotate(12deg) scale(1.04); opacity: .9; } }
 
 .join-page .join-header { animation: join-fade-up .55s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .join-copy .eyebrow { animation: join-fade-up .55s .08s cubic-bezier(.22, 1, .36, 1) both; }
@@ -2873,6 +3189,7 @@ function stopWhisperTalk(): void {
 .join-page .promise-list { animation: join-fade-up .58s .48s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .promise-item:nth-child(2) { animation: join-fade-up .58s .58s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .promise-item:nth-child(3) { animation: join-fade-up .58s .68s cubic-bezier(.22, 1, .36, 1) both; }
+.join-page .visitor-count { animation: join-fade-up .58s .76s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .eyebrow-dot { animation: join-dot-pulse 2.8s .8s ease-in-out infinite; }
 .join-page .join-card { animation: join-fade-up .68s .24s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .join-footer { animation: join-fade-up .55s .72s cubic-bezier(.22, 1, .36, 1) both; }
@@ -2883,7 +3200,7 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 1200px) { .app-shell { grid-template-columns: 72px 255px minmax(0, 1fr) 218px; }.workspace-content { width: min(900px, calc(100% - 42px)); }.control-dock { padding-inline: 18px; }.dock-center { gap: 8px; }.mic-mode-switch button { padding-inline: 7px; }.member-panel { padding-inline: 12px; }.member-volume { display: none; } }
 @media (max-width: 980px) { .app-shell { grid-template-columns: 70px 245px minmax(0, 1fr); }.member-panel { display: none; }.room-hero { min-height: 180px; }.hero-visual { right: 24px; opacity: .55; }.join-content { gap: 40px; }.join-card { padding: 28px; } }
-@media (max-width: 740px) { .join-header, .join-content, .join-footer { width: min(100% - 32px, 560px); }.join-header { min-height: 70px; }.header-note { display: none; }.join-content { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 35px; padding: 36px 0 48px; }.join-copy h1 { margin-top: 15px; font-size: 45px; }.join-description { font-size: 14px; }.promise-list { gap: 13px; margin-top: 27px; }.promise-item { min-width: 0; flex: 1 1 30%; }.promise-item small { display: none; }.join-card { padding: 24px 20px; }.join-footer { min-height: 53px; }.join-footer .footer-spacer { display: none; }.join-footer span:last-child { margin-left: auto; }.field-grid { grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }.app-shell { display: block; height: 100dvh; }.nav-rail, .channel-sidebar, .member-panel { display: none; }.workspace { height: 100%; }.workspace-header { min-height: 61px; padding: 0 15px; }.mobile-brand { display: inline; }.crumb-muted, .breadcrumbs > .ui-icon, .breadcrumbs > strong { display: none; }.workspace-actions { gap: 3px; }.disconnect-button { margin-left: 2px; padding-inline: 9px; }.disconnect-button .ui-icon { display: none; }.workspace-content { width: calc(100% - 30px); padding-top: 18px; }.room-hero { min-height: 182px; padding: 23px 21px; }.room-hero h1 { font-size: 22px; }.room-hero p { max-width: 74%; font-size: 11px; }.hero-visual { right: -15px; bottom: 4px; transform: scale(.75); transform-origin: right bottom; }.voice-section, .chat-panel { margin-top: 25px; }.voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.voice-card { min-height: 143px; }.message-row { max-width: 92%; }.control-dock { min-height: 66px; padding: 8px 15px; }.dock-user { min-width: 0; }.dock-user > div:last-child { display: none; }.dock-center { flex: 1; justify-content: center; }.mic-mode-switch button { padding: 6px 7px; font-size: 9px; }.ptt-indicator { display: none; }.dock-actions { min-width: 75px; }.settings-modal { max-height: calc(100dvh - 28px); }.settings-nav { display: none; }.settings-content { padding: 24px 20px; }.settings-header { min-height: 62px; padding-inline: 20px; }.settings-header h2 { font-size: 19px; }.settings-footer { min-height: 61px; padding-inline: 20px; } }
+@media (max-width: 740px) { .join-header, .join-content, .join-footer { width: min(100% - 32px, 560px); }.join-header { min-height: 70px; }.header-note { display: none; }.join-content { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 35px; padding: 36px 0 48px; }.join-copy h1 { margin-top: 15px; font-size: 45px; }.join-description { font-size: 14px; }.promise-list { gap: 13px; margin-top: 27px; }.promise-item { min-width: 0; flex: 1 1 30%; }.promise-item small { display: none; }.visitor-count { margin-top: 24px; }.join-card { padding: 24px 20px; }.join-footer { min-height: 53px; }.join-footer .footer-spacer { display: none; }.join-footer span:last-child { margin-left: auto; }.field-grid { grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }.app-shell { display: block; height: 100dvh; }.nav-rail, .channel-sidebar, .member-panel { display: none; }.workspace { height: 100%; }.workspace-header { min-height: 61px; padding: 0 15px; }.mobile-brand { display: inline; }.crumb-muted, .breadcrumbs > .ui-icon, .breadcrumbs > strong { display: none; }.workspace-actions { gap: 3px; }.disconnect-button { margin-left: 2px; padding-inline: 9px; }.disconnect-button .ui-icon { display: none; }.workspace-content { width: calc(100% - 30px); padding-top: 18px; }.room-hero { min-height: 182px; padding: 23px 21px; }.room-hero h1 { font-size: 22px; }.room-hero p { max-width: 74%; font-size: 11px; }.hero-visual { right: -15px; bottom: 4px; transform: scale(.75); transform-origin: right bottom; }.voice-section, .chat-panel { margin-top: 25px; }.voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.voice-card { min-height: 143px; }.message-row { max-width: 92%; }.control-dock { min-height: 66px; padding: 8px 15px; }.dock-user { min-width: 0; }.dock-user > div:last-child { display: none; }.dock-center { flex: 1; justify-content: center; }.mic-mode-switch button { padding: 6px 7px; font-size: 9px; }.ptt-indicator { display: none; }.dock-actions { min-width: 75px; }.settings-modal { max-height: calc(100dvh - 28px); }.settings-nav { display: none; }.settings-content { padding: 24px 20px; }.settings-header { min-height: 62px; padding-inline: 20px; }.settings-header h2 { font-size: 19px; }.settings-footer { min-height: 61px; padding-inline: 20px; } }
 @media (max-width: 420px) { .join-copy h1 { font-size: 38px; }.promise-list { display: grid; grid-template-columns: 1fr; }.promise-item small { display: block; }.join-card { border-radius: 15px; }.voice-grid { gap: 8px; }.voice-card { padding-inline: 6px; }.section-counter { display: none; }.workspace-actions .header-action:first-child { display: none; }.dock-icon { display: none; }.dock-actions { min-width: 37px; }.room-stats { gap: 6px; }.room-stats span:last-child, .stat-divider { display: none; } }
 
 /* The connected view keeps only controls that have a working action. The
@@ -2999,6 +3316,7 @@ function stopWhisperTalk(): void {
 .join-page .card-kicker { font-size: 12.5px; }
 .join-page .join-card h2 { font-size: 33.75px; }
 .join-page .card-lead { font-size: 16.25px; }
+.join-page .visitor-count { font-size: 15px; }
 .join-page .notice { font-size: 15px; }
 .join-page .field-label { font-size: 13.75px; }
 .join-page .field-wrap input { font-size: 16.25px; }
@@ -3163,6 +3481,9 @@ function stopWhisperTalk(): void {
 :global(html[data-theme="dark"] .join-page .field-hint),
 :global(html[data-theme="dark"] .join-page .join-meta),
 :global(html[data-theme="dark"] .join-page .join-footer) { color: var(--text-muted); }
+:global(html[data-theme="dark"] .join-page .visitor-count) { color: #b7fff0; border-color: rgba(105, 210, 199, .42); background: linear-gradient(110deg, #173b36, #1c2d2a); box-shadow: 0 10px 28px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(105, 210, 199, .08); }
+:global(html[data-theme="dark"] .join-page .visitor-count::before) { background: linear-gradient(105deg, transparent, rgba(125, 255, 174, .18), transparent); }
+:global(html[data-theme="dark"] .join-page .visitor-count-orbit) { border-color: rgba(105, 210, 199, .34); }
 :global(html[data-theme="dark"] .join-page .join-copy h1),
 :global(html[data-theme="dark"] .join-page .join-card h2),
 :global(html[data-theme="dark"] .join-page .promise-item b),
@@ -3503,6 +3824,21 @@ function stopWhisperTalk(): void {
 .performance-metrics strong { margin-top: 6px; color: var(--accent); font-size: 18px; }
 .performance-metrics span { margin-top: 4px; color: var(--text-muted); font-size: 9px; }
 .performance-status { margin: 11px 0 0; color: var(--text-muted); font-size: 10px; }
+.webrtc-stats { margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--border); }
+.webrtc-stats > header { display: block; margin-bottom: 8px; }
+.webrtc-stats > header strong, .webrtc-stats > header small { display: block; }
+.webrtc-stats > header strong { font-size: 11px; }
+.webrtc-stats > header small { margin-top: 3px; color: var(--text-muted); font-size: 9px; }
+.webrtc-stats-capture, .webrtc-stats-peer { padding: 8px 9px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
+.webrtc-stats-capture { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
+.webrtc-stats-capture span, .webrtc-stats-capture small, .webrtc-stats-peer-heading small, .webrtc-stats-detail { color: var(--text-muted); font-size: 9px; }
+.webrtc-stats-capture strong { margin-left: auto; color: var(--accent); font-size: 11px; }
+.webrtc-stats-peer + .webrtc-stats-peer { margin-top: 7px; }
+.webrtc-stats-peer-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.webrtc-stats-peer-heading strong { font-size: 10px; }
+.webrtc-stats-peer-heading small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.webrtc-stats-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; margin-top: 7px; color: var(--accent); font-size: 10px; font-variant-numeric: tabular-nums; }
+.webrtc-stats-detail { display: block; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Latin-script translations need a little more room than Chinese copy. Keep
    the Chinese layout unchanged and use a compact type scale for English and
@@ -3639,5 +3975,79 @@ function stopWhisperTalk(): void {
 
 @media (prefers-reduced-motion: reduce) {
   .dock-hover-panel, .dock-switch-row input, .mobile-noise-toggle input { transition-duration: .01ms; }
+}
+
+.screen-share-inline-error { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; padding: 8px 10px; color: #a64d47; border: 1px solid color-mix(in srgb, #d96b62 28%, var(--border)); border-radius: 9px; background: color-mix(in srgb, #f7d9d5 45%, var(--surface-1)); font-size: 10px; line-height: 1.4; }
+.screen-share-avatar-wrap { position: relative; overflow: visible; }
+.screen-share-live-indicator { position: absolute; top: -16px; right: 50%; z-index: 2; display: inline-flex; align-items: center; gap: 4px; min-height: 17px; padding: 3px 6px 3px 4px; color: #087b6e; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 999px; background: var(--surface-1); box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 12%, transparent); font-size: 8px; font-weight: 800; line-height: 1; white-space: nowrap; transform: translateX(50%); }
+.screen-share-live-indicator::before { content: ""; width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: #55d783; box-shadow: 0 0 0 3px color-mix(in srgb, #55d783 18%, transparent); animation: screen-share-live-dot 1.2s ease-in-out infinite; }
+.screen-share-wave { display: inline-flex; align-items: center; gap: 1px; height: 14px; color: #55d3bd; }
+.screen-share-wave i { display: block; width: 2px; flex: 0 0 2px; border-radius: 99px; background: currentColor; animation: screen-share-wave 1.1s ease-in-out infinite alternate; }
+.screen-share-wave i:nth-child(2n) { animation-delay: -.18s; }
+.screen-share-wave i:nth-child(3n) { animation-delay: -.42s; }
+.screen-share-wave i:nth-child(4n) { animation-delay: -.66s; }
+.screen-share-stop-button { position: absolute; bottom: -4px; left: -5px; z-index: 3; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; color: var(--danger); border: 2px solid var(--surface-1); border-radius: 7px; background: var(--surface-2); box-shadow: 0 3px 9px color-mix(in srgb, var(--text-primary) 18%, transparent); cursor: pointer; }
+.screen-share-stop-button:hover { color: #fff; border-color: var(--danger); background: var(--danger); }
+.screen-share-stop-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--danger) 42%, transparent); outline-offset: 2px; }
+.screen-share-card-actions { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; min-width: 0; margin-top: 9px; flex-wrap: wrap; }
+.screen-share-start-actions { display: inline-flex; align-items: stretch; justify-content: center; gap: 4px; width: 100%; min-width: 0; }
+.screen-share-card-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 25px; max-width: 100%; padding: 4px 7px; overflow: hidden; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); font-size: 9px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.screen-share-card-button:hover { background: color-mix(in srgb, var(--accent) 15%, var(--surface-1)); }
+.screen-share-card-button.live { color: #0e8c76; background: color-mix(in srgb, #b6f0d5 55%, var(--surface-1)); }
+.screen-share-card-button.viewing { color: #fff; border-color: var(--accent); background: var(--accent); }
+.screen-share-settings-button { display: grid; place-items: center; width: 25px; min-width: 25px; min-height: 25px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-1); cursor: pointer; }
+.screen-share-settings-button:hover, .screen-share-settings-button[aria-expanded="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-1)); }
+.screen-share-settings-backdrop { z-index: 25; align-items: center; padding: 16px; }
+.screen-share-settings-modal { position: relative; width: min(360px, 100%); padding: 22px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 16px; background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 20%, transparent); }
+.screen-share-settings-close { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-2); cursor: pointer; }
+.screen-share-settings-close:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.screen-share-settings-heading { padding-right: 35px; }
+.screen-share-settings-heading h2 { margin: 5px 0 4px; color: var(--text-primary); font-size: 20px; letter-spacing: -.04em; }
+.screen-share-settings-heading p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.screen-share-settings-fields { display: grid; gap: 13px; margin-top: 22px; }
+.screen-share-settings-fields label { display: grid; gap: 6px; min-width: 0; color: var(--text-muted); font-size: 10px; }
+.screen-share-settings-fields label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-share-settings-fields select { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 37px; padding: 0 9px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.screen-share-settings-fields select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent); outline-offset: 1px; }
+.screen-share-settings-note { margin: 15px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
+.screen-share-settings-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); }
+.screen-share-settings-start { min-height: 35px; padding: 0 12px; font-size: 10px; }
+.screen-share-player { position: relative; margin-top: 17px; overflow: hidden; border: 1px solid #263b37; border-radius: 18px; background: #070d0d; box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 18%, transparent); }
+.screen-share-player-stage { position: relative; display: grid; width: 100%; min-height: 245px; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #1d3934, #091010 68%); }
+.screen-share-player-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #030606; }
+.screen-share-player-placeholder { display: flex; align-items: center; flex-direction: column; gap: 10px; max-width: 360px; padding: 30px; color: #b1c2bd; text-align: center; }
+.screen-share-player-placeholder-icon { display: grid; place-items: center; width: 58px; height: 58px; color: #69d2c7; border: 1px solid rgba(105,210,199,.36); border-radius: 18px; background: rgba(105,210,199,.12); }
+.screen-share-player-placeholder strong { color: #f0f8f5; font-size: 15px; }
+.screen-share-player-placeholder > span:last-child { color: #8ea39d; font-size: 10px; line-height: 1.5; }
+.screen-share-player-exit, .screen-share-player-controls button { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; color: #edf7f4; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; background: rgba(8,14,14,.7); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); cursor: pointer; }
+.screen-share-player-exit { position: absolute; top: 15px; left: 15px; z-index: 3; }
+.screen-share-player-exit:hover, .screen-share-player-controls button:hover { color: #fff; border-color: rgba(105,210,199,.75); background: rgba(0,106,100,.85); }
+.screen-share-player-viewers { position: absolute; top: 15px; right: 15px; z-index: 3; display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 8px 5px 11px; color: #f3faf8; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(8,14,14,.74); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); }
+.screen-share-player-viewer-label { display: inline-flex; align-items: center; gap: 5px; color: #d2e2de; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.screen-share-player-viewer-avatars { display: inline-flex; align-items: center; padding-left: 4px; }
+.screen-share-player-viewer-avatar { display: grid; place-items: center; width: 25px; height: 25px; margin-left: -4px; color: #fff; border: 2px solid #15211f; border-radius: 50%; font-size: 9px; font-weight: 800; box-shadow: 0 2px 7px rgba(0,0,0,.25); }
+.screen-share-player-live { position: absolute; top: 22px; left: 64px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; color: #a7fff0; font-size: 11px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
+.screen-share-player-live i { width: 7px; height: 7px; border-radius: 50%; background: #65e48b; box-shadow: 0 0 0 4px rgba(101,228,139,.18); animation: screen-share-live-dot 1.2s ease-in-out infinite; }
+.screen-share-player-source { position: absolute; bottom: 18px; left: 18px; z-index: 3; max-width: 45%; overflow: hidden; color: #f5fbf8; font-size: 12px; font-weight: 800; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.7); white-space: nowrap; }
+.screen-share-player-controls { position: absolute; right: 15px; bottom: 15px; z-index: 3; display: flex; align-items: center; gap: 9px; }
+.screen-share-player-controls label { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 11px; color: #edf7f4; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(8,14,14,.7); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); }
+.screen-share-player-controls input { width: 102px; height: 4px; accent-color: #69d2c7; cursor: pointer; }
+.screen-share-player:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; background: #030606; }
+.screen-share-player:fullscreen .screen-share-player-stage { height: 100%; max-height: none; aspect-ratio: auto; }
+.screen-share-player::backdrop { background: #030606; }
+@keyframes screen-share-wave { 0% { transform: scaleY(.45); opacity: .5; } 100% { transform: scaleY(1); opacity: 1; } }
+@keyframes screen-share-live-dot { 0%, 100% { opacity: .55; transform: scale(.86); } 50% { opacity: 1; transform: scale(1); } }
+@media (max-width: 740px) {
+  .screen-share-live-indicator { top: -14px; font-size: 7px; }
+  .screen-share-card-button { font-size: 8px; }
+  .screen-share-player { margin-top: 14px; border-radius: 14px; }
+  .screen-share-player-stage { min-height: 210px; }
+  .screen-share-player-viewers { top: 10px; right: 10px; }
+  .screen-share-player-live { top: 19px; left: 57px; }
+  .screen-share-player-source { bottom: 12px; left: 12px; max-width: 40%; }
+  .screen-share-player-controls { right: 10px; bottom: 10px; gap: 6px; }
+  .screen-share-player-controls label { padding-inline: 9px; }
+  .screen-share-player-controls input { width: 70px; }
+  .screen-share-player-exit { top: 10px; left: 10px; }
 }
 </style>

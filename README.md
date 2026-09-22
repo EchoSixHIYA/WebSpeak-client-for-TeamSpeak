@@ -86,4 +86,10 @@ WebSpeak распространяется по лицензии [GNU Affero Gene
 
 WebSpeak は [GNU Affero General Public License v3.0 only](./LICENSE) の下で公開されています。変更版をネットワーク経由でユーザーに提供する場合は、対応するソースコードを AGPL-3.0 に従ってユーザーに提供する必要があります。
 
+## Star History
+
+<a href="https://star-history.com/#EchoSixHIYA/WebSpeak-client-for-TeamSpeak&Date">
+  <img src="https://api.star-history.com/svg?repos=EchoSixHIYA/WebSpeak-client-for-TeamSpeak&type=Date" alt="WebSpeak Star History" width="100%" />
+</a>
+
 <div align="right"><a href="#readme-top">返回顶部 · Back to top ↑</a></div>

@@ -1,6 +1,6 @@
 {
   "name": "webspeak-webclient",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@discordjs/opus": "^0.10.0",
-    "@echosixhiya/teamspeak-client": "git+https://github.com/EchoSixHIYA/teamspeak-js.git#0fd526637c44b9ddc83ea89793aca76765399a6a",
+    "@echosixhiya/teamspeak-client": "git+https://github.com/EchoSixHIYA/teamspeak-js.git#be882e6a4ba12e0938fff2d06bdcc5b3bedeb232",
     "express": "^5.2.1",
     "pino": "^10.3.1",
     "werift": "0.24.4",

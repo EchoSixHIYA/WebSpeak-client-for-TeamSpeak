@@ -377,6 +377,19 @@ export class WebSpeakDatabase {
     ).run(key, value);
   }
 
+  nextVisitorNumber(): number {
+    let nextNumber = 1;
+    this.transaction(() => {
+      const currentValue = this.getMeta("visitor_count");
+      const current = currentValue ? Number.parseInt(currentValue, 10) : 0;
+      nextNumber = Number.isSafeInteger(current) && current >= 0 && current < Number.MAX_SAFE_INTEGER
+        ? current + 1
+        : 1;
+      this.setMeta("visitor_count", String(nextNumber));
+    });
+    return nextNumber;
+  }
+
   addAudit(event: string, details: Record<string, unknown> = {}): void {
     this.insertAudit(event, details, new Date().toISOString());
   }
