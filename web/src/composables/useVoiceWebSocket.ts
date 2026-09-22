@@ -67,6 +67,7 @@ export interface ScreenShareStream {
   streamId: string;
   source: "browser" | "teamspeak";
   ownerPeerId: string;
+  ownerClientId?: number;
   ownerNickname: string;
   name: string;
   audio: boolean;
@@ -2028,6 +2029,7 @@ export function useVoiceWebSocket() {
       streamId: value.streamId,
       source: value.source === "teamspeak" ? "teamspeak" : "browser",
       ownerPeerId: value.ownerPeerId,
+      ...(typeof value.ownerClientId === "number" ? { ownerClientId: value.ownerClientId } : {}),
       ownerNickname: typeof value.ownerNickname === "string" ? value.ownerNickname : "TeamSpeak 用户",
       name: typeof value.name === "string" ? value.name : "屏幕共享",
       audio: value.audio === true,

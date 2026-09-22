@@ -88,6 +88,8 @@ export interface ScreenShareStreamDescription {
   streamId: string;
   source: "browser" | "teamspeak";
   ownerPeerId: string;
+  /** TeamSpeak client id used to match a stream to the member card. */
+  ownerClientId?: number;
   ownerNickname: string;
   name: string;
   audio: boolean;
