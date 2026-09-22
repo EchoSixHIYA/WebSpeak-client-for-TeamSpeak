@@ -131,6 +131,19 @@
           </div>
         </header>
 
+        <div v-if="screenShareSettingsOpen" class="modal-backdrop screen-share-settings-backdrop" @click.self="screenShareSettingsOpen = false">
+          <section class="screen-share-settings-modal" role="dialog" aria-modal="true" aria-labelledby="screen-share-settings-title" @click.stop>
+            <button type="button" class="screen-share-settings-close" :aria-label="t('close')" :title="t('close')" @click="screenShareSettingsOpen = false"><Icon name="close" :size="17" /></button>
+            <div class="screen-share-settings-heading"><span class="card-kicker">{{ t('screenShare') }}</span><h2 id="screen-share-settings-title">{{ t('screenShareSettings') }}</h2><p>{{ t('screenShareSettingsHint') }}</p></div>
+            <div class="screen-share-settings-fields">
+              <label><span>{{ t('screenShareResolution') }}</span><select v-model="screenShareResolutionPreset" :aria-label="t('screenShareResolution')"><option v-for="option in screenShareResolutionOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select></label>
+              <label><span>{{ t('screenShareFrameRate') }}</span><select v-model.number="screenShareFrameRate" :aria-label="t('screenShareFrameRate')"><option v-for="fps in screenShareFrameRateOptions" :key="fps" :value="fps">{{ fps }} FPS</option></select></label>
+            </div>
+            <p class="screen-share-settings-note">{{ t('screenShareSettingsNote') }}</p>
+            <footer class="screen-share-settings-footer"><button type="button" class="text-button" @click="screenShareSettingsOpen = false">{{ t('cancel') }}</button><button type="button" class="primary-button screen-share-settings-start" @click="startScreenShareWithSettings"><Icon name="monitor" :size="14" /> {{ t('startScreenShare') }}</button></footer>
+          </section>
+        </div>
+
         <div v-if="voiceState.reconnecting || voiceState.reconnectFailed" :class="['reconnect-banner', { failed: voiceState.reconnectFailed }]" role="status">
           <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
           <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectNow">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="doDisconnect">{{ t('back') }}</button></div>
@@ -174,12 +187,6 @@
                       <div class="screen-share-start-actions">
                         <button type="button" class="screen-share-card-button" @click.stop="startScreenShareWithSettings"><Icon name="monitor" :size="13" /> {{ t('startScreenShare') }}</button>
                         <button type="button" class="screen-share-settings-button" :aria-label="t('screenShareSettings')" :aria-expanded="screenShareSettingsOpen" :title="t('screenShareSettings')" @click.stop="screenShareSettingsOpen = !screenShareSettingsOpen"><Icon name="settings" :size="13" /></button>
-                      </div>
-                      <div v-if="screenShareSettingsOpen" class="screen-share-settings" @click.stop>
-                        <div class="screen-share-settings-heading"><strong>{{ t('screenShareSettings') }}</strong><small>{{ t('screenShareSettingsHint') }}</small></div>
-                        <label><span>{{ t('screenShareResolution') }}</span><select v-model="screenShareResolutionPreset" :aria-label="t('screenShareResolution')"><option v-for="option in screenShareResolutionOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select></label>
-                        <label><span>{{ t('screenShareFrameRate') }}</span><select v-model.number="screenShareFrameRate" :aria-label="t('screenShareFrameRate')"><option v-for="fps in screenShareFrameRateOptions" :key="fps" :value="fps">{{ fps }} FPS</option></select></label>
-                        <small class="screen-share-settings-note">{{ t('screenShareSettingsNote') }}</small>
                       </div>
                     </template>
                     <button v-else-if="!member.isSelf" type="button" :class="['screen-share-card-button', { viewing: screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId }]" @click.stop="toggleScreenShareForMember(member)"><Icon name="monitor" :size="13" /> {{ screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId ? t('watching') : t('watchScreenShare') }}</button>
@@ -3990,14 +3997,21 @@ function stopWhisperTalk(): void {
 .screen-share-card-button.viewing { color: #fff; border-color: var(--accent); background: var(--accent); }
 .screen-share-settings-button { display: grid; place-items: center; width: 25px; min-width: 25px; min-height: 25px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-1); cursor: pointer; }
 .screen-share-settings-button:hover, .screen-share-settings-button[aria-expanded="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-1)); }
-.screen-share-settings { display: grid; gap: 7px; width: 100%; min-width: 0; padding: 9px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 78%, var(--surface-1)); text-align: left; }
-.screen-share-settings-heading strong, .screen-share-settings-heading small { display: block; }
-.screen-share-settings-heading strong { color: var(--text-primary); font-size: 10px; }
-.screen-share-settings-heading small, .screen-share-settings-note { color: var(--text-muted); font-size: 8px; line-height: 1.35; }
-.screen-share-settings label { display: grid; gap: 3px; min-width: 0; color: var(--text-muted); font-size: 9px; }
-.screen-share-settings label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.screen-share-settings select { display: block; width: 100%; min-width: 0; max-width: 100%; padding: 4px 5px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.screen-share-settings select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent); outline-offset: 1px; }
+.screen-share-settings-backdrop { z-index: 25; align-items: center; padding: 16px; }
+.screen-share-settings-modal { position: relative; width: min(360px, 100%); padding: 22px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 16px; background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 20%, transparent); }
+.screen-share-settings-close { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-2); cursor: pointer; }
+.screen-share-settings-close:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.screen-share-settings-heading { padding-right: 35px; }
+.screen-share-settings-heading h2 { margin: 5px 0 4px; color: var(--text-primary); font-size: 20px; letter-spacing: -.04em; }
+.screen-share-settings-heading p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.screen-share-settings-fields { display: grid; gap: 13px; margin-top: 22px; }
+.screen-share-settings-fields label { display: grid; gap: 6px; min-width: 0; color: var(--text-muted); font-size: 10px; }
+.screen-share-settings-fields label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-share-settings-fields select { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 37px; padding: 0 9px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.screen-share-settings-fields select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent); outline-offset: 1px; }
+.screen-share-settings-note { margin: 15px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
+.screen-share-settings-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); }
+.screen-share-settings-start { min-height: 35px; padding: 0 12px; font-size: 10px; }
 .screen-share-player { position: relative; margin-top: 17px; overflow: hidden; border: 1px solid #263b37; border-radius: 18px; background: #070d0d; box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 18%, transparent); }
 .screen-share-player-stage { position: relative; display: grid; width: 100%; min-height: 245px; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #1d3934, #091010 68%); }
 .screen-share-player-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #030606; }
