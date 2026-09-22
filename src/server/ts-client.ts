@@ -354,21 +354,6 @@ export class TSClient extends EventEmitter {
     await tsClientMove(this.client, clientId, channelId, password);
   }
 
-  /**
-   * Probe whether this identity may move a visible client into a channel.
-   *
-   * The browser client protocol does not expose ServerQuery's `permget`, so
-   * the only authoritative capability check available through this session is
-   * the same `clientmove` operation the UI will use. The bridge calls this
-   * with the client's current channel, making the probe a no-op when accepted;
-   * TeamSpeak still evaluates both move-power permissions.
-   */
-  async probeMovePermission(clientId: number, channelId: bigint): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("TeamSpeak session is not ready");
-    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
-    await tsClientMove(this.client, clientId, channelId);
-  }
-
   getClientId(): number {
     // The SDK learns the real client id during the welcome sequence, before
     // TSClient.connect() resumes. Reading it from the SDK prevents the first

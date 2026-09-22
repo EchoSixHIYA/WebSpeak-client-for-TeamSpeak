@@ -49,7 +49,6 @@ export interface VoiceState {
   reconnectAttempt: number;
   reconnectFailed: boolean;
   tsClientId: number;
-  canMoveClients: boolean;
   error: string;
   errorCode: string;
   /**
@@ -295,7 +294,7 @@ const CONNECTION_FAILURE_MESSAGES: Record<string, string> = {
 
 export function useVoiceWebSocket() {
   const ws = ref<WebSocket | null>(null);
-  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, canMoveClients: false, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
+  const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
@@ -447,7 +446,7 @@ export function useVoiceWebSocket() {
     }
   }
 
-  void loadLocalPreferences().then((preferences) => {
+  const audioPreferencesReady = loadLocalPreferences().then((preferences) => {
     if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
     if (typeof preferences.microphoneMuted === "boolean") microphoneMuted.value = preferences.microphoneMuted;
     if (typeof preferences.noiseSuppressionEnabled === "boolean") noiseSuppressionEnabled.value = preferences.noiseSuppressionEnabled;
@@ -1480,7 +1479,10 @@ export function useVoiceWebSocket() {
     state.reconnecting = false;
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
-    void openTicketedConnection(sequence, target, channel, nickname, serverPassword, inviteToken, accelerated);
+    void audioPreferencesReady.then(() => {
+      if (sequence !== connectionSequence) return;
+      void openTicketedConnection(sequence, target, channel, nickname, serverPassword, inviteToken, accelerated);
+    });
   }
 
   async function openTicketedConnection(sequence: number, target: string, channel: string, nickname: string, serverPassword: string, inviteToken: string, accelerated: boolean): Promise<void> {
@@ -1535,7 +1537,6 @@ export function useVoiceWebSocket() {
       clearLatencyProbes();
       rejectPendingCommands(new Error("语音连接已关闭"));
       state.connected = false;
-      state.canMoveClients = false;
       state.connecting = false;
       state.reconnecting = false;
       // Prefer the close code over the generic WebSocket error event. The
@@ -1640,7 +1641,6 @@ export function useVoiceWebSocket() {
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
     state.tsClientId = 0;
-    state.canMoveClients = false;
     state.errorCode = "";
     state.channelSwitchedChannelId = "";
     if (!keepRememberedIdentity) identityMaterial.value = "";
@@ -2066,7 +2066,11 @@ export function useVoiceWebSocket() {
         state.errorCode = "";
         state.channelSwitchedChannelId = "";
         state.tsClientId = Number(msg.tsClientId) || 0;
-        state.canMoveClients = msg.canMoveClients === true;
+        // The mute preference is local to the browser, while TeamSpeak shows
+        // the gateway's own client_input_muted flag to other clients. Send it
+        // as soon as the session is ready so a muted reconnect is visible to
+        // native TeamSpeak users even before WebRTC negotiation completes.
+        sendCmd("setMicrophoneMuted", { muted: microphoneMuted.value });
         screenShareIceServers = normalizeScreenShareIceServers(msg.screenShareIceServers);
         applyWhisperState(msg.whisperTargetIds, msg.whisperActive);
         if (Array.isArray(msg.members)) {
@@ -2212,9 +2216,6 @@ export function useVoiceWebSocket() {
         }
         syncKnownMemberVolumes();
         break;
-      case "capabilities":
-        state.canMoveClients = msg.canMoveClients === true;
-        break;
       case "memberAvatar": {
         const clientId = Number(msg.id);
         const uid = typeof msg.uid === "string" ? msg.uid : "";
@@ -2280,7 +2281,6 @@ export function useVoiceWebSocket() {
       }
       case "disconnected":
         state.connected = false;
-        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = Boolean(msg.recoverable !== false);
         state.reconnectFailed = false;
@@ -2293,7 +2293,6 @@ export function useVoiceWebSocket() {
         break;
       case "reconnecting":
         state.connected = false;
-        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = true;
         state.reconnectFailed = false;
@@ -2310,7 +2309,6 @@ export function useVoiceWebSocket() {
         break;
       case "reconnectFailed":
         state.connected = false;
-        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = false;
         state.reconnectFailed = true;
@@ -2322,7 +2320,6 @@ export function useVoiceWebSocket() {
         break;
       case "connectionFailed":
         state.connected = false;
-        state.canMoveClients = false;
         state.connecting = false;
         state.reconnecting = false;
         // This is the first connection attempt, not a failed reconnect. Keep

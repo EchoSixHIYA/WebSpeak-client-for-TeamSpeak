@@ -23,13 +23,17 @@
             <div class="promise-item"><span class="promise-icon mint"><Icon name="shield" :size="16" /></span><span><b>{{ t('secureJoin') }}</b><small>{{ t('inviteProtected') }}</small></span></div>
             <div class="promise-item"><span class="promise-icon sand"><Icon name="users" :size="16" /></span><span><b>{{ t('realtime') }}</b><small>{{ t('membersSync') }}</small></span></div>
           </div>
+          <div v-if="visitorNumber !== null" class="visitor-count" role="status" aria-live="polite">
+            <span class="visitor-count-orbit" aria-hidden="true"></span>
+            <span class="visitor-count-icon"><Icon name="users" :size="15" /></span>
+            <span class="visitor-count-label">{{ t('visitorCount', { count: visitorNumber }) }}</span>
+            <span class="visitor-count-spark" aria-hidden="true">✦</span>
+          </div>
         </div>
 
         <div class="join-card">
-          <div class="card-kicker">{{ t('joinServer') }}</div>
           <h2>{{ t('welcomeBack') }}</h2>
           <p class="card-lead">{{ t('joinLead') }}</p>
-          <p v-if="visitorNumber !== null" class="visitor-count">{{ t('visitorCount', { count: visitorNumber }) }}</p>
 
           <div v-if="voiceState.error" class="notice error-notice"><span class="notice-symbol">!</span><span class="notice-content"><span>{{ localizedMessage(voiceState.error) }}</span><code v-if="voiceState.errorCode">{{ t('errorCode') }}: {{ visibleErrorCode(voiceState.errorCode) }}</code></span></div>
           <div v-if="browserError" class="notice warning-notice"><span class="notice-symbol">i</span><span>{{ localizedMessage(browserError) }}</span></div>
@@ -41,7 +45,6 @@
               <label class="field-label" for="server-address"><span>{{ t('serverAddress') }}</span><div class="field-wrap"><Icon name="server" :size="17" /><input id="server-address" v-model="serverHost" autocomplete="url" :placeholder="t('serverAddressPlaceholder')" /></div></label>
               <label class="field-label" for="server-port"><span>{{ t('serverPort') }}</span><div class="field-wrap"><Icon name="hash" :size="17" /><input id="server-port" v-model="serverPort" inputmode="numeric" type="text" maxlength="5" :placeholder="t('serverPortPlaceholder')" /></div></label>
             </div>
-            <p v-if="accessMode === 'open'" class="field-hint">{{ t('serverAddressHint') }}</p>
             <div v-if="accelerationAvailable" class="acceleration-choice"><div class="acceleration-copy"><strong>{{ t('relayAcceleration') }}</strong><small>{{ t('relayAccelerationHint') }}</small></div><select v-model="accelerationRelayId" :aria-label="t('relayAcceleration')"><option value="">{{ t('directConnection') }}</option><option v-for="relay in accelerationRelays" :key="relay.id" :value="relay.id">{{ relay.name }}</option></select></div>
             <div v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)" class="local-servers">
               <div v-if="favoriteServers.length" class="local-server-group"><span>{{ t('favoriteServers') }}</span><button v-for="favorite in favoriteServers" :key="favorite.id" type="button" @click="selectLocalServer(favorite.address, favorite.nickname)">{{ favorite.label }}</button></div>
@@ -215,7 +218,7 @@
               <small>{{ channelItem.members.length }}</small>
             </button>
             <div v-if="channelItem.members.length" class="member-list">
-              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf && voiceState.canMoveClients" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" :draggable="!member.isSelf" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
                 <div class="member-flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
@@ -278,7 +281,7 @@
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
-      <div v-if="voiceState.canMoveClients" class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
+      <div class="member-menu-submenu" @mouseenter="memberMoveMenuOpen = true">
         <button type="button" class="member-menu-submenu-trigger" :aria-expanded="memberMoveMenuOpen" @click="toggleMemberMoveMenu"><Icon name="chevron-right" :size="15" /> <span>{{ t('moveMemberMenu') }}</span><Icon name="chevron-right" :size="13" class="member-menu-submenu-arrow" /></button>
         <div v-if="memberMoveMenuOpen" class="member-submenu-panel" @click.stop>
           <button v-if="memberMoveMenuCurrentChannel" type="button" :disabled="memberMoveMenuCurrentSameChannel" @click="moveMemberDirect(memberMenu.member, memberMoveMenuCurrentChannel.id)"><Icon name="users" :size="15" /><span>{{ t('moveMemberMyChannel') }}</span><small>{{ memberMoveMenuCurrentChannel.name }}</small></button>
@@ -286,7 +289,6 @@
           <span v-if="!memberMoveMenuCurrentChannel && !memberMoveMenuOtherChannels.length" class="member-submenu-empty">{{ t('moveMemberNoChannels') }}</span>
         </div>
       </div>
-      <button v-else type="button" class="member-menu-disabled" disabled><Icon name="chevron-right" :size="15" /> {{ t('moveMemberMenu') }}</button>
     </div>
 
     <!-- Protected channel password modal -->
@@ -1640,7 +1642,7 @@ function localizedMessage(message: string) {
     "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
     "你没有执行此操作的权限": "この操作を実行する権限がありません",
   };
-  if (localizedExact[message]) return localizedExact[message];
+  if ((language.value === "ru" || language.value === "ja") && localizedExact[message]) return localizedExact[message];
   const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
   if (errorCodeMatch) {
     const code = errorCodeMatch[1];
@@ -2470,21 +2472,11 @@ function openMemberActions(member: ChannelMember): void {
 }
 
 function toggleMemberMoveMenu(): void {
-  if (!voiceState.canMoveClients) {
-    showToast(t("movePermissionDenied"));
-    return;
-  }
   memberMoveMenuOpen.value = true;
 }
 
 async function moveMemberDirect(member: ChannelMember, targetChannelId: string): Promise<void> {
   if (member.isSelf || !targetChannelId || targetChannelId === "__current__") return;
-  if (!voiceState.canMoveClients) {
-    memberMenu.value = null;
-    memberMoveMenuOpen.value = false;
-    showToast(t("movePermissionDenied"));
-    return;
-  }
   const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
   if (sourceChannel?.id === targetChannelId) {
     memberMenu.value = null;
@@ -2504,9 +2496,8 @@ async function moveMemberDirect(member: ChannelMember, targetChannelId: string):
 }
 
 function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
-  if (member.isSelf || !voiceState.canMoveClients) {
+  if (member.isSelf) {
     event.preventDefault();
-    if (!member.isSelf) showToast(t("movePermissionDenied"));
     return;
   }
   draggedMember.value = member;
@@ -2521,7 +2512,7 @@ function onMemberDragEnd(): void {
 }
 
 function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
-  if (member.isSelf || !voiceState.canMoveClients || event.button !== 0) return;
+  if (member.isSelf || event.button !== 0) return;
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest("input,button")) return;
   event.preventDefault();
@@ -2861,11 +2852,16 @@ function stopWhisperTalk(): void {
 .promise-item b, .promise-item small { display: block; }
 .promise-item b { color: #283431; font-size: 12px; }
 .promise-item small { margin-top: 3px; color: #87938f; font-size: 10px; }
+.visitor-count { position: relative; display: inline-flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; min-height: 42px; margin: 30px 0 0; padding: 7px 14px 7px 9px; overflow: hidden; color: #006a64; border: 1px solid rgba(86, 202, 185, .42); border-radius: 999px; background: linear-gradient(110deg, rgba(225, 250, 245, .94), rgba(244, 255, 252, .78)); box-shadow: 0 10px 24px rgba(0, 106, 100, .1), inset 0 0 0 1px rgba(255, 255, 255, .55); font-size: 12px; font-weight: 700; letter-spacing: .035em; }
+.visitor-count::before { position: absolute; top: 0; bottom: 0; left: -45%; width: 38%; background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .62), transparent); content: ""; pointer-events: none; transform: skewX(-18deg); animation: visitor-shimmer 3.6s 1.5s ease-in-out infinite; }
+.visitor-count-orbit { position: absolute; top: -20px; right: 12px; width: 51px; height: 51px; border: 1px solid rgba(71, 194, 174, .32); border-radius: 50%; pointer-events: none; animation: visitor-orbit 4s ease-in-out infinite; }
+.visitor-count-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 auto; color: #fff; border-radius: 50%; background: linear-gradient(135deg, #006a64, #32cdb7); box-shadow: 0 0 0 4px rgba(55, 205, 182, .12), 0 0 18px rgba(55, 205, 182, .24); }
+.visitor-count-label { position: relative; z-index: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-count-spark { position: relative; z-index: 1; color: #35bea7; font-size: 15px; line-height: 1; animation: visitor-spark 2.1s ease-in-out infinite; }
 .join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
 .join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
 .card-lead { margin: 0 0 7px; color: #7b8885; font-size: 13px; }
-.visitor-count { margin: 0 0 18px; color: #8a9894; font-size: 11px; letter-spacing: .02em; }
 .notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
 .notice-content { min-width: 0; overflow-wrap: anywhere; }
 .notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
@@ -2957,6 +2953,9 @@ function stopWhisperTalk(): void {
 @keyframes join-accent-breathe { 0%, 100% { transform: translateY(0); text-shadow: 0 0 0 rgba(0, 106, 100, 0); } 50% { transform: translateY(-2px); text-shadow: 0 5px 18px rgba(0, 106, 100, .16); } }
 @keyframes join-accent-breathe-dark { 0%, 100% { transform: translateY(0); text-shadow: 0 0 8px rgba(125, 255, 174, .28), 0 0 18px rgba(105, 210, 199, .14); } 50% { transform: translateY(-2px); text-shadow: 0 0 13px rgba(125, 255, 174, .5), 0 0 26px rgba(105, 210, 199, .22); } }
 @keyframes join-dot-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(144, 246, 145, .28); } 50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(144, 246, 145, 0); } }
+@keyframes visitor-shimmer { 0%, 42% { left: -45%; } 72%, 100% { left: 130%; } }
+@keyframes visitor-spark { 0%, 100% { opacity: .58; transform: scale(.88) rotate(0deg); } 50% { opacity: 1; transform: scale(1.14) rotate(12deg); } }
+@keyframes visitor-orbit { 0%, 100% { transform: rotate(-8deg) scale(.96); opacity: .48; } 50% { transform: rotate(12deg) scale(1.04); opacity: .9; } }
 
 .join-page .join-header { animation: join-fade-up .55s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .join-copy .eyebrow { animation: join-fade-up .55s .08s cubic-bezier(.22, 1, .36, 1) both; }
@@ -2966,6 +2965,7 @@ function stopWhisperTalk(): void {
 .join-page .promise-list { animation: join-fade-up .58s .48s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .promise-item:nth-child(2) { animation: join-fade-up .58s .58s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .promise-item:nth-child(3) { animation: join-fade-up .58s .68s cubic-bezier(.22, 1, .36, 1) both; }
+.join-page .visitor-count { animation: join-fade-up .58s .76s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .eyebrow-dot { animation: join-dot-pulse 2.8s .8s ease-in-out infinite; }
 .join-page .join-card { animation: join-fade-up .68s .24s cubic-bezier(.22, 1, .36, 1) both; }
 .join-page .join-footer { animation: join-fade-up .55s .72s cubic-bezier(.22, 1, .36, 1) both; }
@@ -2976,7 +2976,7 @@ function stopWhisperTalk(): void {
 
 @media (max-width: 1200px) { .app-shell { grid-template-columns: 72px 255px minmax(0, 1fr) 218px; }.workspace-content { width: min(900px, calc(100% - 42px)); }.control-dock { padding-inline: 18px; }.dock-center { gap: 8px; }.mic-mode-switch button { padding-inline: 7px; }.member-panel { padding-inline: 12px; }.member-volume { display: none; } }
 @media (max-width: 980px) { .app-shell { grid-template-columns: 70px 245px minmax(0, 1fr); }.member-panel { display: none; }.room-hero { min-height: 180px; }.hero-visual { right: 24px; opacity: .55; }.join-content { gap: 40px; }.join-card { padding: 28px; } }
-@media (max-width: 740px) { .join-header, .join-content, .join-footer { width: min(100% - 32px, 560px); }.join-header { min-height: 70px; }.header-note { display: none; }.join-content { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 35px; padding: 36px 0 48px; }.join-copy h1 { margin-top: 15px; font-size: 45px; }.join-description { font-size: 14px; }.promise-list { gap: 13px; margin-top: 27px; }.promise-item { min-width: 0; flex: 1 1 30%; }.promise-item small { display: none; }.join-card { padding: 24px 20px; }.join-footer { min-height: 53px; }.join-footer .footer-spacer { display: none; }.join-footer span:last-child { margin-left: auto; }.field-grid { grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }.app-shell { display: block; height: 100dvh; }.nav-rail, .channel-sidebar, .member-panel { display: none; }.workspace { height: 100%; }.workspace-header { min-height: 61px; padding: 0 15px; }.mobile-brand { display: inline; }.crumb-muted, .breadcrumbs > .ui-icon, .breadcrumbs > strong { display: none; }.workspace-actions { gap: 3px; }.disconnect-button { margin-left: 2px; padding-inline: 9px; }.disconnect-button .ui-icon { display: none; }.workspace-content { width: calc(100% - 30px); padding-top: 18px; }.room-hero { min-height: 182px; padding: 23px 21px; }.room-hero h1 { font-size: 22px; }.room-hero p { max-width: 74%; font-size: 11px; }.hero-visual { right: -15px; bottom: 4px; transform: scale(.75); transform-origin: right bottom; }.voice-section, .chat-panel { margin-top: 25px; }.voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.voice-card { min-height: 143px; }.message-row { max-width: 92%; }.control-dock { min-height: 66px; padding: 8px 15px; }.dock-user { min-width: 0; }.dock-user > div:last-child { display: none; }.dock-center { flex: 1; justify-content: center; }.mic-mode-switch button { padding: 6px 7px; font-size: 9px; }.ptt-indicator { display: none; }.dock-actions { min-width: 75px; }.settings-modal { max-height: calc(100dvh - 28px); }.settings-nav { display: none; }.settings-content { padding: 24px 20px; }.settings-header { min-height: 62px; padding-inline: 20px; }.settings-header h2 { font-size: 19px; }.settings-footer { min-height: 61px; padding-inline: 20px; } }
+@media (max-width: 740px) { .join-header, .join-content, .join-footer { width: min(100% - 32px, 560px); }.join-header { min-height: 70px; }.header-note { display: none; }.join-content { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 35px; padding: 36px 0 48px; }.join-copy h1 { margin-top: 15px; font-size: 45px; }.join-description { font-size: 14px; }.promise-list { gap: 13px; margin-top: 27px; }.promise-item { min-width: 0; flex: 1 1 30%; }.promise-item small { display: none; }.visitor-count { margin-top: 24px; }.join-card { padding: 24px 20px; }.join-footer { min-height: 53px; }.join-footer .footer-spacer { display: none; }.join-footer span:last-child { margin-left: auto; }.field-grid { grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }.app-shell { display: block; height: 100dvh; }.nav-rail, .channel-sidebar, .member-panel { display: none; }.workspace { height: 100%; }.workspace-header { min-height: 61px; padding: 0 15px; }.mobile-brand { display: inline; }.crumb-muted, .breadcrumbs > .ui-icon, .breadcrumbs > strong { display: none; }.workspace-actions { gap: 3px; }.disconnect-button { margin-left: 2px; padding-inline: 9px; }.disconnect-button .ui-icon { display: none; }.workspace-content { width: calc(100% - 30px); padding-top: 18px; }.room-hero { min-height: 182px; padding: 23px 21px; }.room-hero h1 { font-size: 22px; }.room-hero p { max-width: 74%; font-size: 11px; }.hero-visual { right: -15px; bottom: 4px; transform: scale(.75); transform-origin: right bottom; }.voice-section, .chat-panel { margin-top: 25px; }.voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.voice-card { min-height: 143px; }.message-row { max-width: 92%; }.control-dock { min-height: 66px; padding: 8px 15px; }.dock-user { min-width: 0; }.dock-user > div:last-child { display: none; }.dock-center { flex: 1; justify-content: center; }.mic-mode-switch button { padding: 6px 7px; font-size: 9px; }.ptt-indicator { display: none; }.dock-actions { min-width: 75px; }.settings-modal { max-height: calc(100dvh - 28px); }.settings-nav { display: none; }.settings-content { padding: 24px 20px; }.settings-header { min-height: 62px; padding-inline: 20px; }.settings-header h2 { font-size: 19px; }.settings-footer { min-height: 61px; padding-inline: 20px; } }
 @media (max-width: 420px) { .join-copy h1 { font-size: 38px; }.promise-list { display: grid; grid-template-columns: 1fr; }.promise-item small { display: block; }.join-card { border-radius: 15px; }.voice-grid { gap: 8px; }.voice-card { padding-inline: 6px; }.section-counter { display: none; }.workspace-actions .header-action:first-child { display: none; }.dock-icon { display: none; }.dock-actions { min-width: 37px; }.room-stats { gap: 6px; }.room-stats span:last-child, .stat-divider { display: none; } }
 
 /* The connected view keeps only controls that have a working action. The
@@ -3092,6 +3092,7 @@ function stopWhisperTalk(): void {
 .join-page .card-kicker { font-size: 12.5px; }
 .join-page .join-card h2 { font-size: 33.75px; }
 .join-page .card-lead { font-size: 16.25px; }
+.join-page .visitor-count { font-size: 15px; }
 .join-page .notice { font-size: 15px; }
 .join-page .field-label { font-size: 13.75px; }
 .join-page .field-wrap input { font-size: 16.25px; }
@@ -3230,7 +3231,7 @@ function stopWhisperTalk(): void {
 .room-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--surface-1)), var(--surface-1) 75%); }
 .voice-card, .member-panel, .settings-modal { box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
 .section-heading h2, .room-hero h1, .join-card h2, .member-panel-heading h2, .message-meta strong, .member-copy strong { color: var(--text-primary); }
-.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead, .visitor-count { color: var(--text-muted); }
+.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead { color: var(--text-muted); }
 .chat-panel, .chat-heading, .settings-header, .settings-footer, .settings-separator { border-color: var(--border); }
 .message-bubble { color: var(--text-primary); background: var(--surface-2); }
 .settings-content, .settings-nav { background: var(--surface-1); }
@@ -3253,10 +3254,12 @@ function stopWhisperTalk(): void {
 :global(html[data-theme="dark"] .join-page .join-description),
 :global(html[data-theme="dark"] .join-page .promise-item small),
 :global(html[data-theme="dark"] .join-page .card-lead),
-:global(html[data-theme="dark"] .join-page .visitor-count),
 :global(html[data-theme="dark"] .join-page .field-hint),
 :global(html[data-theme="dark"] .join-page .join-meta),
 :global(html[data-theme="dark"] .join-page .join-footer) { color: var(--text-muted); }
+:global(html[data-theme="dark"] .join-page .visitor-count) { color: #b7fff0; border-color: rgba(105, 210, 199, .42); background: linear-gradient(110deg, #173b36, #1c2d2a); box-shadow: 0 10px 28px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(105, 210, 199, .08); }
+:global(html[data-theme="dark"] .join-page .visitor-count::before) { background: linear-gradient(105deg, transparent, rgba(125, 255, 174, .18), transparent); }
+:global(html[data-theme="dark"] .join-page .visitor-count-orbit) { border-color: rgba(105, 210, 199, .34); }
 :global(html[data-theme="dark"] .join-page .join-copy h1),
 :global(html[data-theme="dark"] .join-page .join-card h2),
 :global(html[data-theme="dark"] .join-page .promise-item b),

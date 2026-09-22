@@ -25,7 +25,6 @@ const { OpusEncoder } = require("@discordjs/opus") as {
 };
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
-const MOVE_PERMISSION_PROBE_INTERVAL_MS = 30_000;
 const AUDIO_FRAME_BYTES = 1_920;
 // A browser audio frame is 20 ms of mono 48 kHz PCM. Keep the server-side
 // WebSocket egress queue small enough that a slow browser cannot turn old
@@ -155,8 +154,6 @@ interface WebClientEntry {
   audio: AudioFlowStats;
   webrtc: WebRtcAudioSession | null;
   lastLatencyProbeAt: number;
-  canMoveClients: boolean;
-  movePermissionProbeTimer: ReturnType<typeof setInterval> | null;
   connectionFailureCode?: string;
   screenPeerId: string;
 }
@@ -299,8 +296,6 @@ export class VoiceBridge {
         audio: createAudioFlowStats(),
         webrtc: null,
         lastLatencyProbeAt: 0,
-        canMoveClients: false,
-        movePermissionProbeTimer: null,
         screenPeerId: entryId,
       };
       this.entries.set(entryId, entry!);
@@ -465,7 +460,6 @@ export class VoiceBridge {
           webrtcAvailable: this.getWebRtcOptions()?.enabled === true,
           screenShareIceServers: this.getScreenShareIceServers(),
           accelerated: Boolean(entry!.acceleration),
-          canMoveClients: entry!.canMoveClients,
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -473,57 +467,11 @@ export class VoiceBridge {
         scheduleMemberAvatarRefresh();
       };
 
-      let movePermissionProbeInFlight = false;
-      const refreshMoveCapability = async (): Promise<void> => {
-        if (!entry || !tsReady || session.state !== "connected" || movePermissionProbeInFlight) return;
-        const probeTarget = findMovePermissionProbeTarget(entry, selfId);
-        if (!probeTarget) return;
-        movePermissionProbeInFlight = true;
-        try {
-          // Probe by moving a visible client to the channel it is already in.
-          // A successful request has no observable state change, while the
-          // server still evaluates i_client_move_power and the target channel's
-          // i_client_needed_move_power. This avoids using ServerQuery-only
-          // `permget`, which is not available on the browser client protocol.
-          await tsClient.probeMovePermission(probeTarget.clientId, BigInt(probeTarget.channelId));
-          if (!entry.canMoveClients) {
-            entry.canMoveClients = true;
-            sendJson({ type: "capabilities", canMoveClients: true });
-          }
-        } catch (error: unknown) {
-          const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
-          // TeamSpeak rejects a no-op move with ALREADY_IN_CHANNEL after it
-          // has evaluated the caller's move power. That is still a positive
-          // permission result for this capability probe; treating it as a
-          // failed probe made server-admin clients look permanently disabled.
-          if (operation.code === "ALREADY_IN_CHANNEL") {
-            if (!entry.canMoveClients) {
-              entry.canMoveClients = true;
-              sendJson({ type: "capabilities", canMoveClients: true });
-            }
-          } else if (operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
-            entry.canMoveClients = false;
-            sendJson({ type: "capabilities", canMoveClients: false });
-          }
-          this.logger.debug({
-            entryId,
-            clientId: probeTarget.clientId,
-            channelId: probeTarget.channelId,
-            code: operation.code,
-          }, "TeamSpeak move capability probe completed");
-        } finally {
-          movePermissionProbeInFlight = false;
-        }
-      };
-      entry!.movePermissionProbeTimer = setInterval(() => { void refreshMoveCapability(); }, MOVE_PERMISSION_PROBE_INTERVAL_MS);
-      entry!.movePermissionProbeTimer.unref?.();
-
       const resetDirectoryForReconnect = () => {
         tsReady = false;
         initialStateSent = false;
         selfId = 0;
         selfChannelId = 0n;
-        entry!.canMoveClients = false;
         directory.clear();
         entry!.channelTree = [];
         entry!.members.clear();
@@ -595,7 +543,6 @@ export class VoiceBridge {
           }
           sendInitialState();
           void this.discoverExistingTeamSpeakStreams(entry!);
-          void refreshMoveCapability();
         } catch (error: unknown) {
           const normalized = normalizeTeamSpeakError(error);
           const failureCode = clientConnectionFailureCode(normalized, serverPassword);
@@ -661,7 +608,6 @@ export class VoiceBridge {
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });
           if (!wasKnown && info.id !== selfId) addServerEvent("joined", `${info.nickname || "未知用户"} 加入了服务器`);
           scheduleMemberAvatarRefresh();
-          void refreshMoveCapability();
         }
       });
 
@@ -991,10 +937,6 @@ export class VoiceBridge {
     if (entry.reconnectTimer) {
       clearTimeout(entry.reconnectTimer);
       entry.reconnectTimer = null;
-    }
-    if (entry.movePermissionProbeTimer) {
-      clearInterval(entry.movePermissionProbeTimer);
-      entry.movePermissionProbeTimer = null;
     }
     entry.opusEncoder = null;
     const webRtc = entry.webrtc;
@@ -1673,12 +1615,21 @@ export class VoiceBridge {
     }
     const config = this.getWebRtcOptions();
     if (!config?.enabled) return;
+    const muted = offer.muted === true;
+    try {
+      // The offer carries the browser's initial mute state. WebRTC can silence
+      // the browser track locally, but TeamSpeak clients only see the state
+      // after the gateway updates its own TS client as well.
+      await entry.tsClient.setInputMuted(muted);
+    } catch (error: unknown) {
+      this.logger.warn({ entryId: entry.id, muted, err: error instanceof Error ? error.message : String(error) }, "Could not synchronize initial microphone mute state");
+    }
     const peer = new WebRtcAudioSession({
       connectionId: entry.id,
       ...(entry.webrtcPublicHost ? { publicHost: entry.webrtcPublicHost } : {}),
       udpPortRange: config.udpPortRange,
       logger: this.logger,
-      microphoneMuted: offer.muted === true,
+      microphoneMuted: muted,
       accompanimentActive: offer.accompanimentActive === true,
       onVoiceFrame: (data, codec) => {
         const now = Date.now();
@@ -1891,10 +1842,6 @@ async function handleCommand(
     if (command.requestId) sendJson({ type: "commandCompleted", requestId: command.requestId });
   } catch (error: unknown) {
     const operation = classifyOperationError(error, "OPERATION_FAILED", "操作失败");
-    if (command.type === "moveClient" && operation.code === "PERMISSION_DENIED" && entry.canMoveClients) {
-      entry.canMoveClients = false;
-      sendJson({ type: "capabilities", canMoveClients: false });
-    }
     sendJson({ type: "error", requestId: command.requestId, error: { code: operation.code, message: operation.message, recoverable: false } });
   }
 }
@@ -2116,17 +2063,6 @@ function mapChannelTree(snapshot: TSDirectorySnapshot, avatarCache = new Map<str
         };
       }),
   }));
-}
-
-function findMovePermissionProbeTarget(entry: Pick<WebClientEntry, "channelTree" | "members">, selfId: number): { clientId: number; channelId: string } | null {
-  for (const rawChannel of entry.channelTree) {
-    if (!isRecord(rawChannel) || typeof rawChannel.id !== "string" || !Array.isArray(rawChannel.members)) continue;
-    for (const rawMember of rawChannel.members) {
-      if (!isRecord(rawMember) || typeof rawMember.id !== "number" || rawMember.id === selfId) continue;
-      if (entry.members.has(rawMember.id)) return { clientId: rawMember.id, channelId: rawChannel.id };
-    }
-  }
-  return null;
 }
 
 function avatarDataUrl(data: Buffer): string | null {
