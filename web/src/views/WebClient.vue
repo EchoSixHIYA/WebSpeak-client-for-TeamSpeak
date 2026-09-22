@@ -669,9 +669,9 @@ const translations: Record<string, Record<string, string>> = {
     screenShareSettings: "共享设置",
     screenShareSettingsHint: "共享前调整输出质量",
     screenShareResolution: "输出分辨率",
-    screenShareResolutionSource: "原始分辨率（浏览器决定）",
-    screenShareResolution720p: "最高 1280 × 720",
-    screenShareResolution1080p: "最高 1920 × 1080",
+    screenShareResolutionSource: "原始分辨率",
+    screenShareResolution720p: "720p（最高 1280 × 720）",
+    screenShareResolution1080p: "1080p（最高 1920 × 1080）",
     screenShareFrameRate: "帧率上限",
     screenShareSettingsNote: "设置会在下一次开始共享时生效",
     watching: "观看中",
@@ -998,9 +998,9 @@ const translations: Record<string, Record<string, string>> = {
     screenShareSettings: "Share settings",
     screenShareSettingsHint: "Adjust output quality before sharing",
     screenShareResolution: "Output resolution",
-    screenShareResolutionSource: "Source resolution (browser decides)",
-    screenShareResolution720p: "Up to 1280 × 720",
-    screenShareResolution1080p: "Up to 1920 × 1080",
+    screenShareResolutionSource: "Source resolution",
+    screenShareResolution720p: "720p (up to 1280 × 720)",
+    screenShareResolution1080p: "1080p (up to 1920 × 1080)",
     screenShareFrameRate: "Frame rate limit",
     screenShareSettingsNote: "These settings apply the next time you start sharing",
     watching: "Watching",
@@ -1322,9 +1322,9 @@ translations.de = {
   screenShareSettings: "Freigabeeinstellungen",
   screenShareSettingsHint: "Ausgabequalität vor dem Teilen anpassen",
   screenShareResolution: "Ausgabeauflösung",
-  screenShareResolutionSource: "Quellauflösung (Browser entscheidet)",
-  screenShareResolution720p: "Maximal 1280 × 720",
-  screenShareResolution1080p: "Maximal 1920 × 1080",
+  screenShareResolutionSource: "Quellauflösung",
+  screenShareResolution720p: "720p (max. 1280 × 720)",
+  screenShareResolution1080p: "1080p (max. 1920 × 1080)",
   screenShareFrameRate: "Bildratenlimit",
   screenShareSettingsNote: "Die Einstellungen gelten beim nächsten Start der Freigabe",
   serverPassword: "Serverpasswort",
@@ -1585,9 +1585,9 @@ translations.ru = {
   screenShareSettings: "Настройки трансляции",
   screenShareSettingsHint: "Настройте качество перед началом трансляции",
   screenShareResolution: "Выходное разрешение",
-  screenShareResolutionSource: "Исходное разрешение (определяет браузер)",
-  screenShareResolution720p: "До 1280 × 720",
-  screenShareResolution1080p: "До 1920 × 1080",
+  screenShareResolutionSource: "Исходное разрешение",
+  screenShareResolution720p: "720p (до 1280 × 720)",
+  screenShareResolution1080p: "1080p (до 1920 × 1080)",
   screenShareFrameRate: "Ограничение FPS",
   screenShareSettingsNote: "Настройки применятся при следующем запуске трансляции",
   noiseSuppression: "Шумоподавление",
@@ -1699,9 +1699,9 @@ translations.ja = {
   screenShareSettings: "共有設定",
   screenShareSettingsHint: "共有前に出力品質を調整",
   screenShareResolution: "出力解像度",
-  screenShareResolutionSource: "元の解像度（ブラウザに任せる）",
-  screenShareResolution720p: "最大 1280 × 720",
-  screenShareResolution1080p: "最大 1920 × 1080",
+  screenShareResolutionSource: "元の解像度",
+  screenShareResolution720p: "720p（最大 1280 × 720）",
+  screenShareResolution1080p: "1080p（最大 1920 × 1080）",
   screenShareFrameRate: "フレームレート上限",
   screenShareSettingsNote: "次回の共有開始時に適用されます",
   noiseSuppression: "ノイズ抑制",
@@ -3982,20 +3982,21 @@ function stopWhisperTalk(): void {
 .screen-share-stop-button { position: absolute; bottom: -4px; left: -5px; z-index: 3; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; color: var(--danger); border: 2px solid var(--surface-1); border-radius: 7px; background: var(--surface-2); box-shadow: 0 3px 9px color-mix(in srgb, var(--text-primary) 18%, transparent); cursor: pointer; }
 .screen-share-stop-button:hover { color: #fff; border-color: var(--danger); background: var(--danger); }
 .screen-share-stop-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--danger) 42%, transparent); outline-offset: 2px; }
-.screen-share-card-actions { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; margin-top: 9px; flex-wrap: wrap; }
-.screen-share-start-actions { display: inline-flex; align-items: stretch; gap: 4px; max-width: 100%; }
-.screen-share-card-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 25px; max-width: 100%; padding: 4px 7px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); font-size: 9px; font-weight: 700; line-height: 1.2; cursor: pointer; }
+.screen-share-card-actions { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; min-width: 0; margin-top: 9px; flex-wrap: wrap; }
+.screen-share-start-actions { display: inline-flex; align-items: stretch; justify-content: center; gap: 4px; width: 100%; min-width: 0; }
+.screen-share-card-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 25px; max-width: 100%; padding: 4px 7px; overflow: hidden; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); font-size: 9px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .screen-share-card-button:hover { background: color-mix(in srgb, var(--accent) 15%, var(--surface-1)); }
 .screen-share-card-button.live { color: #0e8c76; background: color-mix(in srgb, #b6f0d5 55%, var(--surface-1)); }
 .screen-share-card-button.viewing { color: #fff; border-color: var(--accent); background: var(--accent); }
 .screen-share-settings-button { display: grid; place-items: center; width: 25px; min-width: 25px; min-height: 25px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-1); cursor: pointer; }
 .screen-share-settings-button:hover, .screen-share-settings-button[aria-expanded="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-1)); }
-.screen-share-settings { display: grid; gap: 7px; width: 100%; padding: 9px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 78%, var(--surface-1)); text-align: left; }
+.screen-share-settings { display: grid; gap: 7px; width: 100%; min-width: 0; padding: 9px; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 78%, var(--surface-1)); text-align: left; }
 .screen-share-settings-heading strong, .screen-share-settings-heading small { display: block; }
 .screen-share-settings-heading strong { color: var(--text-primary); font-size: 10px; }
 .screen-share-settings-heading small, .screen-share-settings-note { color: var(--text-muted); font-size: 8px; line-height: 1.35; }
-.screen-share-settings label { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--text-muted); font-size: 9px; }
-.screen-share-settings select { min-width: 0; max-width: 58%; padding: 4px 5px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); font: inherit; cursor: pointer; }
+.screen-share-settings label { display: grid; gap: 3px; min-width: 0; color: var(--text-muted); font-size: 9px; }
+.screen-share-settings label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-share-settings select { display: block; width: 100%; min-width: 0; max-width: 100%; padding: 4px 5px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .screen-share-settings select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent); outline-offset: 1px; }
 .screen-share-player { position: relative; margin-top: 17px; overflow: hidden; border: 1px solid #263b37; border-radius: 18px; background: #070d0d; box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 18%, transparent); }
 .screen-share-player-stage { position: relative; display: grid; width: 100%; min-height: 245px; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #1d3934, #091010 68%); }
