@@ -1,6 +1,6 @@
 {
   "name": "webspeak-webclient",
-  "version": "0.2.4-preview",
+  "version": "0.2.4",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",

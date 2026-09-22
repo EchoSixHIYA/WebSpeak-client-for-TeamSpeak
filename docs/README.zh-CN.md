@@ -15,6 +15,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 | 能力 | 说明 |
 | --- | --- |
 | TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
+| 跨端 P2P 屏幕共享 | 支持浏览器用户与 TeamSpeak 6 原生客户端互相发起和观看屏幕共享；媒体优先通过 WebRTC/ICE 直连，WebSpeak 仅转发协商信令。 |
 | IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标和域名解析出的 IPv6 地址。 |
 | 频道与成员 | 浏览频道树、查看实时成员状态并切换频道。 |
 | 实时语音 | 使用 Opus，支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
@@ -71,6 +72,10 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 ```
 
 配置 TURN 后，媒体可能经过该外部 TURN 服务，但不会经过 WebSpeak 网关；未配置时只使用直连和 STUN。
+
+### 跨端 P2P 屏幕共享
+
+浏览器用户与 TeamSpeak 6 原生客户端可以互相发现、发起和观看屏幕共享。浏览器之间以及浏览器与原生客户端之间的屏幕媒体优先通过 WebRTC/ICE 端到端传输；WebSpeak 负责会话鉴权、共享状态和 SDP/ICE 信令转发，不承载屏幕媒体流量。页面提供直播状态、观众人数、播放器音量、全屏和退出控制，也可在共享设置窗口中选择最高 1080p 与 60 FPS，并查看 WebRTC 统计。
 
 ### 2. 中继模式
 
@@ -148,6 +153,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
+| [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | 新增浏览器与 TeamSpeak 6 原生客户端之间的跨端 P2P 屏幕共享；提供 STUN/外部 TURN 配置、直播播放器、观众状态、1080p/60 FPS 采集设置和 WebRTC 统计；优化屏幕共享交互并新增访客编号。 |
 | [v0.2.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.3) | 2026-09-19 | 新增频道成员调度与按权限直接移动；支持头像、静音状态同步和身份恢复；更新五种语言的功能截图与文档。 |
 | [v0.2.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.2) | 2026-09-17 | 提供浏览器端麦克风降噪、俄语和日语支持及按语言欢迎词配置；优化音量交互和 PR #2 基础上的错误提示与错误代码。 |
 | [v0.2.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.1) | 2026-09-13 | 优化首页连接错误显示，保留并安全截断错误代码；默认支持 IPv6 TeamSpeak 目标。 |

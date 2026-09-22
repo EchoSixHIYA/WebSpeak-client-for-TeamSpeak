@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.2.4] — 2026-09-22
+
+### 中文
+
+- 新增跨端 P2P 屏幕共享：浏览器用户可以与 TeamSpeak 6 原生客户端互相发现、发起和观看屏幕共享；浏览器之间以及浏览器与原生客户端之间的媒体流优先通过 WebRTC/ICE 直连，WebSpeak 仅负责会话鉴权、共享状态和 SDP/ICE 信令转发，不承载屏幕媒体流量。
+- 默认使用 TeamSpeak 官方 STUN 服务发现直连候选，并支持管理员显式配置外部 TURN；即使使用 TURN，媒体也经过外部服务而不是 WebSpeak 网关。
+- 新增屏幕共享直播状态、观众人数、播放器音量、全屏和退出控制，并提供发送端/接收端 WebRTC 实时统计。
+- 提供浏览器屏幕采集分辨率和帧率设置，最高支持 1080p、60 FPS；设置改为独立弹窗，避免成员卡片被撑高。
+- 新增首页访客编号，并优化屏幕共享成员卡片和观看交互。
+
+### English
+
+- Added cross-platform P2P screen sharing: browser users can discover, start, and watch screen shares with native TeamSpeak 6 clients. Media between browsers, and between a browser and a native client, prefers a direct WebRTC/ICE path; WebSpeak handles session authorization, share state, and SDP/ICE signaling only and does not carry screen media.
+- Added TeamSpeak's public STUN services for direct-candidate discovery by default, with optional administrator-configured external TURN. Even with TURN, media uses the external service rather than the WebSpeak gateway.
+- Added live screen-share status, viewer counts, player volume, fullscreen, and exit controls, plus live sender/receiver WebRTC statistics.
+- Added browser capture-resolution and frame-rate controls up to 1080p and 60 FPS; moved the controls into a standalone modal so member cards no longer stretch.
+- Added homepage visitor numbering and refined screen-share member-card and viewing interactions.
+
+### Deutsch
+
+- Plattformübergreifendes P2P-Bildschirmteilen ergänzt: Browsernutzer können Bildschirmfreigaben mit nativen TeamSpeak-6-Clients erkennen, starten und ansehen. Die Medienübertragung zwischen Browsern sowie zwischen Browser und nativem Client nutzt möglichst direkte WebRTC-/ICE-Verbindungen; WebSpeak übernimmt nur Sitzungsberechtigung, Freigabestatus und SDP-/ICE-Signalisierung und transportiert keine Bildschirmmedien.
+- Öffentliche TeamSpeak-STUN-Dienste werden standardmäßig zur Ermittlung direkter Kandidaten verwendet; ein externes TURN kann ausdrücklich durch den Administrator konfiguriert werden. Auch mit TURN läuft die Medienübertragung über den externen Dienst und nicht über das WebSpeak-Gateway.
+- Live-Status, Zuschauerzahl, Lautstärke, Vollbild- und Beenden-Steuerung für Bildschirmfreigaben sowie laufende WebRTC-Statistiken für Sender und Empfänger ergänzt.
+- Aufnahmeauflösung und Bildrate im Browser bis 1080p und 60 FPS konfigurierbar; die Einstellungen wurden in ein eigenes Modal verschoben, damit Mitgliederkarten nicht mehr in die Höhe wachsen.
+- Besucherzählung auf der Startseite ergänzt und die Interaktion von Bildschirmfreigabe-Karten und Player verbessert.
+
+### Русский
+
+- Добавлена кроссплатформенная P2P-трансляция экрана: пользователи браузера могут обнаруживать, запускать и смотреть трансляции вместе с нативными клиентами TeamSpeak 6. Медиа между браузерами, а также между браузером и нативным клиентом по возможности передаётся напрямую через WebRTC/ICE; WebSpeak отвечает только за авторизацию сессии, состояние трансляции и SDP/ICE-сигналы и не переносит медиаданные экрана.
+- По умолчанию добавлено обнаружение прямых кандидатов через публичные STUN-сервисы TeamSpeak; администратор может явно настроить внешний TURN. Даже при использовании TURN медиа идёт через внешний сервис, а не через шлюз WebSpeak.
+- Добавлены статус трансляции, число зрителей, громкость проигрывателя, полноэкранный режим и выход, а также текущая статистика WebRTC для отправителя и получателя.
+- Добавлены настройки разрешения и частоты кадров захвата в браузере до 1080p и 60 FPS; настройки вынесены в отдельное окно, чтобы карточки участников не растягивались.
+- Добавлен номер посетителя на главной странице и улучшено управление карточками и просмотром трансляций.
+
+### 日本語
+
+- クロスプラットフォーム P2P 画面共有を追加しました。ブラウザユーザーは TeamSpeak 6 ネイティブクライアントと互いに画面共有を検出・開始・視聴できます。ブラウザ間、およびブラウザとネイティブクライアント間のメディアは可能な限り WebRTC/ICE で直接送信され、WebSpeak はセッション認証、共有状態、SDP/ICE シグナリングだけを担当し、画面メディアは運びません。
+- 初期設定で TeamSpeak 公開 STUN サービスによる直接候補の検出に対応し、管理者が外部 TURN を明示的に設定できるようにしました。TURN 使用時もメディアは外部サービスを経由し、WebSpeak ゲートウェイは経由しません。
+- 配信状態、視聴者数、プレーヤー音量、全画面、終了操作と、送信側・受信側の WebRTC 統計を追加しました。
+- ブラウザの画面取得設定で最大 1080p / 60 FPS を選択できます。設定を独立したモーダルに移し、メンバーカードが縦に伸びないようにしました。
+- ホームページの訪問者番号を追加し、画面共有カードと視聴操作を改善しました。
+
 ## [0.2.3] — 2026-09-19
 
 ### 中文
