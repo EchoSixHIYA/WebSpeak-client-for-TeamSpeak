@@ -2236,7 +2236,15 @@ const chatTabLabel = computed(() => chatTab.value === "channel" ? t("textChannel
 const chatTitle = computed(() => chatTab.value === "channel" ? t("channelChat", { channel: currentChannelName.value }) : chatTab.value === "server" ? t("serverChat") : chatTab.value === "events" ? t("eventLog") : privateConversations.value.find((conversation) => conversation.id === privateClientId.value)?.name ?? t("privateMessage"));
 const chatPlaceholder = computed(() => chatTab.value === "private" ? t("privateMessagePlaceholder") : chatTab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
-const memberMenuStyle = computed(() => memberMenu.value ? { left: `${memberMenu.value.x}px`, top: `${memberMenu.value.y}px` } : {});
+const memberMenuStyle = computed(() => {
+  if (!memberMenu.value) return {};
+  // #app applies zoom:var(--ui-scale) which also scales fixed-element
+  // coordinates against the viewport; divide the pointer position back to CSS
+  // pixels so the context menu opens exactly where the user clicked on large
+  // displays.
+  const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+  return { left: `${memberMenu.value.x / scale}px`, top: `${memberMenu.value.y / scale}px` };
+});
 const median = (values: number[]) => {
   const sorted = [...values].sort((left, right) => left - right);
   return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
@@ -3589,9 +3597,24 @@ function stopWhisperTalk(): void {
 .join-page { height: 100dvh; min-height: 0; overflow: hidden; }
 .join-content { min-height: 0; }
 
+/* Desktop zoom compensation. main.ts sets --ui-scale (>1 only on large
+   viewports) and App.vue applies zoom:var(--ui-scale) on #app. html/body stay
+   pinned to the real viewport (100dvh) while the zoomed roots divide their
+   height by the scale so the rendered result lands on exactly one viewport.
+   Without this a 2K/4K viewport would render a 1.5x-tall shell, clipping the
+   bottom of the workspace and leaving blank space under the control dock.
+   Non-zero fixed offsets (toast, poke banner) are divided back to CSS pixels
+   because zoom also scales fixed coordinates against the viewport. */
+@media (min-width: 851px) {
+  :global(html), :global(body) { height: 100dvh; max-height: 100dvh; }
+  :global(#app), .web-client, .join-page, .app-shell { height: calc(100dvh / var(--ui-scale)); min-height: 0; max-height: calc(100dvh / var(--ui-scale)); }
+  .toast { right: calc(24px / var(--ui-scale)); bottom: calc(24px / var(--ui-scale)); }
+  .poke-banner { top: calc(82px / var(--ui-scale)); right: calc(24px / var(--ui-scale)); }
+}
+
 @media (max-width: 740px) {
   .join-content { overflow-y: auto; }
-  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
   .app-shell .workspace { height: auto; min-height: 0; flex: 1 1 auto; }
   .app-shell.mobile-view-channels .workspace { display: none; }
   .app-shell .member-panel.mobile-section-visible { flex: 1 1 auto; min-height: 0; max-height: none; }
@@ -3621,7 +3644,7 @@ function stopWhisperTalk(): void {
 .member-menu-close { display: none; }
 
 @media (max-width: 740px) {
-  :global(html), :global(body), :global(#app) { height: 100%; min-height: 100%; max-height: none; }
+  :global(html), :global(body), :global(#app) { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .web-client { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .app-shell { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
   .app-shell .workspace { height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
@@ -3683,7 +3706,7 @@ function stopWhisperTalk(): void {
   .member-action-button:hover, .member-action-button:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
 
   .app-shell.mobile-view-chat .workspace-scroll { overflow: hidden; }
-  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
   .app-shell.mobile-view-chat .chat-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 0; padding: 0; border-top: 0; }
   .app-shell.mobile-view-chat .chat-tabs { flex: 0 0 auto; margin-top: 0; padding: 10px 0 9px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
   .app-shell.mobile-view-chat .chat-tabs::-webkit-scrollbar { display: none; }
