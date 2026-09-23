@@ -3049,6 +3049,7 @@ function stopWhisperTalk(): void {
 .join-header, .join-content, .join-footer { position: relative; z-index: 1; }
 .join-header { z-index: 10; }
 .join-header .language-switcher { z-index: 50; }
+.join-footer { z-index: 2; }
 .join-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; }
 .brand-mark, .rail-logo { display: grid; place-items: center; color: #fff; background: #006a64; box-shadow: 0 8px 18px rgba(0, 106, 100, .15); }
@@ -3121,7 +3122,7 @@ function stopWhisperTalk(): void {
 .connect-button { width: 100%; min-height: 44px; margin-top: 10px; font-size: 13px; }
 .button-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
 .join-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; color: #96a29f; font-size: 10px; }
-.join-footer { display: flex; align-items: center; min-height: 68px; color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
+.join-footer { display: flex; align-items: center; min-height: 68px; background: var(--surface-0); color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
 .footer-separator { margin: 0 8px; color: #ccd5d1; }.footer-spacer { flex: 1; }
 
 .app-shell { display: grid; grid-template-columns: 76px 292px minmax(0, 1fr) 246px; height: 100dvh; overflow: hidden; background: #fff; }
@@ -3595,7 +3596,7 @@ function stopWhisperTalk(): void {
    content scroll area so headers, controls and mobile navigation stay fixed. */
 :global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; overflow: hidden; }
 .join-page { height: 100dvh; min-height: 0; overflow: hidden; }
-.join-content { min-height: 0; }
+.join-content { min-height: 0; overflow-y: auto; }
 
 /* Desktop zoom compensation. main.ts sets --ui-scale (>1 only on large
    viewports) and App.vue applies zoom:var(--ui-scale) on #app. html/body stay
