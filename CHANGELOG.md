@@ -10,6 +10,7 @@
 - 提供浏览器屏幕采集分辨率和帧率设置，最高支持 1080p、60 FPS；设置改为独立弹窗，避免成员卡片被撑高。
 - 新增首页访客编号，并优化屏幕共享成员卡片和观看交互。
 - 修正输出限制的应用方式：保持所选桌面或窗口的原始采集尺寸，由发送端编码器按设置缩放和限帧；首页同时显示当前访客序号和累计访客数。
+- 修复 TeamSpeak 握手期间服务器拒绝错误被误报为连接超时的问题；昵称长度不符合要求时会显示明确的修改提示。
 
 ### English
 
@@ -19,6 +20,7 @@
 - Added browser capture-resolution and frame-rate controls up to 1080p and 60 FPS; moved the controls into a standalone modal so member cards no longer stretch.
 - Added homepage visitor numbering and refined screen-share member-card and viewing interactions.
 - Fixed output-limit handling so the selected desktop or window keeps its native capture size while the sender encoder applies the requested scale and frame-rate cap; the homepage now also shows the total visitor count.
+- Fixed handshake refusals being reported as connection timeouts; invalid nickname lengths now show a clear prompt to change the nickname.
 
 ### Deutsch
 
@@ -28,6 +30,7 @@
 - Aufnahmeauflösung und Bildrate im Browser bis 1080p und 60 FPS konfigurierbar; die Einstellungen wurden in ein eigenes Modal verschoben, damit Mitgliederkarten nicht mehr in die Höhe wachsen.
 - Besucherzählung auf der Startseite ergänzt und die Interaktion von Bildschirmfreigabe-Karten und Player verbessert.
 - Die Ausgabelimits werden nun am Sender-Encoder angewendet, während die native Aufnahmegröße des ausgewählten Desktops oder Fensters erhalten bleibt; auf der Startseite wird zusätzlich die Gesamtzahl der Besucher angezeigt.
+- Behoben, dass Ablehnungen während des TeamSpeak-Handshakes als Zeitüberschreitung angezeigt wurden; bei ungültiger Nicknamenslänge erscheint nun ein klarer Änderungshinweis.
 
 ### Русский
 
@@ -37,6 +40,7 @@
 - Добавлены настройки разрешения и частоты кадров захвата в браузере до 1080p и 60 FPS; настройки вынесены в отдельное окно, чтобы карточки участников не растягивались.
 - Добавлен номер посетителя на главной странице и улучшено управление карточками и просмотром трансляций.
 - Исправлено применение ограничений вывода: выбранный рабочий стол или окно сохраняет исходный размер захвата, а запрошенное масштабирование и ограничение частоты кадров применяются кодировщиком отправителя; на главной странице также показывается общее число посетителей.
+- Исправлено ошибочное отображение отказов TeamSpeak во время рукопожатия как тайм-аута; при недопустимой длине имени показывается понятная просьба изменить его.
 
 ### 日本語
 
@@ -46,6 +50,7 @@
 - ブラウザの画面取得設定で最大 1080p / 60 FPS を選択できます。設定を独立したモーダルに移し、メンバーカードが縦に伸びないようにしました。
 - ホームページの訪問者番号を追加し、画面共有カードと視聴操作を改善しました。
 - 出力制限を送信側エンコーダーで適用するよう修正し、選択したデスクトップやウィンドウの元の取得サイズを維持します。ホームページには訪問者番号に加えて累計訪問者数も表示します。
+- TeamSpeak の接続ハンドシェイク中の拒否がタイムアウトとして表示される問題を修正しました。ニックネームの長さが不適切な場合は、変更を促すメッセージを表示します。
 
 ## [0.2.3] — 2026-09-19
 
