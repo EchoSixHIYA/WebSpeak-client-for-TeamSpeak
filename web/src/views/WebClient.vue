@@ -27,6 +27,8 @@
             <span class="visitor-count-orbit" aria-hidden="true"></span>
             <span class="visitor-count-icon"><Icon name="users" :size="15" /></span>
             <span class="visitor-count-label">{{ t('visitorCount', { count: visitorNumber }) }}</span>
+            <span v-if="visitorTotal !== null" class="visitor-count-divider" aria-hidden="true"></span>
+            <span v-if="visitorTotal !== null" class="visitor-count-total">{{ t('visitorTotal', { count: visitorTotal }) }}</span>
             <span class="visitor-count-spark" aria-hidden="true">✦</span>
           </div>
         </div>
@@ -372,7 +374,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
-import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult, type ScreenShareCaptureSettings, type ScreenShareStream } from "../composables/useVoiceWebSocket.js";
+import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult, type ScreenShareOutputSettings, type ScreenShareStream } from "../composables/useVoiceWebSocket.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -483,6 +485,7 @@ const welcomeTextRu = ref("");
 const welcomeTextJa = ref("");
 const appVersion = ref("0.2.4");
 const visitorNumber = ref<number | null>(null);
+const visitorTotal = ref<number | null>(null);
 const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
 const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
@@ -590,6 +593,7 @@ const translations: Record<string, Record<string, string>> = {
     welcomeBack: "欢迎回来",
     joinLead: "输入一个昵称，选择进入的频道。",
     visitorCount: "你是第 {{count}} 个访客",
+    visitorTotal: "共计 {{count}} 个访客",
     serverAddress: "TeamSpeak 服务器地址",
     serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
     serverPort: "语音端口",
@@ -919,6 +923,7 @@ const translations: Record<string, Record<string, string>> = {
     welcomeBack: "Welcome back",
     joinLead: "Choose a nickname and the channel to enter.",
     visitorCount: "You are visitor No. {{count}}",
+    visitorTotal: "{{count}} total visitors",
     serverAddress: "TeamSpeak server address",
     serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
     serverPort: "Voice port",
@@ -1251,6 +1256,7 @@ translations.de = {
   welcomeBack: "Willkommen zurück",
   joinLead: "Wähle einen Namen und den Kanal, dem du beitreten möchtest.",
   visitorCount: "Du bist Besucher Nr. {{count}}",
+  visitorTotal: "Insgesamt {{count}} Besucher",
   serverAddress: "TeamSpeak-Serveradresse",
   serverAddressPlaceholder: "z. B. ts.example.com oder 127.0.0.1",
   serverPort: "Sprachport",
@@ -1610,6 +1616,7 @@ translations.ru = {
   welcomeBack: "С возвращением",
   joinLead: "Выберите имя и канал для входа.",
   visitorCount: "Вы {{count}}-й посетитель",
+  visitorTotal: "Всего посетителей: {{count}}",
   serverAddress: "Адрес сервера TeamSpeak",
   serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
   serverPort: "Голосовой порт",
@@ -1724,6 +1731,7 @@ translations.ja = {
   welcomeBack: "おかえりなさい",
   joinLead: "名前と参加するチャンネルを選択してください。",
   visitorCount: "あなたは{{count}}人目の訪問者です",
+  visitorTotal: "訪問者数：{{count}}人",
   serverAddress: "TeamSpeak サーバーアドレス",
   serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
   serverPort: "音声ポート",
@@ -2607,9 +2615,10 @@ async function loadPublicConfig() {
   try {
     const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
     if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; visitorNumber?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
+    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; visitorNumber?: unknown; visitorTotal?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
     if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
     visitorNumber.value = Number.isSafeInteger(config.visitorNumber) && Number(config.visitorNumber) > 0 ? Number(config.visitorNumber) : null;
+    visitorTotal.value = Number.isSafeInteger(config.visitorTotal) && Number(config.visitorTotal) > 0 ? Number(config.visitorTotal) : null;
     initialized.value = config.initialized === true;
     if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
     if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
@@ -2985,7 +2994,7 @@ async function toggleScreenShareFullscreen(): Promise<void> {
 
 async function startScreenShareWithSettings(): Promise<void> {
   const preset = screenShareResolutionOptions.find((option) => option.value === screenShareResolutionPreset.value);
-  const settings: ScreenShareCaptureSettings = {
+  const settings: ScreenShareOutputSettings = {
     ...(preset?.width && preset.height ? { maxWidth: preset.width, maxHeight: preset.height } : {}),
     maxFrameRate: screenShareFrameRate.value,
   };
@@ -3090,6 +3099,8 @@ function stopWhisperTalk(): void {
 .visitor-count-orbit { position: absolute; top: -20px; right: 12px; width: 51px; height: 51px; border: 1px solid rgba(71, 194, 174, .32); border-radius: 50%; pointer-events: none; animation: visitor-orbit 4s ease-in-out infinite; }
 .visitor-count-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 auto; color: #fff; border-radius: 50%; background: linear-gradient(135deg, #006a64, #32cdb7); box-shadow: 0 0 0 4px rgba(55, 205, 182, .12), 0 0 18px rgba(55, 205, 182, .24); }
 .visitor-count-label { position: relative; z-index: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visitor-count-divider { position: relative; z-index: 1; width: 1px; height: 18px; flex: 0 0 auto; background: currentColor; opacity: .24; }
+.visitor-count-total { position: relative; z-index: 1; min-width: 0; overflow: hidden; color: inherit; font-size: .92em; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
 .visitor-count-spark { position: relative; z-index: 1; color: #35bea7; font-size: 15px; line-height: 1; animation: visitor-spark 2.1s ease-in-out infinite; }
 .join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
 .card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }

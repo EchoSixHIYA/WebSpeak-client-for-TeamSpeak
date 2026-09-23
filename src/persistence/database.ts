@@ -390,6 +390,12 @@ export class WebSpeakDatabase {
     return nextNumber;
   }
 
+  getVisitorCount(): number {
+    const value = this.getMeta("visitor_count");
+    const count = value ? Number.parseInt(value, 10) : 0;
+    return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+  }
+
   addAudit(event: string, details: Record<string, unknown> = {}): void {
     this.insertAudit(event, details, new Date().toISOString());
   }

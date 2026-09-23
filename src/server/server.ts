@@ -24,6 +24,7 @@ export interface WebServerOptions {
   adminService: AdminService;
   logger: Logger;
   nextVisitorNumber?: () => number;
+  visitorCount?: () => number;
 }
 
 export interface WebServer {
@@ -76,9 +77,21 @@ export function createWebServer(options: WebServerOptions): WebServer {
         logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Visitor number could not be assigned");
       }
     }
+    let visitorTotal: number | null = null;
+    if (options.visitorCount) {
+      try {
+        const count = options.visitorCount();
+        if (Number.isSafeInteger(count) && count >= 0) visitorTotal = count;
+      } catch (error: unknown) {
+        logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Visitor total could not be read");
+      }
+    } else if (visitorNumber !== null) {
+      visitorTotal = visitorNumber;
+    }
     response.json({
       ...options.adminService.getPublicConfig(),
       ...(visitorNumber === null ? {} : { visitorNumber }),
+      ...(visitorTotal === null ? {} : { visitorTotal }),
       accelerationAvailable: acceleration.length > 0,
       accelerationRelays: acceleration.map((relay) => ({ id: relay.id, name: relay.name })),
     });

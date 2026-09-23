@@ -9,6 +9,7 @@
 - 新增屏幕共享直播状态、观众人数、播放器音量、全屏和退出控制，并提供发送端/接收端 WebRTC 实时统计。
 - 提供浏览器屏幕采集分辨率和帧率设置，最高支持 1080p、60 FPS；设置改为独立弹窗，避免成员卡片被撑高。
 - 新增首页访客编号，并优化屏幕共享成员卡片和观看交互。
+- 修正输出限制的应用方式：保持所选桌面或窗口的原始采集尺寸，由发送端编码器按设置缩放和限帧；首页同时显示当前访客序号和累计访客数。
 
 ### English
 
@@ -17,6 +18,7 @@
 - Added live screen-share status, viewer counts, player volume, fullscreen, and exit controls, plus live sender/receiver WebRTC statistics.
 - Added browser capture-resolution and frame-rate controls up to 1080p and 60 FPS; moved the controls into a standalone modal so member cards no longer stretch.
 - Added homepage visitor numbering and refined screen-share member-card and viewing interactions.
+- Fixed output-limit handling so the selected desktop or window keeps its native capture size while the sender encoder applies the requested scale and frame-rate cap; the homepage now also shows the total visitor count.
 
 ### Deutsch
 
@@ -25,6 +27,7 @@
 - Live-Status, Zuschauerzahl, Lautstärke, Vollbild- und Beenden-Steuerung für Bildschirmfreigaben sowie laufende WebRTC-Statistiken für Sender und Empfänger ergänzt.
 - Aufnahmeauflösung und Bildrate im Browser bis 1080p und 60 FPS konfigurierbar; die Einstellungen wurden in ein eigenes Modal verschoben, damit Mitgliederkarten nicht mehr in die Höhe wachsen.
 - Besucherzählung auf der Startseite ergänzt und die Interaktion von Bildschirmfreigabe-Karten und Player verbessert.
+- Die Ausgabelimits werden nun am Sender-Encoder angewendet, während die native Aufnahmegröße des ausgewählten Desktops oder Fensters erhalten bleibt; auf der Startseite wird zusätzlich die Gesamtzahl der Besucher angezeigt.
 
 ### Русский
 
@@ -33,6 +36,7 @@
 - Добавлены статус трансляции, число зрителей, громкость проигрывателя, полноэкранный режим и выход, а также текущая статистика WebRTC для отправителя и получателя.
 - Добавлены настройки разрешения и частоты кадров захвата в браузере до 1080p и 60 FPS; настройки вынесены в отдельное окно, чтобы карточки участников не растягивались.
 - Добавлен номер посетителя на главной странице и улучшено управление карточками и просмотром трансляций.
+- Исправлено применение ограничений вывода: выбранный рабочий стол или окно сохраняет исходный размер захвата, а запрошенное масштабирование и ограничение частоты кадров применяются кодировщиком отправителя; на главной странице также показывается общее число посетителей.
 
 ### 日本語
 
@@ -41,6 +45,7 @@
 - 配信状態、視聴者数、プレーヤー音量、全画面、終了操作と、送信側・受信側の WebRTC 統計を追加しました。
 - ブラウザの画面取得設定で最大 1080p / 60 FPS を選択できます。設定を独立したモーダルに移し、メンバーカードが縦に伸びないようにしました。
 - ホームページの訪問者番号を追加し、画面共有カードと視聴操作を改善しました。
+- 出力制限を送信側エンコーダーで適用するよう修正し、選択したデスクトップやウィンドウの元の取得サイズを維持します。ホームページには訪問者番号に加えて累計訪問者数も表示します。
 
 ## [0.2.3] — 2026-09-19
 

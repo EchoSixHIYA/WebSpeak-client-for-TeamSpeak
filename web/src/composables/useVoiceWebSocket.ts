@@ -82,7 +82,7 @@ export interface ScreenShareViewer {
   avatar?: string;
 }
 
-export interface ScreenShareCaptureSettings {
+export interface ScreenShareOutputSettings {
   maxWidth?: number;
   maxHeight?: number;
   maxFrameRate?: number;
@@ -389,6 +389,10 @@ export function useVoiceWebSocket() {
   const screenShareErrorCode = ref("");
   const screenShareRemoteVolume = ref(1);
   let screenShareLocalStream: MediaStream | null = null;
+  // These are encoder/output limits. The display track itself must keep the
+  // source resolution so selecting a high-resolution desktop or game window
+  // never changes that source before capture.
+  let screenShareOutputSettings: ScreenShareOutputSettings | null = null;
   const screenSharePeers = new Map<string, RTCPeerConnection>();
   const screenSharePeerRoles = new Map<string, "owner" | "viewer">();
   const screenShareWebRtcStats = reactive<ScreenShareWebRtcStats>({ updatedAt: null, capture: null, peers: [] });
@@ -1927,7 +1931,10 @@ export function useVoiceWebSocket() {
     screenSharePeerRoles.set(peerId, role);
     startScreenShareStatsPolling();
     if (role === "owner") {
-      for (const track of screenShareLocalStream?.getTracks() ?? []) peer.addTrack(track, screenShareLocalStream!);
+      for (const track of screenShareLocalStream?.getTracks() ?? []) {
+        const sender = peer.addTrack(track, screenShareLocalStream!);
+        if (track.kind === "video") void configureScreenShareVideoSender(sender, track);
+      }
     } else {
       peer.addTransceiver("video", { direction: "recvonly" });
       const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
@@ -1971,6 +1978,39 @@ export function useVoiceWebSocket() {
       if (peer.connectionState === "closed" && screenSharePeers.get(peerId) === peer) closeScreenSharePeer(peerId);
     };
     return peer;
+  }
+
+  async function configureScreenShareVideoSender(sender: RTCRtpSender, track: MediaStreamTrack): Promise<void> {
+    if (!sender.setParameters || track.kind !== "video") return;
+    try {
+      const settings = track.getSettings();
+      const requested = screenShareOutputSettings;
+      const sourceWidth = typeof settings.width === "number" && settings.width > 0 ? settings.width : null;
+      const sourceHeight = typeof settings.height === "number" && settings.height > 0 ? settings.height : null;
+      const targetWidth = requested?.maxWidth ?? sourceWidth;
+      const targetHeight = requested?.maxHeight ?? sourceHeight;
+      const scaleResolutionDownBy = sourceWidth && sourceHeight && targetWidth && targetHeight
+        ? Math.max(1, sourceWidth / targetWidth, sourceHeight / targetHeight)
+        : 1;
+      const sourceFrameRate = typeof settings.frameRate === "number" && settings.frameRate > 0 ? settings.frameRate : null;
+      const targetFrameRate = requested?.maxFrameRate
+        ? Math.max(1, Math.min(requested.maxFrameRate, sourceFrameRate ?? requested.maxFrameRate))
+        : sourceFrameRate;
+      const parameters = sender.getParameters();
+      const encodings = parameters.encodings?.length ? parameters.encodings : [{}];
+      const firstEncoding = { ...encodings[0] };
+      if (scaleResolutionDownBy > 1.01) firstEncoding.scaleResolutionDownBy = scaleResolutionDownBy;
+      if (targetFrameRate) firstEncoding.maxFramerate = targetFrameRate;
+      parameters.encodings = [firstEncoding, ...encodings.slice(1)];
+      // Prefer keeping motion smooth and let the encoder reduce detail/resolution
+      // before it throws away large numbers of frames under pressure.
+      parameters.degradationPreference = "maintain-framerate";
+      await sender.setParameters(parameters);
+    } catch {
+      // Older browsers may reject one of the optional sender parameters. The
+      // track remains usable and the diagnostics panel still exposes the real
+      // negotiated frame rate and dimensions.
+    }
   }
 
   function preferScreenShareCodecs(peer: RTCPeerConnection): void {
@@ -2130,7 +2170,7 @@ export function useVoiceWebSocket() {
     return active?.ownerPeerId ?? "";
   }
 
-  async function startScreenShare(audio = true, settings?: ScreenShareCaptureSettings): Promise<void> {
+  async function startScreenShare(audio = true, settings?: ScreenShareOutputSettings): Promise<void> {
     if (ws.value?.readyState !== WebSocket.OPEN || screenShareActive.value || screenShareStarting.value) return;
     if (!navigator.mediaDevices?.getDisplayMedia) {
       screenShareError.value = "当前浏览器不支持屏幕共享";
@@ -2141,31 +2181,31 @@ export function useVoiceWebSocket() {
     const startGeneration = ++screenShareStartGeneration;
     screenShareStarting.value = true;
     screenShareStartCancelled = false;
-    const videoConstraints: MediaTrackConstraints = {
-      ...(settings?.maxWidth && settings?.maxHeight ? {
-        width: { ideal: settings.maxWidth, max: settings.maxWidth },
-        height: { ideal: settings.maxHeight, max: settings.maxHeight },
-      } : {}),
-      ...(settings?.maxFrameRate ? { frameRate: { ideal: settings.maxFrameRate, max: settings.maxFrameRate } } : {}),
-    };
+    screenShareOutputSettings = settings ?? null;
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio });
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        // Capture the selected surface at its native browser-provided size.
+        // Output resolution/FPS are applied later on each RTCRtpSender so the
+        // user's desktop or application window is never resized or sampled at
+        // the output limit.
+        video: true,
+        audio,
+        // These are preferences: when the selected surface is a window, ask
+        // for that window's audio; when it is a monitor, allow system audio.
+        // The browser/OS may still return no audio or ignore the preference.
+        systemAudio: "include",
+        windowAudio: "window",
+        selfBrowserSurface: "exclude",
+      } as unknown as DisplayMediaStreamOptions);
       if (startGeneration !== screenShareStartGeneration || !screenShareStarting.value || screenShareStartCancelled) {
         stream.getTracks().forEach((track) => track.stop());
+        screenShareOutputSettings = null;
         return;
       }
       const videoTrack = stream.getVideoTracks()[0];
       if (!videoTrack) throw new Error("NO_VIDEO_TRACK");
-      try {
-        // Apply the cap once more after the browser's source picker returns.
-        // Some Chromium versions treat getDisplayMedia constraints as hints
-        // and only enforce the final capture size on the selected track.
-        await videoTrack.applyConstraints(videoConstraints);
-      } catch {
-        // The selected source can still be shared when a browser refuses an
-        // optional display-capture constraint; the actual settings remain
-        // visible in the WebRTC diagnostics panel.
-      }
+      const displaySurface = videoTrack.getSettings().displaySurface;
+      if ("contentHint" in videoTrack) videoTrack.contentHint = displaySurface === "browser" ? "detail" : "motion";
       screenShareLocalStream = stream;
       screenShareRequestSequence = (screenShareRequestSequence + 1) % 1_000_000;
       screenSharePendingStartId = `screen-start-${screenShareRequestSequence}`;
@@ -2175,6 +2215,7 @@ export function useVoiceWebSocket() {
       if (startGeneration !== screenShareStartGeneration) return;
       screenShareLocalStream?.getTracks().forEach((track) => track.stop());
       screenShareLocalStream = null;
+      screenShareOutputSettings = null;
       screenShareStarting.value = false;
       screenSharePendingStartId = "";
       screenShareStartCancelled = false;
@@ -2190,6 +2231,7 @@ export function useVoiceWebSocket() {
     closeAllScreenSharePeers();
     screenShareLocalStream?.getTracks().forEach((track) => track.stop());
     screenShareLocalStream = null;
+    screenShareOutputSettings = null;
     screenShareStarting.value = false;
     screenSharePendingStartId = "";
     screenShareStartCancelled = false;
@@ -2220,6 +2262,7 @@ export function useVoiceWebSocket() {
     closeAllScreenSharePeers();
     screenShareLocalStream?.getTracks().forEach((track) => track.stop());
     screenShareLocalStream = null;
+    screenShareOutputSettings = null;
     screenShareStarting.value = false;
     screenSharePendingStartId = "";
     screenShareStartCancelled = false;
@@ -2328,6 +2371,7 @@ export function useVoiceWebSocket() {
             sendScreenShareMessage({ type: "screenShareStop", streamId: stream.streamId });
             screenShareLocalStream?.getTracks().forEach((track) => track.stop());
             screenShareLocalStream = null;
+            screenShareOutputSettings = null;
             const staleIndex = screenShareStreams.findIndex((candidate) => candidate.streamId === stream.streamId);
             if (staleIndex >= 0) screenShareStreams.splice(staleIndex, 1);
             break;
@@ -2358,6 +2402,7 @@ export function useVoiceWebSocket() {
           screenShareActiveStreamId.value = "";
           screenShareLocalStream?.getTracks().forEach((track) => track.stop());
           screenShareLocalStream = null;
+          screenShareOutputSettings = null;
         }
         if (screenShareViewingStreamId.value === streamId) {
           closeAllScreenSharePeers();
@@ -2398,6 +2443,7 @@ export function useVoiceWebSocket() {
           screenShareStartCancelled = false;
           screenShareLocalStream?.getTracks().forEach((track) => track.stop());
           screenShareLocalStream = null;
+          screenShareOutputSettings = null;
         }
         if (screenShareViewing.value) {
           if (screenShareViewingStreamId.value) sendScreenShareMessage({ type: "screenShareLeave", streamId: screenShareViewingStreamId.value });
