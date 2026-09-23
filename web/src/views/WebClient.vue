@@ -2236,7 +2236,15 @@ const chatTabLabel = computed(() => chatTab.value === "channel" ? t("textChannel
 const chatTitle = computed(() => chatTab.value === "channel" ? t("channelChat", { channel: currentChannelName.value }) : chatTab.value === "server" ? t("serverChat") : chatTab.value === "events" ? t("eventLog") : privateConversations.value.find((conversation) => conversation.id === privateClientId.value)?.name ?? t("privateMessage"));
 const chatPlaceholder = computed(() => chatTab.value === "private" ? t("privateMessagePlaceholder") : chatTab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
-const memberMenuStyle = computed(() => memberMenu.value ? { left: `${memberMenu.value.x}px`, top: `${memberMenu.value.y}px` } : {});
+const memberMenuStyle = computed(() => {
+  if (!memberMenu.value) return {};
+  // #app applies zoom:var(--ui-scale) which also scales fixed-element
+  // coordinates against the viewport; divide the pointer position back to CSS
+  // pixels so the context menu opens exactly where the user clicked on large
+  // displays.
+  const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+  return { left: `${memberMenu.value.x / scale}px`, top: `${memberMenu.value.y / scale}px` };
+});
 const median = (values: number[]) => {
   const sorted = [...values].sort((left, right) => left - right);
   return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
@@ -3041,6 +3049,7 @@ function stopWhisperTalk(): void {
 .join-header, .join-content, .join-footer { position: relative; z-index: 1; }
 .join-header { z-index: 10; }
 .join-header .language-switcher { z-index: 50; }
+.join-footer { z-index: 2; }
 .join-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; }
 .brand-mark, .rail-logo { display: grid; place-items: center; color: #fff; background: #006a64; box-shadow: 0 8px 18px rgba(0, 106, 100, .15); }
@@ -3113,7 +3122,7 @@ function stopWhisperTalk(): void {
 .connect-button { width: 100%; min-height: 44px; margin-top: 10px; font-size: 13px; }
 .button-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
 .join-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; color: #96a29f; font-size: 10px; }
-.join-footer { display: flex; align-items: center; min-height: 68px; color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
+.join-footer { display: flex; align-items: center; min-height: 68px; background: var(--surface-0); color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
 .footer-separator { margin: 0 8px; color: #ccd5d1; }.footer-spacer { flex: 1; }
 
 .app-shell { display: grid; grid-template-columns: 76px 292px minmax(0, 1fr) 246px; height: 100dvh; overflow: hidden; background: #fff; }
@@ -3587,11 +3596,26 @@ function stopWhisperTalk(): void {
    content scroll area so headers, controls and mobile navigation stay fixed. */
 :global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; overflow: hidden; }
 .join-page { height: 100dvh; min-height: 0; overflow: hidden; }
-.join-content { min-height: 0; }
+.join-content { min-height: 0; overflow-y: auto; }
+
+/* Desktop zoom compensation. main.ts sets --ui-scale (>1 only on large
+   viewports) and App.vue applies zoom:var(--ui-scale) on #app. html/body stay
+   pinned to the real viewport (100dvh) while the zoomed roots divide their
+   height by the scale so the rendered result lands on exactly one viewport.
+   Without this a 2K/4K viewport would render a 1.5x-tall shell, clipping the
+   bottom of the workspace and leaving blank space under the control dock.
+   Non-zero fixed offsets (toast, poke banner) are divided back to CSS pixels
+   because zoom also scales fixed coordinates against the viewport. */
+@media (min-width: 851px) {
+  :global(html), :global(body) { height: 100dvh; max-height: 100dvh; }
+  :global(#app), .web-client, .join-page, .app-shell { height: calc(100dvh / var(--ui-scale)); min-height: 0; max-height: calc(100dvh / var(--ui-scale)); }
+  .toast { right: calc(24px / var(--ui-scale)); bottom: calc(24px / var(--ui-scale)); }
+  .poke-banner { top: calc(82px / var(--ui-scale)); right: calc(24px / var(--ui-scale)); }
+}
 
 @media (max-width: 740px) {
   .join-content { overflow-y: auto; }
-  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
   .app-shell .workspace { height: auto; min-height: 0; flex: 1 1 auto; }
   .app-shell.mobile-view-channels .workspace { display: none; }
   .app-shell .member-panel.mobile-section-visible { flex: 1 1 auto; min-height: 0; max-height: none; }
@@ -3621,7 +3645,7 @@ function stopWhisperTalk(): void {
 .member-menu-close { display: none; }
 
 @media (max-width: 740px) {
-  :global(html), :global(body), :global(#app) { height: 100%; min-height: 100%; max-height: none; }
+  :global(html), :global(body), :global(#app) { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .web-client { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .app-shell { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
   .app-shell .workspace { height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
@@ -3683,7 +3707,7 @@ function stopWhisperTalk(): void {
   .member-action-button:hover, .member-action-button:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
 
   .app-shell.mobile-view-chat .workspace-scroll { overflow: hidden; }
-  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
   .app-shell.mobile-view-chat .chat-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 0; padding: 0; border-top: 0; }
   .app-shell.mobile-view-chat .chat-tabs { flex: 0 0 auto; margin-top: 0; padding: 10px 0 9px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
   .app-shell.mobile-view-chat .chat-tabs::-webkit-scrollbar { display: none; }
@@ -3922,8 +3946,21 @@ function stopWhisperTalk(): void {
 /* Desktop audio popovers: keep the rail compact and reveal each control's
    adjustment surface only while the pointer or keyboard focus is on it. */
 @media (min-width: 741px) {
-  .app-shell .member-panel { overflow: visible; }
-  .desktop-audio-dock { position: relative; z-index: 6; }
+  /* 桌面端悬浮（仅 ≥741px 生效，≤740px 移动端布局不受影响）：
+     1) 桌面控制坞 .desktop-audio-dock 脱离文档流悬浮于成员面板底部，
+        仍浮在原布局位置（距面板底 18px），宽度跟随面板内容宽度
+        （left/right 各留 18px，与 member-panel 水平内边距一致，
+        随列宽自适应伸缩）；高度仍由内容撑起。member-panel 作为
+        absolute 包含块并加 padding-bottom 补偿原占位，避免成员列表
+        被遮挡。
+     2) 消息输入框 .message-composer 脱离文档流悬浮于聊天面板底部，
+        宽度跟随聊天面板内容宽度（chat-panel 水平内边距为 0，
+        left/right:0 即与内容宽度完全一致）；chat-panel 作为包含块
+        并加 padding-bottom 补偿原占位，避免消息列表被遮挡。 */
+  .app-shell .member-panel { position: relative; overflow: visible; padding-bottom: calc(18px + 12px + 52px); }
+  .desktop-audio-dock { position: absolute; z-index: 6; left: 18px; right: 18px; bottom: 18px; margin-top: 0; }
+  .app-shell .chat-panel { position: relative; padding-bottom: calc(16px + 48px); }
+  .app-shell .message-composer { position: absolute; z-index: 3; left: 0; right: 0; bottom: 16px; margin-bottom: 0; }
 }
 
 .dock-hover-control { position: relative; flex: 0 0 34px; }
