@@ -3945,8 +3945,21 @@ function stopWhisperTalk(): void {
 /* Desktop audio popovers: keep the rail compact and reveal each control's
    adjustment surface only while the pointer or keyboard focus is on it. */
 @media (min-width: 741px) {
-  .app-shell .member-panel { overflow: visible; }
-  .desktop-audio-dock { position: relative; z-index: 6; }
+  /* 桌面端悬浮（仅 ≥741px 生效，≤740px 移动端布局不受影响）：
+     1) 桌面控制坞 .desktop-audio-dock 脱离文档流悬浮于成员面板底部，
+        仍浮在原布局位置（距面板底 18px），宽度跟随面板内容宽度
+        （left/right 各留 18px，与 member-panel 水平内边距一致，
+        随列宽自适应伸缩）；高度仍由内容撑起。member-panel 作为
+        absolute 包含块并加 padding-bottom 补偿原占位，避免成员列表
+        被遮挡。
+     2) 消息输入框 .message-composer 脱离文档流悬浮于聊天面板底部，
+        宽度跟随聊天面板内容宽度（chat-panel 水平内边距为 0，
+        left/right:0 即与内容宽度完全一致）；chat-panel 作为包含块
+        并加 padding-bottom 补偿原占位，避免消息列表被遮挡。 */
+  .app-shell .member-panel { position: relative; overflow: visible; padding-bottom: calc(18px + 12px + 52px); }
+  .desktop-audio-dock { position: absolute; z-index: 6; left: 18px; right: 18px; bottom: 18px; margin-top: 0; }
+  .app-shell .chat-panel { position: relative; padding-bottom: calc(16px + 48px); }
+  .app-shell .message-composer { position: absolute; z-index: 3; left: 0; right: 0; bottom: 16px; margin-bottom: 0; }
 }
 
 .dock-hover-control { position: relative; flex: 0 0 34px; }
