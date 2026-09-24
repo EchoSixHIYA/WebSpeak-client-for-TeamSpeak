@@ -371,18 +371,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
-import { useVoiceWebSocket, type ChannelInfo, type ChannelMember, type ChatMessage, type LatencyProbeResult, type ScreenShareOutputSettings, type ScreenShareStream } from "../composables/useVoiceWebSocket.js";
-import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listFavorites, listRecentServers, loadLocalPreferences, loadStoredIdentity, recordRecentServer, removeFavorite, removeStoredIdentity, saveFavorite, saveLocalPreferences, saveStoredIdentity, type FavoriteServer, type RecentServer } from "../services/local-persistence.js";
+import { useWebClientChat } from "../composables/useWebClientChat.js";
+import { useWebClientAudioControls } from "../composables/useWebClientAudioControls.js";
+import { useWebClientChannels, type TreeChannel } from "../composables/useWebClientChannels.js";
+import { useWebClientConnection } from "../composables/useWebClientConnection.js";
+import { useWebClientMembers } from "../composables/useWebClientMembers.js";
+import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
+import { useWebClientScreenShare } from "../composables/useWebClientScreenShare.js";
+import { useWebClientPerformance } from "../composables/useWebClientPerformance.js";
+import { useWebClientI18n } from "../composables/useWebClientI18n.js";
+import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfig.js";
+import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
+import { getInitialLanguage, type Language } from "../i18n/web-client.js";
+import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
-import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
-
-interface TreeChannel extends ChannelInfo {
-  depth: number;
-  members: ChannelMember[];
-}
+import { DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
   state: voiceState,
@@ -462,6 +468,13 @@ const {
   clearError,
   measureLatency,
 } = useVoiceWebSocket();
+const {
+  panelOpen: performancePanelOpen,
+  running: performanceRunning,
+  stats: performanceStats,
+  togglePanel: togglePerformancePanel,
+  refresh: refreshPerformanceProbe,
+} = useWebClientPerformance(computed(() => voiceState.connected), measureLatency);
 
 const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
@@ -472,1310 +485,100 @@ const channel = ref(initialChannel);
 const serverHost = ref(initialTarget.address);
 const serverPort = ref(initialTarget.port);
 const serverPassword = ref("");
-const accessMode = ref<"fixed" | "open">("fixed");
 const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") !== "0");
-const favoriteServers = ref<FavoriteServer[]>([]);
-const recentServers = ref<RecentServer[]>([]);
-const initialized = ref(false);
-const siteName = ref("WebSpeak");
-const welcomeTextZh = ref("");
-const welcomeTextEn = ref("");
-const welcomeTextDe = ref("");
-const welcomeTextRu = ref("");
-const welcomeTextJa = ref("");
-const appVersion = ref("0.2.4");
-const visitorNumber = ref<number | null>(null);
-const visitorTotal = ref<number | null>(null);
-const accelerationRelays = ref<Array<{ id: string; name: string }>>([]);
 const accelerationRelayId = ref("");
-const accelerationAvailable = computed(() => accelerationRelays.value.length > 0);
 const browserError = ref("");
-const serverConfigLoading = ref(true);
 const memberQuery = ref("");
-const messageDraft = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
 const channelPasswordDialog = reactive({ open: false, channelId: "", password: "", error: "", submitting: false });
 const serverPasswordDialog = reactive({ open: false, password: "", errorCode: "" });
 const qqModalOpen = ref(false);
 const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475";
-const audioSettingsError = ref("");
 const toast = ref("");
-const chatListEl = ref<HTMLElement | null>(null);
-const screenVideoEl = ref<HTMLVideoElement | null>(null);
-const screenSharePlayerEl = ref<HTMLElement | null>(null);
-const screenShareFullscreen = ref(false);
-type ScreenShareResolutionPreset = "source" | "720p" | "1080p";
-const screenShareResolutionOptions: Array<{ value: ScreenShareResolutionPreset; width?: number; height?: number; label: string }> = [
-  { value: "source", label: "screenShareResolutionSource" },
-  { value: "720p", width: 1280, height: 720, label: "screenShareResolution720p" },
-  { value: "1080p", width: 1920, height: 1080, label: "screenShareResolution1080p" },
-];
-const screenShareFrameRateOptions = [5, 10, 15, 24, 30, 60];
-const storedScreenShareResolution = localStorage.getItem("webspeak:screen-share-resolution") as ScreenShareResolutionPreset | null;
-const screenShareResolutionPreset = ref<ScreenShareResolutionPreset>(screenShareResolutionOptions.some((option) => option.value === storedScreenShareResolution) ? storedScreenShareResolution! : "1080p");
-const storedScreenShareFrameRate = Number(localStorage.getItem("webspeak:screen-share-framerate"));
-const screenShareFrameRate = ref(screenShareFrameRateOptions.includes(storedScreenShareFrameRate) ? storedScreenShareFrameRate : 15);
-const screenShareSettingsOpen = ref(false);
-function setScreenVideoElement(element: unknown): void {
-  screenVideoEl.value = element instanceof HTMLVideoElement ? element : null;
-}
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
-const chatTab = ref<"channel" | "server" | "private" | "events">("channel");
-const privateClientId = ref(0);
-const away = ref(false);
-const awayMessage = ref("");
-const memberMenu = ref<{ member: ChannelMember; x: number; y: number } | null>(null);
-const memberMoveMenuOpen = ref(false);
-const draggedMember = ref<ChannelMember | null>(null);
-const dragOverChannelId = ref("");
-const memberPointerDrag = reactive({ member: null as ChannelMember | null, pointerId: null as number | null, startX: 0, startY: 0, active: false, targetChannelId: "" });
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
-const whisperPttActive = ref(false);
-const performancePanelOpen = ref(false);
-const performanceRunning = ref(false);
-const performanceSamples = ref<LatencyProbeResult[]>([]);
-const performanceProbeResults = ref<Array<LatencyProbeResult | null>>([]);
-const performanceAttempts = ref(0);
-const PERFORMANCE_INTERVAL_MS = 3_000;
-const PERFORMANCE_WINDOW_SIZE = 20;
-let performanceTimer: number | null = null;
-let performanceMonitorGeneration = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-type Language = "zh" | "en" | "de" | "ru" | "ja";
 const language = ref<Language>(getInitialLanguage());
+const { t, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
+const {
+  favoriteServers,
+  recentServers,
+  isFavorite,
+  loadSavedServers,
+  recordCurrentServer,
+  selectLocalServer,
+  toggleFavorite,
+  clearServerHistory,
+} = useWebClientServerHistory({ serverHost, serverPort, nickname, channel, rememberIdentity, identityMaterial, t, showToast });
+const {
+  accessMode,
+  initialized,
+  siteName,
+  appVersion,
+  visitorNumber,
+  visitorTotal,
+  accelerationRelays,
+  accelerationAvailable,
+  serverConfigLoading,
+  localizedWelcomeText,
+  loadPublicConfig,
+} = useWebClientPublicConfig({ serverHost, serverPort, accelerationRelayId, language, t });
 const themeMode = ref<ThemeMode>(getStoredTheme());
 const themeIcon = computed(() => isDarkTheme(themeMode.value) ? "sun" : "moon");
 const themeLabel = computed(() => isDarkTheme(themeMode.value) ? t("switchToLightTheme") : t("switchToDarkTheme"));
-const localizedWelcomeText = computed(() => {
-  const customText = {
-    zh: welcomeTextZh.value,
-    en: welcomeTextEn.value,
-    de: welcomeTextDe.value,
-    ru: welcomeTextRu.value,
-    ja: welcomeTextJa.value,
-  }[language.value];
-  return customText || t("joinDescription");
-});
 applyTheme(themeMode.value);
-const translations: Record<string, Record<string, string>> = {
-  zh: {
-    themeSystem: "跟随系统",
-    themeLight: "浅色主题",
-    themeDark: "深色主题",
-    switchToLightTheme: "切换到浅色主题",
-    switchToDarkTheme: "切换到深色主题",
-    browserWorkspace: "浏览器语音工作台",
-    secureGateway: "安全语音网关",
-    adminConsole: "管理控制台",
-    currentVersion: "当前版本",
-    errorCode: "错误代码",
-    viewChangelog: "查看更新日志",
-    notConfigured: "WebSpeak 尚未配置 TeamSpeak 目标。",
-    configureNow: "打开管理控制台",
-    privateAudio: "私密社区语音",
-    joinLine1: "连接服务器，",
-    joinLine2: "马上开始交流。",
-    joinDescription: "无需安装 TeamSpeak 客户端，打开浏览器即可加入语音频道。低延迟、轻量、专注于每一次对话。",
-    highQuality: "高质量语音",
-    opusAudio: "Opus 低延迟传输",
-    secureJoin: "安全加入",
-    inviteProtected: "邀请链接保护你的服务器",
-    realtime: "实时协作",
-    membersSync: "频道成员状态即时同步",
-    privateServer: "私密语音服务器",
-    mainNav: "主导航",
-    memberVolume: "成员音量",
-    joinServer: "加入你的服务器",
-    welcomeBack: "欢迎回来",
-    joinLead: "输入一个昵称，选择进入的频道。",
-    visitorCount: "你是第 {{count}} 个访客",
-    visitorTotal: "共计 {{count}} 个访客",
-    serverAddress: "TeamSpeak 服务器地址",
-    serverAddressPlaceholder: "例如：ts.example.com 或 127.0.0.1",
-    serverPort: "语音端口",
-    serverPortPlaceholder: "9987",
-    serverAddressHint: "这是网关服务器连接的 TeamSpeak 地址和端口，不是浏览器直接连接地址。",
-    relayAcceleration: "连接中继",
-    directConnection: "直连 TeamSpeak",
-    relayAccelerationHint: "选择一个已配置的中继节点，适合直连不稳定或被拒绝的服务器。",
-    nickname: "你的昵称",
-    nicknamePlaceholder: "例如：Alex Rivera",
-    targetChannel: "目标频道",
-    optional: "可选",
-    emptyDefault: "留空进入默认频道",
-    rememberIdentity: "记住此设备的 TeamSpeak 身份",
-    rememberIdentityHint: "仅保存在本设备，用于下次连接时保持身份。",
-    rememberIdentityConcurrentWarning: "同一浏览器只能同时使用一条保持身份的连接；要开启第二条，请取消勾选或使用另一个浏览器。",
-    identityOptions: "设备身份选项",
-    localPersistenceUnavailable: "当前浏览器无法使用持久化存储，本次将使用临时身份。",
-    favoriteServers: "常用服务器",
-    recentServers: "最近连接",
-    saveFavorite: "保存到常用",
-    removeFavorite: "移除常用",
-    savedFavoriteToast: "已保存到常用服务器",
-    removedFavoriteToast: "已从常用服务器移除",
-    clearLocalData: "清除本地数据",
-    clearLocalDataConfirm: "确定清除本设备保存的身份、收藏、最近连接和音频偏好吗？",
-    localDataCleared: "本地数据已清除",
-    connecting: "正在连接…",
-    enterVoice: "进入语音空间",
-    connectionAuthorized: "连接信息仅用于本次语音会话",
-    githubRepository: "GitHub 仓库",
-    qqGroup: "QQ群",
-    qqGroupQrAlt: "QQ群二维码",
-    qqJoinDirect: "或通过群聊链接直接加入",
-    joinQqGroup: "点击加入QQ群",
-    bilibiliProfile: "Bilibili 个人空间",
-    browserSupport: "Chrome / Edge 94+",
-    teamSpeakClient: "TeamSpeak 浏览器客户端",
-    home: "首页",
-    activity: "动态",
-    server: "服务器",
-    discover: "发现",
-    downloads: "下载",
-    help: "帮助",
-    needHelp: "需要帮助？请联系服务器管理员",
-    serverOptions: "更多服务器选项",
-    online: "在线",
-    audioSettings: "音频设置",
-    overallVolume: "整体音量",
-    muteOutput: "临时静音",
-    unmuteOutput: "恢复声音",
-    desktopAudioControls: "音频控制",
-    desktopAudioHint: "悬停图标调整音量",
-    startAccompaniment: "共享伴奏",
-    stopAccompaniment: "停止伴奏",
-    accompanimentStarted: "伴奏共享已开始",
-    accompanimentStopped: "伴奏共享已停止",
-    accompanimentActive: "伴奏共享中",
-    accompanimentNeedsWebRtc: "伴奏功能需要启用 WebRTC",
-    accompanimentNoAudio: "所选来源没有可共享音频，请重新选择并勾选共享音频",
-    accompanimentPermissionDenied: "无法获取伴奏音频，请允许屏幕共享并勾选共享音频",
-    accompanimentUnsupported: "当前浏览器不支持伴奏共享",
-    screenShare: "屏幕共享",
-    screenShareTitle: "屏幕共享",
-    startScreenShare: "共享屏幕",
-    screenShareStarting: "正在启动直播",
-    stopScreenShare: "停止共享",
-    sharingScreen: "直播中",
-    watchingScreenShare: "正在观看",
-    watchScreenShare: "观看屏幕共享",
-    leaveScreenShare: "停止观看",
-    screenShareVolume: "共享音量",
-    browserSource: "浏览器来源",
-    teamSpeakSource: "TeamSpeak 客户端来源",
-    sharedAudio: "含共享音频",
-    noScreenShares: "当前没有正在进行的屏幕共享",
-    directP2POnly: "直连 P2P · STUN 仅用于发现公网地址",
-    screenShareNativeUnavailable: "原生 TeamSpeak 屏幕共享暂不支持网页观看",
-    screenShareExit: "退出观看",
-    screenShareConnecting: "正在连接屏幕共享",
-    screenShareViewers: "正在观看的观众",
-    screenShareFullscreen: "全屏",
-    screenShareExitFullscreen: "退出全屏",
-    screenShareSettings: "共享设置",
-    screenShareSettingsHint: "共享前调整输出质量",
-    screenShareResolution: "输出分辨率",
-    screenShareResolutionSource: "原始分辨率",
-    screenShareResolution720p: "720p（最高 1280 × 720）",
-    screenShareResolution1080p: "1080p（最高 1920 × 1080）",
-    screenShareFrameRate: "帧率上限",
-    screenShareSettingsNote: "设置会在下一次开始共享时生效",
-    watching: "观看中",
-    serverPassword: "服务器密码",
-    optionalPassword: "没有密码可留空",
-    serverPasswordTitle: "服务器需要密码",
-    serverPasswordPrompt: "输入服务器密码",
-    serverPasswordRequiredLead: "该服务器需要密码，输入密码后重试。",
-    serverPasswordInvalidLead: "服务器密码不正确，请重新输入后重试。",
-    serverPasswordRetry: "输入密码并重试",
-    serverPasswordRetryPlaceholder: "请输入服务器密码",
-    switchChannel: "切换频道",
-    searchChannels: "搜索频道",
-    voiceChannels: "语音频道",
-    peopleOnline: "{{count}} 人在线",
-    channelPreparing: "频道列表准备中",
-    channelPreparingLead: "服务器未提供频道目录时，仍可正常使用语音连接。",
-    reload: "重新加载",
-    quickActions: "快捷操作",
-    inviteFriends: "邀请朋友加入",
-    audioAndMic: "音频与麦克风",
-    stableConnection: "连接稳定",
-    websocket: "WebSocket",
-    serverBreadcrumb: "服务器",
-    copyInvite: "复制邀请链接",
-    exit: "退出",
-    live: "直播中",
-    voiceSpace: "语音空间",
-    roomDescription: "在这里和频道成员保持清晰、自然的交流。",
-    membersOnline: "{{count}} 位成员在线",
-    encrypted: "加密连接",
-    voiceActivity: "语音活动",
-    speakingNow: "正在语音中",
-    onlineShort: "{{count}} 在线",
-    you: "你",
-    selfSuffix: "（你）",
-    connected: "已连接",
-    speaking: "正在说话…",
-    connectedYou: "已连接 · 你",
-    waitingForMembers: "等待成员加入语音",
-    prepareMicrophone: "你可以先在这里准备好麦克风。",
-    moreMembers: "更多成员",
-    viewLeft: "在左侧查看",
-    textChannel: "文字频道",
-    channelChat: "{{channel}} 聊天",
-    messageCount: "{{count}} 条消息",
-    chatStart: "这是聊天的开始",
-    chatStartLead: "发送一条消息，和频道里的朋友打个招呼吧。",
-    chatTabs: "聊天标签",
-    serverChat: "服务器",
-    privateMessage: "私聊",
-    privateMessagePlaceholder: "发送私聊消息…",
-    serverMessagePlaceholder: "发送服务器消息…",
-    channelPasswordPrompt: "请输入频道密码",
-    channelPasswordTitle: "进入加密频道",
-    channelPasswordLead: "该频道需要密码才能进入。",
-    channelPasswordPlaceholder: "输入频道密码",
-    channelPasswordOptional: "如目标频道有密码，请输入",
-    channelPasswordSubmit: "进入频道",
-    channelPasswordCancel: "取消",
-    channelPasswordRetry: "密码不正确，请重试。",
-    privateChatStart: "这是私聊的开始",
-    privateChatStartLead: "发送一条私聊消息。",
-    eventLog: "事件日志",
-    eventCount: "{{count}} 条事件",
-    noEvents: "暂无服务器事件",
-    noEventsLead: "频道和成员变化会显示在这里。",
-    available: "在线",
-    away: "离开",
-    awayPrompt: "离开状态说明（可选）",
-    poke: "戳一戳",
-    pokedYou: "戳了你一下",
-    pokeMessagePrompt: "戳一戳消息（可选）",
-    pokeSent: "已发送戳一戳",
-    copyNickname: "复制昵称",
-    moveMember: "移动到频道",
-    moveMemberMenu: "调度到",
-    moveMemberMyChannel: "我所在的频道",
-    moveMemberNoChannels: "没有可移动的频道",
-    moveMemberTitle: "移动 {{member}}",
-    moveMemberLead: "选择目标频道。TeamSpeak 会根据你的移动权限决定是否允许此操作。",
-    moveMemberTarget: "目标频道",
-    moveMemberChooseChannel: "请选择目标频道",
-    moveMemberSubmit: "确认移动",
-    moveMemberSuccess: "成员已移动",
-    movePermissionDenied: "你没有移动成员的权限",
-    copiedNickname: "昵称已复制",
-    attachmentUnavailable: "附件暂不可用",
-    emojiUnavailable: "表情暂不可用",
-    sendMessagePlaceholder: "发送消息给频道成员…",
-    send: "发送",
-    muteMic: "闭麦",
-    unmuteMic: "开麦",
-    microphoneActive: "麦克风已开启",
-    microphoneMuted: "麦克风已关闭",
-    microphoneActiveHint: "关闭麦克风后不会向服务器发送声音",
-    microphoneMutedHint: "麦克风已关闭，其他人听不到你的声音",
-    sending: "正在发送",
-    exitVoice: "退出语音",
-    people: "成员",
-    searchMembers: "搜索成员",
-    onlineGroup: "在线 — {{count}}",
-    yourDevice: "你的设备",
-    memberOnline: "在线",
-    memberStates: "成员状态",
-    inputMuted: "已禁用麦克风",
-    outputMuted: "已禁用扬声器",
-    channelCommander: "频道指挥官",
-    noMatchingMembers: "没有找到匹配的成员",
-    noMembersInChannel: "此频道暂无成员",
-    volumeTip: "拖动成员右侧滑杆，单独调整听到的音量。",
-    moreMemberOptions: "更多成员选项",
-    connectedToast: "当前已连接到此服务器",
-    connectionInterrupted: "连接已中断，正在尝试恢复…",
-    reconnectingAttempt: "第 {{attempt}} 次重连",
-    reconnectFailed: "无法恢复连接",
-    reconnectNow: "立即重连",
-    back: "返回",
-    volumeToast: "成员音量可以在列表中单独调整",
-    copiedToast: "邀请链接已复制",
-    copyFailedToast: "复制失败，请手动复制浏览器地址",
-    leftToast: "已安全退出语音空间",
-    focusedToast: "当前版本聚焦于语音工作台",
-    settings: "设置",
-    profile: "个人资料",
-    privacy: "隐私",
-    notifications: "通知",
-    browserClient: "浏览器客户端",
-    audioConfiguration: "音频配置",
-    inputDevice: "输入设备",
-    microphone: "麦克风",
-    microphoneState: "麦克风状态",
-    defaultMicrophone: "默认浏览器麦克风",
-    microphoneNumber: "麦克风 {{index}}",
-    speakerNumber: "扬声器 {{index}}",
-    permission: "权限",
-    permissionUnknown: "尚未请求",
-    permissionGranted: "已允许",
-    permissionDenied: "已拒绝",
-    inputVolume: "输入音量",
-    voxThreshold: "语音激活阈值",
-    micLevel: "麦克风音量",
-    microphoneTest: "麦克风测试",
-    stopTest: "停止测试",
-    startTest: "开始测试",
-    localMicTestHint: "本地测试：录音只在浏览器中播放，不会发送到 TeamSpeak。",
-    silence: "安静",
-    optimal: "最佳",
-    loud: "较响",
-    outputDevice: "输出设备",
-    speakers: "扬声器 / 耳机",
-    defaultOutput: "默认浏览器输出",
-    outputVolume: "输出音量",
-    outputDeviceUnsupported: "当前浏览器不支持扬声器设备选择，将使用默认输出设备。",
-    notificationVolume: "通知音量",
-    audioStatus: "音频状态",
-    audioReady: "音频已就绪",
-    noiseSuppression: "浏览器降噪",
-    noiseSuppressionHint: "在浏览器采集端处理",
-    rnnoise: "RNNoise 降噪",
-    echoCancellation: "回声消除",
-    autoGainControl: "自动增益",
-    processingEnabled: "已启用",
-    processingDisabled: "已关闭",
-    processingUnknown: "浏览器未报告",
-    audioUnavailable: "音频不可用（麦克风故障）",
-    microphoneUnavailable: "麦克风不可用，你暂时无法说话",
-    audioSuspended: "音频被浏览器暂停",
-    audioUnknown: "尚未初始化",
-    audioPrivacy: "WebSpeak 会在浏览器安全上下文中处理音频，不会保存录音。",
-    mobileNavigation: "移动端导航",
-    mobileChannels: "频道",
-    mobileChat: "聊天",
-    mobileVoice: "语音",
-    mobileMore: "更多",
-    whisperTargets: "私语目标",
-    setWhisperTarget: "设为私语目标",
-    removeWhisperTarget: "移除私语目标",
-    clearWhisperTargets: "清除目标",
-    whisperHoldToTalk: "按住私语",
-    releaseWhisper: "松开结束私语",
-    cancel: "取消",
-    saveChanges: "保存更改",
-    close: "关闭",
-    done: "完成",
-    voiceLobby: "语音大厅",
-    languageMenu: "语言",
-    networkPerformance: "网络性能",
-    networkPerformanceHint: "浏览器到网关，再到 TeamSpeak 的实时探测",
-    browser: "浏览器",
-    webSpeakGateway: "WebSpeak",
-    teamSpeakServer: "TeamSpeak",
-    browserToGateway: "浏览器 → WebSpeak",
-    gatewayToTeamSpeak: "WebSpeak → TeamSpeak",
-    packetLoss: "丢包",
-    measuring: "正在测量…",
-    measureComplete: "持续监测中（每 3 秒更新）",
-    measureNow: "立即测量",
-    measureUnavailable: "连接后可测量",
-    webrtcStats: "屏幕共享 WebRTC",
-    webrtcStatsHint: "每秒采样实际媒体状态",
-    screenShareCapture: "采集",
-    screenShareSending: "发送给观看者",
-    screenShareReceiving: "从共享者接收",
-    screenShareDroppedFrames: "丢帧",
-    screenShareJitter: "抖动",
-    screenShareRtt: "RTT",
-    langSwitch: "English",
-  },
-  en: {
-    themeSystem: "System theme",
-    themeLight: "Light theme",
-    themeDark: "Dark theme",
-    switchToLightTheme: "Switch to light theme",
-    switchToDarkTheme: "Switch to dark theme",
-    browserWorkspace: "Browser voice workspace",
-    secureGateway: "Secure voice gateway",
-    adminConsole: "Admin console",
-    currentVersion: "Current version",
-    errorCode: "Error code",
-    viewChangelog: "View changelog",
-    notConfigured: "The WebSpeak TeamSpeak target has not been configured.",
-    configureNow: "Open admin console",
-    privateAudio: "Private community audio",
-    joinLine1: "Connect to your server,",
-    joinLine2: "start the conversation.",
-    joinDescription: "No TeamSpeak client installation required. Open your browser and join a voice channel with low-latency audio built for conversation.",
-    highQuality: "High quality audio",
-    opusAudio: "Low-latency Opus transport",
-    secureJoin: "Secure join",
-    inviteProtected: "Invite link protects your server",
-    realtime: "Real-time presence",
-    membersSync: "Channel members stay in sync",
-    privateServer: "Private voice server",
-    mainNav: "Main navigation",
-    memberVolume: "Member volume",
-    joinServer: "JOIN YOUR SERVER",
-    welcomeBack: "Welcome back",
-    joinLead: "Choose a nickname and the channel to enter.",
-    visitorCount: "You are visitor No. {{count}}",
-    visitorTotal: "{{count}} total visitors",
-    serverAddress: "TeamSpeak server address",
-    serverAddressPlaceholder: "e.g. ts.example.com or 127.0.0.1",
-    serverPort: "Voice port",
-    serverPortPlaceholder: "9987",
-    serverAddressHint: "This is the TeamSpeak address and port reached by the gateway, not a direct browser connection.",
-    relayAcceleration: "Connection relay",
-    directConnection: "Direct TeamSpeak connection",
-    relayAccelerationHint: "Choose a configured relay when the direct path is unstable or blocked.",
-    nickname: "Your nickname",
-    nicknamePlaceholder: "e.g. Alex Rivera",
-    targetChannel: "Target channel",
-    optional: "Optional",
-    emptyDefault: "Leave empty to use the default channel",
-    rememberIdentity: "Remember this TeamSpeak identity on this device",
-    rememberIdentityHint: "Stored only on this device and reused on the next connection.",
-    rememberIdentityConcurrentWarning: "Only one connection can use this identity in the same browser. Clear this option for a second connection or use another browser.",
-    identityOptions: "Device identity options",
-    localPersistenceUnavailable: "Persistent browser storage is unavailable; this session will use an ephemeral identity.",
-    favoriteServers: "Favorites",
-    recentServers: "Recent servers",
-    saveFavorite: "Save favorite",
-    removeFavorite: "Remove favorite",
-    savedFavoriteToast: "Saved to favorites",
-    removedFavoriteToast: "Removed from favorites",
-    clearLocalData: "Clear local data",
-    clearLocalDataConfirm: "Clear this device's identity, favorites, recent servers, and audio preferences?",
-    localDataCleared: "Local data cleared",
-    connecting: "Connecting…",
-    enterVoice: "Enter voice space",
-    connectionAuthorized: "Connection details are used only for this voice session",
-    githubRepository: "GitHub repository",
-    qqGroup: "QQ group",
-    qqGroupQrAlt: "QQ group QR code",
-    qqJoinDirect: "Or join directly via the group link",
-    joinQqGroup: "Join the QQ group",
-    bilibiliProfile: "Bilibili profile",
-    browserSupport: "Chrome / Edge 94+",
-    teamSpeakClient: "TeamSpeak browser client",
-    home: "Home",
-    activity: "Activity",
-    server: "Servers",
-    discover: "Discover",
-    downloads: "Downloads",
-    help: "Help",
-    needHelp: "Need help? Contact your server administrator",
-    serverOptions: "More server options",
-    online: "Online",
-    audioSettings: "Audio settings",
-    overallVolume: "Master volume",
-    muteOutput: "Mute all audio",
-    unmuteOutput: "Restore audio",
-    desktopAudioControls: "Audio controls",
-    desktopAudioHint: "Hover an icon to adjust volume",
-    startAccompaniment: "Share accompaniment",
-    stopAccompaniment: "Stop accompaniment",
-    accompanimentStarted: "Accompaniment sharing started",
-    accompanimentStopped: "Accompaniment sharing stopped",
-    accompanimentActive: "Accompaniment sharing",
-    accompanimentNeedsWebRtc: "Accompaniment requires WebRTC",
-    accompanimentNoAudio: "The selected source has no shareable audio. Select it again and enable audio sharing",
-    accompanimentPermissionDenied: "Could not access accompaniment audio. Allow screen sharing and enable audio sharing",
-    accompanimentUnsupported: "This browser does not support accompaniment sharing",
-    screenShare: "Screen sharing",
-    screenShareTitle: "Screen sharing",
-    startScreenShare: "Share screen",
-    screenShareStarting: "Starting live stream",
-    stopScreenShare: "Stop sharing",
-    sharingScreen: "Live",
-    watchingScreenShare: "Watching",
-    watchScreenShare: "Watch screen",
-    leaveScreenShare: "Stop watching",
-    screenShareVolume: "Share volume",
-    browserSource: "Browser source",
-    teamSpeakSource: "TeamSpeak client source",
-    sharedAudio: "with shared audio",
-    noScreenShares: "No active screen shares",
-    directP2POnly: "Direct P2P · STUN for public candidate discovery",
-    screenShareNativeUnavailable: "Native TeamSpeak screen sharing is not available to web viewers yet",
-    screenShareExit: "Exit viewer",
-    screenShareConnecting: "Connecting to screen share",
-    screenShareViewers: "Current viewers",
-    screenShareFullscreen: "Fullscreen",
-    screenShareExitFullscreen: "Exit fullscreen",
-    screenShareSettings: "Share settings",
-    screenShareSettingsHint: "Adjust output quality before sharing",
-    screenShareResolution: "Output resolution",
-    screenShareResolutionSource: "Source resolution",
-    screenShareResolution720p: "720p (up to 1280 × 720)",
-    screenShareResolution1080p: "1080p (up to 1920 × 1080)",
-    screenShareFrameRate: "Frame rate limit",
-    screenShareSettingsNote: "These settings apply the next time you start sharing",
-    watching: "Watching",
-    serverPassword: "Server password",
-    optionalPassword: "Leave blank if not required",
-    serverPasswordTitle: "Server password required",
-    serverPasswordPrompt: "Enter server password",
-    serverPasswordRequiredLead: "This TeamSpeak server requires a password. Enter it and try again.",
-    serverPasswordInvalidLead: "The server password was rejected. Enter it again and retry.",
-    serverPasswordRetry: "Enter password and retry",
-    serverPasswordRetryPlaceholder: "Enter the server password",
-    switchChannel: "Switch channel",
-    searchChannels: "Search channels",
-    voiceChannels: "Voice channels",
-    peopleOnline: "{{count}} online",
-    channelPreparing: "Channel list is preparing",
-    channelPreparingLead: "Voice still works when the server does not expose a channel directory.",
-    reload: "Reload",
-    quickActions: "Quick actions",
-    inviteFriends: "Invite friends",
-    audioAndMic: "Audio & microphone",
-    stableConnection: "Stable connection",
-    websocket: "WebSocket",
-    serverBreadcrumb: "Server",
-    copyInvite: "Copy invite link",
-    exit: "Exit",
-    live: "LIVE",
-    voiceSpace: "Voice space",
-    roomDescription: "Stay in clear, natural conversation with everyone in this channel.",
-    membersOnline: "{{count}} members online",
-    encrypted: "Encrypted connection",
-    voiceActivity: "VOICE ACTIVITY",
-    speakingNow: "Speaking now",
-    onlineShort: "{{count}} online",
-    you: "You",
-    selfSuffix: " (You)",
-    connected: "Connected",
-    speaking: "Speaking…",
-    connectedYou: "Connected · you",
-    waitingForMembers: "Waiting for people to join",
-    prepareMicrophone: "You can get your microphone ready.",
-    moreMembers: "More members",
-    viewLeft: "See them on the left",
-    textChannel: "TEXT CHANNEL",
-    channelChat: "{{channel}} chat",
-    messageCount: "{{count}} messages",
-    chatStart: "This is the beginning of the chat",
-    chatStartLead: "Send a message and say hello to your channel friends.",
-    chatTabs: "Chat tabs",
-    serverChat: "Server",
-    privateMessage: "Private message",
-    privateMessagePlaceholder: "Message privately…",
-    serverMessagePlaceholder: "Message the server…",
-    channelPasswordPrompt: "Enter the channel password",
-    channelPasswordTitle: "Enter protected channel",
-    channelPasswordLead: "This channel requires a password to join.",
-    channelPasswordPlaceholder: "Channel password",
-    channelPasswordOptional: "Enter it if the target channel is protected",
-    channelPasswordSubmit: "Enter channel",
-    channelPasswordCancel: "Cancel",
-    channelPasswordRetry: "That password was not accepted. Try again.",
-    privateChatStart: "This is the beginning of the private chat",
-    privateChatStartLead: "Send a private message.",
-    eventLog: "Event log",
-    eventCount: "{{count}} events",
-    noEvents: "No server events yet",
-    noEventsLead: "Channel and member changes will appear here.",
-    available: "Available",
-    away: "Away",
-    awayPrompt: "Away message (optional)",
-    poke: "Poke",
-    pokedYou: "poked you",
-    pokeMessagePrompt: "Poke message (optional)",
-    pokeSent: "Poke sent",
-    copyNickname: "Copy nickname",
-    moveMember: "Move to channel",
-    moveMemberMenu: "Move to",
-    moveMemberMyChannel: "My channel",
-    moveMemberNoChannels: "No available channels",
-    moveMemberTitle: "Move {{member}}",
-    moveMemberLead: "Choose a target channel. TeamSpeak will enforce your move permissions.",
-    moveMemberTarget: "Target channel",
-    moveMemberChooseChannel: "Choose a target channel",
-    moveMemberSubmit: "Move member",
-    moveMemberSuccess: "Member moved",
-    movePermissionDenied: "You do not have permission to move members",
-    copiedNickname: "Nickname copied",
-    attachmentUnavailable: "Attachments unavailable",
-    emojiUnavailable: "Emoji unavailable",
-    sendMessagePlaceholder: "Message the channel…",
-    send: "Send",
-    muteMic: "Mute mic",
-    unmuteMic: "Unmute mic",
-    microphoneActive: "Microphone on",
-    microphoneMuted: "Microphone off",
-    microphoneActiveHint: "When muted, no microphone audio is sent to the server",
-    microphoneMutedHint: "Your microphone is muted and other members cannot hear you",
-    sending: "Sending",
-    exitVoice: "Leave voice",
-    people: "People",
-    searchMembers: "Search members",
-    onlineGroup: "ONLINE — {{count}}",
-    yourDevice: "Your device",
-    memberOnline: "Online",
-    memberStates: "Member states",
-    inputMuted: "Microphone muted",
-    outputMuted: "Output muted",
-    channelCommander: "Channel commander",
-    noMatchingMembers: "No matching members",
-    noMembersInChannel: "No members in this channel",
-    volumeTip: "Drag a member slider to adjust their volume just for you.",
-    moreMemberOptions: "More member options",
-    connectedToast: "You are connected to this server",
-    connectionInterrupted: "Connection interrupted",
-    reconnectingAttempt: "Reconnecting… Attempt {{attempt}}",
-    reconnectFailed: "Could not restore the connection",
-    reconnectNow: "Reconnect now",
-    back: "Back",
-    volumeToast: "Adjust each member's volume from the list",
-    copiedToast: "Invite link copied",
-    copyFailedToast: "Copy failed. Copy the browser address manually",
-    leftToast: "You left the voice space",
-    focusedToast: "This version is focused on the voice workspace",
-    settings: "Settings",
-    profile: "Profile",
-    privacy: "Privacy",
-    notifications: "Notifications",
-    browserClient: "Browser client",
-    audioConfiguration: "Audio configuration",
-    inputDevice: "Input device",
-    microphone: "Microphone",
-    microphoneState: "Microphone state",
-    defaultMicrophone: "Default browser microphone",
-    microphoneNumber: "Microphone {{index}}",
-    speakerNumber: "Speaker {{index}}",
-    permission: "Permission",
-    permissionUnknown: "Not requested",
-    permissionGranted: "Granted",
-    permissionDenied: "Denied",
-    inputVolume: "Input volume",
-    voxThreshold: "Voice activation threshold",
-    micLevel: "Mic level",
-    microphoneTest: "Microphone test",
-    stopTest: "Stop test",
-    startTest: "Start test",
-    localMicTestHint: "Local test: the recording is played in this browser and never sent to TeamSpeak.",
-    silence: "Silence",
-    optimal: "Optimal",
-    loud: "Loud",
-    outputDevice: "Output device",
-    speakers: "Speakers / headphones",
-    defaultOutput: "Default browser output",
-    outputVolume: "Output volume",
-    outputDeviceUnsupported: "Output device selection is not supported by this browser. Using the default output device.",
-    notificationVolume: "Notification volume",
-    audioStatus: "Audio status",
-    audioReady: "Audio ready",
-    noiseSuppression: "Browser noise suppression",
-    noiseSuppressionHint: "Process audio in the browser",
-    rnnoise: "RNNoise suppression",
-    echoCancellation: "Echo cancellation",
-    autoGainControl: "Automatic gain control",
-    processingEnabled: "Enabled",
-    processingDisabled: "Disabled",
-    processingUnknown: "Not reported by browser",
-    audioUnavailable: "Audio unavailable (microphone failure)",
-    microphoneUnavailable: "Microphone unavailable — others cannot hear you",
-    audioSuspended: "Audio paused by the browser",
-    audioUnknown: "Not initialized",
-    audioPrivacy: "WebSpeak processes audio in the browser's secure context and does not save recordings.",
-    mobileNavigation: "Mobile navigation",
-    mobileChannels: "Channels",
-    mobileChat: "Chat",
-    mobileVoice: "Voice",
-    mobileMore: "More",
-    whisperTargets: "Whisper targets",
-    setWhisperTarget: "Set as whisper target",
-    removeWhisperTarget: "Remove whisper target",
-    clearWhisperTargets: "Clear targets",
-    whisperHoldToTalk: "Hold to whisper",
-    releaseWhisper: "Release to stop whispering",
-    cancel: "Cancel",
-    saveChanges: "Save changes",
-    close: "Close",
-    done: "Done",
-    voiceLobby: "Voice lobby",
-    languageMenu: "Language",
-    networkPerformance: "Network performance",
-    networkPerformanceHint: "Live probes from the browser to WebSpeak and TeamSpeak",
-    browser: "Browser",
-    webSpeakGateway: "WebSpeak",
-    teamSpeakServer: "TeamSpeak",
-    browserToGateway: "Browser → WebSpeak",
-    gatewayToTeamSpeak: "WebSpeak → TeamSpeak",
-    packetLoss: "Packet loss",
-    measuring: "Measuring…",
-    measureComplete: "Monitoring continuously (updates every 3s)",
-    measureNow: "Measure now",
-    measureUnavailable: "Available after connecting",
-    webrtcStats: "Screen-share WebRTC",
-    webrtcStatsHint: "Actual media state sampled every second",
-    screenShareCapture: "Capture",
-    screenShareSending: "Sending to viewer",
-    screenShareReceiving: "Receiving from sharer",
-    screenShareDroppedFrames: "dropped",
-    screenShareJitter: "jitter",
-    screenShareRtt: "RTT",
-    langSwitch: "中文",
-  },
-};
+const {
+  settingsError: audioSettingsError,
+  whisperPttActive,
+  onInputVolume,
+  onNoiseSuppressionToggle,
+  onOutputVolume,
+  onVoxThreshold,
+  onNotificationVolume,
+  onInputDeviceChange,
+  onOutputDeviceChange,
+  toggleMicTest,
+  micMeterBars,
+  meterBarHeight,
+  toggleMicrophone,
+  toggleAccompaniment,
+  onWhisperPttDown,
+  onWhisperPttUp,
+  stopWhisperTalk,
+} = useWebClientAudioControls({
+  settingsOpen,
+  microphoneMuted,
+  inputVolume,
+  voxThreshold,
+  notificationVolume,
+  micLevel,
+  microphoneTestActive,
+  accompanimentActive,
+  accompanimentErrorCode,
+  whisperTargetIds,
+  prepareInputDevices,
+  setInputVolume,
+  setNoiseSuppressionEnabled,
+  setOutputVolume,
+  setVoxThreshold,
+  setNotificationVolume,
+  setInputDevice,
+  setOutputDevice,
+  setMicrophoneMuted,
+  startMicrophoneTest,
+  stopMicrophoneTest,
+  startAccompaniment,
+  stopAccompaniment,
+  setWhisperActive,
+  localizedMessage,
+  showToast,
+  t,
+});
 
-translations.de = {
-  ...translations.en,
-  themeSystem: "Systemdesign",
-  themeLight: "Helles Design",
-  themeDark: "Dunkles Design",
-  switchToLightTheme: "Zum hellen Design wechseln",
-  switchToDarkTheme: "Zum dunklen Design wechseln",
-  browserWorkspace: "Sprachbereich im Browser",
-  secureGateway: "Sicheres Sprach-Gateway",
-  adminConsole: "Administrationskonsole",
-  currentVersion: "Aktuelle Version",
-  errorCode: "Fehlercode",
-  viewChangelog: "Änderungsprotokoll ansehen",
-  notConfigured: "Das TeamSpeak-Ziel von WebSpeak wurde noch nicht konfiguriert.",
-  configureNow: "Administrationskonsole öffnen",
-  privateAudio: "Private Community-Sprachumgebung",
-  joinLine1: "Verbinde dich mit deinem Server,",
-  joinLine2: "und beginne das Gespräch.",
-  joinDescription: "Keine Installation des TeamSpeak-Clients nötig. Öffne den Browser und tritt einem Sprachkanal bei – leichtgewichtig und mit geringer Latenz.",
-  highQuality: "Hochwertige Sprache",
-  opusAudio: "Opus-Übertragung mit geringer Latenz",
-  secureJoin: "Sicher beitreten",
-  inviteProtected: "Einladungslink schützt deinen Server",
-  realtime: "Präsenz in Echtzeit",
-  membersSync: "Kanalmitglieder bleiben synchron",
-  privateServer: "Privater Sprachserver",
-  mainNav: "Hauptnavigation",
-  memberVolume: "Mitgliedslautstärke",
-  joinServer: "DEINEM SERVER BEITRETEN",
-  welcomeBack: "Willkommen zurück",
-  joinLead: "Wähle einen Namen und den Kanal, dem du beitreten möchtest.",
-  visitorCount: "Du bist Besucher Nr. {{count}}",
-  visitorTotal: "Insgesamt {{count}} Besucher",
-  serverAddress: "TeamSpeak-Serveradresse",
-  serverAddressPlaceholder: "z. B. ts.example.com oder 127.0.0.1",
-  serverPort: "Sprachport",
-  serverPortPlaceholder: "9987",
-  serverAddressHint: "Dies ist die TeamSpeak-Adresse und der Port, die vom Gateway erreicht werden – keine direkte Browseradresse.",
-   relayAcceleration: "Verbindungs-Relay",
-   directConnection: "Direkte TeamSpeak-Verbindung",
-   relayAccelerationHint: "Wähle einen konfigurierten Relay, wenn die direkte Verbindung instabil ist oder abgelehnt wird.",
-  nickname: "Dein Name",
-  nicknamePlaceholder: "z. B. Alex Rivera",
-  targetChannel: "Zielkanal",
-  optional: "Optional",
-  emptyDefault: "Leer lassen, um den Standardkanal zu verwenden",
-  rememberIdentity: "Diese TeamSpeak-Identität auf diesem Gerät speichern",
-  rememberIdentityHint: "Wird nur auf diesem Gerät gespeichert und bei der nächsten Verbindung wiederverwendet.",
-  rememberIdentityConcurrentWarning: "Dieselbe Identität kann in einem Browser nur eine Verbindung gleichzeitig verwenden. Deaktiviere die Option für eine zweite Verbindung oder nutze einen anderen Browser.",
-  identityOptions: "Identitätsoptionen des Geräts",
-  localPersistenceUnavailable: "Dauerhafter Browserspeicher ist nicht verfügbar; diese Sitzung verwendet eine temporäre Identität.",
-  favoriteServers: "Favoriten",
-  recentServers: "Zuletzt verwendet",
-  saveFavorite: "Als Favorit speichern",
-  removeFavorite: "Aus Favoriten entfernen",
-  savedFavoriteToast: "Als Favorit gespeichert",
-  removedFavoriteToast: "Aus Favoriten entfernt",
-  clearLocalData: "Lokale Daten löschen",
-  clearLocalDataConfirm: "Identität, Favoriten, letzte Verbindungen und Audioeinstellungen dieses Geräts löschen?",
-  localDataCleared: "Lokale Daten gelöscht",
-  connecting: "Verbindung wird hergestellt…",
-  enterVoice: "Sprachbereich betreten",
-  connectionAuthorized: "Verbindungsdaten werden nur für diese Sprachsitzung verwendet",
-  githubRepository: "GitHub-Repository",
-  qqGroup: "QQ-Gruppe",
-  qqGroupQrAlt: "QR-Code der QQ-Gruppe",
-  qqJoinDirect: "Oder direkt über den Gruppenlink beitreten",
-  joinQqGroup: "QQ-Gruppe beitreten",
-  bilibiliProfile: "Bilibili-Profil",
-  browserSupport: "Chrome / Edge 94+",
-  teamSpeakClient: "TeamSpeak-Browserclient",
-  home: "Startseite",
-  activity: "Aktivität",
-  server: "Server",
-  discover: "Entdecken",
-  downloads: "Downloads",
-  help: "Hilfe",
-  needHelp: "Brauchst du Hilfe? Wende dich an den Serveradministrator.",
-  serverOptions: "Weitere Serveroptionen",
-  online: "Online",
-  audioSettings: "Audioeinstellungen",
-  overallVolume: "Gesamtlautstärke",
-  muteOutput: "Alle Töne stummschalten",
-  unmuteOutput: "Ton wiederherstellen",
-  desktopAudioControls: "Audiosteuerung",
-  desktopAudioHint: "Bewege den Zeiger über ein Symbol, um die Lautstärke anzupassen",
-  startAccompaniment: "Begleitung teilen",
-  stopAccompaniment: "Begleitung stoppen",
-  accompanimentStarted: "Begleitung wird geteilt",
-  accompanimentStopped: "Begleitung beendet",
-  accompanimentActive: "Begleitung aktiv",
-  accompanimentNeedsWebRtc: "Die Begleitungsfunktion benötigt WebRTC.",
-  accompanimentNoAudio: "Die ausgewählte Quelle enthält kein teilbares Audio. Wähle sie erneut und aktiviere die Audiofreigabe.",
-  accompanimentPermissionDenied: "Begleitungs-Audio konnte nicht abgerufen werden. Erlaube die Bildschirmfreigabe und aktiviere die Audiofreigabe.",
-  accompanimentUnsupported: "Dieser Browser unterstützt das Teilen von Begleitung nicht.",
-  startScreenShare: "Bildschirm teilen",
-  screenShareStarting: "Live-Stream wird gestartet",
-  stopScreenShare: "Freigabe beenden",
-  sharingScreen: "LIVE",
-  watchScreenShare: "Bildschirm ansehen",
-  watching: "Wird angesehen",
-  screenShareVolume: "Freigabelautstärke",
-  screenShareNativeUnavailable: "Native TeamSpeak-Bildschirmfreigabe ist für Web-Zuschauer noch nicht verfügbar",
-  screenShareExit: "Ansicht verlassen",
-  screenShareConnecting: "Bildschirmfreigabe wird verbunden",
-  screenShareViewers: "Aktuelle Zuschauer",
-  screenShareFullscreen: "Vollbild",
-  screenShareExitFullscreen: "Vollbild verlassen",
-  screenShareSettings: "Freigabeeinstellungen",
-  screenShareSettingsHint: "Ausgabequalität vor dem Teilen anpassen",
-  screenShareResolution: "Ausgabeauflösung",
-  screenShareResolutionSource: "Quellauflösung",
-  screenShareResolution720p: "720p (max. 1280 × 720)",
-  screenShareResolution1080p: "1080p (max. 1920 × 1080)",
-  screenShareFrameRate: "Bildratenlimit",
-  screenShareSettingsNote: "Die Einstellungen gelten beim nächsten Start der Freigabe",
-  serverPassword: "Serverpasswort",
-  optionalPassword: "Leer lassen, wenn kein Passwort erforderlich ist",
-  serverPasswordTitle: "Serverpasswort erforderlich",
-  serverPasswordPrompt: "Serverpasswort eingeben",
-  serverPasswordRequiredLead: "Dieser TeamSpeak-Server benötigt ein Passwort. Gib es ein und versuche es erneut.",
-  serverPasswordInvalidLead: "Das Serverpasswort wurde abgelehnt. Gib es erneut ein und versuche es noch einmal.",
-  serverPasswordRetry: "Passwort eingeben und erneut versuchen",
-  serverPasswordRetryPlaceholder: "Serverpasswort eingeben",
-  switchChannel: "Kanal wechseln",
-  searchChannels: "Kanäle suchen",
-  voiceChannels: "Sprachkanäle",
-  peopleOnline: "{{count}} online",
-  channelPreparing: "Kanalliste wird vorbereitet",
-  channelPreparingLead: "Auch ohne Kanalliste des Servers funktioniert die Sprachverbindung.",
-  reload: "Neu laden",
-  quickActions: "Schnellaktionen",
-  inviteFriends: "Freunde einladen",
-  audioAndMic: "Audio und Mikrofon",
-  stableConnection: "Stabile Verbindung",
-  websocket: "WebSocket",
-  serverBreadcrumb: "Server",
-  copyInvite: "Einladungslink kopieren",
-  exit: "Beenden",
-  live: "LIVE",
-  voiceSpace: "Sprachbereich",
-  roomDescription: "Bleibe mit allen Mitgliedern dieses Kanals klar und natürlich im Gespräch.",
-  membersOnline: "{{count}} Mitglieder online",
-  encrypted: "Verschlüsselte Verbindung",
-  voiceActivity: "SPRACHAKTIVITÄT",
-  speakingNow: "Spricht gerade",
-  onlineShort: "{{count}} online",
-  you: "Du",
-  selfSuffix: " (Du)",
-  connected: "Verbunden",
-  speaking: "Spricht…",
-  connectedYou: "Verbunden · du",
-  waitingForMembers: "Warte auf weitere Mitglieder",
-  prepareMicrophone: "Du kannst dein Mikrofon hier vorbereiten.",
-  moreMembers: "Weitere Mitglieder",
-  viewLeft: "Links anzeigen",
-  textChannel: "TEXTKANAL",
-  channelChat: "Chat in {{channel}}",
-  messageCount: "{{count}} Nachrichten",
-  chatStart: "Dies ist der Anfang des Chats",
-  chatStartLead: "Sende eine Nachricht und begrüße deine Kanalmitglieder.",
-  chatTabs: "Chat-Tabs",
-  serverChat: "Server",
-  privateMessage: "Private Nachricht",
-  privateMessagePlaceholder: "Private Nachricht senden…",
-  serverMessagePlaceholder: "Nachricht an den Server senden…",
-  channelPasswordPrompt: "Kanalpasswort eingeben",
-  channelPasswordTitle: "Geschützten Kanal betreten",
-  channelPasswordLead: "Für diesen Kanal ist ein Passwort erforderlich.",
-  channelPasswordPlaceholder: "Kanalpasswort",
-  channelPasswordOptional: "Falls der Zielkanal geschützt ist",
-  channelPasswordSubmit: "Kanal betreten",
-  channelPasswordCancel: "Abbrechen",
-  channelPasswordRetry: "Das Passwort wurde abgelehnt. Bitte erneut versuchen.",
-  privateChatStart: "Dies ist der Anfang des privaten Chats",
-  privateChatStartLead: "Sende eine private Nachricht.",
-  eventLog: "Ereignisprotokoll",
-  eventCount: "{{count}} Ereignisse",
-  noEvents: "Noch keine Serverereignisse",
-  noEventsLead: "Änderungen an Kanälen und Mitgliedern werden hier angezeigt.",
-  available: "Verfügbar",
-  away: "Abwesend",
-  awayPrompt: "Abwesenheitsnachricht (optional)",
-  poke: "Anstupsen",
-  pokedYou: "hat dich angestupst",
-  pokeMessagePrompt: "Anstupsnachricht (optional)",
-  pokeSent: "Anstupser gesendet",
-  copyNickname: "Namen kopieren",
-  moveMember: "In Kanal verschieben",
-  moveMemberMenu: "Verschieben nach",
-  moveMemberMyChannel: "Mein Kanal",
-  moveMemberNoChannels: "Keine verfügbaren Kanäle",
-  moveMemberTitle: "{{member}} verschieben",
-  moveMemberLead: "Wähle einen Zielkanal. TeamSpeak prüft deine Verschiebeberechtigung.",
-  moveMemberTarget: "Zielkanal",
-  moveMemberChooseChannel: "Zielkanal auswählen",
-  moveMemberSubmit: "Mitglied verschieben",
-  moveMemberSuccess: "Mitglied verschoben",
-  movePermissionDenied: "Du hast keine Berechtigung, Mitglieder zu verschieben",
-  copiedNickname: "Name kopiert",
-  attachmentUnavailable: "Anhänge nicht verfügbar",
-  emojiUnavailable: "Emojis nicht verfügbar",
-  sendMessagePlaceholder: "Nachricht an die Kanalmitglieder…",
-  send: "Senden",
-  muteMic: "Mikrofon stummschalten",
-  unmuteMic: "Mikrofon einschalten",
-  microphoneActive: "Mikrofon eingeschaltet",
-  microphoneMuted: "Mikrofon ausgeschaltet",
-  microphoneActiveHint: "Bei ausgeschaltetem Mikrofon wird kein Mikrofonton an den Server gesendet.",
-  microphoneMutedHint: "Dein Mikrofon ist ausgeschaltet; andere Mitglieder können dich nicht hören.",
-  sending: "Wird gesendet",
-  exitVoice: "Sprachbereich verlassen",
-  people: "Mitglieder",
-  searchMembers: "Mitglieder suchen",
-  onlineGroup: "Online — {{count}}",
-  yourDevice: "Dein Gerät",
-  memberOnline: "Online",
-  memberStates: "Mitgliederstatus",
-  inputMuted: "Mikrofon deaktiviert",
-  outputMuted: "Lautsprecher deaktiviert",
-  channelCommander: "Kanaladministrator",
-  noMatchingMembers: "Keine passenden Mitglieder gefunden",
-  noMembersInChannel: "Keine Mitglieder in diesem Kanal",
-  volumeTip: "Ziehe den Regler rechts neben einem Mitglied, um dessen Lautstärke einzeln anzupassen.",
-  moreMemberOptions: "Weitere Mitgliederoptionen",
-  connectedToast: "Mit diesem Server verbunden",
-  connectionInterrupted: "Verbindung unterbrochen, Wiederherstellung wird versucht…",
-  reconnectingAttempt: "Verbindungsversuch {{attempt}}",
-  reconnectFailed: "Verbindung konnte nicht wiederhergestellt werden",
-  reconnectNow: "Jetzt neu verbinden",
-  back: "Zurück",
-  volumeToast: "Die Lautstärke jedes Mitglieds kann separat angepasst werden.",
-  copiedToast: "Einladungslink kopiert",
-  copyFailedToast: "Kopieren fehlgeschlagen. Kopiere die Browseradresse manuell.",
-  leftToast: "Sprachbereich sicher verlassen",
-  focusedToast: "Diese Version konzentriert sich auf den Sprachbereich.",
-  settings: "Einstellungen",
-  profile: "Profil",
-  privacy: "Datenschutz",
-  notifications: "Benachrichtigungen",
-  browserClient: "Browserclient",
-  audioConfiguration: "Audiokonfiguration",
-  inputDevice: "Eingabegerät",
-  microphone: "Mikrofon",
-  microphoneState: "Mikrofonstatus",
-  defaultMicrophone: "Standardmikrofon des Browsers",
-  microphoneNumber: "Mikrofon {{index}}",
-  speakerNumber: "Lautsprecher {{index}}",
-  permission: "Berechtigung",
-  permissionUnknown: "Noch nicht angefragt",
-  permissionGranted: "Erlaubt",
-  permissionDenied: "Abgelehnt",
-  inputVolume: "Eingangslautstärke",
-  voxThreshold: "Sprachaktivierungsschwelle",
-  micLevel: "Mikrofonlautstärke",
-  microphoneTest: "Mikrofontest",
-  stopTest: "Test stoppen",
-  startTest: "Test starten",
-  localMicTestHint: "Lokaler Test: Die Aufnahme wird nur im Browser wiedergegeben und nicht an TeamSpeak gesendet.",
-  silence: "Ruhig",
-  optimal: "Optimal",
-  loud: "Laut",
-  outputDevice: "Ausgabegerät",
-  speakers: "Lautsprecher / Kopfhörer",
-  defaultOutput: "Standardausgabe des Browsers",
-  outputVolume: "Ausgabelautstärke",
-  outputDeviceUnsupported: "Dieser Browser unterstützt keine Auswahl des Ausgabegeräts. Die Standardausgabe wird verwendet.",
-  notificationVolume: "Benachrichtigungslautstärke",
-  audioStatus: "Audiostatus",
-  audioReady: "Audio bereit",
-  noiseSuppression: "Browser-Geräuschunterdrückung",
-  noiseSuppressionHint: "Verarbeitung bei der Aufnahme im Browser",
-  rnnoise: "RNNoise-Geräuschunterdrückung",
-  echoCancellation: "Echounterdrückung",
-  autoGainControl: "Automatische Verstärkungsregelung",
-  processingEnabled: "Aktiviert",
-  processingDisabled: "Deaktiviert",
-  processingUnknown: "Vom Browser nicht gemeldet",
-  audioUnavailable: "Audio nicht verfügbar (Mikrofonfehler)",
-  microphoneUnavailable: "Mikrofon nicht verfügbar – andere können dich nicht hören",
-  audioSuspended: "Audio wurde vom Browser pausiert",
-  audioUnknown: "Nicht initialisiert",
-  audioPrivacy: "WebSpeak verarbeitet Audio im sicheren Browserkontext und speichert keine Aufnahmen.",
-  mobileNavigation: "Mobile Navigation",
-  mobileChannels: "Kanäle",
-  mobileChat: "Chat",
-  mobileVoice: "Sprache",
-  mobileMore: "Mehr",
-  whisperTargets: "Flüsterziele",
-  setWhisperTarget: "Als Flüsterziel festlegen",
-  removeWhisperTarget: "Flüsterziel entfernen",
-  clearWhisperTargets: "Ziele löschen",
-  whisperHoldToTalk: "Zum Flüstern gedrückt halten",
-  releaseWhisper: "Loslassen, um das Flüstern zu beenden",
-  cancel: "Abbrechen",
-  saveChanges: "Änderungen speichern",
-  close: "Schließen",
-  done: "Fertig",
-    voiceLobby: "Sprachlobby",
-    languageMenu: "Sprache",
-    networkPerformance: "Netzwerkleistung",
-    networkPerformanceHint: "Live-Messung vom Browser über WebSpeak zu TeamSpeak",
-    browser: "Browser",
-    webSpeakGateway: "WebSpeak",
-    teamSpeakServer: "TeamSpeak",
-    browserToGateway: "Browser → WebSpeak",
-    gatewayToTeamSpeak: "WebSpeak → TeamSpeak",
-    packetLoss: "Paketverlust",
-    measuring: "Wird gemessen…",
-    measureComplete: "Laufende Messung (alle 3 Sekunden)",
-    measureNow: "Jetzt messen",
-    measureUnavailable: "Nach der Verbindung verfügbar",
-    webrtcStats: "WebRTC der Bildschirmfreigabe",
-    webrtcStatsHint: "Tatsächlicher Medienstatus, jede Sekunde erfasst",
-    screenShareCapture: "Aufnahme",
-    screenShareSending: "An Zuschauer senden",
-    screenShareReceiving: "Vom Freigebenden empfangen",
-    screenShareDroppedFrames: "verloren",
-    screenShareJitter: "Jitter",
-    screenShareRtt: "RTT",
-  langSwitch: "中文",
-};
-
-translations.ru = {
-  ...translations.en,
-  themeSystem: "Системная тема",
-  themeLight: "Светлая тема",
-  themeDark: "Тёмная тема",
-  switchToLightTheme: "Включить светлую тему",
-  switchToDarkTheme: "Включить тёмную тему",
-  browserWorkspace: "Голосовое пространство в браузере",
-  secureGateway: "Безопасный голосовой шлюз",
-  adminConsole: "Панель администратора",
-  currentVersion: "Текущая версия",
-  errorCode: "Код ошибки",
-  viewChangelog: "Открыть журнал изменений",
-  notConfigured: "Цель TeamSpeak ещё не настроена в WebSpeak.",
-  configureNow: "Открыть панель администратора",
-  privateAudio: "Приватное голосовое сообщество",
-  joinLine1: "Подключитесь к серверу,",
-  joinLine2: "и начните общение.",
-  joinDescription: "Клиент TeamSpeak устанавливать не нужно. Откройте браузер и присоединитесь к голосовому каналу с низкой задержкой.",
-  overallVolume: "Общая громкость",
-  moveMember: "Переместить в канал",
-  moveMemberMenu: "Переместить в",
-  moveMemberMyChannel: "Мой канал",
-  moveMemberNoChannels: "Нет доступных каналов",
-  moveMemberTitle: "Переместить: {{member}}",
-  moveMemberLead: "Выберите канал. TeamSpeak проверит ваши права на перемещение.",
-  moveMemberTarget: "Целевой канал",
-  moveMemberChooseChannel: "Выберите целевой канал",
-  moveMemberSubmit: "Переместить участника",
-  moveMemberSuccess: "Участник перемещён",
-  movePermissionDenied: "У вас нет права перемещать участников",
-  channelPasswordOptional: "Если целевой канал защищён паролем",
-  inputVolume: "Громкость микрофона",
-  desktopAudioControls: "Управление звуком",
-  desktopAudioHint: "Наведите на значок, чтобы изменить громкость",
-  startScreenShare: "Начать трансляцию",
-  screenShareStarting: "Запуск трансляции",
-  stopScreenShare: "Остановить трансляцию",
-  sharingScreen: "В эфире",
-  watchScreenShare: "Смотреть трансляцию экрана",
-  watching: "Смотрю",
-  screenShareVolume: "Громкость трансляции",
-  screenShareNativeUnavailable: "Демонстрация экрана TeamSpeak пока недоступна для веб-просмотра",
-  screenShareExit: "Выйти из просмотра",
-  screenShareConnecting: "Подключение к трансляции экрана",
-  screenShareViewers: "Текущие зрители",
-  screenShareFullscreen: "На весь экран",
-  screenShareExitFullscreen: "Выйти из полноэкранного режима",
-  screenShareSettings: "Настройки трансляции",
-  screenShareSettingsHint: "Настройте качество перед началом трансляции",
-  screenShareResolution: "Выходное разрешение",
-  screenShareResolutionSource: "Исходное разрешение",
-  screenShareResolution720p: "720p (до 1280 × 720)",
-  screenShareResolution1080p: "1080p (до 1920 × 1080)",
-  screenShareFrameRate: "Ограничение FPS",
-  screenShareSettingsNote: "Настройки применятся при следующем запуске трансляции",
-  noiseSuppression: "Шумоподавление",
-  noiseSuppressionHint: "Обработка звука при захвате в браузере",
-  highQuality: "Качественный звук",
-  opusAudio: "Передача Opus с низкой задержкой",
-  secureJoin: "Безопасное подключение",
-  inviteProtected: "Сервер защищён ссылкой-приглашением",
-  realtime: "Синхронизация в реальном времени",
-  membersSync: "Участники каналов всегда синхронизированы",
-  privateServer: "Приватный голосовой сервер",
-  joinServer: "Войти на сервер",
-  welcomeBack: "С возвращением",
-  joinLead: "Выберите имя и канал для входа.",
-  visitorCount: "Вы {{count}}-й посетитель",
-  visitorTotal: "Всего посетителей: {{count}}",
-  serverAddress: "Адрес сервера TeamSpeak",
-  serverAddressPlaceholder: "например, ts.example.com или 127.0.0.1",
-  serverPort: "Голосовой порт",
-  serverPortPlaceholder: "9987",
-  serverAddressHint: "Это адрес и порт TeamSpeak, к которым обращается шлюз, а не прямое подключение браузера.",
-  relayAcceleration: "Подключение через ретранслятор",
-  directConnection: "Прямое подключение к TeamSpeak",
-  relayAccelerationHint: "Выберите настроенный ретранслятор, если прямой маршрут нестабилен или заблокирован.",
-  nickname: "Ваше имя",
-  nicknamePlaceholder: "например, Alex Rivera",
-  targetChannel: "Целевой канал",
-  optional: "необязательно",
-  emptyDefault: "Оставьте пустым для канала по умолчанию",
-  rememberIdentity: "Запомнить личность TeamSpeak на этом устройстве",
-  rememberIdentityHint: "Хранится только на этом устройстве и используется при следующем подключении.",
-  rememberIdentityConcurrentWarning: "Одна личность может использоваться только одним подключением в этом браузере. Для второго подключения отключите эту опцию или используйте другой браузер.",
-  deviceIdentityOptions: "Настройки личности устройства",
-  enterVoiceSpace: "Войти в голосовое пространство",
-  connectionDetailsPrivate: "Данные подключения используются только для этой голосовой сессии",
-  recentServers: "Недавние серверы",
-  saveFavorite: "Сохранить в избранное",
-  savedFavoriteToast: "Сервер сохранён в избранное",
-  removedFavoriteToast: "Сервер удалён из избранного",
-  clearLocalData: "Очистить локальные данные",
-  clearLocalDataConfirm: "Удалить сохранённое имя, настройки и личность с этого устройства?",
-  localDataCleared: "Локальные данные очищены",
-  languageMenu: "Язык",
-  networkPerformance: "Сетевая производительность",
-  networkPerformanceHint: "Непрерывные измерения от браузера через WebSpeak к TeamSpeak",
-  packetLoss: "Потери пакетов",
-  measuring: "Измерение…",
-  measureComplete: "Мониторинг продолжается (обновление каждые 3 секунды)",
-  measureNow: "Измерить сейчас",
-  measureUnavailable: "Доступно после подключения",
-  webrtcStats: "WebRTC трансляции экрана",
-  webrtcStatsHint: "Фактическое состояние медиапотока, замер каждую секунду",
-  screenShareCapture: "Захват",
-  screenShareSending: "Отправка зрителю",
-  screenShareReceiving: "Получение от ведущего",
-  screenShareDroppedFrames: "пропуски",
-  screenShareJitter: "джиттер",
-  screenShareRtt: "RTT",
-  langSwitch: "中文",
-};
-
-translations.ja = {
-  ...translations.en,
-  themeSystem: "システム設定",
-  themeLight: "ライトテーマ",
-  themeDark: "ダークテーマ",
-  switchToLightTheme: "ライトテーマに切り替え",
-  switchToDarkTheme: "ダークテーマに切り替え",
-  browserWorkspace: "ブラウザ音声ワークスペース",
-  secureGateway: "安全な音声ゲートウェイ",
-  adminConsole: "管理コンソール",
-  currentVersion: "現在のバージョン",
-  errorCode: "エラーコード",
-  viewChangelog: "更新履歴を見る",
-  notConfigured: "WebSpeak の TeamSpeak 接続先がまだ設定されていません。",
-  configureNow: "管理コンソールを開く",
-  privateAudio: "プライベートコミュニティ音声",
-  joinLine1: "サーバーに接続して、",
-  joinLine2: "すぐに会話を始めよう。",
-  joinDescription: "TeamSpeak クライアントのインストールは不要です。ブラウザから低遅延の音声チャンネルに参加できます。",
-  overallVolume: "全体音量",
-  moveMember: "チャンネルへ移動",
-  moveMemberMenu: "移動先",
-  moveMemberMyChannel: "自分のチャンネル",
-  moveMemberNoChannels: "移動できるチャンネルがありません",
-  moveMemberTitle: "{{member}}を移動",
-  moveMemberLead: "移動先を選択してください。TeamSpeak が権限を確認します。",
-  moveMemberTarget: "移動先チャンネル",
-  moveMemberChooseChannel: "移動先を選択",
-  moveMemberSubmit: "メンバーを移動",
-  moveMemberSuccess: "メンバーを移動しました",
-  movePermissionDenied: "メンバーを移動する権限がありません",
-  channelPasswordOptional: "移動先にパスワードがある場合",
-  inputVolume: "マイク音量",
-  desktopAudioControls: "音声コントロール",
-  desktopAudioHint: "アイコンにカーソルを合わせて音量を調整",
-  startScreenShare: "画面を共有",
-  screenShareStarting: "配信を開始中",
-  stopScreenShare: "共有を停止",
-  sharingScreen: "ライブ中",
-  watchScreenShare: "画面共有を見る",
-  watching: "視聴中",
-  screenShareVolume: "共有音量",
-  screenShareNativeUnavailable: "TeamSpeak のネイティブ画面共有は現在ウェブで視聴できません",
-  screenShareExit: "視聴を終了",
-  screenShareConnecting: "画面共有に接続中",
-  screenShareViewers: "現在の視聴者",
-  screenShareFullscreen: "全画面",
-  screenShareExitFullscreen: "全画面を終了",
-  screenShareSettings: "共有設定",
-  screenShareSettingsHint: "共有前に出力品質を調整",
-  screenShareResolution: "出力解像度",
-  screenShareResolutionSource: "元の解像度",
-  screenShareResolution720p: "720p（最大 1280 × 720）",
-  screenShareResolution1080p: "1080p（最大 1920 × 1080）",
-  screenShareFrameRate: "フレームレート上限",
-  screenShareSettingsNote: "次回の共有開始時に適用されます",
-  noiseSuppression: "ノイズ抑制",
-  noiseSuppressionHint: "ブラウザ側で音声を処理",
-  highQuality: "高品質な音声",
-  opusAudio: "低遅延 Opus 転送",
-  secureJoin: "安全に参加",
-  inviteProtected: "招待リンクでサーバーを保護",
-  realtime: "リアルタイムの同期",
-  membersSync: "チャンネルメンバーを常に同期",
-  privateServer: "プライベート音声サーバー",
-  joinServer: "サーバーに参加",
-  welcomeBack: "おかえりなさい",
-  joinLead: "名前と参加するチャンネルを選択してください。",
-  visitorCount: "あなたは{{count}}人目の訪問者です",
-  visitorTotal: "訪問者数：{{count}}人",
-  serverAddress: "TeamSpeak サーバーアドレス",
-  serverAddressPlaceholder: "例: ts.example.com または 127.0.0.1",
-  serverPort: "音声ポート",
-  serverPortPlaceholder: "9987",
-  serverAddressHint: "ゲートウェイが接続する TeamSpeak のアドレスとポートです。ブラウザからの直接接続先ではありません。",
-  relayAcceleration: "中継接続",
-  directConnection: "TeamSpeak へ直接接続",
-  relayAccelerationHint: "直接接続が不安定またはブロックされている場合は、設定済みの中継を選択してください。",
-  nickname: "ニックネーム",
-  nicknamePlaceholder: "例: Alex Rivera",
-  targetChannel: "参加先チャンネル",
-  optional: "任意",
-  emptyDefault: "空欄にするとデフォルトチャンネルを使用します",
-  rememberIdentity: "この端末に TeamSpeak ID を保存",
-  rememberIdentityHint: "この端末だけに保存し、次回の接続で再利用します。",
-  rememberIdentityConcurrentWarning: "同じブラウザでは、この ID を同時に1接続だけ使用できます。2つ目の接続では無効にするか、別のブラウザを使ってください。",
-  deviceIdentityOptions: "端末 ID の設定",
-  enterVoiceSpace: "音声スペースに参加",
-  connectionDetailsPrivate: "接続情報は今回の音声セッションでのみ使用されます",
-  recentServers: "最近のサーバー",
-  saveFavorite: "お気に入りに保存",
-  savedFavoriteToast: "サーバーをお気に入りに保存しました",
-  removedFavoriteToast: "お気に入りから削除しました",
-  clearLocalData: "ローカルデータを消去",
-  clearLocalDataConfirm: "この端末に保存された名前、設定、IDを削除しますか？",
-  localDataCleared: "ローカルデータを消去しました",
-  languageMenu: "言語",
-  networkPerformance: "ネットワーク性能",
-  networkPerformanceHint: "ブラウザから WebSpeak を経由して TeamSpeak まで継続測定",
-  packetLoss: "パケット損失",
-  measuring: "測定中…",
-  measureComplete: "継続監視中（3秒ごとに更新）",
-  measureNow: "今すぐ測定",
-  measureUnavailable: "接続後に利用できます",
-  webrtcStats: "画面共有 WebRTC",
-  webrtcStatsHint: "実際のメディア状態を1秒ごとに測定",
-  screenShareCapture: "キャプチャ",
-  screenShareSending: "視聴者へ送信",
-  screenShareReceiving: "共有者から受信",
-  screenShareDroppedFrames: "ドロップ",
-  screenShareJitter: "ジッター",
-  screenShareRtt: "RTT",
-  langSwitch: "中文",
-};
 
 function initialServerTarget() {
   const explicit = query.get("server") ?? query.get("target");
@@ -1783,284 +586,6 @@ function initialServerTarget() {
   const host = (query.get("tsHost") ?? location.hostname).trim();
   const port = (query.get("tsPort") ?? DEFAULT_TEAM_SPEAK_PORT).trim();
   return splitTeamSpeakTarget(host, port || DEFAULT_TEAM_SPEAK_PORT);
-}
-
-function getInitialLanguage(): Language {
-  const stored = localStorage.getItem("webspeak:language");
-  if (stored === "zh" || stored === "en" || stored === "de" || stored === "ru" || stored === "ja") return stored;
-  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh")) return "zh";
-  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("de")) return "de";
-  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ru")) return "ru";
-  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ja")) return "ja";
-  return "en";
-}
-
-function t(key: string, variables: Record<string, string | number> = {}) {
-  let value = translations[language.value][key] ?? translations.en[key] ?? translations.zh[key] ?? key;
-  for (const [name, replacement] of Object.entries(variables)) value = value.replaceAll(`{{${name}}}`, String(replacement));
-  return value;
-}
-
-function localizedMessage(message: string) {
-  if (language.value === "zh") return message;
-  const localizedExact: Record<string, string> = language.value === "ru" ? {
-    "该服务器需要密码，请输入密码后重试": "Для этого сервера требуется пароль. Введите его и повторите попытку",
-    "服务器密码错误，请重新输入": "Неверный пароль сервера. Введите его ещё раз",
-    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Длина имени не соответствует требованиям TeamSpeak (не менее 3 символов). Измените имя и повторите попытку",
-    "TeamSpeak 服务器地址无效": "Неверный адрес сервера TeamSpeak",
-    "找不到 TeamSpeak 服务器主机名，请检查地址": "Не удалось найти сервер TeamSpeak. Проверьте адрес",
-    "无法到达 TeamSpeak 服务器，请检查网络或地址": "Сервер TeamSpeak недоступен. Проверьте сеть или адрес",
-    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Сервер TeamSpeak отклонил подключение. Проверьте порт и состояние службы",
-    "连接 TeamSpeak 超时，请检查网络或服务器状态": "Истекло время подключения к TeamSpeak. Проверьте сеть и состояние сервера",
-    "你没有执行此操作的权限": "У вас нет права выполнять это действие",
-  } : {
-    "该服务器需要密码，请输入密码后重试": "このサーバーにはパスワードが必要です。入力して再試行してください",
-    "服务器密码错误，请重新输入": "サーバーパスワードが正しくありません。もう一度入力してください",
-    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "ニックネームの長さが TeamSpeak の要件を満たしていません（3文字以上）。変更して再試行してください",
-    "TeamSpeak 服务器地址无效": "TeamSpeak サーバーアドレスが正しくありません",
-    "找不到 TeamSpeak 服务器主机名，请检查地址": "TeamSpeak サーバーが見つかりません。アドレスを確認してください",
-    "无法到达 TeamSpeak 服务器，请检查网络或地址": "TeamSpeak サーバーに到達できません。ネットワークまたはアドレスを確認してください",
-    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "TeamSpeak サーバーが接続を拒否しました。ポートとサービスの状態を確認してください",
-    "连接 TeamSpeak 超时，请检查网络或服务器状态": "TeamSpeak への接続がタイムアウトしました。ネットワークとサーバーの状態を確認してください",
-    "你没有执行此操作的权限": "この操作を実行する権限がありません",
-  };
-  if ((language.value === "ru" || language.value === "ja") && localizedExact[message]) return localizedExact[message];
-  const errorCodeMatch = message.match(/错误代码：([A-Z0-9_-]{1,64})）(?:：([^，。]+))?/);
-  if (errorCodeMatch) {
-    const code = errorCodeMatch[1];
-    const detail = errorCodeMatch[2] ? `: ${errorCodeMatch[2]}` : "";
-    const operation = message.startsWith("操作失败");
-    if (language.value === "de") return `${operation ? "Vorgang" : "TeamSpeak-Verbindung"} fehlgeschlagen (Fehlercode: ${code})${detail}. Prüfe Eingaben, Netzwerk und Serverstatus`;
-    if (language.value === "ru") return `${operation ? "Операция" : "Подключение TeamSpeak"} не выполнена (код ошибки: ${code})${detail}. Проверьте ввод, сеть и состояние сервера`;
-    if (language.value === "ja") return `${operation ? "操作" : "TeamSpeak 接続"}に失敗しました（エラーコード: ${code}）${detail}。入力、ネットワーク、サーバーの状態を確認してください`;
-    return `${operation ? "Operation" : "TeamSpeak connection"} failed (error code: ${code})${detail}. Check your input, network, and server status`;
-  }
-  const exact: Record<string, string> = {
-    "语音功能需要 HTTPS 安全连接": "Voice requires a secure HTTPS connection",
-    "当前浏览器不支持麦克风访问": "This browser does not support microphone access",
-    "当前浏览器不支持 Web Audio 音频处理": "This browser does not support Web Audio processing",
-    "当前浏览器不支持音频解码，请使用最新版 Chrome 或 Edge": "Audio decoding is unavailable. Use the latest Chrome or Edge",
-    "当前浏览器不支持扬声器设备选择，将使用默认输出设备": "Output device selection is not supported by this browser. Using the default output device",
-    "所选扬声器当前不可用": "The selected speaker is not available",
-    "连接服务器失败，请检查邀请链接或服务器状态": "Could not connect. Check the invite link or server status",
-    "请求来源不受信任，请从正确的网站入口重新打开": "The request origin is not trusted. Reopen the official WebSpeak page",
-    "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak has not been configured yet. Contact the administrator",
-    "请求过于频繁，请稍后重试": "Too many requests. Try again shortly",
-    "当前中继加速不可用，请关闭加速或联系管理员": "The selected relay is unavailable. Turn off relay mode or contact the administrator",
-    "邀请链接已失效或已被撤销": "The invite link is invalid, expired, or revoked",
-    "TeamSpeak 连接已断开": "The TeamSpeak connection was closed",
-    "连接已断开": "The connection was closed",
-    "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "This TeamSpeak identity is already used by another browser page. Close that connection or clear ‘Remember identity’ and try again",
-    "TeamSpeak 服务器地址无效": "The TeamSpeak server address is invalid",
-    "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "The nickname length does not meet the TeamSpeak server requirements (at least 3 characters). Change it and try again",
-    "TeamSpeak 服务器连接失败": "Could not connect to the TeamSpeak server",
-    "找不到 TeamSpeak 服务器主机名，请检查地址": "The TeamSpeak server hostname could not be resolved. Check the address",
-    "无法到达 TeamSpeak 服务器，请检查网络或地址": "The TeamSpeak server is unreachable. Check the network or address",
-    "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "The TeamSpeak server refused the connection. Check the port and server status",
-    "TeamSpeak 连接被服务器或网络重置，请稍后重试": "The TeamSpeak connection was reset by the server or network. Try again shortly",
-    "连接 TeamSpeak 超时，请检查网络或服务器状态": "The TeamSpeak connection timed out. Check the network or server status",
-    "该服务器需要密码，请输入密码后重试": "This server requires a password. Enter it and try again",
-    "服务器密码错误，请重新输入": "The server password is incorrect. Enter it again",
-    "TeamSpeak 协议协商失败": "TeamSpeak protocol negotiation failed",
-    "TeamSpeak 服务器拒绝了连接": "The TeamSpeak server rejected the connection",
-    "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "TeamSpeak connection failed. Check the address, network, or server status",
-    "服务器当前已满，请稍后重试": "The server is full. Try again shortly",
-    "服务器当前已满或拒绝了连接，请稍后重试": "The server is full or rejected the connection. Try again shortly",
-    "WebSpeak 尚未配置 TeamSpeak 目标。": "The WebSpeak TeamSpeak target has not been configured",
-    "此 TeamSpeak 服务器地址不允许连接": "This TeamSpeak server address is not allowed",
-    "请输入有效的昵称": "Enter a valid nickname",
-    "消息格式无效": "The message format is invalid",
-    "请求标识无效": "The request id is invalid",
-    "不支持的操作": "This operation is not supported",
-    "操作参数无效": "The operation payload is invalid",
-    "频道标识无效": "The channel id is invalid",
-    "成员标识无效": "The member id is invalid",
-    "频道密码无效": "The channel password is invalid",
-    "文字消息无效": "The text message is invalid",
-    "戳一戳消息无效": "The poke message is invalid",
-    "离开状态无效": "The away status is invalid",
-    "音频帧格式无效": "The audio frame is invalid",
-    "私语目标无效": "The whisper targets are invalid",
-    "私语状态无效": "The whisper state is invalid",
-    "请先选择私语目标": "Choose a whisper target first",
-    "私语目标已离线": "A whisper target is offline",
-    "TeamSpeak 会话尚未就绪": "The TeamSpeak session is not ready",
-    "频道切换失败": "Channel switch failed",
-    "该频道需要密码": "This channel requires a password",
-    "该频道已满": "This channel is full",
-    "你没有执行此操作的权限": "You do not have permission to perform this action",
-    "不能移动自己的客户端": "You cannot move yourself",
-    "目标频道不可用": "The target channel is unavailable",
-    "成员已离线或当前不可见": "The member is offline or no longer visible",
-    "成员已离线": "This member is offline",
-    "操作失败": "The operation failed",
-    "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "The voice session token is missing or expired. Return to the list and enter the voice space again",
-    "语音网关拒绝了本次连接：身份无效，请取消“保持身份”后重新进入": "The voice gateway rejected the connection because the identity is invalid. Clear ‘Remember identity’ and try again",
-    "语音网关拒绝了本次连接：身份无效或无法在此页面使用，请取消“保持身份”后重新进入": "The voice gateway rejected the connection because the identity is invalid or unavailable on this page. Clear ‘Remember identity’ and try again",
-    "当前中继加速不可用，请关闭加速后重试或联系管理员": "The selected relay is unavailable. Turn off relay mode and try again, or contact the administrator",
-    "与语音网关的网络连接异常中断（掉线或代理断开），并非 TeamSpeak 服务器拒绝连接，请检查网络后重新进入": "The voice gateway connection was interrupted (offline or proxy disconnected); the TeamSpeak server did not reject it. Check your network and enter again",
-    "语音网关会话意外结束，请重新进入语音空间": "The voice gateway session ended unexpectedly. Enter the voice space again",
-    "语音网关未能创建 TeamSpeak 客户端（服务器可能已关闭或地址不可达），请确认服务器地址或稍后重试": "The voice gateway could not create a TeamSpeak client. The server may be offline or unreachable; check the address and try again",
-    "该昵称已被服务器上的其他用户占用，请更换昵称": "This nickname is already in use on the server. Choose another one",
-    "该昵称已被占用，请更换昵称": "This nickname is already in use. Choose another one",
-    "你的身份安全等级低于该服务器要求，请提升后重试": "Your identity security level is below what this server requires. Raise it and try again",
-    "该身份建立的连接数已达上限，请关闭其他连接后重试": "This identity reached its connection limit. Close the other connections and try again",
-    "客户端版本过旧，服务器拒绝连接，请升级后重试": "Your client version is outdated and the server rejected the connection. Update and try again",
-    "客户端版本过旧，服务器拒绝了该操作": "Your client version is outdated, so the server rejected this action",
-    "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Too many requests: the server flood protection rejected you temporarily. Try again shortly",
-    "操作过于频繁，请稍后重试": "Too many requests. Try again shortly",
-    "你已被该服务器封禁，无法连接": "You are banned from this server, so the connection is refused",
-    "你已被该服务器封禁": "You are banned from this server",
-    "你已被服务器移出": "You were removed from the server",
-    "TeamSpeak 服务器正在关闭，暂时无法连接": "The TeamSpeak server is shutting down and is unreachable right now",
-    "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "The TeamSpeak server could not finish initialising the connection. Check the address and port, or try again shortly",
-    "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "The TeamSpeak server rejected the parameters, usually because the nickname length or format is invalid",
-  };
-  if (language.value === "en" && exact[message]) return exact[message];
-  if (message.startsWith("麦克风访问失败：")) {
-    const detail = message.slice(8);
-    if (language.value === "ru") return `Не удалось получить доступ к микрофону: ${detail}`;
-    if (language.value === "ja") return `マイクへのアクセスに失敗しました: ${detail}`;
-    return language.value === "de" ? `Mikrofonzugriff fehlgeschlagen: ${detail}` : `Microphone access failed: ${detail}`;
-  }
-  if (message.startsWith("切换失败：")) {
-    const detail = message.slice(5);
-    if (language.value === "ru") return `Не удалось переключить канал: ${detail}`;
-    if (language.value === "ja") return `チャンネルの切り替えに失敗しました: ${detail}`;
-    return language.value === "de" ? `Kanalwechsel fehlgeschlagen: ${detail}` : `Channel switch failed: ${detail}`;
-  }
-  if (language.value === "de") {
-    const german: Record<string, string> = {
-      "语音功能需要 HTTPS 安全连接": "Für Sprachfunktionen ist eine sichere HTTPS-Verbindung erforderlich",
-      "当前浏览器不支持麦克风访问": "Dieser Browser unterstützt keinen Mikrofonzugriff",
-      "当前浏览器不支持 Web Audio 音频处理": "Dieser Browser unterstützt keine Web-Audio-Verarbeitung",
-      "连接服务器失败，请检查邀请链接或服务器状态": "Verbindung fehlgeschlagen. Prüfe den Einladungslink oder den Serverstatus",
-      "请求来源不受信任，请从正确的网站入口重新打开": "Die Anfragequelle ist nicht vertrauenswürdig. Öffne die offizielle WebSpeak-Seite erneut",
-      "WebSpeak 尚未完成配置，请联系管理员": "WebSpeak wurde noch nicht konfiguriert. Wende dich an den Administrator",
-      "请求过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
-      "当前中继加速不可用，请关闭加速或联系管理员": "Das ausgewählte Relay ist nicht verfügbar. Deaktiviere den Relay-Modus oder wende dich an den Administrator",
-      "邀请链接已失效或已被撤销": "Der Einladungslink ist ungültig, abgelaufen oder widerrufen",
-      "TeamSpeak 连接已断开": "Die TeamSpeak-Verbindung wurde getrennt",
-      "连接已断开": "Die Verbindung wurde getrennt",
-      "TeamSpeak 服务器地址无效": "Die TeamSpeak-Serveradresse ist ungültig",
-      "昵称长度不符合 TeamSpeak 服务器要求，至少 3 个字符，请修改后重试": "Die Länge des Spitznamens entspricht nicht den Anforderungen des TeamSpeak-Servers (mindestens 3 Zeichen). Ändere ihn und versuche es erneut",
-      "请输入有效的昵称": "Gib einen gültigen Nicknamen ein",
-      "找不到 TeamSpeak 服务器主机名，请检查地址": "Der TeamSpeak-Servername konnte nicht aufgelöst werden. Prüfe die Adresse",
-      "无法到达 TeamSpeak 服务器，请检查网络或地址": "Der TeamSpeak-Server ist nicht erreichbar. Prüfe Netzwerk und Adresse",
-      "TeamSpeak 服务器拒绝了连接，请检查端口和服务状态": "Der TeamSpeak-Server hat die Verbindung abgelehnt. Prüfe Port und Serverstatus",
-      "TeamSpeak 连接被服务器或网络重置，请稍后重试": "Die TeamSpeak-Verbindung wurde vom Server oder Netzwerk zurückgesetzt. Versuche es später erneut",
-      "连接 TeamSpeak 超时，请检查网络或服务器状态": "Die TeamSpeak-Verbindung hat das Zeitlimit überschritten. Prüfe Netzwerk und Serverstatus",
-      "该服务器需要密码，请输入密码后重试": "Dieser Server benötigt ein Passwort. Gib es ein und versuche es erneut",
-      "服务器密码错误，请重新输入": "Das Serverpasswort ist falsch. Gib es erneut ein",
-      "TeamSpeak 协议协商失败": "Die Aushandlung des TeamSpeak-Protokolls ist fehlgeschlagen",
-      "TeamSpeak 服务器拒绝了连接": "Der TeamSpeak-Server hat die Verbindung abgelehnt",
-      "TeamSpeak 连接失败，请检查地址、网络或服务器状态": "Die TeamSpeak-Verbindung ist fehlgeschlagen. Prüfe Adresse, Netzwerk und Serverstatus",
-      "服务器当前已满或拒绝了连接，请稍后重试": "Der Server ist voll oder hat die Verbindung abgelehnt. Versuche es später erneut",
-      "服务器当前已满，请稍后重试": "Der Server ist derzeit voll. Versuche es später erneut",
-      "该昵称已被服务器上的其他用户占用，请更换昵称": "Dieser Spitzname wird auf dem Server bereits verwendet. Wähle einen anderen",
-      "该昵称已被占用，请更换昵称": "Dieser Spitzname wird bereits verwendet. Wähle einen anderen",
-      "你的身份安全等级低于该服务器要求，请提升后重试": "Deine Sicherheitsstufe liegt unter der Anforderung dieses Servers. Erhöhe sie und versuche es erneut",
-      "该身份建立的连接数已达上限，请关闭其他连接后重试": "Diese Identität hat ihr Verbindungslimit erreicht. Schließe die anderen Verbindungen und versuche es erneut",
-      "客户端版本过旧，服务器拒绝连接，请升级后重试": "Deine Client-Version ist veraltet und der Server hat die Verbindung abgelehnt. Aktualisiere und versuche es erneut",
-      "客户端版本过旧，服务器拒绝了该操作": "Deine Client-Version ist veraltet, daher hat der Server diese Aktion abgelehnt",
-      "操作过于频繁，已被服务器洪水防护暂时拒绝，请稍后重试": "Zu viele Anfragen: Der Flood-Schutz des Servers hat dich vorübergehend abgewiesen. Versuche es gleich erneut",
-      "操作过于频繁，请稍后重试": "Zu viele Anfragen. Versuche es gleich erneut",
-      "你已被该服务器封禁，无法连接": "Du wurdest von diesem Server gebannt und kannst nicht verbinden",
-      "你已被该服务器封禁": "Du wurdest von diesem Server gebannt",
-      "你已被服务器移出": "Du wurdest vom Server entfernt",
-      "TeamSpeak 服务器正在关闭，暂时无法连接": "Der TeamSpeak-Server wird heruntergefahren und ist derzeit nicht erreichbar",
-      "TeamSpeak 服务器未能完成连接初始化，请检查地址、端口或稍后重试": "Der TeamSpeak-Server konnte die Verbindungsinitialisierung nicht abschließen. Prüfe Adresse und Port oder versuche es später erneut",
-      "TeamSpeak 服务器拒绝了参数，通常是昵称长度或格式不合规": "Der TeamSpeak-Server hat die Parameter abgelehnt, meist wegen ungültiger Länge oder ungültigen Formats des Spitznamens",
-      "此 TeamSpeak 身份已在另一个浏览器页面使用，请关闭另一条连接或取消“保持身份”后重试": "Diese TeamSpeak-Identität wird bereits in einem anderen Browser-Tab verwendet. Schließe die andere Verbindung oder deaktiviere „Identität merken“ und versuche es erneut",
-      "语音会话票据缺失或已过期，请返回列表重新进入语音空间": "Der Sprachsitzungs-Token fehlt oder ist abgelaufen. Kehre zur Liste zurück und tritt dem Sprachraum erneut bei",
-      "语音网关拒绝了本次连接：身份无效，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig. Deaktiviere „Identität merken“ und tritt erneut bei",
-      "语音网关拒绝了本次连接：身份无效或无法在此页面使用，请取消“保持身份”后重新进入": "Das Sprach-Gateway hat die Verbindung abgelehnt: Die Identität ist ungültig oder kann auf dieser Seite nicht verwendet werden. Deaktiviere „Identität merken“ und tritt erneut bei",
-      "当前中继加速不可用，请关闭加速后重试或联系管理员": "Der beschleunigte Relay-Modus ist nicht verfügbar. Deaktiviere ihn und versuche es erneut oder wende dich an den Administrator",
-      "与语音网关的网络连接异常中断（掉线或代理断开），并非 TeamSpeak 服务器拒绝连接，请检查网络后重新进入": "Die Verbindung zum Sprach-Gateway wurde unerwartet unterbrochen (Offline oder Proxy getrennt) – der TeamSpeak-Server hat die Verbindung nicht abgelehnt. Prüfe deine Netzwerkverbindung und tritt erneut bei",
-      "语音网关会话意外结束，请重新进入语音空间": "Die Sprach-Gateway-Sitzung wurde unerwartet beendet. Tritt dem Sprachraum erneut bei",
-      "语音网关未能创建 TeamSpeak 客户端（服务器可能已关闭或地址不可达），请确认服务器地址或稍后重试": "Das Sprach-Gateway konnte keinen TeamSpeak-Client erstellen (der Server ist möglicherweise aus oder nicht erreichbar). Prüfe die Serveradresse oder versuche es später erneut",
-      "消息格式无效": "Ungültiges Nachrichtenformat",
-      "请求标识无效": "Ungültige Anforderungs-ID",
-      "不支持的操作": "Nicht unterstützte Operation",
-      "操作参数无效": "Ungültige Operationsparameter",
-      "频道标识无效": "Ungültige Kanal-ID",
-      "频道密码无效": "Ungültiges Kanalpasswort",
-      "成员标识无效": "Ungültige Mitglieds-ID",
-      "文字消息无效": "Ungültige Textnachricht",
-      "戳一戳消息无效": "Ungültige Poke-Nachricht",
-      "离开状态无效": "Ungültiger Abwesenheitsstatus",
-      "音频帧格式无效": "Ungültiges Audio-Frame-Format",
-      "成员音量无效": "Ungültige Mitgliedslautstärke",
-      "私语目标无效": "Ungültige Flüsterziele",
-      "私语状态无效": "Ungültiger Flüsterstatus",
-      "请先选择私语目标": "Wähle zuerst ein Flüsterziel",
-      "TeamSpeak 会话尚未就绪": "Die TeamSpeak-Sitzung ist noch nicht bereit",
-      "频道切换失败": "Kanalwechsel fehlgeschlagen",
-      "该频道需要密码": "Dieser Kanal erfordert ein Passwort",
-      "该频道已满": "Dieser Kanal ist voll",
-      "你没有执行此操作的权限": "Du hast keine Berechtigung für diese Aktion",
-      "不能移动自己的客户端": "Du kannst dich nicht selbst verschieben",
-      "目标频道不可用": "Der Zielkanal ist nicht verfügbar",
-      "成员已离线或当前不可见": "Das Mitglied ist offline oder nicht mehr sichtbar",
-      "成员已离线": "Das Mitglied ist offline",
-      "操作失败": "Operation fehlgeschlagen",
-    };
-    if (german[message]) return german[message];
-    if (message.startsWith("麦克风访问失败：")) return `Mikrofonzugriff fehlgeschlagen: ${message.slice(8)}`;
-    if (message.startsWith("麦克风声音未能发送：")) return `Mikrofon-Audio konnte nicht gesendet werden: ${message.slice(10)}`;
-    if (message.startsWith("音频链路异常")) return message.replace("音频链路异常", "Audioverbindung fehlerhaft");
-  }
-  if (language.value === "ru") return exact[message] ?? "Не удалось выполнить операцию. Проверьте ввод, сеть и состояние сервера";
-  if (language.value === "ja") return exact[message] ?? "操作に失敗しました。入力、ネットワーク、サーバーの状態を確認してください";
-  return exact[message] ?? message;
-}
-
-function localizedAudioNotice(code: string, message: string) {
-  if (language.value === "zh") return message;
-  const normalizedCode = visibleErrorCode(code || "AUDIO_NOTICE");
-  const messages: Record<string, { en: string; de: string; ru: string; ja: string }> = {
-    WEBRTC_FALLBACK: {
-      en: `WebRTC realtime voice is unavailable (error code: ${normalizedCode}). Compatibility transport is active; latency and audio quality may be lower`,
-      de: `Echtzeitstimme über WebRTC ist nicht verfügbar (Fehlercode: ${normalizedCode}). Der Kompatibilitätstransport ist aktiv; Latenz und Audioqualität können schlechter sein`,
-      ru: `Голосовая связь WebRTC недоступна (код ошибки: ${normalizedCode}). Используется совместимый транспорт; задержка и качество звука могут быть ниже`,
-      ja: `WebRTC のリアルタイム音声は利用できません（エラーコード: ${normalizedCode}）。互換トランスポートを使用するため、遅延や音質が低下する場合があります`,
-    },
-    PLAYBACK_BLOCKED: {
-      en: "The browser blocked automatic audio playback. Click the page or allow audio playback for this site",
-      de: "Der Browser hat die automatische Audiowiedergabe blockiert. Klicke auf die Seite oder erlaube die Audiowiedergabe für diese Website",
-      ru: "Браузер заблокировал автоматическое воспроизведение. Нажмите на страницу или разрешите воспроизведение для этого сайта",
-      ja: "ブラウザが自動再生をブロックしました。ページをクリックするか、このサイトの再生を許可してください",
-    },
-    DEVICE_LIST_UNAVAILABLE: {
-      en: "Audio devices could not be listed. The browser default devices will be used",
-      de: "Audiogeräte konnten nicht aufgelistet werden. Die Standardgeräte des Browsers werden verwendet",
-      ru: "Не удалось получить список аудиоустройств. Будут использованы устройства браузера по умолчанию",
-      ja: "オーディオデバイスを一覧表示できません。ブラウザのデフォルトデバイスを使用します",
-    },
-    AUDIO_CONTEXT_SUSPENDED: {
-      en: "Browser audio processing is paused. Click the page once to resume microphone and speaker audio",
-      de: "Die Audioverarbeitung des Browsers ist pausiert. Klicke einmal auf die Seite, um Mikrofon und Lautsprecher fortzusetzen",
-      ru: "Обработка звука браузером приостановлена. Нажмите на страницу, чтобы возобновить работу микрофона и динамиков",
-      ja: "ブラウザの音声処理が一時停止しています。ページを一度クリックしてマイクとスピーカーを再開してください",
-    },
-    AUDIO_ENCODER_UNAVAILABLE: {
-      en: `Microphone audio could not be encoded (error code: ${normalizedCode}). Other members may not hear you`,
-      de: `Mikrofon-Audio konnte nicht kodiert werden (Fehlercode: ${normalizedCode}). Andere Mitglieder hören dich möglicherweise nicht`,
-      ru: `Не удалось кодировать звук микрофона (код ошибки: ${normalizedCode}). Другие участники могут вас не слышать`,
-      ja: `マイク音声をエンコードできませんでした（エラーコード: ${normalizedCode}）。他のメンバーに音声が届かない可能性があります`,
-    },
-  };
-  const locale = language.value === "de" ? "de" : language.value === "ru" ? "ru" : language.value === "ja" ? "ja" : "en";
-  return messages[code]?.[locale] ?? localizedMessage(message);
-}
-
-function visibleErrorCode(code: string): string {
-  const normalized = String(code || "CONNECTION_FAILED")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9_-]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return (normalized || "CONNECTION_FAILED").slice(0, 64);
 }
 
 function persistLanguage() {
@@ -2075,174 +600,175 @@ function cycleTheme() {
 }
 
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
-
-const channelTree = computed<TreeChannel[]>(() => {
-  const source = [...channels];
-  const sourceIndex = new Map(source.map((item, index) => [item.id, index]));
-  const enriched = source.map((item) => ({
-    ...item,
-    members: (item.members ?? []).map((member) => ({ ...member, isSelf: member.id === voiceState.tsClientId })),
-  }));
-  const byId = new Map(enriched.map((item) => [item.id, item]));
-  const depthCache = new Map<string, number>();
-
-  function depthOf(item: ChannelInfo, visiting = new Set<string>()): number {
-    if (depthCache.has(item.id)) return depthCache.get(item.id)!;
-    if (!item.parentID || item.parentID === "0" || visiting.has(item.id)) return 0;
-    const parent = byId.get(item.parentID);
-    const depth = parent ? depthOf(parent, new Set(visiting).add(item.id)) + 1 : 0;
-    depthCache.set(item.id, depth);
-    return depth;
-  }
-
-  const childrenByParent = new Map<string, TreeChannel[]>();
-  for (const item of enriched) {
-    const channel = { ...item, depth: depthOf(item) };
-    const siblings = childrenByParent.get(channel.parentID) ?? [];
-    siblings.push(channel);
-    childrenByParent.set(channel.parentID, siblings);
-  }
-
-  function orderSiblings(siblings: TreeChannel[]): TreeChannel[] {
-    const bySiblingId = new Map(siblings.map((item) => [item.id, item]));
-    const successors = new Map<string, TreeChannel[]>();
-    const roots: TreeChannel[] = [];
-    const sourceOrder = (left: TreeChannel, right: TreeChannel) =>
-      (sourceIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (sourceIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER);
-
-    for (const item of siblings) {
-      const predecessor = item.order && item.order !== "0" && bySiblingId.has(item.order) ? item.order : "";
-      if (!predecessor) roots.push(item);
-      else successors.set(predecessor, [...(successors.get(predecessor) ?? []), item]);
-    }
-
-    roots.sort(sourceOrder);
-    for (const items of successors.values()) items.sort(sourceOrder);
-
-    const ordered: TreeChannel[] = [];
-    const visited = new Set<string>();
-    const append = (item: TreeChannel) => {
-      if (visited.has(item.id)) return;
-      visited.add(item.id);
-      ordered.push(item);
-      for (const successor of successors.get(item.id) ?? []) append(successor);
-    };
-    for (const root of roots) append(root);
-    for (const item of [...siblings].sort(sourceOrder)) append(item);
-    return ordered;
-  }
-
-  const orderedTree: TreeChannel[] = [];
-  const visit = (parentID: string) => {
-    for (const channel of orderSiblings(childrenByParent.get(parentID) ?? [])) {
-      orderedTree.push(channel);
-      visit(channel.id);
-    }
-  };
-  visit("0");
-  for (const channel of enriched) {
-    if (!orderedTree.some((item) => item.id === channel.id)) {
-      const fallback = { ...channel, depth: depthOf(channel) };
-      orderedTree.push(fallback);
-      visit(channel.id);
-    }
-  }
-  return orderedTree;
+const {
+  playerElement: screenSharePlayerEl,
+  fullscreen: screenShareFullscreen,
+  resolutionOptions: screenShareResolutionOptions,
+  frameRateOptions: screenShareFrameRateOptions,
+  resolutionPreset: screenShareResolutionPreset,
+  frameRate: screenShareFrameRate,
+  settingsOpen: screenShareSettingsOpen,
+  viewers: screenSharePlayerViewers,
+  viewerCount: screenSharePlayerViewerCount,
+  ownerName: screenSharePlayerOwnerName,
+  errorText: screenShareErrorText,
+  setVideoElement: setScreenVideoElement,
+  streamForMember: screenShareStreamForMember,
+  toggleForMember: toggleScreenShareForMember,
+  viewerStyle: screenShareViewerStyle,
+  setVolume: onScreenShareVolume,
+  toggleFullscreen: toggleScreenShareFullscreen,
+  startWithSettings: startScreenShareWithSettings,
+} = useWebClientScreenShare({
+  streams: screenShareStreams,
+  viewing: screenShareViewing,
+  viewingStreamId: screenShareViewingStreamId,
+  remoteStream: screenShareRemoteStream,
+  remoteVolume: screenShareRemoteVolume,
+  error: screenShareError,
+  errorCode: screenShareErrorCode,
+  startScreenShare,
+  joinScreenShare,
+  leaveScreenShare,
+  nickname,
+  avatarStyle,
+  t,
 });
-
-const currentChannel = computed<TreeChannel | undefined>(() => {
-  const explicitlySelected = channelTree.value.find((item) => item.id === selectedChannelId.value);
-  if (explicitlySelected) return explicitlySelected;
-  const fromSelf = channelTree.value.find((item) => item.members.some((member) => member.id === voiceState.tsClientId));
-  if (fromSelf) return fromSelf;
-  return channelTree.value.find((item) => item.name === channel.value) ?? channelTree.value[0];
+const {
+  channelTree,
+  currentChannel,
+  currentChannelName,
+  currentChannelDescription,
+  currentMembers,
+  roomMembers,
+  memberChannels,
+  filteredMemberChannels,
+  whisperTargets,
+} = useWebClientChannels({
+  channels,
+  members,
+  clientId: computed(() => voiceState.tsClientId),
+  selectedChannelId,
+  channelName: channel,
+  memberQuery,
+  whisperTargetIds,
+  t,
 });
-const currentChannelName = computed(() => (currentChannel.value?.name ?? channel.value) || t("voiceLobby"));
-const currentChannelDescription = computed(() => currentChannel.value?.description ?? "");
-const screenShareErrorText = computed(() => {
-  if (screenShareErrorCode.value === "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED") return t("screenShareNativeUnavailable");
-  return screenShareError.value;
+const {
+  away,
+  memberMenu,
+  memberMoveMenuOpen,
+  draggedMember,
+  dragOverChannelId,
+  memberMoveMenuCurrentChannel,
+  memberMoveMenuCurrentSameChannel,
+  memberMoveMenuOtherChannels,
+  openMemberMenu,
+  openMemberActions,
+  toggleMemberMoveMenu,
+  moveMemberDirect,
+  onMemberDragStart,
+  onMemberDragEnd,
+  onMemberPointerDown,
+  onMemberPointerMove,
+  onMemberPointerUp,
+  onMemberPointerCancel,
+  onChannelDragOver,
+  onChannelDragLeave,
+  onChannelDrop,
+  toggleWhisperTarget,
+  clearWhisperTargets,
+  pokeMember,
+  copyMemberName,
+  toggleAway,
+  isSpeaking,
+  memberDisplayName,
+} = useWebClientMembers({
+  channels: memberChannels,
+  currentChannel,
+  members,
+  speakingIds,
+  whisperTargetIds,
+  moveClient,
+  setWhisperTargets,
+  sendPoke,
+  setAway,
+  stopWhisperTalk,
+  localizedMessage,
+  showToast,
+  t,
 });
-const currentMembers = computed<ChannelMember[]>(() => {
-  const source = currentChannel.value ? currentChannel.value.members : members;
-  return source.map((member) => ({ ...member, isSelf: member.isSelf || member.id === voiceState.tsClientId }));
+const {
+  tab: chatTab,
+  privateClientId,
+  messageDraft,
+  listElement: chatListEl,
+  conversations: privateConversations,
+  visibleMessages: visibleChatMessages,
+  tabLabel: chatTabLabel,
+  title: chatTitle,
+  placeholder: chatPlaceholder,
+  openPrivateChat,
+  submitMessage,
+} = useWebClientChat({
+  messages: chatMessages,
+  members,
+  currentChannel,
+  currentChannelName,
+  selectedChannelId,
+  clientId: computed(() => voiceState.tsClientId),
+  isMobileViewport,
+  mobileSection,
+  closeMemberMenu: () => { memberMenu.value = null; },
+  sendTextMessage,
+  sendServerMessage,
+  sendPrivateMessage,
+  notifyPrivateMessage: () => playNotification("private"),
+  t,
 });
-const activeScreenShareStream = computed<ScreenShareStream | null>(() => screenShareStreams.find((stream) => stream.streamId === screenShareViewingStreamId.value) ?? null);
-const screenSharePlayerViewers = computed(() => activeScreenShareStream.value?.viewers.slice(-5) ?? []);
-const screenSharePlayerViewerCount = computed(() => activeScreenShareStream.value?.viewerCount ?? activeScreenShareStream.value?.viewers.length ?? 0);
-const screenSharePlayerOwnerName = computed(() => activeScreenShareStream.value?.ownerNickname ?? t("screenShare"));
-function screenShareStreamForMember(member: ChannelMember): ScreenShareStream | null {
-  return screenShareStreams.find((stream) => {
-    if (typeof stream.ownerClientId === "number" && stream.ownerClientId === member.id) return true;
-    if (stream.source === "teamspeak" && stream.ownerPeerId === `ts-${member.id}`) return true;
-    return stream.ownerNickname === member.nickname;
-  }) ?? null;
-}
-function toggleScreenShareForMember(member: ChannelMember): void {
-  const stream = screenShareStreamForMember(member);
-  if (!stream) return;
-  if (screenShareViewingStreamId.value === stream.streamId) leaveScreenShare();
-  else joinScreenShare(stream.streamId);
-}
-function screenShareViewerStyle(viewer: { nickname: string; avatar?: string }) {
-  return avatarStyle(viewer.nickname, viewer.nickname === nickname.value, viewer.avatar ?? "");
-}
-const roomMembers = computed(() => currentMembers.value.slice(0, 4));
-const memberChannels = computed<TreeChannel[]>(() => {
-  if (channelTree.value.length) return channelTree.value;
-  return [{ id: "__current__", parentID: "0", name: currentChannelName.value, description: currentChannelDescription.value, members: currentMembers.value, depth: 0 }];
+const {
+  canJoin,
+  currentServerTarget,
+  doConnect,
+  doDisconnect,
+  submitServerPassword,
+  cancelServerPassword,
+  selectChannel,
+  submitChannelPassword,
+  cancelChannelPassword,
+  selectChannelById,
+} = useWebClientConnection({
+  initialized,
+  accessMode,
+  isConnecting: computed(() => voiceState.connecting),
+  errorCode: computed(() => voiceState.errorCode),
+  channelSwitchedChannelId: computed(() => voiceState.channelSwitchedChannelId),
+  nickname,
+  channelName: channel,
+  serverHost,
+  serverPort,
+  serverPassword,
+  rememberIdentity,
+  identityMaterial,
+  accelerationRelayId,
+  inviteToken,
+  selectedChannelId,
+  channels: channelTree,
+  clientId: computed(() => voiceState.tsClientId),
+  channelPasswordDialog,
+  serverPasswordDialog,
+  chatTab,
+  connect,
+  disconnect,
+  switchChannel,
+  clearError,
+  saveNickname: (value) => {
+    localStorage.setItem("webspeak:nickname", value);
+    void saveLocalPreferences({ schemaVersion: 1, lastNickname: value });
+  },
+  showToast,
+  t,
 });
-const filteredMemberChannels = computed(() => {
-  const search = memberQuery.value.trim().toLowerCase();
-  if (!search) return memberChannels.value;
-  return memberChannels.value.filter((item) => item.name.toLowerCase().includes(search) || item.members.some((member) => member.nickname.toLowerCase().includes(search)));
-});
-const memberMoveMenuCurrentChannel = computed<TreeChannel | null>(() => {
-  const member = memberMenu.value?.member;
-  const currentId = currentChannel.value?.id;
-  if (!member || !currentId || currentId === "__current__") return null;
-  const sourceChannelId = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id ?? "";
-  return memberChannels.value.find((channel) => channel.id === currentId) ?? null;
-});
-const memberMoveMenuCurrentSameChannel = computed(() => {
-  const member = memberMenu.value?.member;
-  const currentId = memberMoveMenuCurrentChannel.value?.id;
-  if (!member || !currentId) return false;
-  return memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id === currentId;
-});
-const memberMoveMenuOtherChannels = computed<TreeChannel[]>(() => {
-  const member = memberMenu.value?.member;
-  if (!member) return [];
-  const sourceChannelId = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id))?.id ?? "";
-  const currentChannelId = memberMoveMenuCurrentChannel.value?.id;
-  return memberChannels.value.filter((channel) => channel.id !== "__current__" && channel.id !== sourceChannelId && channel.id !== currentChannelId);
-});
-const whisperTargets = computed(() => [...whisperTargetIds].map((id) => members.find((member) => member.id === id)).filter((member): member is ChannelMember => Boolean(member)));
-
-const privateConversations = computed(() => {
-  const conversations = new Map<string, { id: number; name: string; lastMessage: number }>();
-  for (const message of chatMessages) {
-    if (message.scope !== "private" || !message.conversationId) continue;
-    const id = Number(message.conversationId);
-    if (!id) continue;
-    const member = members.find((candidate) => candidate.id === id);
-    const existing = conversations.get(message.conversationId);
-    conversations.set(message.conversationId, { id, name: member?.nickname ?? existing?.name ?? message.invokerName, lastMessage: Math.max(existing?.lastMessage ?? 0, message.timestamp) });
-  }
-  return [...conversations.values()].sort((a, b) => b.lastMessage - a.lastMessage);
-});
-
-const visibleChatMessages = computed(() => {
-  if (chatTab.value === "server") return chatMessages.filter((message) => message.scope === "server");
-  if (chatTab.value === "private") return chatMessages.filter((message) => message.scope === "private" && message.conversationId === String(privateClientId.value));
-  if (chatTab.value !== "channel") return [];
-  const channelId = currentChannel.value?.id;
-  return chatMessages.filter((message) => message.scope === "channel" && (!message.targetId || message.targetId === "0" || !channelId || message.targetId === channelId));
-});
-
-const chatTabLabel = computed(() => chatTab.value === "channel" ? t("textChannel") : chatTab.value === "server" ? t("serverChat") : chatTab.value === "private" ? t("privateMessage") : t("eventLog"));
-const chatTitle = computed(() => chatTab.value === "channel" ? t("channelChat", { channel: currentChannelName.value }) : chatTab.value === "server" ? t("serverChat") : chatTab.value === "events" ? t("eventLog") : privateConversations.value.find((conversation) => conversation.id === privateClientId.value)?.name ?? t("privateMessage"));
-const chatPlaceholder = computed(() => chatTab.value === "private" ? t("privateMessagePlaceholder") : chatTab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 const memberMenuStyle = computed(() => {
   if (!memberMenu.value) return {};
@@ -2253,90 +779,12 @@ const memberMenuStyle = computed(() => {
   const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
   return { left: `${memberMenu.value.x / scale}px`, top: `${memberMenu.value.y / scale}px` };
 });
-const median = (values: number[]) => {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
-};
-const performanceStats = computed(() => {
-  const samples = performanceSamples.value;
-  const attempts = performanceAttempts.value;
-  const gatewaySamples = samples.map((sample) => sample.browserRttMs);
-  const teamSpeakSamples = samples.filter((sample) => sample.teamSpeakReachable && sample.teamSpeakLatencyMs != null).map((sample) => sample.teamSpeakLatencyMs as number);
-  return {
-    gatewayLatencyMs: median(gatewaySamples),
-    gatewayLossPercent: attempts > 0 ? Math.round(((attempts - samples.length) / attempts) * 100) : null,
-    teamSpeakLatencyMs: median(teamSpeakSamples),
-    teamSpeakLossPercent: attempts > 0 ? Math.round(((attempts - teamSpeakSamples.length) / attempts) * 100) : null,
-    ready: attempts > 0,
-  };
-});
-
-watch(channelTree, (list) => {
-  if (!selectedChannelId.value && list[0]) {
-    selectedChannelId.value = list.find((item) => item.name === channel.value)?.id
-      ?? list.find((item) => item.members.some((member) => member.id === voiceState.tsClientId))?.id
-      ?? "";
-  }
-}, { deep: true });
-watch([() => chatMessages.length, chatTab, privateClientId], () => nextTick(scrollChatToEnd));
-watch(() => chatMessages.length, (length, previousLength) => {
-  const latest = chatMessages[length - 1];
-  if (latest && length > previousLength && latest.scope === "private" && !latest.isSelf) playNotification("private");
-});
-watch(() => voiceState.errorCode, (code) => {
-  if (code !== "CHANNEL_PASSWORD_REQUIRED" || !selectedChannelId.value) return;
-  channelPasswordDialog.open = true;
-  channelPasswordDialog.channelId = selectedChannelId.value;
-  channelPasswordDialog.password = "";
-  channelPasswordDialog.error = t("channelPasswordRetry");
-  channelPasswordDialog.submitting = false;
-  clearError();
-  void nextTick(() => document.getElementById("channel-password-input")?.focus());
-});
-watch(() => voiceState.errorCode, (code) => {
-  if (code !== "SERVER_PASSWORD_REQUIRED" && code !== "INVALID_SERVER_PASSWORD") return;
-  serverPasswordDialog.open = true;
-  serverPasswordDialog.password = "";
-  serverPasswordDialog.errorCode = code;
-  clearError();
-  void nextTick(() => document.getElementById("retry-server-password-input")?.focus());
-});
-watch(() => voiceState.channelSwitchedChannelId, (channelId) => {
-  if (!channelPasswordDialog.open || !channelId || channelId !== channelPasswordDialog.channelId) return;
-  channelPasswordDialog.open = false;
-  channelPasswordDialog.channelId = "";
-  channelPasswordDialog.password = "";
-  channelPasswordDialog.error = "";
-  channelPasswordDialog.submitting = false;
-});
 watch(() => pokeNotifications.length, (length, previousLength) => {
   const latest = pokeNotifications[length - 1];
   if (!latest || length <= previousLength) return;
   showToast(`${latest.invokerName} ${t("pokedYou")}${latest.message ? `：${latest.message}` : ""}`);
   playNotification("poke");
   if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(t("poke"), { body: `${latest.invokerName}: ${latest.message || t("pokedYou")}` });
-});
-watch(settingsOpen, (open) => {
-  if (open) {
-    audioSettingsError.value = "";
-    prepareInputDevices().catch((error: unknown) => {
-      audioSettingsError.value = microphoneErrorMessage(error);
-    });
-  } else {
-    stopMicrophoneTest();
-  }
-});
-watch([screenShareRemoteStream, screenShareRemoteVolume], ([stream, volume]) => {
-  void nextTick(() => {
-    const video = screenVideoEl.value;
-    if (!video) return;
-    if (video.srcObject !== stream) video.srcObject = stream;
-    video.volume = Math.max(0, Math.min(1, volume ?? 1));
-    if (stream) void video.play().catch(() => undefined);
-  });
-});
-watch(screenShareViewing, (viewing) => {
-  if (!viewing && document.fullscreenElement === screenSharePlayerEl.value) void document.exitFullscreen().catch(() => undefined);
 });
 watch(rememberIdentity, (remember) => {
   localStorage.setItem("webspeak:remember-identity", remember ? "1" : "0");
@@ -2350,74 +798,11 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
   if (!remember && material) identityMaterial.value = "";
 });
 watch(() => voiceState.connected, (connected) => {
-  if (!connected) {
-    stopPerformanceMonitoring();
-    return;
-  }
+  if (!connected) return;
   playNotification("connected");
-  const address = currentServerTarget();
-  if (!address) return;
-  const recent: RecentServer = {
-    id: serverKey(address),
-    address,
-    ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}),
-    ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
-    lastConnectedAt: Date.now(),
-    ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}),
-  };
-  void recordRecentServer(recent).then(() => listRecentServers().then((items) => { recentServers.value = items; }));
-  if (performancePanelOpen.value) startPerformanceMonitoring();
+  recordCurrentServer();
 });
 
-function togglePerformancePanel() {
-  performancePanelOpen.value = !performancePanelOpen.value;
-  if (performancePanelOpen.value) startPerformanceMonitoring();
-  else stopPerformanceMonitoring();
-}
-
-function resetPerformanceSamples(): void {
-  performanceProbeResults.value = [];
-  performanceSamples.value = [];
-  performanceAttempts.value = 0;
-}
-
-function startPerformanceMonitoring(): void {
-  if (performanceTimer || !voiceState.connected) return;
-  resetPerformanceSamples();
-  const generation = ++performanceMonitorGeneration;
-  void runPerformanceProbe(generation);
-  performanceTimer = window.setInterval(() => {
-    void runPerformanceProbe(generation);
-  }, PERFORMANCE_INTERVAL_MS);
-}
-
-function stopPerformanceMonitoring(): void {
-  if (performanceTimer) {
-    clearInterval(performanceTimer);
-    performanceTimer = null;
-  }
-  performanceMonitorGeneration += 1;
-  performanceRunning.value = false;
-}
-
-function refreshPerformanceProbe(): void {
-  void runPerformanceProbe();
-}
-
-async function runPerformanceProbe(generation = performanceMonitorGeneration): Promise<void> {
-  if (performanceRunning.value || !voiceState.connected || !performancePanelOpen.value) return;
-  performanceRunning.value = true;
-  try {
-    const sample = await measureLatency();
-    if (generation !== performanceMonitorGeneration || !performancePanelOpen.value) return;
-    performanceProbeResults.value.push(sample);
-    if (performanceProbeResults.value.length > PERFORMANCE_WINDOW_SIZE) performanceProbeResults.value.shift();
-    performanceAttempts.value = performanceProbeResults.value.length;
-    performanceSamples.value = performanceProbeResults.value.filter((result): result is LatencyProbeResult => result !== null);
-  } finally {
-    if (generation === performanceMonitorGeneration) performanceRunning.value = false;
-  }
-}
 watch(() => voiceState.reconnecting, (reconnecting, wasReconnecting) => {
   if (reconnecting && !wasReconnecting) {
     playNotification("disconnected");
@@ -2430,7 +815,6 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 let deviceChangeHandler: (() => void) | undefined;
 let viewportMediaQuery: MediaQueryList | undefined;
 let viewportChangeHandler: (() => void) | undefined;
-let fullscreenChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   browserError.value = checkSupport() ?? "";
@@ -2450,8 +834,7 @@ onMounted(() => {
   }).finally(() => {
     identityReady.value = true;
   });
-  void listFavorites().then((items) => { favoriteServers.value = items; });
-  void listRecentServers().then((items) => { recentServers.value = items; });
+  void loadSavedServers();
   deviceChangeHandler = () => { void refreshAudioDevices().catch(() => undefined); };
   navigator.mediaDevices?.addEventListener("devicechange", deviceChangeHandler);
   viewportMediaQuery = window.matchMedia("(max-width: 740px)");
@@ -2462,86 +845,13 @@ onMounted(() => {
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
-  fullscreenChangeHandler = syncScreenShareFullscreen;
-  document.addEventListener("fullscreenchange", fullscreenChangeHandler);
 });
 onUnmounted(() => {
-  stopPerformanceMonitoring();
   disconnect();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
-  if (fullscreenChangeHandler) document.removeEventListener("fullscreenchange", fullscreenChangeHandler);
   if (toastTimer) clearTimeout(toastTimer);
 });
-
-function doConnect() {
-  if (!canJoin.value || voiceState.connecting) return;
-  clearError();
-  nickname.value = nickname.value.trim();
-  localStorage.setItem("webspeak:nickname", nickname.value);
-  void saveLocalPreferences({ schemaVersion: 1, lastNickname: nickname.value });
-  if (accessMode.value === "open") {
-    serverHost.value = serverHost.value.trim();
-    serverPort.value = serverPort.value.trim();
-  }
-  selectedChannelId.value = "";
-  // Keep the password field available for a retry even when the target is
-  // administrator-managed. The gateway still controls the target in fixed
-  // mode and only accepts a non-empty retry password for that target.
-  connect(currentServerTarget(), channel.value.trim(), nickname.value, serverPassword.value, rememberIdentity.value ? identityMaterial.value : "", rememberIdentity.value, inviteToken, Boolean(accelerationRelayId.value), accelerationRelayId.value);
-}
-
-function doDisconnect() {
-  disconnect();
-  selectedChannelId.value = "";
-  showToast(t("leftToast"));
-}
-
-function submitServerPassword() {
-  if (!serverPasswordDialog.open || !serverPasswordDialog.password) return;
-  serverPassword.value = serverPasswordDialog.password;
-  serverPasswordDialog.open = false;
-  serverPasswordDialog.password = "";
-  serverPasswordDialog.errorCode = "";
-  doConnect();
-}
-
-function cancelServerPassword() {
-  serverPasswordDialog.open = false;
-  serverPasswordDialog.password = "";
-  serverPasswordDialog.errorCode = "";
-  clearError();
-}
-
-function selectChannel(item: TreeChannel) {
-  selectedChannelId.value = item.id;
-  channel.value = item.name;
-  chatTab.value = "channel";
-  switchChannel(item.id);
-}
-
-function submitChannelPassword() {
-  if (!channelPasswordDialog.open || !channelPasswordDialog.channelId || !channelPasswordDialog.password) return;
-  channelPasswordDialog.error = "";
-  channelPasswordDialog.submitting = true;
-  switchChannel(channelPasswordDialog.channelId, channelPasswordDialog.password);
-}
-
-function cancelChannelPassword() {
-  const ownChannel = channelTree.value.find((item) => item.members.some((member) => member.id === voiceState.tsClientId));
-  if (ownChannel) selectedChannelId.value = ownChannel.id;
-  channelPasswordDialog.open = false;
-  channelPasswordDialog.channelId = "";
-  channelPasswordDialog.password = "";
-  channelPasswordDialog.error = "";
-  channelPasswordDialog.submitting = false;
-  clearError();
-}
-
-function selectChannelById() {
-  const item = channelTree.value.find((candidate) => candidate.id === selectedChannelId.value);
-  if (item) selectChannel(item);
-}
 
 function channelLabel(item: TreeChannel) {
   return `${"　".repeat(item.depth)}${item.name}`;
@@ -2559,45 +869,6 @@ function doShare() {
   navigator.clipboard?.writeText(invite.toString()).then(() => showToast(t("copiedToast")), () => showToast(t("copyFailedToast")));
 }
 
-const canJoin = computed(() => Boolean(
-  initialized.value
-  && nickname.value.trim()
-  && (accessMode.value === "fixed" || (serverHost.value.trim() && isValidTeamSpeakPort(serverPort.value))),
-));
-const isFavorite = computed(() => favoriteServers.value.some((favorite) => favorite.id === serverKey(currentServerTarget())));
-
-function currentServerTarget(): string {
-  return combineTeamSpeakTarget(serverHost.value, serverPort.value);
-}
-
-function serverKey(address: string): string {
-  return address.trim().toLocaleLowerCase();
-}
-
-function selectLocalServer(address: string, savedNickname?: string): void {
-  const target = splitTeamSpeakTarget(address);
-  serverHost.value = target.address;
-  serverPort.value = target.port;
-  if (savedNickname && !nickname.value.trim()) nickname.value = savedNickname;
-}
-
-async function toggleFavorite(): Promise<void> {
-  const address = currentServerTarget();
-  if (!address) return;
-  const id = serverKey(address);
-  const existing = favoriteServers.value.find((favorite) => favorite.id === id);
-  if (existing) {
-    await removeFavorite(id);
-    favoriteServers.value = favoriteServers.value.filter((favorite) => favorite.id !== id);
-    showToast(t("removedFavoriteToast"));
-    return;
-  }
-  const favorite: FavoriteServer = { id, label: address, address, ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}), ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}), ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}) };
-  await saveFavorite(favorite);
-  favoriteServers.value = [...favoriteServers.value, favorite].sort((a, b) => a.label.localeCompare(b.label));
-  showToast(t("savedFavoriteToast"));
-}
-
 async function clearBrowserData(): Promise<void> {
   if (!window.confirm(t("clearLocalDataConfirm"))) return;
   await clearStoredLocalData();
@@ -2606,248 +877,13 @@ async function clearBrowserData(): Promise<void> {
   applyTheme(themeMode.value);
   identityMaterial.value = "";
   rememberIdentity.value = false;
-  favoriteServers.value = [];
-  recentServers.value = [];
+  clearServerHistory();
   showToast(t("localDataCleared"));
-}
-
-async function loadPublicConfig() {
-  try {
-    const response = await fetch("/api/public-config", { headers: { accept: "application/json" } });
-    if (!response.ok) return;
-    const config = await response.json() as { version?: unknown; initialized?: unknown; siteName?: unknown; welcomeText?: unknown; welcomeTextEn?: unknown; welcomeTexts?: unknown; accessMode?: unknown; target?: unknown; visitorNumber?: unknown; visitorTotal?: unknown; accelerationAvailable?: unknown; accelerationRelays?: unknown };
-    if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
-    visitorNumber.value = Number.isSafeInteger(config.visitorNumber) && Number(config.visitorNumber) > 0 ? Number(config.visitorNumber) : null;
-    visitorTotal.value = Number.isSafeInteger(config.visitorTotal) && Number(config.visitorTotal) > 0 ? Number(config.visitorTotal) : null;
-    initialized.value = config.initialized === true;
-    if (typeof config.siteName === "string" && config.siteName.trim()) siteName.value = config.siteName.trim();
-    if (typeof config.welcomeText === "string") welcomeTextZh.value = config.welcomeText;
-    if (typeof config.welcomeTextEn === "string") welcomeTextEn.value = config.welcomeTextEn;
-    if (config.welcomeTexts && typeof config.welcomeTexts === "object" && !Array.isArray(config.welcomeTexts)) {
-      const welcomeTexts = config.welcomeTexts as Record<string, unknown>;
-      if (typeof welcomeTexts.zh === "string") welcomeTextZh.value = welcomeTexts.zh;
-      if (typeof welcomeTexts.en === "string") welcomeTextEn.value = welcomeTexts.en;
-      if (typeof welcomeTexts.de === "string") welcomeTextDe.value = welcomeTexts.de;
-      if (typeof welcomeTexts.ru === "string") welcomeTextRu.value = welcomeTexts.ru;
-      if (typeof welcomeTexts.ja === "string") welcomeTextJa.value = welcomeTexts.ja;
-    }
-    accessMode.value = config.accessMode === "open" ? "open" : "fixed";
-    accelerationRelays.value = Array.isArray(config.accelerationRelays)
-      ? config.accelerationRelays.flatMap((value) => {
-        if (!value || typeof value !== "object") return [];
-        const relay = value as { id?: unknown; name?: unknown };
-        return typeof relay.id === "string" && typeof relay.name === "string" && relay.id && relay.name
-          ? [{ id: relay.id, name: relay.name }]
-          : [];
-      })
-      : [];
-    if (!accelerationAvailable.value || !accelerationRelays.value.some((relay) => relay.id === accelerationRelayId.value)) accelerationRelayId.value = "";
-    const hasInviteTarget = query.has("server") || query.has("target") || query.has("tsHost") || query.has("tsPort");
-    if (!hasInviteTarget && typeof config.target === "string" && config.target.trim()) {
-      const target = splitTeamSpeakTarget(config.target);
-      serverHost.value = target.address;
-      serverPort.value = target.port;
-    }
-  } catch {
-    // Keep joining disabled until the gateway can confirm its initialized policy.
-  } finally {
-    serverConfigLoading.value = false;
-  }
-}
-
-function submitMessage() {
-  if (!messageDraft.value.trim()) return;
-  if (chatTab.value === "channel") sendTextMessage(messageDraft.value, currentChannel.value?.id ?? selectedChannelId.value);
-  else if (chatTab.value === "server") sendServerMessage(messageDraft.value);
-  else if (chatTab.value === "private" && privateClientId.value) sendPrivateMessage(privateClientId.value, messageDraft.value, String(privateClientId.value));
-  messageDraft.value = "";
-}
-
-function openPrivateChat(clientId: number): void {
-  if (!clientId || clientId === voiceState.tsClientId) return;
-  privateClientId.value = clientId;
-  chatTab.value = "private";
-  if (isMobileViewport.value) mobileSection.value = "chat";
-  memberMenu.value = null;
-  nextTick(scrollChatToEnd);
-}
-
-function openMemberMenu(member: ChannelMember, event: Event): void {
-  if (member.isSelf) return;
-  memberMoveMenuOpen.value = false;
-  const point = event instanceof MouseEvent ? event : undefined;
-  memberMenu.value = { member, x: Math.min((point?.clientX ?? 20), Math.max(12, window.innerWidth - 210)), y: Math.min((point?.clientY ?? 20), Math.max(12, window.innerHeight - 170)) };
-}
-
-function openMemberActions(member: ChannelMember): void {
-  if (member.isSelf) return;
-  memberMoveMenuOpen.value = false;
-  memberMenu.value = { member, x: 0, y: 0 };
-}
-
-function toggleMemberMoveMenu(): void {
-  memberMoveMenuOpen.value = true;
-}
-
-async function moveMemberDirect(member: ChannelMember, targetChannelId: string): Promise<void> {
-  if (member.isSelf || !targetChannelId || targetChannelId === "__current__") return;
-  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
-  if (sourceChannel?.id === targetChannelId) {
-    memberMenu.value = null;
-    memberMoveMenuOpen.value = false;
-    return;
-  }
-  memberMenu.value = null;
-  memberMoveMenuOpen.value = false;
-  try {
-    // Moving a visible client is a server-admin operation; channel passwords
-    // must never be requested or forwarded for this action.
-    await moveClient(member.id, targetChannelId);
-    showToast(t("moveMemberSuccess"));
-  } catch (error: unknown) {
-    showToast(localizedMessage(error instanceof Error ? error.message : "操作失败"));
-  }
-}
-
-function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
-  if (member.isSelf) {
-    event.preventDefault();
-    return;
-  }
-  draggedMember.value = member;
-  dragOverChannelId.value = "";
-  event.dataTransfer?.setData("text/plain", String(member.id));
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-}
-
-function onMemberDragEnd(): void {
-  draggedMember.value = null;
-  dragOverChannelId.value = "";
-}
-
-function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
-  if (member.isSelf || event.button !== 0) return;
-  const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("input,button")) return;
-  event.preventDefault();
-  memberPointerDrag.member = member;
-  memberPointerDrag.pointerId = event.pointerId;
-  memberPointerDrag.startX = event.clientX;
-  memberPointerDrag.startY = event.clientY;
-  memberPointerDrag.active = false;
-  memberPointerDrag.targetChannelId = "";
-  const currentTarget = event.currentTarget as HTMLElement | null;
-  currentTarget?.setPointerCapture?.(event.pointerId);
-}
-
-function onMemberPointerMove(event: PointerEvent): void {
-  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
-  const distance = Math.hypot(event.clientX - memberPointerDrag.startX, event.clientY - memberPointerDrag.startY);
-  if (!memberPointerDrag.active && distance < 6) return;
-  event.preventDefault();
-  memberPointerDrag.active = true;
-  draggedMember.value = memberPointerDrag.member;
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-member-channel-id]");
-  const targetChannelId = target?.dataset.memberChannelId ?? "";
-  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === memberPointerDrag.member?.id));
-  if (!sourceChannel || !targetChannelId || targetChannelId === sourceChannel.id) {
-    memberPointerDrag.targetChannelId = "";
-    dragOverChannelId.value = "";
-    return;
-  }
-  memberPointerDrag.targetChannelId = targetChannelId;
-  dragOverChannelId.value = targetChannelId;
-}
-
-function onMemberPointerUp(event: PointerEvent): void {
-  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
-  const member = memberPointerDrag.member;
-  const targetChannelId = memberPointerDrag.targetChannelId;
-  const currentTarget = event.currentTarget as HTMLElement | null;
-  currentTarget?.releasePointerCapture?.(event.pointerId);
-  memberPointerDrag.member = null;
-  memberPointerDrag.pointerId = null;
-  memberPointerDrag.active = false;
-  memberPointerDrag.targetChannelId = "";
-  draggedMember.value = null;
-  dragOverChannelId.value = "";
-  if (targetChannelId) void moveMemberDirect(member, targetChannelId);
-}
-
-function onMemberPointerCancel(event: PointerEvent): void {
-  if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
-  const currentTarget = event.currentTarget as HTMLElement | null;
-  currentTarget?.releasePointerCapture?.(event.pointerId);
-  memberPointerDrag.member = null;
-  memberPointerDrag.pointerId = null;
-  memberPointerDrag.active = false;
-  memberPointerDrag.targetChannelId = "";
-  draggedMember.value = null;
-  dragOverChannelId.value = "";
-}
-
-function onChannelDragOver(channelItem: TreeChannel, event: DragEvent): void {
-  const member = draggedMember.value;
-  if (!member || channelItem.id === "__current__") return;
-  const sourceChannel = memberChannels.value.find((channel) => channel.members.some((candidate) => candidate.id === member.id));
-  if (!sourceChannel || sourceChannel.id === channelItem.id) return;
-  event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  dragOverChannelId.value = channelItem.id;
-}
-
-function onChannelDragLeave(channelItem: TreeChannel, event: DragEvent): void {
-  const currentTarget = event.currentTarget;
-  const relatedTarget = event.relatedTarget;
-  if (currentTarget instanceof HTMLElement && relatedTarget instanceof Node && currentTarget.contains(relatedTarget)) return;
-  if (dragOverChannelId.value === channelItem.id) dragOverChannelId.value = "";
-}
-
-function onChannelDrop(channelItem: TreeChannel, event: DragEvent): void {
-  event.preventDefault();
-  const member = draggedMember.value;
-  onMemberDragEnd();
-  if (!member || channelItem.id === "__current__") return;
-  void moveMemberDirect(member, channelItem.id);
-}
-
-function toggleWhisperTarget(member: ChannelMember): void {
-  if (member.isSelf) return;
-  const targets = new Set(whisperTargetIds);
-  if (targets.has(member.id)) targets.delete(member.id);
-  else if (targets.size < 8) targets.add(member.id);
-  setWhisperTargets([...targets]);
-  showToast(targets.has(member.id) ? t("setWhisperTarget") : t("removeWhisperTarget"));
-}
-
-function clearWhisperTargets(): void {
-  stopWhisperTalk();
-  setWhisperTargets([]);
-}
-
-function pokeMember(member: ChannelMember): void {
-  sendPoke(member.id, window.prompt(t("pokeMessagePrompt"), "") ?? "");
-  showToast(t("pokeSent"));
-}
-
-function copyMemberName(member: ChannelMember): void {
-  navigator.clipboard?.writeText(member.nickname).then(() => showToast(t("copiedNickname")), () => showToast(t("copyFailedToast")));
-}
-
-function toggleAway(): void {
-  away.value = !away.value;
-  awayMessage.value = away.value ? (window.prompt(t("awayPrompt"), awayMessage.value) ?? "") : "";
-  setAway(away.value, awayMessage.value);
 }
 
 function dismissPoke(id: string): void {
   const index = pokeNotifications.findIndex((poke) => poke.id === id);
   if (index >= 0) pokeNotifications.splice(index, 1);
-}
-
-function scrollChatToEnd() {
-  const list = chatListEl.value;
-  if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
 }
 
 function showToast(message: string) {
@@ -2879,14 +915,6 @@ function messageAvatar(message: ChatMessage): string {
   return member?.avatar ?? "";
 }
 
-function isSpeaking(member: ChannelMember) {
-  return speakingIds.has(member.id);
-}
-
-function memberDisplayName(member: ChannelMember): string {
-  return member.isSelf ? `${member.nickname}${t("selfSuffix")}` : member.nickname;
-}
-
 function formatTime(timestamp: number) {
   const locale = language.value === "zh" ? "zh-CN" : language.value === "de" ? "de-DE" : language.value === "ru" ? "ru-RU" : language.value === "ja" ? "ja-JP" : "en-US";
   return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(timestamp);
@@ -2900,1202 +928,6 @@ function rangeStyle(value: number, max: number) {
 function onVolInput(clientId: number, event: Event) {
   setVolume(clientId, Number((event.target as HTMLInputElement).value) / 100);
 }
-
-function onInputVolume(event: Event) {
-  setInputVolume(Number((event.target as HTMLInputElement).value) / 100);
-}
-
-function onNoiseSuppressionToggle(event: Event) {
-  void setNoiseSuppressionEnabled((event.target as HTMLInputElement).checked);
-}
-
-function onOutputVolume(event: Event) {
-  setOutputVolume(Number((event.target as HTMLInputElement).value) / 100);
-}
-
-function onVoxThreshold(event: Event) {
-  setVoxThreshold(Number((event.target as HTMLInputElement).value) / 1000);
-}
-
-function onNotificationVolume(event: Event) {
-  setNotificationVolume(Number((event.target as HTMLInputElement).value) / 100);
-}
-
-async function onInputDeviceChange(event: Event) {
-  audioSettingsError.value = "";
-  try {
-    await setInputDevice((event.target as HTMLSelectElement).value);
-  } catch (error: unknown) {
-    audioSettingsError.value = microphoneErrorMessage(error, "无法切换麦克风");
-  }
-}
-
-async function onOutputDeviceChange(event: Event) {
-  audioSettingsError.value = "";
-  try {
-    await setOutputDevice((event.target as HTMLSelectElement).value);
-  } catch (error: unknown) {
-    audioSettingsError.value = localizedMessage(error instanceof Error ? error.message : "无法切换扬声器");
-  }
-}
-
-async function toggleMicTest() {
-  audioSettingsError.value = "";
-  try {
-    if (microphoneTestActive.value) stopMicrophoneTest();
-    else await startMicrophoneTest();
-  } catch (error: unknown) {
-    audioSettingsError.value = microphoneErrorMessage(error);
-  }
-}
-
-function microphoneErrorMessage(error: unknown, fallback = "请检查浏览器权限") {
-  const name = error instanceof DOMException ? error.name : "";
-  const reasons: Record<string, string> = {
-    NotAllowedError: "浏览器未授予麦克风权限",
-    NotFoundError: "未找到可用的麦克风",
-    NotReadableError: "麦克风可能正被其他程序占用",
-    OverconstrainedError: "所选麦克风当前不可用",
-    SecurityError: "浏览器阻止了麦克风访问",
-  };
-  return `麦克风访问失败：${reasons[name] ?? fallback}`;
-}
-
-const micMeterBars = computed(() => Math.round(micLevel.value * 24));
-function meterBarHeight(index: number) {
-  if (!microphoneTestActive.value) return 5;
-  const intensity = Math.max(0, micLevel.value - (index / 24) * 0.65);
-  return 5 + Math.round(intensity * 34);
-}
-
-function toggleMicrophone(): void {
-  setMicrophoneMuted(!microphoneMuted.value);
-  showToast(microphoneMuted.value ? t("microphoneMuted") : t("microphoneActive"));
-}
-
-function onScreenShareVolume(event: Event): void {
-  screenShareRemoteVolume.value = Math.max(0, Math.min(1, Number((event.target as HTMLInputElement).value) / 100));
-}
-
-function syncScreenShareFullscreen(): void {
-  screenShareFullscreen.value = document.fullscreenElement === screenSharePlayerEl.value;
-}
-
-async function toggleScreenShareFullscreen(): Promise<void> {
-  const player = screenSharePlayerEl.value;
-  if (!player) return;
-  try {
-    if (document.fullscreenElement === player) await document.exitFullscreen();
-    else if (player.requestFullscreen) await player.requestFullscreen();
-  } catch {
-    screenShareFullscreen.value = false;
-  }
-}
-
-async function startScreenShareWithSettings(): Promise<void> {
-  const preset = screenShareResolutionOptions.find((option) => option.value === screenShareResolutionPreset.value);
-  const settings: ScreenShareOutputSettings = {
-    ...(preset?.width && preset.height ? { maxWidth: preset.width, maxHeight: preset.height } : {}),
-    maxFrameRate: screenShareFrameRate.value,
-  };
-  localStorage.setItem("webspeak:screen-share-resolution", screenShareResolutionPreset.value);
-  localStorage.setItem("webspeak:screen-share-framerate", String(screenShareFrameRate.value));
-  screenShareSettingsOpen.value = false;
-  await startScreenShare(true, settings);
-}
-
-async function toggleAccompaniment(): Promise<void> {
-  try {
-    if (accompanimentActive.value) {
-      await stopAccompaniment();
-      showToast(t("accompanimentStopped"));
-      return;
-    }
-    await startAccompaniment();
-    if (accompanimentActive.value) showToast(t("accompanimentStarted"));
-  } catch {
-    const messageKey = accompanimentErrorCode.value === "needsWebRtc"
-      ? "accompanimentNeedsWebRtc"
-      : accompanimentErrorCode.value === "noAudio"
-        ? "accompanimentNoAudio"
-        : accompanimentErrorCode.value === "unsupported"
-          ? "accompanimentUnsupported"
-          : "accompanimentPermissionDenied";
-    showToast(t(messageKey));
-  }
-}
-
-function onWhisperPttDown(event: PointerEvent): void {
-  if (!whisperTargetIds.size) return;
-  const target = event.currentTarget as HTMLElement | null;
-  if (target?.setPointerCapture && !target.hasPointerCapture(event.pointerId)) target.setPointerCapture(event.pointerId);
-  whisperPttActive.value = true;
-  setWhisperActive(true);
-}
-
-function onWhisperPttUp(event: PointerEvent): void {
-  const target = event.currentTarget as HTMLElement | null;
-  if (target?.releasePointerCapture && target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
-  stopWhisperTalk();
-}
-
-function stopWhisperTalk(): void {
-  if (!whisperPttActive.value) return;
-  whisperPttActive.value = false;
-  setWhisperActive(false);
-}
 </script>
 
-<style scoped>
-:global(*) { box-sizing: border-box; }
-:global(body) { margin: 0; background: #f7f9f8; color: #192120; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-:global(button), :global(input) { font: inherit; }
-:global(button) { border: 0; }
-
-.web-client { min-height: 100dvh; outline: none; background: #f7f9f8; color: #192120; }
-.join-page { min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: #f7f9f8; }
-.join-header, .join-content, .join-footer { width: min(1240px, calc(100% - 64px)); margin: 0 auto; }
-.join-header, .join-content, .join-footer { position: relative; z-index: 1; }
-.join-header { z-index: 10; }
-.join-header .language-switcher { z-index: 50; }
-.join-footer { z-index: 2; }
-.join-header { min-height: 84px; display: flex; align-items: center; justify-content: space-between; }
-.brand-lockup { display: flex; align-items: center; gap: 12px; }
-.brand-mark, .rail-logo { display: grid; place-items: center; color: #fff; background: #006a64; box-shadow: 0 8px 18px rgba(0, 106, 100, .15); }
-.brand-mark { display: block; width: 40px; height: 40px; border-radius: 12px; object-fit: cover; }
-.brand-lockup strong { display: block; color: #006a64; font-size: 18px; letter-spacing: -.04em; }
-.brand-lockup strong span { color: #24312f; font-weight: 500; }
-.brand-lockup small { display: block; margin-top: 2px; color: #7b8885; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
-.header-tools { display: flex; align-items: center; gap: 17px; }
-.github-button { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 13px; color: #fff; background: #1f2d2b; border: 1px solid #1f2d2b; border-radius: 9px; box-shadow: 0 5px 12px rgba(31,45,43,.16); font-size: 12px; font-weight: 800; text-decoration: none; transition: .18s; }
-.github-button:hover { color: #fff; background: #006a64; border-color: #006a64; box-shadow: 0 7px 16px rgba(0,106,100,.2); transform: translateY(-1px); }
-.github-button .ui-icon { flex: 0 0 auto; }
-.version-badge { display: inline-flex; align-items: center; min-height: 30px; padding: 0 9px; color: #006a64; background: #e7f4f1; border: 1px solid #cfe9e4; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
-.changelog-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #f2f8f6; border: 1px solid #dcebe7; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none; transition: .18s; }
-.changelog-button:hover { color: #fff; background: #006a64; border-color: #006a64; }
-.header-note { display: flex; align-items: center; gap: 8px; color: #71807c; font-size: 12px; }
-.language-switch { min-width: 50px; min-height: 28px; padding: 0 9px; color: #006a64; background: #e2f2ef; border: 1px solid #c8e6e1; border-radius: 7px; font-size: 10px; font-weight: 700; cursor: pointer; transition: .18s; }
-.language-switch:hover { color: #fff; background: #006a64; border-color: #006a64; }
-.language-menu-row { display: flex; align-items: center; gap: 10px; }
-.language-menu-row > span { flex: 1; }
-.tiny-dot, .online-dot, .status-pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #65d879; box-shadow: 0 0 0 4px rgba(101, 216, 121, .14); }
-.join-content { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(480px, 520px); align-items: center; gap: clamp(40px, 6vw, 88px); padding: 38px 0 56px; }
-.join-copy { max-width: 630px; }
-.eyebrow, .room-eyebrow { display: flex; align-items: center; gap: 9px; color: #006a64; font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
-.eyebrow-dot { width: 9px; height: 9px; border-radius: 50%; background: #90f691; }
-.join-copy h1 { margin: 20px 0 18px; color: #192120; font-size: clamp(42px, 5.3vw, 72px); line-height: 1.04; letter-spacing: -.075em; }
-.join-copy h1 em { color: #006a64; font-style: normal; }
-.join-description { max-width: 500px; margin: 0; color: #65736f; font-size: 17px; line-height: 1.75; }
-.promise-list { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 42px; }
-.promise-item { display: flex; align-items: center; gap: 10px; min-width: 160px; }
-.promise-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: #006a64; background: #d8f3ef; }
-.promise-icon.mint { color: #258844; background: #e0f6e1; }
-.promise-icon.sand { color: #9c6739; background: #f7ebdc; }
-.promise-item b, .promise-item small { display: block; }
-.promise-item b { color: #283431; font-size: 12px; }
-.promise-item small { margin-top: 3px; color: #87938f; font-size: 10px; }
-.visitor-count { position: relative; display: inline-flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; min-height: 42px; margin: 30px 0 0; padding: 7px 14px 7px 9px; overflow: hidden; color: #006a64; border: 1px solid rgba(86, 202, 185, .42); border-radius: 999px; background: linear-gradient(110deg, rgba(225, 250, 245, .94), rgba(244, 255, 252, .78)); box-shadow: 0 10px 24px rgba(0, 106, 100, .1), inset 0 0 0 1px rgba(255, 255, 255, .55); font-size: 12px; font-weight: 700; letter-spacing: .035em; }
-.visitor-count::before { position: absolute; top: 0; bottom: 0; left: -45%; width: 38%; background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .62), transparent); content: ""; pointer-events: none; transform: skewX(-18deg); animation: visitor-shimmer 3.6s 1.5s ease-in-out infinite; }
-.visitor-count-orbit { position: absolute; top: -20px; right: 12px; width: 51px; height: 51px; border: 1px solid rgba(71, 194, 174, .32); border-radius: 50%; pointer-events: none; animation: visitor-orbit 4s ease-in-out infinite; }
-.visitor-count-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 auto; color: #fff; border-radius: 50%; background: linear-gradient(135deg, #006a64, #32cdb7); box-shadow: 0 0 0 4px rgba(55, 205, 182, .12), 0 0 18px rgba(55, 205, 182, .24); }
-.visitor-count-label { position: relative; z-index: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.visitor-count-divider { position: relative; z-index: 1; width: 1px; height: 18px; flex: 0 0 auto; background: currentColor; opacity: .24; }
-.visitor-count-total { position: relative; z-index: 1; min-width: 0; overflow: hidden; color: inherit; font-size: .92em; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
-.visitor-count-spark { position: relative; z-index: 1; color: #35bea7; font-size: 15px; line-height: 1; animation: visitor-spark 2.1s ease-in-out infinite; }
-.join-card { padding: 30px; border: 1px solid rgba(214, 226, 223, .8); border-radius: 20px; background: rgba(255, 255, 255, .86); box-shadow: 0 20px 52px rgba(35, 68, 63, .08); backdrop-filter: blur(12px); }
-.card-kicker, .section-kicker { color: #79918c; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
-.join-card h2 { margin: 10px 0 7px; color: #1b2825; font-size: 27px; letter-spacing: -.045em; }
-.card-lead { margin: 0 0 7px; color: #7b8885; font-size: 13px; }
-.notice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; margin: 0 0 10px; padding: 9px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
-.notice-content { min-width: 0; overflow-wrap: anywhere; }
-.notice-content code { display: block; max-width: 100%; margin-top: 3px; overflow: hidden; color: currentColor; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; opacity: .78; }
-.error-notice { color: #a53c38; background: #fff0ef; border: 1px solid #f7d4d1; }
-.warning-notice { color: #8a6537; background: #fff8e9; border: 1px solid #f2dfb3; }
-.notice-symbol { display: grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; color: #fff; background: currentColor; color: #fff; font-size: 10px; font-weight: 800; }
-.error-notice .notice-symbol { background: #d95d55; }
-.warning-notice .notice-symbol { background: #c89143; }
-.join-form { display: grid; gap: 6px; }
-.field-grid { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 12px; }
-.field-grid .field-label { display: block; }
-.field-grid .field-label:not(:first-child) { margin-top: 0; }
-.field-hint { margin: 1px 0 5px; color: #879590; font-size: 10px; line-height: 1.5; }
-.field-label, .settings-label { color: #43514d; font-size: 11px; font-weight: 600; }
-.field-label:not(:first-child) { margin-top: 6px; }
-.field-label span { color: #a2aaa7; font-weight: 400; }
-.field-wrap { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; color: #8b9b96; border-radius: 10px; background: #f3f6f5; transition: .2s ease; }
-.field-wrap:focus-within { color: #006a64; background: #fff; box-shadow: 0 0 0 2px #81d8d0; }
-.field-wrap input { width: 100%; min-width: 0; padding: 0; color: #24312f; outline: none; border: 0; background: transparent; font-size: 13px; }
-.field-wrap input::placeholder { color: #a5b0ad; }
-.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; color: #fff; background: #006a64; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform .18s, box-shadow .18s, background .18s; }
-.primary-button:hover:not(:disabled) { background: #005650; box-shadow: 0 9px 20px rgba(0, 106, 100, .18); transform: translateY(-1px); }
-.primary-button:active:not(:disabled) { transform: translateY(0); }
-.primary-button:disabled { cursor: not-allowed; opacity: .45; }
-.connect-button { width: 100%; min-height: 44px; margin-top: 10px; font-size: 13px; }
-.button-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
-.join-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; color: #96a29f; font-size: 10px; }
-.join-footer { display: flex; align-items: center; min-height: 68px; background: var(--surface-0); color: #9ba6a3; border-top: 1px solid #e8edeb; font-size: 11px; }.join-footer a { color: #628e89; text-decoration: none; }.join-footer a:hover { color: #006a64; text-decoration: underline; }
-.footer-separator { margin: 0 8px; color: #ccd5d1; }.footer-spacer { flex: 1; }
-
-.app-shell { display: grid; grid-template-columns: 76px 292px minmax(0, 1fr) 246px; height: 100dvh; overflow: hidden; background: #fff; }
-.nav-rail { display: flex; flex-direction: column; align-items: center; padding: 17px 0 14px; color: #52615d; background: #f1f4f3; border-right: 1px solid #e1e9e6; }
-.rail-logo { width: 42px; height: 42px; border-radius: 13px; }
-.rail-nav { display: flex; flex-direction: column; gap: 8px; margin-top: 40px; }
-.rail-button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; width: 58px; padding: 8px 0; color: #7b8a85; background: transparent; border-radius: 10px; cursor: pointer; transition: .18s ease; }
-.rail-button span { font-size: 9px; font-weight: 600; }
-.rail-button:hover, .rail-button.active { color: #006a64; background: #dcefeb; }
-.rail-button.active::before { position: absolute; left: -9px; top: 11px; width: 3px; height: 27px; border-radius: 0 3px 3px 0; background: #006a64; content: ""; }
-.rail-bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: auto; }
-.rail-avatar { display: grid; place-items: center; width: 34px; height: 34px; color: #fff; background: #006a64; border: 3px solid #fff; border-radius: 50%; font-size: 11px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.08); cursor: pointer; }
-.channel-sidebar { display: flex; flex-direction: column; min-width: 0; color: #2b3935; background: #f8faf9; border-right: 1px solid #e6ecea; }
-.sidebar-server { display: flex; align-items: center; gap: 10px; min-height: 73px; padding: 15px 15px 12px; border-bottom: 1px solid #e6ecea; }
-.server-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; color: #006a64; background: #d8f0ed; border-radius: 10px; }
-.server-heading { min-width: 0; flex: 1; }.server-heading strong, .server-heading span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.server-heading strong { color: #24312f; font-size: 12px; }.server-heading span { margin-top: 4px; color: #84918d; font-size: 10px; }.server-heading i { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: #65d879; }
-.round-icon { display: grid; place-items: center; width: 31px; height: 31px; flex: 0 0 auto; color: #71817c; background: transparent; border-radius: 8px; cursor: pointer; transition: .18s; }.round-icon:hover { color: #006a64; background: #e4efec; }
-.sidebar-profile { display: flex; align-items: center; gap: 10px; padding: 18px 17px 14px; }.profile-avatar, .dock-avatar { display: grid; place-items: center; flex: 0 0 auto; color: #fff; border-radius: 11px; font-weight: 700; }.profile-avatar { width: 38px; height: 38px; font-size: 12px; }.profile-copy { min-width: 0; flex: 1; }.profile-copy strong, .profile-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.profile-copy strong { color: #263530; font-size: 12px; }.profile-copy span { margin-top: 4px; color: #7d8e88; font-size: 10px; }.profile-settings { display: grid; place-items: center; color: #7d8e88; background: transparent; cursor: pointer; }.profile-settings:hover { color: #006a64; }
-.channel-search, .member-search { display: flex; align-items: center; gap: 8px; color: #85928e; background: #eef3f1; border-radius: 8px; }.channel-search { margin: 0 14px 18px; padding: 0 10px; min-height: 34px; }.channel-search input, .member-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: #40504b; font-size: 11px; }.channel-search input::placeholder, .member-search input::placeholder { color: #9ba6a3; }.channel-search kbd { padding: 2px 5px; color: #9aa7a3; background: #fff; border: 1px solid #dbe4e0; border-radius: 4px; font-size: 9px; }
-.sidebar-scroll { flex: 1; overflow-y: auto; padding-bottom: 14px; }.channel-section-title { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 8px; color: #82908c; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.channel-section-title button { display: grid; place-items: center; padding: 2px; color: #87958f; background: transparent; cursor: pointer; }.channel-section-title button:hover { color: #006a64; }
-.channel-entry { display: flex; align-items: center; gap: 9px; min-height: 46px; padding-right: 12px; color: #56635f; cursor: pointer; transition: .16s; }.channel-entry:hover { background: #eef5f2; }.channel-entry.selected { color: #006a64; background: #dcefeb; }.channel-entry-copy { min-width: 0; flex: 1; }.channel-entry-copy strong, .channel-entry-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.channel-entry-copy strong { font-size: 12px; font-weight: 600; }.channel-entry-copy span { margin-top: 3px; color: #93a09c; font-size: 9px; }.channel-entry.selected .channel-entry-copy span { color: #4c9690; }.channel-selected-mark { margin-left: auto; color: #006a64; }.channel-member-preview { display: flex; flex-direction: column; gap: 6px; padding: 3px 12px 8px 0; color: #74827e; font-size: 10px; }.mini-member { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.mini-avatar { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; color: #fff; border-radius: 6px; font-size: 8px; font-weight: 700; }.mini-member b { margin-left: auto; color: #006a64; font-size: 9px; }.more-members { color: #006a64; font-size: 9px; }.channel-empty { margin: 5px 14px 0; padding: 19px 14px; color: #8a9793; border: 1px dashed #d3dfdb; border-radius: 10px; text-align: center; }.empty-icon { display: grid; place-items: center; width: 34px; height: 34px; margin: 0 auto 9px; color: #6aa9a3; background: #e2f2ef; border-radius: 10px; }.channel-empty strong { display: block; color: #5a6964; font-size: 11px; }.channel-empty p { margin: 6px 0 12px; font-size: 10px; line-height: 1.5; }.channel-empty button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; color: #006a64; background: #e0f3f0; border-radius: 6px; font-size: 10px; cursor: pointer; }.sidebar-divider { height: 1px; margin: 18px 14px; background: #e2e9e6; }.quick-action { display: flex; align-items: center; gap: 10px; width: calc(100% - 28px); margin: 2px 14px; padding: 9px 5px; color: #6d7c77; background: transparent; text-align: left; cursor: pointer; }.quick-action:hover { color: #006a64; }.quick-action span { flex: 1; font-size: 11px; }.quick-action .ui-icon:last-child { color: #a6b2ae; }.sidebar-footer { display: flex; align-items: center; gap: 7px; min-height: 43px; padding: 0 16px; color: #75837e; border-top: 1px solid #e6ecea; font-size: 10px; }.footer-latency { margin-left: auto; color: #a0ada8; font-size: 9px; }
-
-.workspace { display: flex; min-width: 0; flex-direction: column; background: #fff; }.workspace-header { display: flex; align-items: center; justify-content: space-between; min-height: 73px; padding: 0 29px; border-bottom: 1px solid #eef2f0; }.breadcrumbs { display: flex; align-items: center; gap: 9px; min-width: 0; color: #52605b; font-size: 12px; }.breadcrumbs strong { overflow: hidden; color: #26332f; text-overflow: ellipsis; white-space: nowrap; }.crumb-muted { color: #98a39f; }.mobile-brand { display: none; color: #006a64; font-size: 17px; font-weight: 800; letter-spacing: -.06em; }.mobile-brand em { color: #293632; font-style: normal; font-weight: 500; }.workspace-actions, .dock-actions { display: flex; align-items: center; gap: 8px; }.header-action, .dock-icon { display: grid; place-items: center; color: #75847f; background: transparent; border-radius: 8px; cursor: pointer; transition: .16s; }.header-action { width: 32px; height: 32px; }.header-action:hover, .dock-icon:hover { color: #006a64; background: #edf5f2; }.disconnect-button { display: inline-flex; align-items: center; gap: 6px; min-height: 33px; margin-left: 8px; padding: 0 13px; color: #a94d48; background: #fff2f1; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }.disconnect-button:hover { color: #fff; background: #c95a54; }
-.workspace { display: flex; min-width: 0; flex-direction: column; background: #fff; }.workspace-header { display: flex; align-items: center; justify-content: space-between; min-height: 73px; padding: 0 29px; border-bottom: 1px solid #eef2f0; }.breadcrumbs { display: flex; align-items: center; gap: 9px; min-width: 0; color: #52605b; font-size: 12px; }.breadcrumbs strong { overflow: hidden; color: #26332f; text-overflow: ellipsis; white-space: nowrap; }.crumb-muted { color: #98a39f; }.mobile-brand { display: none; color: #006a64; font-size: 17px; font-weight: 800; letter-spacing: -.06em; }.mobile-brand em { color: #293632; font-style: normal; font-weight: 500; }.workspace-actions, .dock-actions { display: flex; align-items: center; gap: 8px; }.header-action, .dock-icon { display: grid; place-items: center; color: #75847f; background: transparent; border-radius: 8px; cursor: pointer; transition: .16s; }.header-action { width: 32px; height: 32px; }.header-action:hover, .dock-icon:hover { color: #006a64; background: #edf5f2; }.workspace-language { margin-left: 3px; }.disconnect-button { display: inline-flex; align-items: center; gap: 6px; min-height: 33px; margin-left: 8px; padding: 0 13px; color: #a94d48; background: #fff2f1; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }.disconnect-button:hover { color: #fff; background: #c95a54; }
-.workspace-scroll { flex: 1; overflow-y: auto; }.workspace-content { width: min(950px, calc(100% - 64px)); margin: 0 auto; padding: 31px 0 27px; }.room-hero { position: relative; min-height: 190px; overflow: hidden; padding: 30px 34px; border-radius: 16px; background: linear-gradient(110deg, #e3f4f1, #f8fbfa 68%, #fff); }.room-hero-content { position: relative; z-index: 1; }.room-eyebrow { color: #4d817a; font-size: 10px; }.live-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; color: #2d7540; background: #d6f5d9; border-radius: 999px; font-size: 9px; letter-spacing: .08em; }.live-pill i { width: 5px; height: 5px; border-radius: 50%; background: #56cf69; }.room-hero h1 { display: flex; align-items: center; gap: 8px; margin: 16px 0 7px; color: #18302c; font-size: 26px; letter-spacing: -.05em; }.room-hero h1 .ui-icon { color: #006a64; }.room-hero p { max-width: 470px; margin: 0; color: #64817a; font-size: 12px; line-height: 1.6; }.room-stats { display: flex; align-items: center; gap: 11px; margin-top: 19px; color: #52716b; font-size: 10px; }.room-stats span { display: inline-flex; align-items: center; gap: 5px; }.stat-divider { width: 1px; height: 13px; background: #b8d9d4; }.hero-decoration { position: absolute; border: 1px solid rgba(0,106,100,.12); border-radius: 50%; }.hero-decoration.one { width: 250px; height: 250px; right: 48px; top: -116px; }.hero-decoration.two { width: 355px; height: 355px; right: -20px; top: -168px; }.hero-visual { position: absolute; right: 85px; bottom: 20px; width: 160px; height: 120px; opacity: .75; }.orbit { position: absolute; inset: 16px 4px; border: 1px solid rgba(0,106,100,.19); border-radius: 50%; transform: rotate(28deg); }.orbit-b { inset: 0 26px; transform: rotate(-49deg); }.hero-wave { position: absolute; right: 29px; bottom: 45px; display: flex; align-items: center; gap: 4px; height: 53px; }.hero-wave i { display: block; width: 3px; min-height: 8px; border-radius: 4px; background: #63c7bf; animation: wave 2.2s ease-in-out infinite alternate; }.hero-wave i:nth-child(3n) { background: #90f691; animation-delay: -.8s; }.hero-wave i:nth-child(4n) { animation-delay: -.4s; }
-.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }.voice-section { margin-top: 34px; }.section-heading h2 { display: flex; align-items: center; gap: 7px; margin: 6px 0 0; color: #1d2926; font-size: 20px; letter-spacing: -.04em; }.section-counter { color: #87928e; font-size: 10px; }.voice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 12px; margin-top: 17px; }.voice-card { min-height: 152px; padding: 17px 11px 13px; border: 1px solid #edf1ef; border-radius: 13px; background: #fff; box-shadow: 0 7px 18px rgba(20,58,51,.04); text-align: center; transition: .18s; }.voice-card:hover { transform: translateY(-2px); box-shadow: 0 11px 24px rgba(20,58,51,.08); }.voice-card.speaking { border-color: #90f691; box-shadow: 0 0 14px rgba(144,246,145,.35); }.voice-avatar-wrap { position: relative; width: 68px; margin: 0 auto 11px; }.voice-avatar { display: grid; place-items: center; width: 68px; height: 68px; color: #fff; border-radius: 50%; font-size: 20px; font-weight: 700; }.voice-status { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 24px; height: 24px; color: #78908b; background: #fff; border: 1px solid #e0eae6; border-radius: 50%; }.voice-status.speaking { color: #278c3b; border-color: #90f691; }.voice-card > strong, .voice-card > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.voice-card > strong { color: #2c3935; font-size: 12px; }.voice-card > span { margin-top: 5px; color: #91a09a; font-size: 10px; }.voice-card.speaking > span { color: #278c3b; }.more-card { display: grid; place-items: center; align-content: center; }.more-count { display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 11px; color: #006a64; background: #e0f2ef; border-radius: 50%; font-size: 14px; font-weight: 700; }.voice-empty { display: flex; align-items: center; gap: 11px; margin-top: 17px; padding: 18px; color: #83908c; border: 1px dashed #dce6e2; border-radius: 12px; font-size: 11px; }.voice-empty .empty-icon { margin: 0; width: 34px; height: 34px; }.voice-empty strong { color: #4c5e58; }.voice-empty span:last-child { margin-left: auto; }
-.chat-panel { margin-top: 34px; padding: 0 0 16px; border-top: 1px solid #eef2f0; }.chat-heading { padding-top: 25px; }.chat-heading h2 .ui-icon { color: #006a64; }.message-list { display: flex; flex-direction: column; gap: 18px; min-height: 170px; max-height: 360px; overflow-y: auto; padding: 22px 8px 10px 3px; }.chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 145px; color: #9aa6a2; text-align: center; }.chat-empty-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 11px; color: #6fa8a2; background: #e5f3f1; border-radius: 14px; }.chat-empty strong { color: #556761; font-size: 12px; }.chat-empty span { margin-top: 5px; font-size: 10px; }.message-row { display: flex; align-items: flex-start; gap: 11px; max-width: 78%; }.message-row.mine { align-self: flex-end; flex-direction: row-reverse; }.message-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; }.message-body { min-width: 0; }.message-meta { display: flex; align-items: baseline; gap: 8px; margin: 1px 0 6px; }.message-row.mine .message-meta { justify-content: flex-end; }.message-meta strong { color: #384843; font-size: 11px; }.message-meta time { color: #a1ada9; font-size: 9px; }.message-bubble { padding: 10px 13px; color: #43534e; background: #f1f5f3; border-radius: 4px 13px 13px 13px; font-size: 12px; line-height: 1.55; }.message-row.mine .message-bubble { color: #fff; background: #006a64; border-radius: 13px 4px 13px 13px; }.message-composer { display: flex; align-items: center; gap: 7px; min-height: 48px; padding: 6px 8px 6px 12px; background: #f3f6f5; border-radius: 11px; }.message-composer input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: #3a4944; font-size: 12px; }.message-composer input::placeholder { color: #9aa6a2; }.composer-tool { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; color: #94a19d; background: transparent; border-radius: 7px; }.composer-tool:not(:disabled) { cursor: pointer; }.composer-tool:disabled { opacity: .6; }.send-button { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: #fff; background: #006a64; border-radius: 9px; cursor: pointer; }.send-button:disabled { cursor: not-allowed; opacity: .35; }
-.control-dock { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 74px; padding: 10px 29px; border-top: 1px solid #e9efec; background: rgba(255,255,255,.94); box-shadow: 0 -5px 18px rgba(23,52,47,.03); }.dock-user { display: flex; align-items: center; gap: 9px; min-width: 140px; }.dock-avatar { width: 34px; height: 34px; border-radius: 10px; font-size: 11px; }.dock-user strong, .dock-user span { display: block; }.dock-user strong { max-width: 125px; overflow: hidden; color: #33423d; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }.dock-user span { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: #7e8d87; font-size: 9px; }.dock-user span i { width: 5px; height: 5px; border-radius: 50%; background: #65d879; }.dock-center { display: flex; align-items: center; gap: 14px; }.mic-mode-switch { display: flex; padding: 3px; background: #eef3f1; border-radius: 8px; }.mic-mode-switch button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; color: #8b9894; background: transparent; border-radius: 6px; font-size: 10px; cursor: pointer; }.mic-mode-switch button.active { color: #006a64; background: #fff; box-shadow: 0 2px 5px rgba(21,54,48,.08); font-weight: 700; }.ptt-indicator { display: inline-flex; align-items: center; gap: 7px; color: #7c8b86; font-size: 10px; }.ptt-indicator span { width: 7px; height: 7px; border-radius: 50%; background: #b2bfbb; }.ptt-indicator.active { color: #278c3b; }.ptt-indicator.active span { background: #65d879; box-shadow: 0 0 0 4px rgba(101,216,121,.15); }.dock-actions { min-width: 140px; justify-content: flex-end; }.dock-icon { width: 34px; height: 34px; }.dock-end { display: grid; place-items: center; width: 37px; height: 37px; color: #fff; background: #c95a54; border-radius: 10px; cursor: pointer; }.dock-end:hover { background: #b84c47; }
-
-.member-panel { min-width: 0; padding: 26px 16px; color: #2c3935; background: #fbfcfc; border-left: 1px solid #eef2f0; }.member-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; }.member-panel-heading h2 { margin: 5px 0 0; color: #25322e; font-size: 19px; letter-spacing: -.04em; }.member-search { margin-top: 18px; padding: 0 10px; min-height: 33px; }.member-group { margin-top: 24px; }.member-group-title { display: flex; align-items: center; gap: 8px; color: #85928e; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.group-line { height: 1px; flex: 1; background: #e6edeb; }.member-list { display: flex; flex-direction: column; gap: 17px; margin-top: 17px; }.member-row { display: flex; align-items: center; gap: 8px; min-width: 0; }.member-avatar { position: relative; display: grid; place-items: center; width: 33px; height: 33px; flex: 0 0 auto; color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; }.member-avatar.speaking { box-shadow: 0 0 0 2px #90f691, 0 0 10px rgba(144,246,145,.35); }.member-presence { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border: 2px solid #fbfcfc; border-radius: 50%; background: #65d879; }.member-copy { min-width: 0; flex: 1; }.member-copy strong, .member-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.member-copy strong { color: #34423d; font-size: 10px; }.member-copy span { margin-top: 4px; color: #96a29e; font-size: 9px; }.member-volume { display: flex; align-items: center; gap: 5px; color: #a1afaa; width: 64px; }.member-volume input { width: 45px; height: 4px; appearance: none; border-radius: 99px; outline: none; cursor: pointer; }.member-volume input::-webkit-slider-thumb, .settings-range::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.12); cursor: pointer; }.member-volume input::-moz-range-thumb, .settings-range::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.12); cursor: pointer; }.member-empty { margin-top: 22px; color: #98a49f; font-size: 10px; text-align: center; }.member-panel-tip { display: flex; gap: 8px; margin-top: 36px; padding: 12px; color: #72827c; background: #eef5f2; border-radius: 9px; font-size: 9px; line-height: 1.5; }.member-panel-tip .ui-icon { color: #5e9e96; }
-
-.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 28px; background: rgba(25, 33, 31, .42); backdrop-filter: blur(5px); }.settings-modal { display: flex; width: min(920px, 100%); max-height: min(760px, calc(100dvh - 56px)); overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.2); }.settings-nav { display: flex; flex-direction: column; width: 215px; flex: 0 0 auto; padding: 28px 12px 20px; background: #f8faf9; border-right: 1px solid #e6ecea; }.settings-title { padding: 0 13px 20px; color: #25322e; font-size: 19px; font-weight: 700; }.settings-nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 13px; color: #65736f; background: transparent; border-left: 3px solid transparent; border-radius: 8px; font-size: 11px; text-align: left; cursor: pointer; }.settings-nav-item.active { color: #006a64; background: #e2efec; border-left-color: #006a64; font-weight: 700; }.settings-version { margin-top: auto; padding: 20px 13px 0; color: #98a5a0; border-top: 1px solid #e4ebe8; font-size: 10px; line-height: 1.7; }.settings-version span { color: #b0bbb7; }.settings-main { display: flex; min-width: 0; flex: 1; flex-direction: column; }.settings-header { display: flex; align-items: center; justify-content: space-between; min-height: 75px; padding: 0 28px; border-bottom: 1px solid #edf1ef; }.settings-header h2 { margin: 0; color: #202c29; font-size: 22px; letter-spacing: -.045em; }.settings-content { flex: 1; overflow-y: auto; padding: 28px 40px; }.settings-section { max-width: 620px; margin: 0 auto; }.settings-section h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 21px; color: #293631; font-size: 16px; }.settings-section h3 .ui-icon { color: #006a64; }.settings-label { display: block; margin-bottom: 8px; color: #5e6d67; font-size: 10px; font-weight: 500; }.select-like { display: flex; align-items: center; justify-content: space-between; min-height: 39px; margin-bottom: 19px; padding: 0 13px; color: #394742; background: #f4f7f6; border-radius: 8px; font-size: 11px; }.select-like .ui-icon { color: #677671; }.settings-range-row { display: flex; align-items: center; justify-content: space-between; }.settings-range-row .settings-label { margin: 0; }.settings-range-row strong { color: #006a64; font-size: 10px; }.settings-range { width: 100%; height: 6px; margin: 11px 0 20px; appearance: none; border-radius: 999px; outline: none; cursor: pointer; }.settings-range::-webkit-slider-thumb { width: 19px; height: 19px; }.settings-range::-moz-range-thumb { width: 19px; height: 19px; }.mic-test { padding: 15px; border: 1px solid #e5ece9; border-radius: 11px; background: #fafcfb; }.mic-test-header { display: flex; align-items: center; justify-content: space-between; }.mic-test-header strong { color: #36453f; font-size: 11px; }.mic-test-header button { padding: 6px 9px; color: #006a64; background: #e0f1ee; border-radius: 5px; font-size: 10px; cursor: pointer; }.meter { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; height: 39px; margin-top: 12px; padding: 0 4px 4px; border-bottom: 1px solid #dce6e2; }.meter i { width: 5px; min-height: 4px; border-radius: 3px 3px 0 0; background: #dfe6e3; }.meter i.active { background: #81ed8b; box-shadow: 0 0 7px rgba(129,237,139,.45); animation: meter 1s ease-in-out infinite alternate; }.meter-labels { display: flex; justify-content: space-between; margin-top: 6px; color: #9ba6a2; font-size: 8px; }.settings-separator { max-width: 620px; margin: 32px auto; border-top: 1px solid #edf1ef; }.mode-note { display: flex; align-items: flex-start; gap: 8px; padding: 12px; color: #66817a; background: #eef7f4; border-radius: 8px; font-size: 10px; line-height: 1.5; }.mode-note .ui-icon { color: #4f9c91; }.settings-footer { display: flex; justify-content: flex-end; gap: 16px; min-height: 67px; padding: 15px 28px; border-top: 1px solid #edf1ef; }.text-button { padding: 0 6px; color: #63716c; background: transparent; font-size: 11px; font-weight: 600; cursor: pointer; }.save-button { padding: 0 23px; }.qq-modal-card { position: relative; width: min(460px, 100%); max-height: min(90dvh, 720px); overflow-y: auto; padding: 30px; color: #263431; border: 1px solid #d9e7e3; border-radius: 20px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.22); text-align: center; }.qq-modal-heading { padding: 0 24px 18px; }.qq-modal-heading h2 { margin: 8px 0 0; color: #1d2d29; font-size: 25px; letter-spacing: -.04em; }.qq-modal-close { position: absolute; top: 13px; right: 13px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: #6d7d78; background: #f1f6f4; border: 1px solid #e1ebe8; border-radius: 50%; cursor: pointer; }.qq-modal-close:hover { color: #006a64; background: #e2f2ef; border-color: #c8e6e1; }.qq-qr-image { display: block; width: min(100%, 360px); max-height: min(55vh, 520px); margin: 0 auto; object-fit: contain; border-radius: 12px; }.qq-direct-join { margin: 18px 0 9px; color: #667773; font-size: 13px; }.qq-join-link { display: block; padding: 11px 14px; color: #006a64; background: #edf8f5; border: 1px solid #cfe9e4; border-radius: 10px; font-size: 12px; font-weight: 700; line-height: 1.45; text-decoration: none; overflow-wrap: anywhere; }.qq-join-link:hover { color: #fff; background: #006a64; border-color: #006a64; }.toast { position: fixed; z-index: 30; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 11px 15px; color: #fff; background: #263e39; border-radius: 9px; box-shadow: 0 10px 24px rgba(16,48,42,.2); font-size: 11px; animation: toast-in .25s ease-out; }
-
-.channel-password-modal { position: relative; width: min(420px, 100%); padding: 31px 32px 28px; color: #263431; border: 1px solid #d9e7e3; border-radius: 18px; background: #fff; box-shadow: 0 20px 60px rgba(16,40,35,.22); }
-.channel-password-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 17px; color: #006a64; background: #e4f4f0; border-radius: 14px; }
-.channel-password-modal h2 { margin: 7px 0 8px; color: #1d2d29; font-size: 24px; letter-spacing: -.04em; }
-.channel-password-modal > p { margin: 0 0 23px; color: #70817b; font-size: 12px; line-height: 1.6; }
-.channel-password-form .field-label { margin-bottom: 8px; }
-.channel-password-form .field-wrap { margin-bottom: 12px; }
-.channel-password-error { margin: 0 0 14px; }
-.channel-password-actions { display: flex; align-items: center; justify-content: flex-end; gap: 15px; margin-top: 21px; }
-.channel-password-submit { min-height: 40px; padding: 0 16px; }
-.channel-password-submit .button-spinner { width: 14px; height: 14px; }
-.channel-password-submit:disabled { cursor: wait; opacity: .7; }
-
-@media (max-width: 740px) {
-  .channel-password-backdrop { align-items: flex-end; padding: 0; }
-  .channel-password-modal { width: 100%; padding: 27px 22px calc(23px + env(safe-area-inset-bottom, 0px)); border-radius: 20px 20px 0 0; }
-  .channel-password-modal h2 { font-size: 22px; }
-}
-
-:global(html[data-theme="dark"] .channel-password-modal) { color: var(--text-primary); border-color: var(--border); background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 18%, transparent); }
-:global(html[data-theme="dark"] .channel-password-modal h2) { color: var(--text-primary); }
-:global(html[data-theme="dark"] .channel-password-modal > p) { color: var(--text-muted); }
-:global(html[data-theme="dark"] .channel-password-icon) { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface-2)); }
-
-@keyframes spin { to { transform: rotate(360deg); } } @keyframes wave { from { transform: scaleY(.68); opacity: .65; } to { transform: scaleY(1.08); opacity: 1; } } @keyframes meter { from { transform: scaleY(.65); } to { transform: scaleY(1); } } @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-@keyframes join-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes join-title-in { from { opacity: 0; letter-spacing: -.02em; transform: translateY(18px) scale(.98); } to { opacity: 1; letter-spacing: -.075em; transform: translateY(0) scale(1); } }
-@keyframes join-accent-breathe { 0%, 100% { transform: translateY(0); text-shadow: 0 0 0 rgba(0, 106, 100, 0); } 50% { transform: translateY(-2px); text-shadow: 0 5px 18px rgba(0, 106, 100, .16); } }
-@keyframes join-accent-breathe-dark { 0%, 100% { transform: translateY(0); text-shadow: 0 0 8px rgba(125, 255, 174, .28), 0 0 18px rgba(105, 210, 199, .14); } 50% { transform: translateY(-2px); text-shadow: 0 0 13px rgba(125, 255, 174, .5), 0 0 26px rgba(105, 210, 199, .22); } }
-@keyframes join-dot-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(144, 246, 145, .28); } 50% { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(144, 246, 145, 0); } }
-@keyframes visitor-shimmer { 0%, 42% { left: -45%; } 72%, 100% { left: 130%; } }
-@keyframes visitor-spark { 0%, 100% { opacity: .58; transform: scale(.88) rotate(0deg); } 50% { opacity: 1; transform: scale(1.14) rotate(12deg); } }
-@keyframes visitor-orbit { 0%, 100% { transform: rotate(-8deg) scale(.96); opacity: .48; } 50% { transform: rotate(12deg) scale(1.04); opacity: .9; } }
-
-.join-page .join-header { animation: join-fade-up .55s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .join-copy .eyebrow { animation: join-fade-up .55s .08s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .join-copy h1 { animation: join-title-in .78s .16s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .join-copy h1 em { display: inline-block; animation: join-accent-breathe 5s 1.15s ease-in-out infinite; }
-.join-page .join-description { animation: join-fade-up .58s .36s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .promise-list { animation: join-fade-up .58s .48s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .promise-item:nth-child(2) { animation: join-fade-up .58s .58s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .promise-item:nth-child(3) { animation: join-fade-up .58s .68s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .visitor-count { animation: join-fade-up .58s .76s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .eyebrow-dot { animation: join-dot-pulse 2.8s .8s ease-in-out infinite; }
-.join-page .join-card { animation: join-fade-up .68s .24s cubic-bezier(.22, 1, .36, 1) both; }
-.join-page .join-footer { animation: join-fade-up .55s .72s cubic-bezier(.22, 1, .36, 1) both; }
-
-@media (prefers-reduced-motion: reduce) {
-  .join-page *, .join-page *::before, .join-page *::after { animation: none !important; transition-duration: .01ms !important; }
-}
-
-@media (max-width: 1200px) { .app-shell { grid-template-columns: 72px 255px minmax(0, 1fr) 218px; }.workspace-content { width: min(900px, calc(100% - 42px)); }.control-dock { padding-inline: 18px; }.dock-center { gap: 8px; }.mic-mode-switch button { padding-inline: 7px; }.member-panel { padding-inline: 12px; }.member-volume { display: none; } }
-@media (max-width: 980px) { .app-shell { grid-template-columns: 70px 245px minmax(0, 1fr); }.member-panel { display: none; }.room-hero { min-height: 180px; }.hero-visual { right: 24px; opacity: .55; }.join-content { gap: 40px; }.join-card { padding: 28px; } }
-@media (max-width: 740px) { .join-header, .join-content, .join-footer { width: min(100% - 32px, 560px); }.join-header { min-height: 70px; }.header-note { display: none; }.join-content { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 35px; padding: 36px 0 48px; }.join-copy h1 { margin-top: 15px; font-size: 45px; }.join-description { font-size: 14px; }.promise-list { gap: 13px; margin-top: 27px; }.promise-item { min-width: 0; flex: 1 1 30%; }.promise-item small { display: none; }.visitor-count { margin-top: 24px; }.join-card { padding: 24px 20px; }.join-footer { min-height: 53px; }.join-footer .footer-spacer { display: none; }.join-footer span:last-child { margin-left: auto; }.field-grid { grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }.app-shell { display: block; height: 100dvh; }.nav-rail, .channel-sidebar, .member-panel { display: none; }.workspace { height: 100%; }.workspace-header { min-height: 61px; padding: 0 15px; }.mobile-brand { display: inline; }.crumb-muted, .breadcrumbs > .ui-icon, .breadcrumbs > strong { display: none; }.workspace-actions { gap: 3px; }.disconnect-button { margin-left: 2px; padding-inline: 9px; }.disconnect-button .ui-icon { display: none; }.workspace-content { width: calc(100% - 30px); padding-top: 18px; }.room-hero { min-height: 182px; padding: 23px 21px; }.room-hero h1 { font-size: 22px; }.room-hero p { max-width: 74%; font-size: 11px; }.hero-visual { right: -15px; bottom: 4px; transform: scale(.75); transform-origin: right bottom; }.voice-section, .chat-panel { margin-top: 25px; }.voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.voice-card { min-height: 143px; }.message-row { max-width: 92%; }.control-dock { min-height: 66px; padding: 8px 15px; }.dock-user { min-width: 0; }.dock-user > div:last-child { display: none; }.dock-center { flex: 1; justify-content: center; }.mic-mode-switch button { padding: 6px 7px; font-size: 9px; }.ptt-indicator { display: none; }.dock-actions { min-width: 75px; }.settings-modal { max-height: calc(100dvh - 28px); }.settings-nav { display: none; }.settings-content { padding: 24px 20px; }.settings-header { min-height: 62px; padding-inline: 20px; }.settings-header h2 { font-size: 19px; }.settings-footer { min-height: 61px; padding-inline: 20px; } }
-@media (max-width: 420px) { .join-copy h1 { font-size: 38px; }.promise-list { display: grid; grid-template-columns: 1fr; }.promise-item small { display: block; }.join-card { border-radius: 15px; }.voice-grid { gap: 8px; }.voice-card { padding-inline: 6px; }.section-counter { display: none; }.workspace-actions .header-action:first-child { display: none; }.dock-icon { display: none; }.dock-actions { min-width: 37px; }.room-stats { gap: 6px; }.room-stats span:last-child, .stat-divider { display: none; } }
-
-/* The connected view keeps only controls that have a working action. The
-   channel tree lives with the member list so every channel remains visible
-   even when the current user is elsewhere. */
-.app-shell { grid-template-columns: minmax(0, 1fr) 318px; }
-.nav-rail, .channel-sidebar { display: none; }
-.workspace { min-width: 0; }
-.identity-options { margin-top: 8px; color: #677872; font-size: 11px; }
-.identity-options summary { width: fit-content; color: #277970; cursor: pointer; }
-.identity-options[open] summary { margin-bottom: 10px; }
-.cancel-connect-button { justify-self: center; min-height: 32px; padding: 0 10px; color: #6b7d77; background: transparent; font-size: 11px; cursor: pointer; }
-.cancel-connect-button:hover { color: #006a64; text-decoration: underline; }
-.member-panel { display: flex; flex-direction: column; min-height: 0; padding: 26px 18px 18px; overflow: hidden; }
-.member-tree { flex: 1; min-height: 0; margin-top: 18px; padding-right: 3px; overflow-y: auto; }
-.member-channel-group { padding: 8px 0 14px; border-bottom: 1px solid #e7eeeb; }
-.member-channel-group + .member-channel-group { margin-top: 8px; }
-.member-channel-heading { display: flex; align-items: center; gap: 7px; width: 100%; padding: 5px 4px; color: #52635d; background: transparent; border-radius: 7px; text-align: left; cursor: pointer; }
-.member-channel-heading:hover, .member-channel-group.current .member-channel-heading { color: #006a64; background: #e5f3f0; }
-.member-channel-heading span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
-.member-channel-heading small { color: #94a29d; font-size: 10px; }
-.member-channel-group.current .member-channel-heading small { color: #4d9a92; }
-.member-channel-group .member-list { gap: 13px; margin: 9px 4px 0 14px; }
-.member-volume { display: flex; }
-.channel-no-members { margin: 7px 4px 0 31px; color: #a0ada8; font-size: 10px; }
-.member-panel-tip { flex: 0 0 auto; margin-top: 15px; }
-.settings-modal { width: min(760px, 100%); }
-.settings-nav { display: none; }
-.settings-content { padding: 30px 42px; }
-.settings-select { display: block; width: 100%; min-height: 42px; margin-bottom: 19px; padding: 0 13px; color: #394742; border: 1px solid #e0eae6; border-radius: 8px; outline: none; background: #f4f7f6; font-size: 11px; cursor: pointer; }
-.settings-select:focus { border-color: #81d8d0; box-shadow: 0 0 0 2px rgba(129,216,208,.2); }
-.settings-select:disabled { cursor: wait; opacity: .65; }
-.settings-error { margin: -9px 0 15px; color: #b14e47; font-size: 10px; line-height: 1.5; }
-.settings-footer { justify-content: flex-end; }
-.reconnect-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 14px auto 0; width: min(950px, calc(100% - 64px)); padding: 12px 16px; color: #6c5a2c; border: 1px solid #f0dfae; border-radius: 10px; background: #fff9e8; }
-.reconnect-banner.failed { color: #8f4540; border-color: #f2d1cd; background: #fff2f1; }
-.reconnect-banner.degraded { color: #7a4d1d; border-color: #f3d9a9; background: #fff7ec; } /* 降级/告警级提示（如音频链路降级） */
-.reconnect-copy { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.reconnect-copy strong { font-size: 13px; }
-.reconnect-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.reconnect-actions { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
-.reconnect-actions .secondary-button { min-height: 34px; padding-inline: 13px; }
-.remember-identity { display: flex; align-items: flex-start; gap: 9px; margin-top: 8px; color: #465650; cursor: pointer; }
-.acceleration-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 2px; padding: 10px 11px; color: #245f58; background: #edf9f5; border: 1px solid #c4e9df; border-radius: 10px; }
-.acceleration-choice select { min-width: 150px; max-width: 48%; padding: 8px 28px 8px 10px; color: #245f58; background: #fff; border: 1px solid #b9ded5; border-radius: 8px; font: inherit; font-size: 11px; font-weight: 700; }
-.acceleration-copy { min-width: 0; }
-.acceleration-choice strong, .acceleration-choice small { display: block; }
-.acceleration-choice strong { font-size: 11px; font-weight: 800; }
-.acceleration-choice small { margin-top: 3px; color: #6b8c85; font-size: 10px; line-height: 1.45; }
-.remember-identity input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: #087d74; }
-.remember-identity strong, .remember-identity small { display: block; }
-.remember-identity strong { font-size: 11px; font-weight: 700; }
-.remember-identity small { margin-top: 3px; color: #8b9994; font-size: 10px; line-height: 1.4; }
-.identity-warning { margin: 8px 0 0; color: #9a6a32; font-size: 10px; line-height: 1.45; }
-:global(html[data-theme="dark"] .acceleration-choice) { color: #b8eee3; background: #183530; border-color: #2b645b; }
-:global(html[data-theme="dark"] .acceleration-choice small) { color: #91b9b0; }
-:global(html[data-theme="dark"] .acceleration-choice select) { color: #d9f8f1; background: #203f39; border-color: #3b766d; }
-.local-servers { display: grid; gap: 8px; margin: 1px 0 5px; }
-.local-server-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.local-server-group > span { width: 100%; color: #87958f; font-size: 10px; font-weight: 700; }
-.local-server-group button, .favorite-toggle { padding: 5px 8px; color: #277970; background: #eef8f5; border: 1px solid #d7ebe6; border-radius: 6px; font-size: 10px; cursor: pointer; }
-.local-server-group button:hover, .favorite-toggle:hover { background: #e0f3ee; }
-.favorite-toggle { justify-self: start; margin: -1px 0 4px; }
-.clear-local-button { padding: 0; color: #85928d; background: transparent; border: 0; font-size: 10px; cursor: pointer; }
-.clear-local-button:hover { color: #b14e47; text-decoration: underline; }
-@media (max-width: 740px) { .reconnect-banner { align-items: flex-start; flex-direction: column; gap: 10px; width: calc(100% - 30px); }.reconnect-copy { align-items: flex-start; flex-direction: column; gap: 4px; }.reconnect-actions { width: 100%; justify-content: flex-end; } }
-.save-button { min-height: 38px; }
-
-/* Increase connected-view typography by 25% while keeping the layout compact. */
-.app-shell .breadcrumbs { font-size: 15px; }
-.app-shell .disconnect-button { font-size: 14px; }
-.app-shell .room-eyebrow { font-size: 12.5px; }
-.app-shell .live-pill { font-size: 11.25px; }
-.app-shell .room-hero h1 { font-size: 32.5px; }
-.app-shell .room-hero p { font-size: 15px; }
-.app-shell .room-stats { font-size: 12.5px; }
-.app-shell .section-kicker, .app-shell .section-counter { font-size: 12.5px; }
-.app-shell .section-heading h2 { font-size: 25px; }
-.app-shell .voice-card > strong { font-size: 15px; }
-.app-shell .voice-card > span { font-size: 12.5px; }
-.app-shell .more-count { font-size: 17.5px; }
-.app-shell .voice-empty { font-size: 13.75px; }
-.app-shell .chat-empty strong { font-size: 15px; }
-.app-shell .chat-empty span { font-size: 12.5px; }
-.app-shell .message-meta strong { font-size: 13.75px; }
-.app-shell .message-meta time { font-size: 11.25px; }
-.app-shell .message-bubble, .app-shell .message-composer input { font-size: 15px; }
-.app-shell .dock-user strong { font-size: 13.75px; }
-.app-shell .dock-user span, .app-shell .mic-mode-switch button, .app-shell .ptt-indicator { font-size: 11.25px; }
-.app-shell .member-panel-heading h2 { font-size: 23.75px; }
-.app-shell .member-search input { font-size: 13.75px; }
-.app-shell .member-channel-heading span { font-size: 15px; }
-.app-shell .member-channel-heading small { font-size: 12.5px; }
-.app-shell .member-copy strong { font-size: 12.5px; }
-.app-shell .member-copy span, .app-shell .channel-no-members { font-size: 11.25px; }
-.app-shell .member-empty, .app-shell .member-panel-tip { font-size: 12.5px; }
-.settings-modal .settings-header h2 { font-size: 27.5px; }
-.settings-modal .settings-section h3 { font-size: 20px; }
-.settings-modal .settings-label, .settings-modal .settings-range-row strong, .settings-modal .settings-error { font-size: 12.5px; }
-.settings-modal .settings-select { font-size: 13.75px; }
-.settings-modal .mic-test-header strong { font-size: 13.75px; }
-.settings-modal .mic-test-header button { font-size: 12.5px; }
-.settings-modal .meter-labels { font-size: 10px; }
-.settings-modal .mode-note { font-size: 12.5px; }
-.join-page .brand-lockup strong { font-size: 22.5px; }
-.join-page .brand-lockup small, .join-page .header-note { font-size: 12.5px; }
-.join-page .language-switch { font-size: 12.5px; }
-.join-page .eyebrow { font-size: 13.75px; }
-.join-page .join-copy h1 { font-size: clamp(52px, 6.6vw, 90px); }
-.join-page .join-description { font-size: 21.25px; }
-.join-page .promise-item b { font-size: 15px; }
-.join-page .promise-item small { font-size: 12.5px; }
-.join-page .card-kicker { font-size: 12.5px; }
-.join-page .join-card h2 { font-size: 33.75px; }
-.join-page .card-lead { font-size: 16.25px; }
-.join-page .visitor-count { font-size: 15px; }
-.join-page .notice { font-size: 15px; }
-.join-page .field-label { font-size: 13.75px; }
-.join-page .field-wrap input { font-size: 16.25px; }
-.join-page .primary-button { font-size: 15px; }
-.join-page .connect-button { font-size: 16.25px; }
-.join-page .join-meta, .join-page .join-footer { font-size: 12.5px; }
-
-@media (min-width: 741px) and (max-width: 980px) { .app-shell { grid-template-columns: minmax(0, 1fr); }.member-panel { display: none; } }
-@media (max-width: 980px) { .app-shell { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(210px, 35dvh); }.workspace { height: auto; min-height: 0; }.member-panel { display: flex; border-top: 1px solid #eef2f0; border-left: 0; padding: 16px 18px; }.member-tree { margin-top: 10px; } }
-@media (max-width: 740px) { .app-shell { display: grid; grid-template-rows: minmax(0, 1fr) 220px; }.app-shell .room-hero h1 { font-size: 27.5px; }.app-shell .room-hero p { font-size: 13.75px; }.app-shell .section-heading h2 { font-size: 21.25px; }.app-shell .message-bubble, .app-shell .message-composer input { font-size: 13.75px; }.app-shell .mic-mode-switch button { font-size: 11.25px; }.settings-modal .settings-content { padding: 24px 20px; }.settings-modal .settings-header h2 { font-size: 23.75px; } }
-
-/* Keep the connected workspace sized to the browser viewport and let the
-   workspace and member tree own their scroll areas when the window shrinks. */
-:global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; }
-:global(body) { overflow-x: hidden; overflow-y: auto; }
-.web-client { height: 100dvh; min-height: 0; max-height: 100dvh; }
-.web-client { overflow: hidden; }
-.join-page { height: 100dvh; min-height: 0; overflow-y: auto; }
-.app-shell { grid-template-columns: 318px minmax(0, 1fr); height: 100dvh; min-height: 0; max-height: 100dvh; }
-.workspace { grid-column: 2; grid-row: 1; min-height: 0; height: 100%; }
-.workspace-scroll { min-height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
-.member-panel { grid-column: 1; grid-row: 1; border-right: 1px solid #eef2f0; border-left: 0; }
-.voice-avatar.speaking { box-shadow: 0 0 0 3px #90f691, 0 0 14px rgba(144,246,145,.48); }
-.chat-panel { min-height: 0; }
-.message-list { min-height: clamp(150px, 20dvh, 220px); max-height: min(360px, 42dvh); }
-.workspace-content { padding-bottom: 64px; }
-
-@media (max-width: 980px) {
-  .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(210px, 35dvh); }
-  .workspace { grid-column: 1; grid-row: 1; height: auto; }
-  .member-panel { grid-column: 1; grid-row: 2; display: flex; border-top: 1px solid #eef2f0; border-right: 0; padding: 16px 18px; }
-}
-
-@media (max-width: 740px) {
-  .app-shell { grid-template-rows: minmax(0, 1fr) 220px; }
-}
-
-/* Desktop audio controls live in the member rail so the workspace header
-   stays focused on navigation. Mobile keeps its existing controls below the
-   voice cards and in the More panel. */
-.header-tools { align-items: center; }
-.header-action, .round-icon { line-height: 0; }
-.guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
-.guide-button:hover { color: #fff; background: #006a64; border-color: #006a64; }
-.workspace-actions { align-items: center; flex-wrap: nowrap; }
-.workspace-actions .header-action { flex: 0 0 34px; padding: 0; line-height: 0; }
-.workspace-actions .header-action .ui-icon { margin: 0; }
-.desktop-audio-dock { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; min-width: 0; margin-top: 12px; padding: 9px; color: var(--text-muted); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 20px color-mix(in srgb, var(--text-primary) 10%, transparent); }
-.desktop-audio-dock-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
-.desktop-audio-dock-copy strong { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.desktop-audio-dock-copy span { overflow: hidden; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-.desktop-audio-dock-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
-.dock-audio-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: 9px; cursor: pointer; transition: color .16s, background .16s, border-color .16s, transform .16s; }
-.dock-audio-button:hover, .dock-audio-button:focus-visible { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 32%, var(--border)); transform: translateY(-1px); }
-.dock-audio-button.microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-1)); }
-.dock-audio-button.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-1)); }
-.dock-audio-button.accompaniment-toggle.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
-.settings-mode-switch { width: fit-content; margin: 0 0 7px; }
-.settings-hint { margin: -1px 0 19px; color: #8b9994; font-size: 11px; }
-
-@media (max-width: 740px) {
-  .header-tools { gap: 7px; }
-  .header-note, .github-button span, .qq-button .qq-label, .changelog-button span, .guide-button span { display: none; }
-  .github-button { width: 34px; justify-content: center; padding: 0; }
-  .qq-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
-  .changelog-button { width: 32px; min-width: 32px; min-height: 32px; padding: 0; }
-  .guide-button { width: 32px; justify-content: center; padding: 0; }
-}
-.chat-tabs { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 18px; overflow-x: auto; padding-bottom: 3px; }
-.chat-tabs button { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 7px 10px; color: #74837e; background: #f3f7f5; border: 1px solid transparent; border-radius: 7px; font-size: 11px; cursor: pointer; }
-.chat-tabs button:hover { color: #006a64; background: #e8f4f1; }
-.chat-tabs button.active { color: #006a64; background: #dff1ed; border-color: #c9e5df; font-weight: 700; }
-.event-row { display: flex; align-items: baseline; gap: 12px; padding: 9px 10px; color: #65746e; border-bottom: 1px solid #edf2f0; font-size: 12px; line-height: 1.45; }
-.event-row time { flex: 0 0 auto; color: #99a6a1; font-size: 10px; }
-.member-panel-heading { align-items: flex-end; }
-.status-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; color: #5f746c; background: #f2f7f5; border: 1px solid #e0ebe7; border-radius: 7px; font-size: 11px; cursor: pointer; }
-.status-button:hover, .status-button.active { color: #8c653a; background: #fcf3e7; border-color: #f0dcc0; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #66d27a; }
-.status-button.active .status-dot { background: #e0a34d; }
-.member-row { position: relative; padding: 4px 6px; margin: -4px -6px; border-radius: 9px; transition: background .16s ease, box-shadow .16s ease; }
-.member-row:hover, .member-row:focus-within { background: #edf7f4; box-shadow: 0 4px 12px rgba(20, 58, 51, .07); }
-.member-context-menu { position: fixed; z-index: 40; display: grid; min-width: 188px; gap: 3px; padding: 8px; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
-.member-context-menu strong { padding: 4px 8px 7px; color: #2a3934; font-size: 12px; }
-.member-context-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; color: #52625c; background: transparent; border-radius: 6px; font-size: 11px; text-align: left; cursor: pointer; }
-.member-context-menu button:hover { color: #006a64; background: #edf6f3; }
-.member-menu-submenu { position: relative; }
-.member-menu-submenu-trigger { width: 100%; }
-.member-menu-submenu-arrow { margin-left: auto; }
-.member-submenu-panel { position: absolute; z-index: 1; top: -8px; left: calc(100% + 6px); display: grid; min-width: 220px; max-height: min(420px, calc(100vh - 24px)); gap: 3px; padding: 8px; overflow-y: auto; background: #fff; border: 1px solid #e0eae6; border-radius: 10px; box-shadow: 0 14px 35px rgba(20, 50, 44, .16); }
-.member-submenu-panel button { width: 100%; min-width: 0; }
-.member-submenu-panel button:disabled { opacity: .55; cursor: default; }
-.member-submenu-panel button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.member-submenu-panel button small { margin-left: auto; color: #83928c; font-size: 10px; white-space: nowrap; }
-.member-submenu-empty { display: block; padding: 8px; color: #83928c; font-size: 11px; }
-.member-menu-disabled { opacity: .55; cursor: not-allowed !important; }
-:global(html[data-theme="dark"]) .member-context-menu,
-:global(html[data-theme="dark"]) .member-submenu-panel { color: var(--text-primary); background: var(--surface-1); border-color: var(--border); box-shadow: 0 18px 42px color-mix(in srgb, #000 38%, transparent); }
-:global(html[data-theme="dark"]) .member-context-menu strong { color: var(--text-primary); }
-:global(html[data-theme="dark"]) .member-context-menu button { color: var(--text-muted); }
-:global(html[data-theme="dark"]) .member-context-menu button:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
-:global(html[data-theme="dark"]) .member-submenu-panel button small,
-:global(html[data-theme="dark"]) .member-submenu-empty { color: var(--text-muted); }
-.menu-volume { display: grid; gap: 6px; padding: 4px 8px 8px; color: #71817c; font-size: 10px; }
-.menu-volume input { width: 100%; height: 5px; appearance: none; border-radius: 99px; outline: none; cursor: pointer; }
-.menu-volume input::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; cursor: pointer; }
-.menu-volume input::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: #fff; cursor: pointer; }
-.poke-banner { position: fixed; z-index: 35; top: 82px; right: 24px; display: flex; align-items: center; gap: 9px; max-width: min(380px, calc(100% - 48px)); padding: 10px 11px; color: #52645c; background: #fffdf6; border: 1px solid #f0dfbd; border-radius: 9px; box-shadow: 0 8px 22px rgba(88, 65, 28, .12); font-size: 12px; }
-.poke-banner > .ui-icon { color: #d2973d; }
-.poke-banner span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.poke-banner strong { color: #8f6532; }
-.poke-banner small { font-size: inherit; }
-.poke-banner button { display: grid; place-items: center; padding: 3px; color: #9b8a6e; background: transparent; border-radius: 5px; cursor: pointer; }
-.poke-banner button:hover { color: #735020; background: #f9eed9; }
-.audio-diagnostic, .audio-level-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: #7b8a85; font-size: 11px; }
-.audio-diagnostic strong, .audio-level-row strong { color: #3c625b; font-size: 11px; }
-.permission-denied { color: #b3514b !important; }
-.permission-granted { color: #2d8547 !important; }
-.audio-level-track { height: 7px; margin: 7px 0 17px; overflow: hidden; background: #e8efec; border-radius: 999px; }
-.audio-level-track i { display: block; height: 100%; min-width: 0; background: linear-gradient(90deg, #69c8bb, #58d675); border-radius: inherit; transition: width .08s linear; }
-.test-audio { display: block; width: 100%; height: 34px; margin-top: 11px; }
-
-/* M008 semantic theme tokens and keyboard-safe surfaces. */
-:global(:root) { color-scheme: light; --surface-0: #f7f9f8; --surface-1: #fff; --surface-2: #f1f6f4; --text-primary: #192120; --text-muted: #71807c; --border: #e4ece9; --accent: #006a64; --success: #65d879; --warning: #c89143; --danger: #c95a54; }
-:global(:root[data-theme="dark"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; }
-@media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) { color-scheme: dark; --surface-0: #101918; --surface-1: #172321; --surface-2: #202f2c; --text-primary: #e8f3f0; --text-muted: #9bb0aa; --border: #30413d; --accent: #69d2c7; --success: #78e489; --warning: #e2b36c; --danger: #ee8a82; } }
-.web-client { background: var(--surface-0); color: var(--text-primary); }
-.join-page { background-color: var(--surface-0); color: var(--text-primary); }
-.join-page .join-card { position: relative; }
-.app-shell, .workspace { background: var(--surface-1); }
-.workspace-header, .member-panel, .voice-card, .settings-modal { background: var(--surface-1); border-color: var(--border); }
-.workspace-header { border-bottom-color: var(--border); }
-.workspace-content { color: var(--text-primary); }
-.join-card { background: color-mix(in srgb, var(--surface-1) 92%, transparent); border-color: var(--border); }
-.field-wrap, .message-composer, .member-search, .mic-mode-switch, .mode-note { background: var(--surface-2); }
-.field-wrap input, .message-composer input, .member-search input, .settings-select { color: var(--text-primary); }
-.room-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--surface-1)), var(--surface-1) 75%); }
-.voice-card, .member-panel, .settings-modal { box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
-.section-heading h2, .room-hero h1, .join-card h2, .member-panel-heading h2, .message-meta strong, .member-copy strong { color: var(--text-primary); }
-.section-kicker, .card-kicker, .settings-label, .header-note, .section-counter, .message-meta time, .member-copy span, .chat-empty, .join-description, .card-lead { color: var(--text-muted); }
-.chat-panel, .chat-heading, .settings-header, .settings-footer, .settings-separator { border-color: var(--border); }
-.message-bubble { color: var(--text-primary); background: var(--surface-2); }
-.settings-content, .settings-nav { background: var(--surface-1); }
-.settings-nav { border-right-color: var(--border); }
-.settings-section h3, .settings-header h2 { color: var(--text-primary); }
- .settings-select { background: var(--surface-2); border-color: var(--border); color: var(--text-primary); }
-.audio-level-track, .meter i { background: var(--border); }
-.member-presence { border-color: var(--surface-1); }
-.member-row:hover, .member-row:focus-within { background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)); box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 8%, transparent); }
-:global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible), :global(textarea:focus-visible) { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
-.message-composer { position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 3; }
-@media (max-width: 740px) { .workspace-scroll { overscroll-behavior: contain; }.workspace-content { width: min(100% - 24px, 650px); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }.message-composer { margin-bottom: 8px; } }
-@media (max-width: 740px) { .member-context-menu { left: 12px !important; right: 12px; top: auto !important; bottom: env(safe-area-inset-bottom, 0px); min-width: 0; border-radius: 16px 16px 0 0; padding: 14px; } .member-context-menu button { min-height: 42px; font-size: 13px; } .member-context-menu strong { padding: 4px 8px 11px; font-size: 14px; } .menu-volume { font-size: 12px; } }
-@media (max-width: 740px) { .member-submenu-panel { position: static; min-width: 0; max-height: 190px; margin: 4px 0 0 24px; padding: 4px; border-radius: 10px; box-shadow: none; } .member-submenu-panel button { min-height: 42px; font-size: 13px; } }
-
-:global(html[data-theme="dark"] .join-page .brand-lockup strong) { color: var(--accent); }
-:global(html[data-theme="dark"] .join-page .brand-lockup strong span) { color: var(--text-primary); }
-:global(html[data-theme="dark"] .join-page .brand-lockup small),
-:global(html[data-theme="dark"] .join-page .header-note),
-:global(html[data-theme="dark"] .join-page .join-description),
-:global(html[data-theme="dark"] .join-page .promise-item small),
-:global(html[data-theme="dark"] .join-page .card-lead),
-:global(html[data-theme="dark"] .join-page .field-hint),
-:global(html[data-theme="dark"] .join-page .join-meta),
-:global(html[data-theme="dark"] .join-page .join-footer) { color: var(--text-muted); }
-:global(html[data-theme="dark"] .join-page .visitor-count) { color: #b7fff0; border-color: rgba(105, 210, 199, .42); background: linear-gradient(110deg, #173b36, #1c2d2a); box-shadow: 0 10px 28px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(105, 210, 199, .08); }
-:global(html[data-theme="dark"] .join-page .visitor-count::before) { background: linear-gradient(105deg, transparent, rgba(125, 255, 174, .18), transparent); }
-:global(html[data-theme="dark"] .join-page .visitor-count-orbit) { border-color: rgba(105, 210, 199, .34); }
-:global(html[data-theme="dark"] .join-page .join-copy h1),
-:global(html[data-theme="dark"] .join-page .join-card h2),
-:global(html[data-theme="dark"] .join-page .promise-item b),
-:global(html[data-theme="dark"] .join-page .field-label) { color: var(--text-primary); }
-:global(html[data-theme="dark"] .join-page .join-copy h1 em),
-:global(html[data-theme="dark"] .join-page .eyebrow),
-:global(html[data-theme="dark"] .join-page .card-kicker),
-:global(html[data-theme="dark"] .join-page .field-label span),
-:global(html[data-theme="dark"] .join-page .join-footer a) { color: var(--accent); }
-:global(html[data-theme="dark"] .join-page .join-card) { background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-color: var(--border); box-shadow: 0 20px 52px color-mix(in srgb, var(--text-primary) 14%, transparent); }
-:global(html[data-theme="dark"] .join-page .field-wrap) { color: var(--text-muted); background: var(--surface-2); }
-:global(html[data-theme="dark"] .join-page .field-wrap input) { color: var(--text-primary); }
-:global(html[data-theme="dark"] .join-page .qq-modal-card) { color: var(--text-primary); border-color: var(--border); background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 18%, transparent); }
-:global(html[data-theme="dark"] .join-page .qq-modal-heading h2) { color: var(--text-primary); }
-:global(html[data-theme="dark"] .join-page .qq-direct-join) { color: var(--text-muted); }
-:global(html[data-theme="dark"] .join-page .qq-modal-close) { color: var(--text-muted); background: var(--surface-2); border-color: var(--border); }
-:global(html[data-theme="dark"] .join-page .qq-join-link) { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-:global(html[data-theme="dark"] .join-page .qq-join-link:hover) { color: var(--surface-1); background: var(--accent); border-color: var(--accent); }
-:global(html[data-theme="dark"] .join-page .field-wrap input::placeholder) { color: var(--text-muted); }
-:global(html[data-theme="dark"] .join-page .join-footer) { border-top-color: var(--border); }
-
-/* Restore the high-contrast dark welcome treatment. The artwork was removed,
-   so the copy needs its own restrained glow instead of falling back to the
-   light-theme charcoal colors on the dark surface. */
-:global(html[data-theme="dark"] .join-page .join-copy h1) {
-  color: #f3fffb;
-  text-shadow: 0 1px 0 #07100f, 0 0 9px rgba(243, 255, 251, .16);
-}
-:global(html[data-theme="dark"] .join-page .join-copy h1 em) {
-  color: #7dffae;
-  text-shadow: 0 0 10px rgba(125, 255, 174, .38), 0 0 22px rgba(105, 210, 199, .18);
-  animation-name: join-accent-breathe-dark;
-}
-:global(html[data-theme="dark"] .join-page .join-description) {
-  color: #c4d9d3;
-  text-shadow: 0 0 8px rgba(196, 217, 211, .12);
-}
-:global(html[data-theme="dark"] .join-page .promise-item b) {
-  color: #f0fff9;
-  text-shadow: 0 0 7px rgba(240, 255, 249, .14);
-}
-:global(html[data-theme="dark"] .join-page .promise-item small) {
-  color: #a9c6be;
-}
-:global(html[data-theme="dark"] .join-page .promise-icon) {
-  box-shadow: 0 0 12px rgba(105, 210, 199, .14);
-}
-
-/* M007 whisper target controls and M008 mobile navigation. */
-.whisper-strip { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 14px; color: #52645e; border: 1px solid #d6ebe5; border-radius: 10px; background: #eef8f5; }
-.whisper-strip-copy { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.whisper-strip-copy strong { display: inline-flex; align-items: center; gap: 6px; color: #006a64; font-size: 12px; white-space: nowrap; }
-.whisper-strip-copy span { overflow: hidden; color: #71837d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.whisper-ptt-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; color: #fff; background: #006a64; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
-.whisper-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
-.mobile-nav, .mobile-more-panel { display: none; }
-.mobile-section-hidden { display: block; }
-
-@media (min-width: 741px) {
-  .app-shell .mobile-section-hidden { display: block; }
-}
-
-@media (max-width: 740px) {
-  .app-shell { display: flex; flex-direction: column; height: auto; min-height: 100dvh; max-height: none; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); overflow: visible; }
-  .app-shell .workspace { display: flex; flex: 1 1 auto; height: calc(100dvh - 61px); min-height: 0; }
-  .app-shell .workspace-scroll { flex: 1; height: 100%; min-height: 0; overflow-y: auto; }
-  .app-shell .mobile-section-hidden { display: none; }
-  .app-shell.mobile-view-more .workspace { display: none; }
-  .app-shell .member-panel { display: none !important; order: 2; width: 100%; max-height: calc(100dvh - 142px); min-height: 235px; padding: 18px 15px 24px; border-top: 1px solid var(--border); border-right: 0; overflow: hidden; }
-  .app-shell .member-panel.mobile-section-visible { display: flex !important; }
-  .app-shell .member-panel .member-tree { max-height: none; }
-  .mobile-more-panel { display: grid; gap: 10px; width: min(100% - 30px, 650px); margin: 26px auto 0; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent); }
-  .mobile-more-panel h2 { margin: 0 0 8px; color: var(--text-primary); font-size: 24px; }
-  .mobile-more-panel button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; color: var(--text-primary); background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; text-align: left; cursor: pointer; }
-  .mobile-more-panel button:hover { color: var(--accent); border-color: var(--accent); }
-  .mobile-more-panel button.danger { color: var(--danger); }
-  .mobile-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; min-height: 68px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-top: 1px solid var(--border); box-shadow: 0 -7px 20px color-mix(in srgb, var(--text-primary) 8%, transparent); backdrop-filter: blur(14px); }
-  .mobile-nav button { display: grid; place-items: center; gap: 3px; min-width: 0; color: var(--text-muted); background: transparent; border-radius: 8px; font-size: 11px; cursor: pointer; }
-  .mobile-nav button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 700; }
-  .mobile-nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .whisper-strip { align-items: stretch; flex-wrap: wrap; gap: 8px; }
-  .whisper-strip-copy { width: 100%; flex: 1 0 100%; }
-  .whisper-ptt-button { flex: 1; min-height: 46px; }
-  .whisper-strip > .text-button { min-height: 38px; }
-}
-
-/* Keep the desktop join card comfortable without making the welcome page
-   taller than the browser. Smaller viewports can scroll inside the card. */
-@media (min-width: 741px) {
-  .join-header { min-height: 72px; }
-  .join-content { padding: 28px 0 36px; }
-  .join-card { max-height: calc(100dvh - 190px); overflow-y: auto; }
-  .join-footer { min-height: 54px; }
-}
-
-@media (max-width: 740px) {
-  .join-card { max-height: none; overflow: visible; }
-}
-
-/* The document itself never becomes the scroll surface. Each view owns its
-   content scroll area so headers, controls and mobile navigation stay fixed. */
-:global(html), :global(body), :global(#app) { width: 100%; height: 100dvh; min-height: 0; max-height: 100dvh; overflow: hidden; }
-.join-page { height: 100dvh; min-height: 0; overflow: hidden; }
-.join-content { min-height: 0; overflow-y: auto; }
-
-/* Desktop zoom compensation. main.ts sets --ui-scale (>1 only on large
-   viewports) and App.vue applies zoom:var(--ui-scale) on #app. html/body stay
-   pinned to the real viewport (100dvh) while the zoomed roots divide their
-   height by the scale so the rendered result lands on exactly one viewport.
-   Without this a 2K/4K viewport would render a 1.5x-tall shell, clipping the
-   bottom of the workspace and leaving blank space under the control dock.
-   Non-zero fixed offsets (toast, poke banner) are divided back to CSS pixels
-   because zoom also scales fixed coordinates against the viewport. */
-@media (min-width: 851px) {
-  :global(html), :global(body) { height: 100dvh; max-height: 100dvh; }
-  :global(#app), .web-client, .join-page, .app-shell { height: calc(100dvh / var(--ui-scale)); min-height: 0; max-height: calc(100dvh / var(--ui-scale)); }
-  .toast { right: calc(24px / var(--ui-scale)); bottom: calc(24px / var(--ui-scale)); }
-  .poke-banner { top: calc(82px / var(--ui-scale)); right: calc(24px / var(--ui-scale)); }
-}
-
-@media (max-width: 740px) {
-  .join-content { overflow-y: auto; }
-  .app-shell { height: 100dvh; min-height: 0; max-height: 100dvh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
-  .app-shell .workspace { height: auto; min-height: 0; flex: 1 1 auto; }
-  .app-shell.mobile-view-channels .workspace { display: none; }
-  .app-shell .member-panel.mobile-section-visible { flex: 1 1 auto; min-height: 0; max-height: none; }
-  .mobile-more-panel { min-height: 0; max-height: none; margin-bottom: 0; overflow-y: auto; }
-}
-
-/* Match every native scroll surface to the WebSpeak palette. */
-:global(*) { scrollbar-color: #8fcfc7 transparent; scrollbar-width: thin; }
-:global(*::-webkit-scrollbar) { width: 8px; height: 8px; }
-:global(*::-webkit-scrollbar-track) { background: transparent; }
-:global(*::-webkit-scrollbar-thumb) { background: #a7d9d2; background-clip: padding-box; border: 2px solid transparent; border-radius: 999px; }
-:global(*::-webkit-scrollbar-thumb:hover) { background: #6bbab1; background-clip: padding-box; border-width: 1px; }
-:global(:root[data-theme="dark"] *) { scrollbar-color: #438f88 transparent; }
-:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb) { background: #438f88; border-color: transparent; }
-:global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover) { background: #69c7bc; }
-
-/* Mobile interaction pass: keep the browser viewport fixed and give each
-   mobile surface its own touch-friendly scroll area. */
-.mobile-voice-controls, .voice-member-action, .member-action-button, .member-menu-backdrop { display: none; }
-.microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
-.microphone-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
-.microphone-control .settings-label { margin-bottom: 4px; }
-.microphone-control .settings-hint { max-width: 390px; margin: 0; }
-.microphone-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; flex: 0 0 auto; padding: 0 12px; color: #fff; background: var(--accent); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
-.microphone-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, var(--surface-1)); }
-.member-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.member-menu-close { display: none; }
-
-@media (max-width: 740px) {
-  :global(html), :global(body), :global(#app) { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
-  .web-client { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
-  .app-shell { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
-  .app-shell .workspace { height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
-  .app-shell .workspace-scroll { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-  .workspace-header { min-height: calc(60px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 14px 0; box-sizing: border-box; position: sticky; top: 0; z-index: 6; background: color-mix(in srgb, var(--surface-1) 94%, transparent); backdrop-filter: blur(14px); }
-  .breadcrumbs { flex: 1 1 auto; min-width: 0; gap: 6px; font-size: 13px; }
-  .breadcrumbs .crumb-muted, .breadcrumbs > .ui-icon { display: none; }
-  .mobile-brand { display: inline; font-size: 18px; }
-  .workspace-actions { flex: 0 0 auto; gap: 3px; }
-  .workspace-actions .header-action { width: 36px; height: 36px; flex-basis: 36px; }
-  .workspace-actions .theme-toggle, .workspace-actions .workspace-language { display: none; }
-  .disconnect-button { width: 36px; height: 36px; min-height: 36px; margin-left: 0; padding: 0; justify-content: center; }
-  .disconnect-button .ui-icon { display: block; margin: 0; }
-  .disconnect-button span { display: none; }
-  .workspace-content { display: block; width: 100%; max-width: none; min-height: 100%; margin: 0; padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
-  .room-hero { min-height: 152px; padding: 22px 20px; border-radius: 18px; }
-  .room-hero h1 { margin-top: 14px; font-size: 25px; }
-  .room-hero p { max-width: 72%; font-size: 12px; }
-  .room-stats { margin-top: 15px; font-size: 11px; }
-  .hero-visual { right: -28px; bottom: -2px; transform: scale(.72); transform-origin: right bottom; }
-  .voice-section { margin-top: 21px; }
-  .section-heading { gap: 10px; }
-  .section-heading h2 { font-size: 22px; }
-  .voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-  .voice-card { position: relative; min-height: 136px; padding: 18px 8px 14px; border-radius: 16px; }
-  .voice-avatar-wrap, .voice-avatar { width: 60px; height: 60px; }
-  .voice-avatar-wrap { margin-bottom: 10px; }
-  .voice-avatar { font-size: 18px; }
-  .voice-status { width: 21px; height: 21px; }
-  .app-shell .voice-card > strong { max-width: 100%; font-size: 14px; }
-  .app-shell .voice-card > span { margin-top: 4px; font-size: 11px; }
-  .voice-member-action { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-muted); background: color-mix(in srgb, var(--surface-2) 78%, transparent); border-radius: 10px; cursor: pointer; }
-  .voice-member-action:hover, .voice-member-action:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
-  .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
-  .mobile-voice-toggle, .mobile-voice-settings { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; min-width: 0; padding: 0 11px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-  .mobile-voice-toggle { flex: 1 1 auto; }
-  .mobile-voice-toggle.muted, .mobile-more-panel button.muted { color: var(--danger); }
-  .mobile-voice-settings { flex: 0 0 auto; width: 82px; }
-  .mobile-voice-settings span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  .app-shell .member-panel.mobile-section-visible { display: flex !important; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; max-height: none; padding: 18px 14px 16px; border-top: 0; border-right: 0; overflow: hidden; }
-  .member-panel-heading { flex: 0 0 auto; }
-  .member-panel-heading h2 { font-size: 23px; }
-  .status-button { min-height: 34px; padding-inline: 10px; font-size: 12px; }
-  .member-search { flex: 0 0 auto; min-height: 44px; margin-top: 14px; padding: 0 12px; border-radius: 11px; }
-  .member-search input { font-size: 15px; }
-  .app-shell .member-panel .member-tree { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 12px; padding: 0 2px 4px 0; overflow-y: auto; scrollbar-gutter: stable; }
-  .member-channel-group { padding: 7px 0 12px; }
-  .member-channel-heading { min-height: 44px; padding: 0 9px; border-radius: 11px; font-size: 14px; }
-  .member-channel-heading small { font-size: 12px; }
-  .member-list { gap: 3px; margin-top: 5px; }
-  .member-row { min-height: 58px; margin: 0; padding: 7px 7px; gap: 9px; border-radius: 12px; }
-  .member-avatar { width: 40px; height: 40px; border-radius: 12px; font-size: 12px; }
-  .member-presence { width: 10px; height: 10px; }
-  .member-copy strong { font-size: 14px; }
-  .member-copy span { margin-top: 3px; font-size: 12px; }
-  .desktop-audio-dock, .member-flags, .member-volume, .member-panel-tip { display: none; }
-  .member-action-button { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; color: var(--text-muted); background: transparent; border-radius: 10px; cursor: pointer; }
-  .member-action-button:hover, .member-action-button:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
-
-  .app-shell.mobile-view-chat .workspace-scroll { overflow: hidden; }
-  .app-shell.mobile-view-chat .workspace-content { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
-  .app-shell.mobile-view-chat .chat-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 0; padding: 0; border-top: 0; }
-  .app-shell.mobile-view-chat .chat-tabs { flex: 0 0 auto; margin-top: 0; padding: 10px 0 9px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
-  .app-shell.mobile-view-chat .chat-tabs::-webkit-scrollbar { display: none; }
-  .app-shell.mobile-view-chat .chat-heading { flex: 0 0 auto; padding: 13px 0 9px; }
-  .app-shell.mobile-view-chat .chat-heading h2 { font-size: 21px; }
-  .app-shell.mobile-view-chat .message-list { flex: 1 1 auto; min-height: 0; max-height: none; padding: 10px 2px 16px; overflow-y: auto; overscroll-behavior: contain; }
-  .app-shell.mobile-view-chat .message-row { max-width: 94%; gap: 9px; }
-  .app-shell.mobile-view-chat .message-avatar { width: 36px; height: 36px; }
-  .app-shell.mobile-view-chat .message-meta strong { font-size: 12px; }
-  .app-shell.mobile-view-chat .message-bubble { padding: 10px 12px; font-size: 14px; }
-  .app-shell.mobile-view-chat .message-composer { position: relative; flex: 0 0 auto; min-height: 54px; margin: 0 0 4px; padding: 7px 8px 7px 13px; border: 1px solid var(--border); }
-  .app-shell.mobile-view-chat .message-composer input { font-size: 14px; }
-
-  .mobile-more-panel { width: calc(100% - 28px); max-height: none; margin: 16px auto 0; padding: 18px; border-radius: 18px; overflow-y: auto; }
-  .mobile-more-panel h2 { font-size: 25px; }
-  .mobile-more-panel button { min-height: 52px; font-size: 14px; }
-  .mobile-nav { min-height: 74px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
-  .mobile-nav button { min-height: 52px; font-size: 12px; }
-
-  .member-menu-backdrop { position: fixed; z-index: 39; inset: 0; display: block; background: rgba(13, 29, 26, .38); backdrop-filter: blur(2px); }
-  .member-context-menu { z-index: 40; left: 10px !important; right: 10px; top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; min-width: 0; max-height: calc(100svh - 100px); padding: 12px; border-radius: 18px; box-shadow: 0 18px 42px rgba(13, 38, 33, .25); }
-  .member-menu-header strong { padding: 4px 8px 11px; font-size: 16px; }
-  .member-menu-close { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; padding: 0 !important; color: var(--text-muted); background: var(--surface-2); border-radius: 10px; }
-  .member-context-menu button { min-height: 50px; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
-  .member-context-menu .member-menu-close { min-height: 36px; }
-  .menu-volume { padding: 5px 8px 11px; font-size: 12px; }
-  .menu-volume input { height: 7px; }
-
-  .modal-backdrop { align-items: flex-end; padding: 0; }
-  .settings-modal { width: 100%; max-height: calc(100svh - env(safe-area-inset-top, 0px)); border-radius: 22px 22px 0 0; }
-  .qq-modal-card { width: 100%; max-height: calc(100svh - env(safe-area-inset-top, 0px)); padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; }
-  .qq-qr-image { width: min(100%, 330px); max-height: 52svh; }
-  .settings-main { min-height: 0; overflow: hidden; }
-  .settings-header { min-height: 64px; padding-inline: 18px; }
-  .settings-content { min-height: 0; padding: 20px 18px; overflow-y: auto; }
-  .settings-footer { min-height: 68px; padding: 8px 18px calc(8px + env(safe-area-inset-bottom, 0px)); }
-  .settings-footer .save-button { min-height: 48px; }
-  .microphone-control { align-items: stretch; flex-direction: column; gap: 10px; }
-  .microphone-control .settings-hint { max-width: none; }
-  .microphone-toggle { width: 100%; min-height: 44px; }
-
-  .join-page { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
-  .join-header { min-height: calc(62px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); box-sizing: border-box; }
-  .join-content { align-items: stretch; justify-content: flex-start; gap: 24px; width: min(100% - 28px, 560px); padding: 24px 0 28px; overflow-y: auto; }
-  .join-copy h1 { margin: 14px 0 14px; font-size: clamp(40px, 12vw, 58px); }
-  .join-description { font-size: 15px; line-height: 1.65; }
-  .promise-list { margin-top: 23px; }
-  .join-card { padding: 22px 18px; border-radius: 18px; }
-  .join-card h2 { font-size: 25px; }
-  .field-grid { grid-template-columns: minmax(0, 1fr) 112px; }
-  .join-footer { width: min(100% - 28px, 560px); }
-}
-
-@media (max-width: 390px) {
-  .join-page .header-tools { gap: 4px; }
-  .join-page .github-button, .join-page .changelog-button, .join-page .guide-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
-  .join-page .version-badge { min-height: 32px; padding-inline: 6px; font-size: 10px; }
-  .join-page .language-switcher { min-width: 62px; }
-  .workspace-header { padding-inline: 10px; }
-  .workspace-actions .header-action { width: 32px; height: 32px; flex-basis: 32px; }
-  .disconnect-button { width: 32px; height: 32px; }
-  .room-hero { padding-inline: 16px; }
-  .mobile-voice-settings { width: 56px; padding-inline: 4px; }
-  .mobile-voice-toggle { flex: 0 0 44px; padding-inline: 0; }
-  .mobile-voice-toggle span { display: none; }
-  .mobile-voice-settings span { display: none; }
-  .join-content { gap: 18px; }
-  .join-card { padding-inline: 15px; }
-}
-
-/* Keep every welcome-page action inside the viewport on narrow phones. */
-@media (max-width: 420px) {
-  .join-page .join-header { width: calc(100% - 20px); gap: 6px; }
-  .join-page .brand-lockup { min-width: 0; flex: 1 1 auto; gap: 7px; }
-  .join-page .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
-  .join-page .brand-lockup strong { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-  .join-page .brand-lockup small { display: none; }
-  .join-page .header-tools { min-width: 0; flex: 0 0 auto; gap: 2px; }
-  .join-page .header-tools .theme-toggle { display: none; }
-  .join-page .github-button, .join-page .bilibili-button, .join-page .changelog-button, .join-page .guide-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
-  .join-page .github-button, .join-page .bilibili-button, .join-page .changelog-button, .join-page .guide-button { justify-content: center; }
-  .join-page .github-button .ui-icon { width: 16px; height: 16px; }
-  .join-page .bilibili-glyph { width: 18px; height: 18px; }
-  .join-page .version-badge { min-width: 28px; min-height: 28px; padding-inline: 4px; font-size: 9px; }
-  .join-page .language-switcher { min-width: 58px; }
-}
-
-@media (max-width: 360px) {
-  .join-page .brand-lockup > div { display: none; }
-  .join-page .brand-lockup { flex: 0 0 32px; }
-}
-
-.bilibili-button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; color: #e56b91; background: #fff0f5; border: 1px solid #f6d2df; border-radius: 8px; font-size: 11px; font-weight: 800; text-decoration: none; transition: .18s; }
-.bilibili-button:hover { color: #fff; background: #e56b91; border-color: #e56b91; box-shadow: 0 7px 16px rgba(229,107,145,.2); transform: translateY(-1px); }
-.bilibili-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: #fff; background: #e56b91; border-radius: 5px; font-size: 11px; line-height: 1; }
-.bilibili-button:hover .bilibili-glyph { color: #e56b91; background: #fff; }
-
-.qq-button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px; color: #1684b8; background: #eef9ff; border: 1px solid #cdeafa; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; transition: .18s; }
-.qq-button:hover { color: #fff; background: #168fca; border-color: #168fca; box-shadow: 0 7px 16px rgba(22,143,202,.2); transform: translateY(-1px); }
-.qq-button .ui-icon { color: #168fca; }
-.qq-button:hover .ui-icon { color: #fff; }
-
-@media (max-width: 740px) {
-  .bilibili-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
-  .bilibili-button .bilibili-label { display: none; }
-  .qq-button { width: 32px; min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
-  .qq-button .qq-label { display: none; }
-}
-
-@media (max-width: 390px) {
-  .join-page .bilibili-button { width: 32px; min-width: 32px; min-height: 32px; height: 32px; }
-}
-
-/* Override the shared Bilibili sizing above for the tighter welcome header. */
-@media (max-width: 420px) {
-  .join-page .bilibili-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
-  .join-page .qq-button { width: 28px; min-width: 28px; min-height: 28px; height: 28px; padding: 0; }
-}
-
-.network-performance { position: relative; z-index: 8; }
-.performance-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 33px; padding: 0 9px; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); border: 1px solid var(--border); border-radius: 8px; font-size: 11px; cursor: pointer; transition: .16s; }
-.performance-trigger:hover, .performance-trigger[aria-expanded="true"] { background: color-mix(in srgb, var(--accent) 15%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.performance-trigger small { color: var(--text-muted); font-size: 10px; }
-.performance-panel { position: absolute; top: calc(100% + 10px); right: 0; width: 330px; padding: 15px; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border); border-radius: 13px; box-shadow: 0 16px 36px color-mix(in srgb, var(--text-primary) 18%, transparent); }
-.performance-panel header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.performance-panel header strong, .performance-panel header small { display: block; }
-.performance-panel header strong { font-size: 13px; }
-.performance-panel header small { max-width: 255px; margin-top: 4px; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
-.performance-refresh { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; color: var(--accent); background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; }
-.performance-refresh:disabled { cursor: wait; opacity: .55; }
-.performance-route { display: flex; align-items: center; gap: 6px; margin: 15px 0 11px; color: var(--text-muted); font-size: 9px; }
-.performance-route span { padding: 4px 6px; background: var(--surface-2); border-radius: 5px; white-space: nowrap; }
-.performance-route i { width: 18px; height: 1px; flex: 1; background: var(--accent); opacity: .55; }
-.performance-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.performance-metrics article { min-width: 0; padding: 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; }
-.performance-metrics small, .performance-metrics strong, .performance-metrics span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.performance-metrics small { color: var(--text-muted); font-size: 9px; }
-.performance-metrics strong { margin-top: 6px; color: var(--accent); font-size: 18px; }
-.performance-metrics span { margin-top: 4px; color: var(--text-muted); font-size: 9px; }
-.performance-status { margin: 11px 0 0; color: var(--text-muted); font-size: 10px; }
-.webrtc-stats { margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--border); }
-.webrtc-stats > header { display: block; margin-bottom: 8px; }
-.webrtc-stats > header strong, .webrtc-stats > header small { display: block; }
-.webrtc-stats > header strong { font-size: 11px; }
-.webrtc-stats > header small { margin-top: 3px; color: var(--text-muted); font-size: 9px; }
-.webrtc-stats-capture, .webrtc-stats-peer { padding: 8px 9px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
-.webrtc-stats-capture { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
-.webrtc-stats-capture span, .webrtc-stats-capture small, .webrtc-stats-peer-heading small, .webrtc-stats-detail { color: var(--text-muted); font-size: 9px; }
-.webrtc-stats-capture strong { margin-left: auto; color: var(--accent); font-size: 11px; }
-.webrtc-stats-peer + .webrtc-stats-peer { margin-top: 7px; }
-.webrtc-stats-peer-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.webrtc-stats-peer-heading strong { font-size: 10px; }
-.webrtc-stats-peer-heading small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.webrtc-stats-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; margin-top: 7px; color: var(--accent); font-size: 10px; font-variant-numeric: tabular-nums; }
-.webrtc-stats-detail { display: block; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Latin-script translations need a little more room than Chinese copy. Keep
-   the Chinese layout unchanged and use a compact type scale for English and
-   German so headings, labels, and actions do not force awkward wrapping. */
-.web-client.language-en .join-page .brand-lockup strong,
-.web-client.language-de .join-page .brand-lockup strong { font-size: 19.8px; }
-.web-client.language-en .join-page .brand-lockup small,
-.web-client.language-en .join-page .header-note,
-.web-client.language-de .join-page .brand-lockup small,
-.web-client.language-de .join-page .header-note { font-size: 11px; }
-.web-client.language-en .join-page .github-button,
-.web-client.language-en .join-page .qq-button,
-.web-client.language-en .join-page .bilibili-button,
-.web-client.language-en .join-page .changelog-button,
-.web-client.language-en .join-page .guide-button,
-.web-client.language-de .join-page .github-button,
-.web-client.language-de .join-page .qq-button,
-.web-client.language-de .join-page .bilibili-button,
-.web-client.language-de .join-page .changelog-button,
-.web-client.language-de .join-page .guide-button { font-size: 9.7px; }
-.web-client.language-en .join-page .eyebrow,
-.web-client.language-de .join-page .eyebrow { font-size: 12px; }
-.web-client.language-en .join-page .join-copy h1,
-.web-client.language-de .join-page .join-copy h1 { font-size: clamp(46px, 5.8vw, 79px); }
-.web-client.language-en .join-page .join-description,
-.web-client.language-de .join-page .join-description { font-size: 18px; }
-.web-client.language-en .join-page .promise-item b,
-.web-client.language-de .join-page .promise-item b { font-size: 13.2px; }
-.web-client.language-en .join-page .promise-item small,
-.web-client.language-de .join-page .promise-item small { font-size: 11px; }
-.web-client.language-en .join-page .card-kicker,
-.web-client.language-de .join-page .card-kicker { font-size: 11px; }
-.web-client.language-en .join-page .join-card h2,
-.web-client.language-de .join-page .join-card h2 { font-size: 29.7px; }
-.web-client.language-en .join-page .card-lead,
-.web-client.language-de .join-page .card-lead { font-size: 14.3px; }
-.web-client.language-en .join-page .notice,
-.web-client.language-de .join-page .notice { font-size: 13.2px; }
-.web-client.language-en .join-page .field-label,
-.web-client.language-de .join-page .field-label { font-size: 12px; }
-.web-client.language-en .join-page .field-wrap input,
-.web-client.language-de .join-page .field-wrap input { font-size: 14.3px; }
-.web-client.language-en .join-page .primary-button,
-.web-client.language-de .join-page .primary-button { font-size: 13.2px; }
-.web-client.language-en .join-page .connect-button,
-.web-client.language-de .join-page .connect-button { font-size: 14.3px; }
-.web-client.language-en .join-page .join-meta,
-.web-client.language-en .join-page .join-footer,
-.web-client.language-de .join-page .join-meta,
-.web-client.language-de .join-page .join-footer { font-size: 11px; }
-
-@media (max-width: 740px) {
-  .web-client.language-en .join-page .join-copy h1,
-  .web-client.language-de .join-page .join-copy h1 { font-size: clamp(35px, 10.6vw, 51px); }
-  .web-client.language-en .join-page .join-description,
-  .web-client.language-de .join-page .join-description { font-size: 13.2px; }
-  .web-client.language-en .join-page .join-card h2,
-  .web-client.language-de .join-page .join-card h2 { font-size: 22px; }
-  .web-client.language-en .join-page .card-lead,
-  .web-client.language-de .join-page .card-lead { font-size: 13px; }
-}
-
-@media (max-width: 420px) {
-  .web-client.language-en .join-page .brand-lockup strong,
-  .web-client.language-de .join-page .brand-lockup strong { font-size: 13.2px; }
-}
-
-@media (max-width: 740px) {
-  .performance-trigger { width: 36px; height: 36px; min-height: 36px; justify-content: center; padding: 0; }
-  .performance-trigger-label, .performance-trigger small, .performance-trigger > .ui-icon:last-child { display: none; }
-  .performance-panel { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); right: 10px; width: min(340px, calc(100vw - 20px)); }
-}
-
-@media (max-width: 390px) {
-  .performance-trigger { width: 32px; height: 32px; flex-basis: 32px; }
-  .performance-panel { right: 8px; width: min(330px, calc(100vw - 16px)); padding: 13px; }
-  .performance-route { gap: 3px; }
-  .performance-route span { padding-inline: 4px; font-size: 8px; }
-}
-
-/* Desktop audio popovers: keep the rail compact and reveal each control's
-   adjustment surface only while the pointer or keyboard focus is on it. */
-@media (min-width: 741px) {
-  /* 桌面端悬浮（仅 ≥741px 生效，≤740px 移动端布局不受影响）：
-     1) 桌面控制坞 .desktop-audio-dock 脱离文档流悬浮于成员面板底部，
-        仍浮在原布局位置（距面板底 18px），宽度跟随面板内容宽度
-        （left/right 各留 18px，与 member-panel 水平内边距一致，
-        随列宽自适应伸缩）；高度仍由内容撑起。member-panel 作为
-        absolute 包含块并加 padding-bottom 补偿原占位，避免成员列表
-        被遮挡。
-     2) 消息输入框 .message-composer 脱离文档流悬浮于聊天面板底部，
-        宽度跟随聊天面板内容宽度（chat-panel 水平内边距为 0，
-        left/right:0 即与内容宽度完全一致）；chat-panel 作为包含块
-        并加 padding-bottom 补偿原占位，避免消息列表被遮挡。 */
-  .app-shell .member-panel { position: relative; overflow: visible; padding-bottom: calc(18px + 12px + 52px); }
-  .desktop-audio-dock { position: absolute; z-index: 6; left: 18px; right: 18px; bottom: 18px; margin-top: 0; }
-  .app-shell .chat-panel { position: relative; padding-bottom: calc(16px + 48px); }
-  .app-shell .message-composer { position: absolute; z-index: 3; left: 0; right: 0; bottom: 16px; margin-bottom: 0; }
-}
-
-.dock-hover-control { position: relative; flex: 0 0 34px; }
-.dock-hover-panel {
-  position: absolute;
-  z-index: 20;
-  right: 50%;
-  bottom: calc(100% + 10px);
-  width: min(224px, calc(100vw - 32px));
-  padding: 13px 14px;
-  color: var(--text-primary);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 15px 34px color-mix(in srgb, var(--text-primary) 18%, transparent);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translate(50%, 6px);
-  transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
-}
-.dock-hover-panel::after { content: ""; position: absolute; right: auto; bottom: -6px; left: 50%; width: 10px; height: 10px; background: var(--surface-1); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: translateX(-50%) rotate(45deg); }
-.dock-hover-control:hover .dock-hover-panel,
-.dock-hover-control:focus-within .dock-hover-panel { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(50%, 0); }
-.dock-microphone-panel { width: min(246px, calc(100vw - 32px)); }
-.dock-slider-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dock-slider-heading span { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.dock-slider-heading strong { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
-.dock-slider { width: 100%; height: 5px; margin: 11px 0 1px; appearance: none; border-radius: 999px; outline: none; cursor: pointer; }
-.dock-slider::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); box-shadow: 0 2px 4px color-mix(in srgb, var(--text-primary) 14%, transparent); cursor: pointer; }
-.dock-slider::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid #81d8d0; border-radius: 50%; background: var(--surface-1); box-shadow: 0 2px 4px color-mix(in srgb, var(--text-primary) 14%, transparent); cursor: pointer; }
-.dock-panel-divider { height: 1px; margin: 12px 0; background: var(--border); }
-.dock-switch-row, .mobile-noise-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; }
-.dock-switch-row > span, .mobile-noise-toggle > span { min-width: 0; }
-.dock-switch-row strong, .mobile-noise-toggle strong { display: block; color: var(--text-primary); font-size: 11px; }
-.mobile-noise-toggle { margin-bottom: 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
-.mobile-noise-toggle small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
-.dock-switch-row input, .mobile-noise-toggle input { position: relative; width: 34px; height: 20px; flex: 0 0 34px; margin: 0; padding: 0; appearance: none; border: 2px solid var(--border); border-radius: 999px; outline: none; background: var(--surface-2); cursor: pointer; transition: background .16s ease, border-color .16s ease; }
-.dock-switch-row input::before, .mobile-noise-toggle input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); transition: transform .16s ease, background .16s ease; }
-.dock-switch-row input:checked, .mobile-noise-toggle input:checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 72%, var(--surface-2)); }
-.dock-switch-row input:checked::before, .mobile-noise-toggle input:checked::before { background: var(--surface-1); transform: translateX(14px); }
-.dock-switch-row input:focus-visible, .mobile-noise-toggle input:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
-
-.member-row[draggable="true"] { cursor: grab; touch-action: none; }
-.member-row[draggable="true"]:active { cursor: grabbing; }
-.member-row.dragging { opacity: .45; }
-.member-channel-group.drag-over { padding: 6px 6px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.member-channel-group.drag-over .member-channel-heading { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface-1)); }
-
-@media (prefers-reduced-motion: reduce) {
-  .dock-hover-panel, .dock-switch-row input, .mobile-noise-toggle input { transition-duration: .01ms; }
-}
-
-.screen-share-inline-error { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; padding: 8px 10px; color: #a64d47; border: 1px solid color-mix(in srgb, #d96b62 28%, var(--border)); border-radius: 9px; background: color-mix(in srgb, #f7d9d5 45%, var(--surface-1)); font-size: 10px; line-height: 1.4; }
-.screen-share-avatar-wrap { position: relative; overflow: visible; }
-.screen-share-live-indicator { position: absolute; top: -16px; right: 50%; z-index: 2; display: inline-flex; align-items: center; gap: 4px; min-height: 17px; padding: 3px 6px 3px 4px; color: #087b6e; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 999px; background: var(--surface-1); box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 12%, transparent); font-size: 8px; font-weight: 800; line-height: 1; white-space: nowrap; transform: translateX(50%); }
-.screen-share-live-indicator::before { content: ""; width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: #55d783; box-shadow: 0 0 0 3px color-mix(in srgb, #55d783 18%, transparent); animation: screen-share-live-dot 1.2s ease-in-out infinite; }
-.screen-share-wave { display: inline-flex; align-items: center; gap: 1px; height: 14px; color: #55d3bd; }
-.screen-share-wave i { display: block; width: 2px; flex: 0 0 2px; border-radius: 99px; background: currentColor; animation: screen-share-wave 1.1s ease-in-out infinite alternate; }
-.screen-share-wave i:nth-child(2n) { animation-delay: -.18s; }
-.screen-share-wave i:nth-child(3n) { animation-delay: -.42s; }
-.screen-share-wave i:nth-child(4n) { animation-delay: -.66s; }
-.screen-share-stop-button { position: absolute; bottom: -4px; left: -5px; z-index: 3; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; color: var(--danger); border: 2px solid var(--surface-1); border-radius: 7px; background: var(--surface-2); box-shadow: 0 3px 9px color-mix(in srgb, var(--text-primary) 18%, transparent); cursor: pointer; }
-.screen-share-stop-button:hover { color: #fff; border-color: var(--danger); background: var(--danger); }
-.screen-share-stop-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--danger) 42%, transparent); outline-offset: 2px; }
-.screen-share-card-actions { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; min-width: 0; margin-top: 9px; flex-wrap: wrap; }
-.screen-share-start-actions { display: inline-flex; align-items: stretch; justify-content: center; gap: 4px; width: 100%; min-width: 0; }
-.screen-share-card-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 25px; max-width: 100%; padding: 4px 7px; overflow: hidden; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); font-size: 9px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.screen-share-card-button:hover { background: color-mix(in srgb, var(--accent) 15%, var(--surface-1)); }
-.screen-share-card-button.live { color: #0e8c76; background: color-mix(in srgb, #b6f0d5 55%, var(--surface-1)); }
-.screen-share-card-button.viewing { color: #fff; border-color: var(--accent); background: var(--accent); }
-.screen-share-settings-button { display: grid; place-items: center; width: 25px; min-width: 25px; min-height: 25px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-1); cursor: pointer; }
-.screen-share-settings-button:hover, .screen-share-settings-button[aria-expanded="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-1)); }
-.screen-share-settings-backdrop { z-index: 25; align-items: center; padding: 16px; }
-.screen-share-settings-modal { position: relative; width: min(360px, 100%); padding: 22px; color: var(--text-primary); border: 1px solid var(--border); border-radius: 16px; background: var(--surface-1); box-shadow: 0 20px 60px color-mix(in srgb, var(--text-primary) 20%, transparent); }
-.screen-share-settings-close { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; background: var(--surface-2); cursor: pointer; }
-.screen-share-settings-close:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.screen-share-settings-heading { padding-right: 35px; }
-.screen-share-settings-heading h2 { margin: 5px 0 4px; color: var(--text-primary); font-size: 20px; letter-spacing: -.04em; }
-.screen-share-settings-heading p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
-.screen-share-settings-fields { display: grid; gap: 13px; margin-top: 22px; }
-.screen-share-settings-fields label { display: grid; gap: 6px; min-width: 0; color: var(--text-muted); font-size: 10px; }
-.screen-share-settings-fields label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.screen-share-settings-fields select { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 37px; padding: 0 9px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.screen-share-settings-fields select:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent); outline-offset: 1px; }
-.screen-share-settings-note { margin: 15px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.45; }
-.screen-share-settings-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); }
-.screen-share-settings-start { min-height: 35px; padding: 0 12px; font-size: 10px; }
-.screen-share-player { position: relative; margin-top: 17px; overflow: hidden; border: 1px solid #263b37; border-radius: 18px; background: #070d0d; box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 18%, transparent); }
-.screen-share-player-stage { position: relative; display: grid; width: 100%; min-height: 245px; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #1d3934, #091010 68%); }
-.screen-share-player-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #030606; }
-.screen-share-player-placeholder { display: flex; align-items: center; flex-direction: column; gap: 10px; max-width: 360px; padding: 30px; color: #b1c2bd; text-align: center; }
-.screen-share-player-placeholder-icon { display: grid; place-items: center; width: 58px; height: 58px; color: #69d2c7; border: 1px solid rgba(105,210,199,.36); border-radius: 18px; background: rgba(105,210,199,.12); }
-.screen-share-player-placeholder strong { color: #f0f8f5; font-size: 15px; }
-.screen-share-player-placeholder > span:last-child { color: #8ea39d; font-size: 10px; line-height: 1.5; }
-.screen-share-player-exit, .screen-share-player-controls button { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; color: #edf7f4; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; background: rgba(8,14,14,.7); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); cursor: pointer; }
-.screen-share-player-exit { position: absolute; top: 15px; left: 15px; z-index: 3; }
-.screen-share-player-exit:hover, .screen-share-player-controls button:hover { color: #fff; border-color: rgba(105,210,199,.75); background: rgba(0,106,100,.85); }
-.screen-share-player-viewers { position: absolute; top: 15px; right: 15px; z-index: 3; display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 8px 5px 11px; color: #f3faf8; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(8,14,14,.74); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); }
-.screen-share-player-viewer-label { display: inline-flex; align-items: center; gap: 5px; color: #d2e2de; font-size: 10px; font-weight: 700; white-space: nowrap; }
-.screen-share-player-viewer-avatars { display: inline-flex; align-items: center; padding-left: 4px; }
-.screen-share-player-viewer-avatar { display: grid; place-items: center; width: 25px; height: 25px; margin-left: -4px; color: #fff; border: 2px solid #15211f; border-radius: 50%; font-size: 9px; font-weight: 800; box-shadow: 0 2px 7px rgba(0,0,0,.25); }
-.screen-share-player-live { position: absolute; top: 22px; left: 64px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; color: #a7fff0; font-size: 11px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
-.screen-share-player-live i { width: 7px; height: 7px; border-radius: 50%; background: #65e48b; box-shadow: 0 0 0 4px rgba(101,228,139,.18); animation: screen-share-live-dot 1.2s ease-in-out infinite; }
-.screen-share-player-source { position: absolute; bottom: 18px; left: 18px; z-index: 3; max-width: 45%; overflow: hidden; color: #f5fbf8; font-size: 12px; font-weight: 800; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.7); white-space: nowrap; }
-.screen-share-player-controls { position: absolute; right: 15px; bottom: 15px; z-index: 3; display: flex; align-items: center; gap: 9px; }
-.screen-share-player-controls label { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 11px; color: #edf7f4; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(8,14,14,.7); box-shadow: 0 5px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); }
-.screen-share-player-controls input { width: 102px; height: 4px; accent-color: #69d2c7; cursor: pointer; }
-.screen-share-player:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; background: #030606; }
-.screen-share-player:fullscreen .screen-share-player-stage { height: 100%; max-height: none; aspect-ratio: auto; }
-.screen-share-player::backdrop { background: #030606; }
-@keyframes screen-share-wave { 0% { transform: scaleY(.45); opacity: .5; } 100% { transform: scaleY(1); opacity: 1; } }
-@keyframes screen-share-live-dot { 0%, 100% { opacity: .55; transform: scale(.86); } 50% { opacity: 1; transform: scale(1); } }
-@media (max-width: 740px) {
-  .screen-share-live-indicator { top: -14px; font-size: 7px; }
-  .screen-share-card-button { font-size: 8px; }
-  .screen-share-player { margin-top: 14px; border-radius: 14px; }
-  .screen-share-player-stage { min-height: 210px; }
-  .screen-share-player-viewers { top: 10px; right: 10px; }
-  .screen-share-player-live { top: 19px; left: 57px; }
-  .screen-share-player-source { bottom: 12px; left: 12px; max-width: 40%; }
-  .screen-share-player-controls { right: 10px; bottom: 10px; gap: 6px; }
-  .screen-share-player-controls label { padding-inline: 9px; }
-  .screen-share-player-controls input { width: 70px; }
-  .screen-share-player-exit { top: 10px; left: 10px; }
-}
-</style>
+<style scoped src="../styles/web-client.css"></style>
