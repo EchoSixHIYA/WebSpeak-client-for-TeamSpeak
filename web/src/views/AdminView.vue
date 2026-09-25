@@ -1387,3 +1387,39 @@ async function parseResponse(response: Response) { const value = await response.
   .admin-main{height:100%;min-height:0}
 }
 </style>
+
+<style scoped>
+.operations-page .operations-grid{grid-template-columns:minmax(0,1fr);align-items:start;gap:14px}
+.operations-page .operations-primary,.operations-page .lower-operations{grid-template-columns:minmax(0,1fr);margin-top:0}
+.operations-page .operation-card{height:auto;min-height:0;overflow:visible}
+.operations-page .operation-empty{min-height:84px}
+.operations-page .diagnostic-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr))}
+.operations-page .audit-card .event-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+
+@media(min-width:1101px){
+  .operations-page .invite-form{grid-template-columns:minmax(220px,1.2fr) minmax(280px,1fr) auto;align-items:end;gap:12px 16px}
+  .operations-page .invite-form>label{grid-column:1;grid-row:1}
+  .operations-page .invite-form-grid{grid-column:2;grid-row:1;align-self:end}
+  .operations-page .invite-form>.field-help{grid-column:1/3;grid-row:2}
+  .operations-page .invite-form>.primary-button{grid-column:3;grid-row:1;white-space:nowrap}
+  .operations-page .diagnostics-card{display:grid;grid-template-columns:minmax(0,1fr)}
+  .operations-page .diagnostics-card>header{grid-column:1/-1}
+  .operations-page .diagnostics-card>.diagnostic-list{grid-column:1;grid-row:2;grid-template-columns:repeat(5,minmax(0,1fr))}
+  .operations-page .diagnostics-card>.secondary-button{grid-column:1;grid-row:3;justify-self:end;white-space:nowrap}
+}
+
+@media(max-width:1100px){
+  .operations-page .diagnostic-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr))}
+}
+
+@media(max-width:850px){
+  .operations-page .operations-primary,.operations-page .lower-operations{grid-template-columns:minmax(0,1fr)}
+  .operations-page .invite-form{grid-template-columns:minmax(0,1fr)}
+  .operations-page .invite-form>label,.operations-page .invite-form-grid,.operations-page .invite-form>.field-help,.operations-page .invite-form>.primary-button{grid-column:1;grid-row:auto}
+  .operations-page .diagnostics-card{display:block}
+}
+
+@media(max-width:560px){
+  .operations-page .diagnostic-list{grid-template-columns:minmax(0,1fr)}
+}
+</style>
