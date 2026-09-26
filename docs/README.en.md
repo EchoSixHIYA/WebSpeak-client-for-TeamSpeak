@@ -25,7 +25,8 @@ The public demo is hosted in Hong Kong and its network conditions and load may b
 | Desktop accompaniment | Select an audio-enabled window or browser tab and share its sound with the current channel. |
 | Identity and access | Remembered identity, visitor-defined targets, and revocable expiring invite links. |
 | Administration | Manage targets, access policy, WebRTC, relays, invites, sessions, logs, diagnostics, and backups. |
-| User experience | Chinese, English, German, Russian, and Japanese UI, light/dark themes, and responsive desktop/mobile layouts. |
+| Skins | Protected Day, Night, and ILLUSIA skins, plus instance-managed `.wskin` appearances with administrator enable/default controls. |
+| User experience | Chinese, English, German, Russian, and Japanese UI with responsive desktop/mobile layouts. |
 | Self-hosting | Data stays with the operator; Docker, Windows x64, and Linux x64 deployment options are provided. |
 
 ## 🖼️ Screenshots
@@ -153,6 +154,7 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 | Version | Date | Summary |
 | --- | --- | --- |
+| 0.2.5-preview | 2026-09-27 | Added `.wskin` skins, administrator enable/default controls, and protected Day/Night/ILLUSIA built-ins; removed the unfinished Aurora Voice sample, fixed skin-load flashes, dark-control contrast, and voice-room artwork layering, and added the official skin-development Agent Skill. |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | Added cross-platform P2P screen sharing between browsers and native TeamSpeak 6 clients; added STUN/external-TURN configuration, live player and viewer state, 1080p/60 FPS capture settings, and WebRTC statistics; refined screen-share interactions and added visitor numbering. |
 | [v0.2.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.3) | 2026-09-19 | Added channel member scheduling and permission-aware direct moves; added avatar, mute-state, and remembered-identity support; refreshed feature screenshots and documentation for all five languages. |
 | [v0.2.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.2) | 2026-09-17 | Added browser-side microphone noise suppression, Russian and Japanese UI, and per-language welcome text; refined volume interaction and error messages/codes on top of PR #2. |

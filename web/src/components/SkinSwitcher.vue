@@ -3,10 +3,12 @@
     <button
       type="button"
       class="skin-trigger"
+      data-ws-part="skin.trigger"
       :aria-label="menuLabel"
       :title="`${menuLabel}: ${selectedOption.label}`"
       aria-haspopup="listbox"
       :aria-expanded="open"
+      :data-ws-state="open ? 'open' : 'closed'"
       :aria-controls="menuId"
       @click.stop="toggle"
     >
@@ -15,12 +17,14 @@
       <Icon name="chevron-down" :size="12" />
     </button>
 
-    <div v-if="open" :id="menuId" class="skin-dropdown" role="listbox" :aria-label="menuLabel" @click.stop>
+    <div v-if="open" :id="menuId" class="skin-dropdown" data-ws-part="skin.menu" role="listbox" :aria-label="menuLabel" @click.stop>
       <button
         v-for="option in options"
         :key="option.value"
         type="button"
         class="skin-option"
+        data-ws-part="skin.option"
+        :data-ws-skin-id="option.value"
         :class="{ selected: modelValue === option.value }"
         role="option"
         :aria-selected="modelValue === option.value"
@@ -92,23 +96,25 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   min-width: 34px;
   min-height: 32px;
   padding: 0 8px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface-1));
-  border: 1px solid var(--border);
+  color: #08766f;
+  background: rgba(250, 254, 255, .94);
+  border: 1px solid #c8e6e1;
   border-radius: 8px;
   font: inherit;
   font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
-  transition: color .16s, background .16s, border-color .16s;
+  box-shadow: 0 4px 12px rgba(8, 126, 134, .08);
+  transition: color .16s, background .16s, border-color .16s, box-shadow .16s;
 }
 
 .skin-trigger:hover,
 .skin-switcher.open .skin-trigger {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface-1));
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  color: #056e76;
+  background: #edfafa;
+  border-color: #8fd7d9;
+  box-shadow: 0 6px 16px rgba(30, 170, 184, .14);
 }
 
 .skin-trigger > .ui-icon:last-child { margin-left: 1px; }
@@ -121,10 +127,12 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   gap: 3px;
   min-width: 176px;
   padding: 6px;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
+  color: #123849;
+  background: linear-gradient(145deg, rgba(250, 255, 255, .99), rgba(232, 249, 250, .98));
+  border: 1px solid rgba(104, 196, 211, .58);
   border-radius: 11px;
-  box-shadow: 0 14px 32px color-mix(in srgb, var(--text-primary) 16%, transparent);
+  box-shadow: 0 18px 42px rgba(29, 115, 139, .2), inset 0 1px 0 rgba(255, 255, 255, .96);
+  backdrop-filter: blur(18px) saturate(1.12);
 }
 
 .skin-option {
@@ -133,9 +141,9 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   gap: 9px;
   min-height: 36px;
   padding: 0 9px;
-  color: var(--text-primary);
-  background: transparent;
-  border: 1px solid transparent;
+  color: #123849;
+  background: rgba(255, 255, 255, .62);
+  border: 1px solid rgba(255, 255, 255, .5);
   border-radius: 7px;
   font: inherit;
   font-size: 11px;
@@ -143,14 +151,15 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   cursor: pointer;
 }
 
-.skin-option > .ui-icon:first-child { color: var(--text-muted); }
-.skin-option > .ui-icon:last-child { margin-left: auto; color: var(--accent); }
+.skin-option > .ui-icon:first-child { color: #64858a; }
+.skin-option > .ui-icon:last-child { margin-left: auto; color: #087e86; }
 .skin-option:hover,
 .skin-option:focus-visible,
 .skin-option.selected {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  color: #087e86;
+  background: rgba(211, 245, 248, .92);
+  border-color: rgba(71, 201, 212, .42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .82);
 }
 
 @media (max-width: 520px) {

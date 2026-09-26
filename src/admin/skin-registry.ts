@@ -12,6 +12,8 @@ const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const MAX_FONT_BYTES = 4 * 1024 * 1024;
 const MAX_SKINS = 50;
 const MAX_TOTAL_ARCHIVES = 200 * 1024 * 1024;
+export const BUILTIN_SKIN_IDS = ["builtin.light", "builtin.dark", "community.illusia-voice"] as const;
+const BUILTIN_SKIN_ID_SET = new Set<string>(BUILTIN_SKIN_IDS);
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
@@ -27,6 +29,11 @@ export interface SkinCatalogEntry {
   previewUrl?: string;
   previewMimeType?: string;
   installedAt: number;
+  enabled: boolean;
+}
+
+export interface SkinRegistrySettings {
+  defaultSkinId: string;
 }
 
 interface SkinArchiveEntry {
@@ -41,7 +48,7 @@ interface SkinArchiveEntry {
   unixFileType: number;
 }
 
-type ParsedSkinManifest = Omit<SkinCatalogEntry, "installedAt" | "previewUrl" | "previewMimeType"> & {
+type ParsedSkinManifest = Omit<SkinCatalogEntry, "installedAt" | "previewUrl" | "previewMimeType" | "enabled"> & {
   entry: string;
   content?: string;
   preview?: string;
@@ -52,6 +59,10 @@ export class SkinRegistryError extends Error {
     super(message);
     this.name = "SkinRegistryError";
   }
+}
+
+export function isBuiltinSkinId(id: string): boolean {
+  return BUILTIN_SKIN_ID_SET.has(id);
 }
 
 export class SkinRegistry {
@@ -67,7 +78,7 @@ export class SkinRegistry {
         if (!isCatalogEntry(value) || filename !== `${value.id}.json`) continue;
         const archiveInfo = await stat(path.join(this.directory, `${value.id}.wskin`)).catch(() => null);
         if (!archiveInfo?.isFile() || archiveInfo.size < 22 || archiveInfo.size > MAX_ARCHIVE_BYTES) continue;
-        entries.push(value);
+        entries.push({ ...value, enabled: value.enabled !== false });
       } catch {
         // Ignore incomplete or stale metadata. The archive itself remains untouched.
       }
@@ -76,6 +87,7 @@ export class SkinRegistry {
   }
 
   async save(bytes: Buffer, expectedId: string): Promise<SkinCatalogEntry> {
+    if (isBuiltinSkinId(expectedId)) throw new SkinRegistryError("Built-in skins cannot be replaced.", "SKIN_BUILTIN_PROTECTED");
     if (!isSafeSkinId(expectedId)) throw new SkinRegistryError("Skin ID is invalid.", "SKIN_ID_INVALID");
     const parsed = validateSkinArchive(bytes, expectedId);
     await mkdir(this.directory, { recursive: true });
@@ -86,10 +98,12 @@ export class SkinRegistry {
     const totalBytes = archivePaths.reduce((sum, entry) => sum + (entry.id === expectedId ? 0 : entry.size), bytes.byteLength);
     if (totalBytes > MAX_TOTAL_ARCHIVES) throw new SkinRegistryError("The total skin storage limit is 200 MiB.", "SKIN_STORAGE_LIMIT");
 
-    const installedAt = replacing ? current.find((entry) => entry.id === expectedId)!.installedAt : Date.now();
+    const previous = current.find((entry) => entry.id === expectedId);
+    const installedAt = previous?.installedAt ?? Date.now();
     const catalog: SkinCatalogEntry = {
       ...parsed.manifest,
       installedAt,
+      enabled: previous?.enabled ?? true,
       ...(parsed.previewMime ? { previewUrl: `/api/skins/${expectedId}/preview`, previewMimeType: parsed.previewMime } : {}),
     };
     const nonce = randomBytes(6).toString("hex");
@@ -114,7 +128,7 @@ export class SkinRegistry {
 
   async readArchive(id: string): Promise<Buffer | null> {
     if (!isSafeSkinId(id)) return null;
-    if (!(await this.list()).some((entry) => entry.id === id)) return null;
+    if (!(await this.list()).some((entry) => entry.id === id && entry.enabled)) return null;
     try { return await readFile(path.join(this.directory, `${id}.wskin`)); }
     catch { return null; }
   }
@@ -122,7 +136,7 @@ export class SkinRegistry {
   async readPreview(id: string): Promise<{ bytes: Buffer; mimeType: string } | null> {
     if (!isSafeSkinId(id)) return null;
     const catalog = (await this.list()).find((entry) => entry.id === id);
-    if (!catalog?.previewUrl) return null;
+    if (!catalog?.enabled || !catalog.previewUrl) return null;
     const mimeType = catalog.previewMimeType || "application/octet-stream";
     try {
       const bytes = await readFile(path.join(this.directory, `${id}.preview`));
@@ -131,7 +145,9 @@ export class SkinRegistry {
   }
 
   async remove(id: string): Promise<boolean> {
+    if (isBuiltinSkinId(id)) throw new SkinRegistryError("Built-in skins cannot be removed.", "SKIN_BUILTIN_PROTECTED");
     if (!isSafeSkinId(id)) return false;
+    const wasDefault = await this.getDefaultSkinId() === id;
     const archive = path.join(this.directory, `${id}.wskin`);
     const catalog = path.join(this.directory, `${id}.json`);
     const preview = path.join(this.directory, `${id}.preview`);
@@ -140,7 +156,54 @@ export class SkinRegistry {
     await Promise.all([archive, catalog, preview].map((file) => unlink(file).catch((error: unknown) => {
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
     })));
+    if (wasDefault) await this.setDefaultSkin("builtin.light");
     return true;
+  }
+
+  async setEnabled(id: string, enabled: boolean): Promise<SkinCatalogEntry> {
+    if (isBuiltinSkinId(id)) throw new SkinRegistryError("Built-in skins cannot be disabled.", "SKIN_BUILTIN_PROTECTED");
+    const entry = (await this.list()).find((item) => item.id === id);
+    if (!entry) throw new SkinRegistryError("The skin was not found.", "SKIN_NOT_FOUND");
+    const wasDefault = await this.getDefaultSkinId() === id;
+    const updated = { ...entry, enabled };
+    await writeAtomicJson(path.join(this.directory, `${id}.json`), updated);
+    if (!enabled && wasDefault) await this.setDefaultSkin("builtin.light");
+    return updated;
+  }
+
+  async getDefaultSkinId(): Promise<string> {
+    try {
+      const value: unknown = JSON.parse(await readFile(path.join(this.directory, "settings.json"), "utf8"));
+      const id = value && typeof value === "object" ? (value as Record<string, unknown>).defaultSkinId : null;
+      if (typeof id !== "string") return "builtin.light";
+      if (isBuiltinSkinId(id)) return id;
+      const entry = (await this.list()).find((skin) => skin.id === id && skin.enabled);
+      return entry ? id : "builtin.light";
+    } catch {
+      return "builtin.light";
+    }
+  }
+
+  async setDefaultSkin(id: string): Promise<SkinRegistrySettings> {
+    if (!isBuiltinSkinId(id)) {
+      const entry = (await this.list()).find((skin) => skin.id === id && skin.enabled);
+      if (!entry) throw new SkinRegistryError("The default skin must be enabled and installed.", "SKIN_DEFAULT_INVALID");
+    }
+    await mkdir(this.directory, { recursive: true });
+    const settings = { defaultSkinId: id };
+    await writeAtomicJson(path.join(this.directory, "settings.json"), settings);
+    return settings;
+  }
+}
+
+async function writeAtomicJson(filename: string, value: unknown): Promise<void> {
+  const temporary = `${filename}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value), { flag: "wx", mode: 0o600 });
+    await rename(temporary, filename);
+  } catch (error) {
+    await unlink(temporary).catch(() => undefined);
+    throw error;
   }
 }
 
@@ -374,6 +437,7 @@ function isCatalogEntry(value: unknown): value is SkinCatalogEntry {
   if (!isSafeSkinId(item.id) || !isShortText(item.name, 80) || !isShortText(item.author, 80) || !isShortText(item.license, 80)) return false;
   if (typeof item.version !== "string" || !semver.test(item.version) || typeof item.minAppVersion !== "string" || !semver.test(item.minAppVersion)) return false;
   if (!Number.isSafeInteger(item.installedAt) || (item.installedAt as number) < 0) return false;
+  if (item.enabled !== undefined && typeof item.enabled !== "boolean") return false;
   if (item.description !== undefined && (typeof item.description !== "string" || item.description.length > 400)) return false;
   const hasPreview = item.previewUrl !== undefined || item.previewMimeType !== undefined;
   return !hasPreview || (item.previewUrl === `/api/skins/${item.id}/preview` && ["image/png", "image/jpeg", "image/webp", "image/avif", "image/gif"].includes(String(item.previewMimeType)));

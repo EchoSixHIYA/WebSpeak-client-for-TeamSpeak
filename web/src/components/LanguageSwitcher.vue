@@ -3,9 +3,11 @@
     <button
       type="button"
       class="language-trigger"
+      data-ws-part="language.trigger"
       :aria-label="menuLabel"
       aria-haspopup="listbox"
       :aria-expanded="open"
+      :data-ws-state="open ? 'open' : 'closed'"
       :aria-controls="menuId"
       @click.stop="toggle"
     >
@@ -14,12 +16,14 @@
       <Icon name="chevron-down" :size="13" />
     </button>
 
-    <div v-if="open" :id="menuId" class="language-dropdown" role="listbox" :aria-label="menuLabel" @click.stop>
+    <div v-if="open" :id="menuId" class="language-dropdown" data-ws-part="language.menu" role="listbox" :aria-label="menuLabel" @click.stop>
       <button
         v-for="option in options"
         :key="option.value"
         type="button"
         class="language-option"
+        data-ws-part="language.option"
+        :data-ws-language="option.value"
         :class="{ selected: modelValue === option.value }"
         role="option"
         :aria-selected="modelValue === option.value"

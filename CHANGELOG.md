@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.5-preview] — 2026-09-27（相对 0.2.4）
+
+### 中文
+
+- 新增 `.wskin` 视觉皮肤系统：用户可在首页、语音工作区和 `/demo` 选择外观；皮肤可更换背景、美术素材与组件视觉，但页面结构、排版空间、控件位置和交互仍由 WebSpeak 固定提供，管理后台不受皮肤影响。
+- 管理员可在皮肤库启用/停用自定义皮肤并指定实例默认皮肤；访客手动选择会保留，未手动选择的访客采用实例默认。默认日间、默认夜间和 ILLUSIA 风是受保护内置皮肤，不能删除、停用或替换。
+- 将完成度不足的 Aurora Voice 示例移除，以 ILLUSIA 风作为完整皮肤开发样例；细化首页装饰、语音区跨层级立绘、耳机场景、聊天空状态和屏幕播放器表现，并修复深色模式控件可读性、组件溢出和皮肤加载闪烁。
+- 新增官方仓库皮肤开发 Agent Skill，配套更新开发规范与多语言功能说明；访客总数在统计暂不可用时也不会低于当前访客序号。
+
+### English
+
+- Added the `.wskin` visual skin system. Visitors can choose appearances on the home page, voice workspace, and `/demo`; skins may customize artwork and component visuals while WebSpeak retains page structure, layout, control placement, and behavior. The administration console remains unskinned.
+- Administrators can enable/disable custom skins and set an instance default. Deliberate visitor choices are preserved; visitors without an explicit choice receive the instance default. Default Day, Default Night, and ILLUSIA are protected built-ins that cannot be removed, disabled, or replaced.
+- Removed the unfinished Aurora Voice sample and made ILLUSIA the complete reference skin. Refined homepage artwork, layered voice-room character art and headphone scene, the empty-chat backdrop, and the screen-share player; fixed dark-mode control contrast, overflow, and skin-load flashes.
+- Added the repository's official skin-development Agent Skill and synchronized the guide and localized feature notes. The displayed visitor total also remains at least as high as the current visitor ordinal when the counter is unavailable.
+
+### Deutsch
+
+- Das visuelle `.wskin`-System wurde ergänzt. Besucher können das Design auf der Startseite, im Sprachbereich und unter `/demo` wählen. Skins dürfen Grafiken und die visuelle Darstellung anpassen; Seitenstruktur, Layout, Positionen der Bedienelemente und Verhalten bleiben von WebSpeak vorgegeben. Die Administrationskonsole bleibt ungestaltet.
+- Administratoren können eigene Skins aktivieren/deaktivieren und ein Standarddesign für die Instanz festlegen. Eine bewusst getroffene Besucherauswahl bleibt erhalten; ohne eigene Auswahl gilt der Instanzstandard. Tagesmodus, Nachtmodus und ILLUSIA sind geschützte integrierte Skins und können weder gelöscht noch deaktiviert oder ersetzt werden.
+- Das unfertige Aurora-Voice-Beispiel wurde entfernt; ILLUSIA ist nun das vollständige Referenzdesign. Startseitenkunst, Ebenenillustration und Kopfhörerszene im Sprachbereich, leerer Chat-Hintergrund und Bildschirmfreigabe-Player wurden verfeinert. Außerdem wurden dunkle Bedienelemente, Überläufe und Skin-Ladeblitze korrigiert.
+- Der offizielle Skin-Entwicklungs-Agent-Skill des Repositorys wurde ergänzt; Anleitung und lokalisierte Funktionsübersichten wurden aktualisiert. Die Besucher-Gesamtzahl fällt bei nicht verfügbarem Zähler nicht unter die aktuelle Besuchernummer.
+
+### Русский
+
+- Добавлена визуальная система скинов `.wskin`: посетители могут выбирать оформление на главной странице, в голосовом пространстве и в `/demo`. Скины меняют иллюстрации и внешний вид компонентов, а структуру, компоновку, расположение элементов управления и поведение задаёт WebSpeak. Панель администратора не оформляется скинами.
+- Администраторы могут включать и отключать пользовательские скины и задавать оформление по умолчанию для экземпляра. Явный выбор посетителя сохраняется; без него используется настройка экземпляра. Дневная тема, ночная тема и ILLUSIA — защищённые встроенные скины, которые нельзя удалить, отключить или заменить.
+- Удалён незавершённый пример Aurora Voice; полной эталонной темой стала ILLUSIA. Улучшены иллюстрации главной страницы, многослойный персонаж и сцена с наушниками в голосовой комнате, фон пустого чата и проигрыватель трансляции экрана. Исправлены контраст элементов в тёмном режиме, переполнение и вспышки при загрузке скина.
+- В официальный репозиторий добавлен Agent Skill для разработки скинов, обновлены руководство и локализованные описания функций. При недоступности счётчика общее число посетителей не опускается ниже текущего номера посетителя.
+
+### 日本語
+
+- `.wskin` ビジュアルスキン機能を追加しました。ホーム、音声ワークスペース、`/demo` で外観を選択できます。背景や素材、コンポーネントの見た目を変更できますが、ページ構造、レイアウト、操作部品の位置と動作は WebSpeak が管理します。管理コンソールには適用されません。
+- 管理者はカスタムスキンの有効/無効と、インスタンスのデフォルトスキンを設定できます。訪問者が明示的に選んだスキンは維持され、未選択の場合はインスタンスのデフォルトを使用します。昼、夜、ILLUSIA の3種類は保護された内蔵スキンで、削除・無効化・置換できません。
+- 未完成の Aurora Voice サンプルを削除し、ILLUSIA を完成版のリファレンスにしました。ホームのアート、音声画面の重ね合わせ立ち絵とヘッドホン背景、空のチャット背景、画面共有プレーヤーを調整し、ダークモードの視認性、はみ出し、読み込み時のちらつきを修正しました。
+- 公式リポジトリにスキン開発 Agent Skill を追加し、ガイドと各言語の機能説明を更新しました。カウンターを取得できない場合も、訪問者総数が現在の訪問者番号を下回らないようにしました。
+
 ## [0.2.4] — 2026-09-22
 
 ### 中文

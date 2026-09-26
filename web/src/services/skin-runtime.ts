@@ -1,12 +1,14 @@
 import { getInstalledSkin, saveInstalledSkin } from "./local-persistence.js";
 import type { InstalledSkin } from "./skin-pack.js";
-import { applyTheme, getBuiltinSkinCss, getStoredTheme, isDarkTheme, type ThemeMode } from "./theme.js";
+import { applyTheme, getBuiltinSkinCss, getStoredTheme, isDarkTheme } from "./theme.js";
+import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
+import { getBundledSkinPackageUrl, isPublicSkinEnabled } from "./skin-catalog.js";
 
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
 export const BUILTIN_DARK_SKIN = "builtin.dark";
 const CUSTOM_STYLE_ID = "webspeak-active-custom-skin";
-const BUILTIN_STYLE_ID = "webspeak-active-built-in-skin";
+const CUSTOM_BASE_STYLE_ID = "webspeak-active-custom-skin-base";
 
 let activeAssetUrls: string[] = [];
 let criticalControlObserver: MutationObserver | null = null;
@@ -27,7 +29,7 @@ export async function activateStoredSkin(): Promise<InstalledSkin | null> {
   return activateSkin(selectedId);
 }
 
-export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.4"): Promise<InstalledSkin | null> {
+export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.5-preview"): Promise<InstalledSkin | null> {
   if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN) {
     clearCustomSkinStyle();
     applyTheme(id === BUILTIN_DARK_SKIN ? "dark" : "light");
@@ -35,11 +37,16 @@ export async function activateSkin(id: string, expectedVersion?: string, appVers
     storeSkinId(id);
     return null;
   }
+  if (!isPublicSkinEnabled(id)) {
+    if (typeof localStorage !== "undefined") localStorage.removeItem("webspeak:skin-choice");
+    return fallBackToBuiltin();
+  }
 
   let skin = await getInstalledSkin(id);
   if (!skin || (expectedVersion && skin.version !== expectedVersion)) {
     try {
-      const response = await fetch(`/api/skins/${encodeURIComponent(id)}/package`, { cache: "no-cache" });
+      const packageUrl = getBundledSkinPackageUrl(id) ?? `/api/skins/${encodeURIComponent(id)}/package`;
+      const response = await fetch(packageUrl, { cache: "no-cache" });
       if (!response.ok) throw new Error("Skin package is no longer available.");
       const archive = await response.blob();
       const file = new File([archive], `${id}.wskin`, { type: "application/octet-stream" });
@@ -59,13 +66,19 @@ export async function activateSkin(id: string, expectedVersion?: string, appVers
   try {
     const { resolveSkinCssAssets } = await import("./skin-pack.js");
     const compiled = resolveSkinCssAssets(skin.css, skin.assets);
-    const baseTheme: Exclude<ThemeMode, "system"> = isDarkTheme(getStoredTheme()) ? "dark" : "light";
-    applyTheme(baseTheme);
-    const root = document.getElementById(BUILTIN_STYLE_ID) as HTMLStyleElement | null;
-    if (root) {
-      root.dataset.skinPackage = skin.id;
-      root.textContent = getBuiltinSkinCss(baseTheme).replaceAll(`data-ws-skin="builtin.${baseTheme}"`, `data-ws-skin="${skin.id}"`);
+    // A community skin is a complete appearance choice, not an overlay on the
+    // previously selected day/night skin. Keep the document theme (used by the
+    // independent admin appearance) but give unstyled public parts a light,
+    // neutral fallback. A custom skin can opt into dark colors itself.
+    applyTheme(getStoredTheme());
+    let baseStyle = document.getElementById(CUSTOM_BASE_STYLE_ID) as HTMLStyleElement | null;
+    if (!baseStyle) {
+      baseStyle = document.createElement("style");
+      baseStyle.id = CUSTOM_BASE_STYLE_ID;
+      document.head.append(baseStyle);
     }
+    baseStyle.dataset.skinPackage = skin.id;
+    baseStyle.textContent = scopeBuiltinThemeForCustomSkin(getBuiltinSkinCss("light"), "light", skin.id);
     document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
       clientRoot.dataset.wsSkin = skin!.id;
     });
@@ -99,6 +112,7 @@ function fallBackToBuiltin(): null {
 
 export function clearCustomSkinStyle(): void {
   document.getElementById(CUSTOM_STYLE_ID)?.remove();
+  document.getElementById(CUSTOM_BASE_STYLE_ID)?.remove();
   activeAssetUrls.forEach((url) => URL.revokeObjectURL(url));
   activeAssetUrls = [];
 }

@@ -1,5 +1,5 @@
 <template>
-  <div :class="['web-client', 'ws-skin-root', `language-${language}`]" data-ws-part="app" :data-ws-page="voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed ? 'voice' : 'home'">
+  <div :class="['web-client', 'ws-skin-root', `language-${language}`, { 'skin-initializing': !skinReady }]" data-ws-part="app" :data-ws-page="voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed ? 'voice' : 'home'">
     <!-- Connection / welcome screen -->
     <section v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed" class="join-page" data-ws-part="home">
       <header class="join-header" data-ws-part="home.header">
@@ -32,6 +32,10 @@
         </div>
 
         <div class="join-card" data-ws-part="home.join-card">
+          <div class="join-card-effects" aria-hidden="true">
+            <span class="join-card-waveform" data-ws-part="home.join-card.waveform"><i v-for="bar in 9" :key="bar"></i></span>
+            <span class="join-card-sonar" data-ws-part="home.join-card.sonar"><i v-for="ring in 3" :key="ring"></i></span>
+          </div>
           <h2 data-ws-part="home.join-title">{{ skinHomeCopy.welcomeTitle || t('welcomeBack') }}</h2>
           <p class="card-lead" data-ws-part="home.join-description">{{ skinHomeCopy.welcomeDescription || t('joinLead') }}</p>
 
@@ -99,7 +103,7 @@
     </section>
 
     <!-- Connected application shell -->
-    <div v-else :class="['app-shell', `mobile-view-${mobileSection}`]" data-ws-part="voice.shell" @click="memberMenu = null">
+    <div v-else :class="['app-shell', `mobile-view-${mobileSection}`]" :data-performance-open="performancePanelOpen ? 'true' : 'false'" data-ws-part="voice.shell" @click="memberMenu = null">
       <main class="workspace" data-ws-part="voice.workspace">
         <header class="workspace-header" data-ws-part="voice.header">
           <div class="breadcrumbs" data-ws-part="voice.breadcrumbs"><span class="mobile-brand">TeamSpeak <em>Web</em></span><span class="crumb-muted">{{ t('serverBreadcrumb') }}</span><Icon name="chevron-right" :size="14" /><strong>{{ currentChannelName }}</strong></div>
@@ -154,6 +158,7 @@
         <div class="workspace-scroll" data-ws-part="voice.scroll">
           <div class="workspace-content" data-ws-part="voice.content">
             <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]" data-ws-part="voice.activity">
+              <div class="voice-activity-artwork" data-ws-part="voice.activity.artwork" aria-hidden="true"></div>
               <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2>{{ t('speakingNow') }}</h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
               <div v-if="screenShareError" class="screen-share-inline-error" data-ws-part="voice.screen-share-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
               <section v-if="screenShareViewing" ref="screenSharePlayerEl" class="screen-share-player" data-ws-part="voice.screen-player" role="region" :aria-label="t('screenShare')">
@@ -189,7 +194,7 @@
                         <button type="button" class="screen-share-settings-button" :aria-label="t('screenShareSettings')" :aria-expanded="screenShareSettingsOpen" :title="t('screenShareSettings')" @click.stop="screenShareSettingsOpen = !screenShareSettingsOpen"><Icon name="settings" :size="13" /></button>
                       </div>
                     </template>
-                    <button v-else-if="!member.isSelf" type="button" :class="['screen-share-card-button', { viewing: screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId }]" @click.stop="toggleScreenShareForMember(member)"><Icon name="monitor" :size="13" /> {{ screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId ? t('watching') : t('watchScreenShare') }}</button>
+                    <button v-else-if="!member.isSelf" type="button" :class="['screen-share-card-button', { viewing: screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId }]" :data-ws-state="screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId ? 'viewing' : 'idle'" @click.stop="toggleScreenShareForMember(member)"><Icon name="monitor" :size="13" /> {{ screenShareViewingStreamId === screenShareStreamForMember(member)?.streamId ? t('watching') : t('watchScreenShare') }}</button>
                   </div>
                 </article>
               </div>
@@ -216,13 +221,13 @@
               <div ref="chatListEl" class="message-list" data-ws-part="voice.chat.messages">
                 <div v-if="chatTab === 'events'">
                   <article v-for="event in serverEvents" :key="event.id" class="event-row" data-ws-part="voice.chat.event"><time>{{ formatTime(event.timestamp) }}</time><span>{{ event.message }}</span></article>
-                  <div v-if="!serverEvents.length" class="chat-empty" data-ws-part="voice.chat.empty"><div class="chat-empty-icon"><Icon name="bell" :size="24" /></div><strong>{{ t('noEvents') }}</strong><span>{{ t('noEventsLead') }}</span></div>
+                  <div v-if="!serverEvents.length" class="chat-empty" data-ws-part="voice.chat.empty" data-ws-state="events-empty"><div class="chat-empty-icon"><Icon name="bell" :size="24" /></div><strong>{{ t('noEvents') }}</strong><span>{{ t('noEventsLead') }}</span></div>
                 </div>
-                <div v-else-if="!visibleChatMessages.length" class="chat-empty" data-ws-part="voice.chat.empty"><div class="chat-empty-icon"><Icon name="message" :size="24" /></div><strong>{{ chatTab === 'private' ? t('privateChatStart') : t('chatStart') }}</strong><span>{{ chatTab === 'private' ? t('privateChatStartLead') : t('chatStartLead') }}</span></div>
+                <div v-else-if="!visibleChatMessages.length" class="chat-empty" data-ws-part="voice.chat.empty" data-ws-state="messages-empty"><strong>{{ chatTab === 'private' ? t('privateChatStart') : t('chatStart') }}</strong><span>{{ chatTab === 'private' ? t('privateChatStartLead') : t('chatStartLead') }}</span></div>
                 <template v-for="message in visibleChatMessages" :key="message.id">
                   <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]" data-ws-part="voice.chat.message" :data-ws-state="message.isSelf ? 'mine' : 'other'">
                 <div class="message-avatar" data-ws-part="voice.chat.message-avatar" :style="avatarStyle(message.invokerName, message.isSelf, messageAvatar(message))">{{ messageAvatar(message) ? '' : avatarInitial(message.invokerName) }}</div>
-                  <div class="message-body" data-ws-part="voice.chat.message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble">{{ message.message }}</div></div>
+                  <div class="message-body" data-ws-part="voice.chat.message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble" data-ws-part="voice.chat.message-bubble">{{ message.message }}</div></div>
                   </article>
                 </template>
               </div>
@@ -386,7 +391,7 @@ import { useWebClientServerHistory } from "../composables/useWebClientServerHist
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listInstalledSkins, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
-import { listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
+import { getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, clearCustomSkinStyle, getStoredSkinId } from "../services/skin-runtime.js";
 import { applyTheme, getStoredTheme, isDarkTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import { DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -509,7 +514,9 @@ const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value
 const { t: translate, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
 function t(key: string, variables: Record<string, string | number> = {}) {
   const template = skinMessageOverrides.value[key];
-  if (template === undefined) return translate(key, variables);
+  // WebSpeak's own locale dictionaries are the complete baseline; a skin only
+  // replaces non-empty strings it explicitly provides.
+  if (template === undefined || !template.trim()) return translate(key, variables);
   return Object.entries(variables).reduce((value, [name, replacement]) => value.replaceAll(`{{${name}}}`, String(replacement)), template);
 }
 const {
@@ -543,14 +550,18 @@ function resolveSkinMode(theme: ThemeMode): SkinMode {
 const themeMode = ref<SkinMode>(resolveSkinMode(getStoredTheme()));
 applyTheme(themeMode.value);
 if (localStorage.getItem("webspeak:theme") === "system") saveTheme(themeMode.value);
-const activeSkinId = ref(getStoredSkinId() ?? (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const storedSkinId = getStoredSkinId();
+const activeSkinId = ref(storedSkinId ?? (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN);
 const installedSkins = ref<InstalledSkin[]>([]);
 const catalogSkins = ref<SkinCatalogEntry[]>([]);
 const skinOptions = computed<SkinOption[]>(() => [
-  { value: BUILTIN_LIGHT_SKIN, label: t("skinDay"), icon: "sun" },
-  { value: BUILTIN_DARK_SKIN, label: t("skinNight"), icon: "moon" },
-  ...catalogSkins.value.map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
-  ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
+  ...catalogSkins.value.map((skin) => ({
+    value: skin.id,
+    label: skin.id === BUILTIN_LIGHT_SKIN ? t("skinDay") : skin.id === BUILTIN_DARK_SKIN ? t("skinNight") : skin.name,
+    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : "compass",
+  })),
+  ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id) && isPublicSkinEnabled(skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
 ]);
 const skinHomeCopy = computed<SkinHomeCopy>(() => resolveSkinHomeCopy(activeSkin.value, language.value));
 const skinHomeFeatures = computed(() => {
@@ -559,11 +570,23 @@ const skinHomeFeatures = computed(() => {
     { id: "secure", title: t("secureJoin"), description: t("inviteProtected"), icon: "shield", tone: "mint" },
     { id: "realtime", title: t("realtime"), description: t("membersSync"), icon: "users", tone: "sand" },
   ];
-  const custom = skinHomeCopy.value.features;
-  if (!custom) return defaults;
+  const features = [...defaults];
+  const custom = skinHomeCopy.value.features ?? [];
   const icons = ["waveform", "shield", "users"];
   const tones = ["", "mint", "sand"];
-  return custom.map((feature, index) => ({ id: `custom-${index}`, ...feature, icon: icons[index % icons.length], tone: tones[index % tones.length] }));
+  custom.forEach((feature, index) => {
+    const base = defaults[index];
+    const replacement = {
+      id: base?.id ?? `custom-${index}`,
+      title: feature.title.trim() || base?.title || "",
+      description: feature.description.trim() || base?.description || "",
+      icon: base?.icon ?? icons[index % icons.length],
+      tone: base?.tone ?? tones[index % tones.length],
+    };
+    if (base) features[index] = replacement;
+    else if (replacement.title && replacement.description) features.push(replacement);
+  });
+  return features;
 });
 const {
   settingsError: audioSettingsError,
@@ -628,6 +651,7 @@ function persistLanguage() {
 }
 
 async function onSkinChange(skinId: string) {
+  localStorage.setItem("webspeak:skin-choice", skinId);
   activeSkinId.value = skinId;
   const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
   activeSkin.value = await activateSkin(skinId, catalogSkin?.version, appVersion.value);
@@ -639,24 +663,60 @@ async function onSkinChange(skinId: string) {
 }
 
 async function initializeSkin(): Promise<void> {
-  const [preferences, skins, availableSkins] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), listPublicSkins()]);
-  installedSkins.value = skins;
-  catalogSkins.value = availableSkins;
-  if (!localStorage.getItem("webspeak:theme")) {
-    if (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark") {
-      themeMode.value = resolveSkinMode(preferences.theme);
+  const catalogPromise = listPublicSkins().catch(() => []);
+  try {
+    const [preferences, skins, availableSkins] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), catalogPromise]);
+    installedSkins.value = skins;
+    catalogSkins.value = availableSkins;
+    if (!localStorage.getItem("webspeak:theme")) {
+      if (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark") {
+        themeMode.value = resolveSkinMode(preferences.theme);
+      }
+      saveTheme(themeMode.value);
     }
-    saveTheme(themeMode.value);
+    // Only a deliberate choice should override the instance default. The active
+    // skin and local preference also contain automatically applied defaults.
+    const savedSkinId = localStorage.getItem("webspeak:skin-choice");
+    const preferredSkinId = savedSkinId && isPublicSkinEnabled(savedSkinId)
+      ? savedSkinId
+      : getPublicDefaultSkinId();
+    const preferredSkin = availableSkins.find((skin) => skin.id === preferredSkinId);
+    activeSkinId.value = preferredSkinId;
+    // Apply the locally cached package (or fetch it if absent) before revealing
+    // the page. The network catalog/version check must not block the first paint.
+    activeSkin.value = await activateSkin(preferredSkinId, preferredSkin?.version, appVersion.value);
+    activeSkinId.value = getStoredSkinId() ?? preferredSkinId;
+    if (activeSkinId.value === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
+    else if (activeSkinId.value === BUILTIN_DARK_SKIN) themeMode.value = "dark";
+    else themeMode.value = resolveSkinMode(getStoredTheme());
+    void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
+  } catch {
+    // Storage or package loading can fail on restricted browsers. Do not leave
+    // the application hidden, and restore a usable built-in palette instead.
+    activeSkin.value = null;
+    activeSkinId.value = themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+    try {
+      await activateSkin(activeSkinId.value, undefined, appVersion.value);
+    } catch {
+      applyTheme(themeMode.value);
+    }
+  } finally {
+    // The active skin's CSS and asset URLs are installed before this becomes
+    // visible, so the built-in day/night palette is never shown in between.
+    skinReady.value = true;
   }
-  const preferredSkinId = getStoredSkinId() || preferences.skinId || (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN);
-  activeSkinId.value = preferredSkinId;
-  const catalogSkin = availableSkins.find((skin) => skin.id === preferredSkinId);
-  activeSkin.value = await activateSkin(preferredSkinId, catalogSkin?.version, appVersion.value);
-  activeSkinId.value = getStoredSkinId() ?? preferredSkinId;
-  if (activeSkinId.value === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
-  else if (activeSkinId.value === BUILTIN_DARK_SKIN) themeMode.value = "dark";
-  else themeMode.value = resolveSkinMode(getStoredTheme());
-  void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
+
+  void catalogPromise.then(async (availableSkins) => {
+    catalogSkins.value = availableSkins;
+    const selectedSkin = availableSkins.find((skin) => skin.id === activeSkinId.value);
+    const installedSkin = installedSkins.value.find((skin) => skin.id === activeSkinId.value);
+    if (!selectedSkin || !installedSkin || installedSkin.version === selectedSkin.version) return;
+    const updatedSkin = await activateSkin(selectedSkin.id, selectedSkin.version, appVersion.value);
+    if (getStoredSkinId() !== selectedSkin.id) return;
+    activeSkin.value = updatedSkin;
+    activeSkinId.value = getStoredSkinId() ?? selectedSkin.id;
+    installedSkins.value = await listInstalledSkins();
+  }).catch(() => undefined);
 }
 
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
@@ -930,7 +990,7 @@ function doShare() {
 async function clearBrowserData(): Promise<void> {
   if (!window.confirm(t("clearLocalDataConfirm"))) return;
   await clearStoredLocalData();
-  for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:theme", "webspeak:active-skin", "webspeak:input-device", "webspeak:output-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
+  for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:theme", "webspeak:active-skin", "webspeak:skin-choice", "webspeak:input-device", "webspeak:output-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
   clearCustomSkinStyle();
   activeSkin.value = null;
   installedSkins.value = [];

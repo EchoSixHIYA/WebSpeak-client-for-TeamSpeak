@@ -14,6 +14,7 @@ import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
 import type { SkinRegistry } from "../admin/skin-registry.js";
+import { resolveVisitorTotal } from "./visitor-count.js";
 
 export interface WebServerOptions {
   port: number;
@@ -79,11 +80,10 @@ export function createWebServer(options: WebServerOptions): WebServer {
         logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Visitor number could not be assigned");
       }
     }
-    let visitorTotal: number | null = null;
+    let visitorTotal = resolveVisitorTotal(visitorNumber, null);
     if (options.visitorCount) {
       try {
-        const count = options.visitorCount();
-        if (Number.isSafeInteger(count) && count >= 0) visitorTotal = count;
+        visitorTotal = resolveVisitorTotal(visitorNumber, options.visitorCount());
       } catch (error: unknown) {
         logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Visitor total could not be read");
       }
@@ -101,7 +101,10 @@ export function createWebServer(options: WebServerOptions): WebServer {
 
   app.get("/api/skins", async (_request, response) => {
     response.setHeader("Cache-Control", "no-cache");
-    response.json({ skins: await options.skinRegistry?.list() ?? [] });
+    response.json({
+      skins: await options.skinRegistry?.list() ?? [],
+      defaultSkinId: await options.skinRegistry?.getDefaultSkinId() ?? "builtin.light",
+    });
   });
 
   app.get("/api/skins/:id/package", async (request, response) => {

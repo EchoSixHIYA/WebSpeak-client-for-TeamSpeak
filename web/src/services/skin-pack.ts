@@ -11,12 +11,30 @@ const MAX_CONTENT_BYTES = 256 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const MAX_FONT_BYTES = 4 * 1024 * 1024;
 const ALLOWED_AT_RULES = new Set(["media", "supports", "container", "layer", "font-face", "keyframes", "-webkit-keyframes"]);
+const LAYOUT_AFFECTING_PROPERTIES = new Set([
+  "all", "display", "position", "top", "right", "bottom", "left", "inset", "inset-block", "inset-inline",
+  "width", "height", "min-width", "min-height", "max-width", "max-height", "inline-size", "block-size",
+  "min-inline-size", "min-block-size", "max-inline-size", "max-block-size", "aspect-ratio", "box-sizing",
+  "gap", "row-gap", "column-gap", "grid", "flex", "order", "float", "clear", "overflow", "overflow-x",
+  "overflow-y", "overflow-block", "overflow-inline", "overscroll-behavior", "z-index", "visibility",
+  "pointer-events", "clip", "clip-path", "mask", "mask-image", "transform", "transform-origin", "transform-style", "translate", "scale", "rotate",
+  "perspective", "perspective-origin", "contain", "content-visibility", "container", "container-name",
+  "container-type", "contain-intrinsic-size", "resize", "columns", "column-count", "column-width", "scrollbar-width", "font",
+  "font-size", "line-height", "letter-spacing", "word-spacing", "white-space", "word-break", "overflow-wrap", "word-wrap",
+  "text-wrap", "text-overflow", "text-indent", "text-transform", "text-combine-upright", "text-autospace", "text-spacing-trim",
+  "line-clamp", "tab-size", "hyphens", "line-break", "text-size-adjust", "initial-letter", "shape-outside", "baseline-shift",
+  "box-orient", "box-direction", "box-lines", "ruby-position", "caption-side", "table-layout", "border-collapse", "border-spacing",
+  "writing-mode", "direction", "unicode-bidi", "vertical-align", "appearance", "zoom", "scrollbar-gutter", "touch-action", "user-select", "cursor", "content",
+  "position-anchor", "position-area", "position-try-fallbacks", "position-try-order", "anchor-name", "anchor-scope",
+]);
 const OPTIONAL_VISUAL_PARTS = new Set([
   "home.hero.eyebrow",
   "home.gateway-status",
   "home.features",
   "home.feature",
   "home.visitors",
+  "home.join-card.waveform",
+  "home.join-card.sonar",
   "voice.activity-heading",
   "voice.member.avatar",
   "voice.member.live-indicator",
@@ -440,6 +458,7 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
   root.walkRules((rule: Rule) => {
     if (hasKeyframesAncestor(rule)) return;
     if (rule.parent?.type === "rule") throw rule.error("Nested style rules are not supported; use flat selectors.");
+    if (!selectorUsesPublicHook(rule.selector)) throw rule.error("Skin selectors must use :root, [data-ws-page], or [data-ws-part] so they stay attached to WebSpeak's stable visual interface.");
     if (targetsOnlyOptionalVisualParts(rule.selector)) hideableRules.add(rule);
     try {
       rule.selector = selectorParser((selectors) => {
@@ -493,6 +512,13 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
     const canHideTarget = owningRule
       ? hideableRules.has(owningRule) || Boolean(keyframesRule && optionalOnlyKeyframes.has(keyframesRule.params.trim()))
       : false;
+    if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)) {
+      throw declaration.error("Custom skin variables must use the --skin- prefix so they cannot replace WebSpeak's structural tokens.");
+    }
+    if (isLayoutAffectingProperty(property)) {
+      throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");
+    }
+    if (property === "font-family") warnings.add("Custom fonts can change localized text wrapping; verify every WebSpeak language before publishing.");
     if (["behavior", "-moz-binding"].includes(property) || /expression\s*\(|javascript\s*:|vbscript\s*:/i.test(value)) {
       throw declaration.error("Executable CSS values are not allowed.");
     }
@@ -541,6 +567,33 @@ function targetsOnlyOptionalVisualParts(selector: string): boolean {
   } catch {
     return false;
   }
+}
+
+function selectorUsesPublicHook(selector: string): boolean {
+  try {
+    const parsed = selectorParser().astSync(selector);
+    return parsed.nodes.length > 0 && parsed.nodes.every((item) => {
+      let scoped = false;
+      let usesPrivateName = false;
+      item.walk((node) => {
+        if (node.type === "attribute" && ["data-ws-part", "data-ws-page"].includes(node.attribute.toLowerCase())) scoped = true;
+        if (node.type === "pseudo" && node.value.toLowerCase() === ":root") scoped = true;
+        if (node.type === "class" || node.type === "id") usesPrivateName = true;
+      });
+      return scoped && !usesPrivateName;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function isLayoutAffectingProperty(property: string): boolean {
+  const unprefixed = property.replace(/^-(?:webkit|moz|ms|o)-/, "");
+  if (LAYOUT_AFFECTING_PROPERTIES.has(unprefixed)) return true;
+  if (/^(?:margin|padding)(?:-|$)/.test(unprefixed)) return true;
+  if (/^border(?:-|$)/.test(unprefixed) && !/^border-(?:color(?:-|$)|radius(?:-|$))/.test(unprefixed)) return true;
+  if (/^(?:grid|flex|align-(?:content|items|self)|justify-(?:content|items|self)|place-(?:content|items|self)|offset|transform|overscroll|overflow|column)(?:-|$)/.test(unprefixed)) return true;
+  return /^font-(?!family$|weight$|style$|synthesis$|palette$)/.test(unprefixed);
 }
 
 function findOwningRule(node: Node): Rule | null {

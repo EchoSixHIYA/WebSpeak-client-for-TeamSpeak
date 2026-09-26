@@ -44,6 +44,7 @@
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
 - [皮肤开发规范](./docs/SKIN_DEVELOPMENT.md)
+- [WebSpeak 皮肤开发 Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
 
 ## 社区 · Community
 

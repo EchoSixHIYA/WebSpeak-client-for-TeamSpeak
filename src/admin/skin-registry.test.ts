@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -37,6 +37,10 @@ test("skin registry validates, lists, replaces, serves, and removes packages", a
   assert.equal((await registry.list()).length, 1);
   assert.deepEqual(await registry.readArchive("sample-skin"), firstArchive);
   assert.deepEqual((await registry.readPreview("sample-skin"))?.bytes, Buffer.from([5, 6, 7, 8]));
+  await registry.setEnabled("sample-skin", false);
+  assert.equal(await registry.readArchive("sample-skin"), null);
+  assert.equal(await registry.readPreview("sample-skin"), null);
+  await registry.setEnabled("sample-skin", true);
 
   const replacement = { ...manifest, version: "2.0.0", content: undefined, preview: undefined };
   const secondArchive = createZip([
@@ -53,6 +57,34 @@ test("skin registry validates, lists, replaces, serves, and removes packages", a
   assert.deepEqual(await registry.list(), []);
   assert.equal(await registry.readArchive("sample-skin"), null);
   assert.equal(await registry.remove("sample-skin"), false);
+});
+
+test("custom skins can be enabled, disabled, and selected as the instance default", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-settings-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const archive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, content: undefined, preview: undefined }))],
+    ["skin.css", Buffer.from("[data-ws-part=\"demo.voice-card\"] { color: teal; }")],
+  ]);
+
+  const skin = await registry.save(archive, "sample-skin");
+  assert.equal(skin.enabled, true);
+  assert.equal(await registry.getDefaultSkinId(), "builtin.light");
+  await registry.setDefaultSkin("sample-skin");
+  assert.equal(await registry.getDefaultSkinId(), "sample-skin");
+
+  const disabled = await registry.setEnabled("sample-skin", false);
+  assert.equal(disabled.enabled, false);
+  assert.equal(await registry.readArchive("sample-skin"), null);
+  assert.equal(await registry.getDefaultSkinId(), "builtin.light");
+  await assert.rejects(registry.setDefaultSkin("sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_DEFAULT_INVALID");
+
+  await registry.setEnabled("sample-skin", true);
+  assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+  await registry.setDefaultSkin("sample-skin");
+  assert.equal(await registry.remove("sample-skin"), true);
+  assert.equal(await registry.getDefaultSkinId(), "builtin.light");
 });
 
 test("skin registry rejects path traversal and mismatched local ZIP headers", async (context) => {
@@ -74,15 +106,15 @@ test("skin registry rejects path traversal and mismatched local ZIP headers", as
   assert.deepEqual(await registry.list(), []);
 });
 
-test("the documented Aurora Voice package passes the server-side upload validator", async (context) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-example-"));
+test("the three bundled skins cannot be replaced or removed through the registry", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-builtins-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   const registry = new SkinRegistry(directory);
-  const archive = await readFile(new URL("../../docs/examples/aurora-voice.wskin", import.meta.url));
-  const entry = await registry.save(archive, "community.aurora-voice");
-  assert.equal(entry.name, "Aurora Voice");
-  assert.equal(entry.previewUrl, "/api/skins/community.aurora-voice/preview");
-  assert.equal((await registry.list()).length, 1);
+  for (const id of ["builtin.light", "builtin.dark", "community.illusia-voice"]) {
+    await assert.rejects(registry.save(Buffer.alloc(22), id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
+    await assert.rejects(registry.remove(id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
+    await assert.rejects(registry.setEnabled(id, false), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
+  }
 });
 
 function createZip(files: Array<[string, Buffer]>): Buffer {

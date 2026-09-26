@@ -1,5 +1,5 @@
 <template>
-  <div class="demo-page ws-skin-root" data-ws-part="app" data-ws-page="demo">
+  <div :class="['demo-page', 'ws-skin-root', { 'skin-initializing': !skinReady }]" data-ws-part="app" data-ws-page="demo">
     <header class="demo-header" data-ws-part="demo.header">
       <div class="demo-brand" data-ws-part="demo.brand"><span><Icon name="waveform" :size="21" /></span><div><strong>WebSpeak</strong><small>{{ copy.browserClient }}</small></div></div>
       <div class="demo-tools" data-ws-part="demo.header-tools"><span class="demo-badge" data-ws-part="demo.badge">{{ copy.demoBadge }}</span><SkinSwitcher v-model="activeSkinId" data-ws-part="demo.skin-switcher" :menu-label="copy.skinSelector" :options="skinOptions" @change="onSkinChange" /><LanguageSwitcher v-model="language" data-ws-part="demo.language-switcher" :menu-label="copy.languageMenu" @change="persistLanguage" /><a href="/" data-ws-part="demo.home-link">{{ copy.back }}</a></div>
@@ -37,7 +37,7 @@ import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
 import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
-import { listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
+import { getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, getStoredSkinId } from "../services/skin-runtime.js";
 import type { InstalledSkin } from "../services/skin-pack.js";
 import { getStoredTheme, isDarkTheme } from "../services/theme.js";
@@ -49,14 +49,18 @@ const storedLanguage = localStorage.getItem("webspeak:language");
 const language = ref<Language>(storedLanguage === "en" || storedLanguage === "de" || storedLanguage === "ru" || storedLanguage === "ja" ? storedLanguage : "zh");
 const baseCopy = computed(() => language.value === "zh" ? zh : language.value === "de" ? de : language.value === "ru" ? ru : language.value === "ja" ? ja : en);
 const activeSkin = shallowRef<InstalledSkin | null>(null);
-const activeSkinId = ref(getStoredSkinId() ?? (isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const storedSkinId = getStoredSkinId();
+const activeSkinId = ref(storedSkinId ?? (isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN);
 const installedSkins = ref<InstalledSkin[]>([]);
 const catalogSkins = ref<SkinCatalogEntry[]>([]);
 const skinOptions = computed<SkinOption[]>(() => [
-  { value: BUILTIN_LIGHT_SKIN, label: copy.value.skinDay, icon: "sun" },
-  { value: BUILTIN_DARK_SKIN, label: copy.value.skinNight, icon: "moon" },
-  ...catalogSkins.value.map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
-  ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
+  ...catalogSkins.value.map((skin) => ({
+    value: skin.id,
+    label: skin.id === BUILTIN_LIGHT_SKIN ? copy.value.skinDay : skin.id === BUILTIN_DARK_SKIN ? copy.value.skinNight : skin.name,
+    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : "compass",
+  })),
+  ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id) && isPublicSkinEnabled(skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
 ]);
 const copy = computed(() => {
   const result = { ...baseCopy.value };
@@ -67,7 +71,7 @@ const copy = computed(() => {
     for (const [key, value] of Object.entries(content.locales[locale]?.messages ?? {})) {
       if (!key.startsWith("demo.")) continue;
       const copyKey = key.slice("demo.".length) as keyof typeof result;
-      if (Object.prototype.hasOwnProperty.call(result, copyKey)) result[copyKey] = value;
+      if (Object.prototype.hasOwnProperty.call(result, copyKey) && value.trim()) result[copyKey] = value;
     }
   }
   return result;
@@ -99,20 +103,44 @@ const visibleMessages = computed(() => activeTab.value === "channel" ? messages.
 
 function persistLanguage() { localStorage.setItem("webspeak:language", language.value); void saveLocalPreferences({ schemaVersion: 1, language: language.value }); }
 async function onSkinChange(skinId: string) {
+  localStorage.setItem("webspeak:skin-choice", skinId);
   const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
   activeSkin.value = await activateSkin(skinId, catalogSkin?.version);
   activeSkinId.value = getStoredSkinId() ?? skinId;
   void saveLocalPreferences({ schemaVersion: 1, skinId: activeSkinId.value });
 }
 onMounted(async () => {
-  const [preferences, installed, available] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), listPublicSkins()]);
-  installedSkins.value = installed;
-  catalogSkins.value = available;
-  const selectedId = getStoredSkinId() ?? preferences.skinId ?? activeSkinId.value;
-  activeSkinId.value = selectedId;
-  const catalogSkin = available.find((skin) => skin.id === selectedId);
-  activeSkin.value = await activateSkin(selectedId, catalogSkin?.version);
-  activeSkinId.value = getStoredSkinId() ?? selectedId;
+  const catalogPromise = listPublicSkins().catch(() => []);
+  try {
+    const [preferences, installed, available] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), catalogPromise]);
+    installedSkins.value = installed;
+    catalogSkins.value = available;
+    // Only a deliberate choice should override the instance default. The active
+    // skin and local preference also contain automatically applied defaults.
+    const savedSkinId = localStorage.getItem("webspeak:skin-choice");
+    const selectedId = savedSkinId && isPublicSkinEnabled(savedSkinId) ? savedSkinId : getPublicDefaultSkinId();
+    const selectedSkin = available.find((skin) => skin.id === selectedId);
+    activeSkinId.value = selectedId;
+    activeSkin.value = await activateSkin(selectedId, selectedSkin?.version);
+    activeSkinId.value = getStoredSkinId() ?? selectedId;
+  } catch {
+    activeSkin.value = null;
+    activeSkinId.value = isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+    await activateSkin(activeSkinId.value).catch(() => undefined);
+  } finally {
+    skinReady.value = true;
+  }
+
+  void catalogPromise.then(async (available) => {
+    catalogSkins.value = available;
+    const selected = available.find((skin) => skin.id === activeSkinId.value);
+    const installed = installedSkins.value.find((skin) => skin.id === activeSkinId.value);
+    if (!selected || !installed || installed.version === selected.version) return;
+    activeSkin.value = await activateSkin(selected.id, selected.version);
+    if (getStoredSkinId() !== selected.id) return;
+    activeSkinId.value = getStoredSkinId() ?? selected.id;
+    installedSkins.value = await listInstalledSkins();
+  }).catch(() => undefined);
 });
 function selectChannel(id: string) { selectedChannelId.value = id; activeTab.value = "channel"; }
 function toggleSpeaking() { speakingId.value = speakingId.value ? "" : selectedChannel.value.members[0]?.id ?? ""; }
@@ -123,6 +151,7 @@ function avatarStyle(name: string) { let hash = 0; for (const char of name) hash
 
 <style scoped>
 .demo-page, .demo-page * { box-sizing: border-box; }
+.demo-page.skin-initializing { visibility: hidden; }
 .demo-page { min-height: 100dvh; padding: 0 28px 38px; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 72% 12%, rgba(126, 213, 205, .18), transparent 26rem), #f7f9f8; color: #1c2b28; }
 .demo-page button, .demo-page input { font: inherit; }
 .demo-header { display: flex; align-items: center; justify-content: space-between; width: min(1380px, 100%); min-height: 82px; margin: 0 auto; }
@@ -138,12 +167,11 @@ function avatarStyle(name: string) { let hash = 0; for (const char of name) hash
    divide the fixed poke banner offsets back to CSS pixels so it stays at the
    intended 82px/25px margin instead of drifting by the zoom factor. */
 @media (min-width: 851px) { .demo-poke { top: calc(82px / var(--ui-scale)); right: calc(25px / var(--ui-scale)); } }
-:global(:root[data-theme="dark"]) .demo-page { color: #e8f3f0; background: #101918; }
-:global(:root[data-theme="dark"]) .demo-channel-panel, :global(:root[data-theme="dark"]) .demo-actions-panel, :global(:root[data-theme="dark"]) .demo-main, :global(:root[data-theme="dark"]) .demo-voice-card { background: #172321; border-color: #30413d; }
-:global(:root[data-theme="dark"]) .demo-panel-title strong, :global(:root[data-theme="dark"]) .demo-hero h1, :global(:root[data-theme="dark"]) .demo-section-heading strong, :global(:root[data-theme="dark"]) .demo-chat-head strong, :global(:root[data-theme="dark"]) .demo-voice-card strong, :global(:root[data-theme="dark"]) .demo-user strong { color: #e8f3f0; }
-:global(:root[data-theme="dark"]) .demo-hero { background: linear-gradient(112deg, #173e3a, #172321); }
-:global(:root[data-theme="dark"]) .demo-message p, :global(:root[data-theme="dark"]) .demo-composer, :global(:root[data-theme="dark"]) .demo-actions-panel > button { background: #202f2c; color: #d7e7e3; }
-:global(:root[data-theme="dark"]) .demo-chat-head, :global(:root[data-theme="dark"]) .demo-user { border-color: #30413d; }
-@media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) .demo-page .demo-channel-panel, :global(:root[data-theme="system"]) .demo-page .demo-actions-panel, :global(:root[data-theme="system"]) .demo-page .demo-main, :global(:root[data-theme="system"]) .demo-page .demo-voice-card { background: #172321; border-color: #30413d; } }
+.demo-page[data-ws-skin="builtin.dark"] { color: #e8f3f0; background: #101918; }
+.demo-page[data-ws-skin="builtin.dark"] .demo-channel-panel, .demo-page[data-ws-skin="builtin.dark"] .demo-actions-panel, .demo-page[data-ws-skin="builtin.dark"] .demo-main, .demo-page[data-ws-skin="builtin.dark"] .demo-voice-card { background: #172321; border-color: #30413d; }
+.demo-page[data-ws-skin="builtin.dark"] .demo-panel-title strong, .demo-page[data-ws-skin="builtin.dark"] .demo-hero h1, .demo-page[data-ws-skin="builtin.dark"] .demo-section-heading strong, .demo-page[data-ws-skin="builtin.dark"] .demo-chat-head strong, .demo-page[data-ws-skin="builtin.dark"] .demo-voice-card strong, .demo-page[data-ws-skin="builtin.dark"] .demo-user strong { color: #e8f3f0; }
+.demo-page[data-ws-skin="builtin.dark"] .demo-hero { background: linear-gradient(112deg, #173e3a, #172321); }
+.demo-page[data-ws-skin="builtin.dark"] .demo-message p, .demo-page[data-ws-skin="builtin.dark"] .demo-composer, .demo-page[data-ws-skin="builtin.dark"] .demo-actions-panel > button { background: #202f2c; color: #d7e7e3; }
+.demo-page[data-ws-skin="builtin.dark"] .demo-chat-head, .demo-page[data-ws-skin="builtin.dark"] .demo-user { border-color: #30413d; }
 .demo-page :where(button, a, input, select):focus-visible { outline: 3px solid #69d2c7; outline-offset: 2px; }
 </style>

@@ -106,13 +106,14 @@
           <div class="page-heading"><div><h2>{{ tr('skinLibrary') }}</h2><p>{{ tr('skinLibraryLead') }}</p></div><button class="primary-button" type="button" :disabled="skinUploading" @click="skinFileInput?.click()"><span v-if="skinUploading" class="spinner small"></span><Icon v-else name="share" :size="16" />{{ skinUploading ? tr('skinUploading') : tr('skinUpload') }}</button></div>
           <input ref="skinFileInput" class="skin-file-input" type="file" accept=".wskin,application/zip" @change="onSkinFileChanged" />
           <div class="alert info skin-library-scope"><Icon name="info" :size="16" /><span>{{ tr('skinLibraryScope') }}</span></div>
+          <section class="skin-default-control"><div><strong>{{ tr('skinDefault') }}</strong><p>{{ tr('skinDefaultLead') }}</p></div><select v-model="skinDefaultId" :disabled="skinLoading || skinDefaultSaving" :aria-label="tr('skinDefault')" @change="saveSkinDefault"><option v-for="skin in enabledSkinEntries" :key="skin.id" :value="skin.id">{{ skinName(skin) }}</option></select></section>
           <div v-if="skinManagerError" class="alert error" role="alert">{{ skinManagerError }}</div>
           <div v-if="skinManagerNotice" class="alert success" role="status">{{ skinManagerNotice }}</div>
           <div v-if="skinLoading" class="skin-library-loading"><span class="spinner"></span>{{ tr('loading') }}</div>
           <div v-else-if="skinEntries.length" class="skin-library-grid">
             <article v-for="skin in skinEntries" :key="skin.id" class="skin-library-card">
-              <div class="skin-preview"><img v-if="skin.previewUrl" :src="skin.previewUrl" :alt="skin.name" /><span v-else><Icon name="compass" :size="28" /></span><small>v{{ skin.version }}</small></div>
-              <div class="skin-library-copy"><div class="skin-library-title"><h3>{{ skin.name }}</h3><span>{{ skin.id }}</span></div><p v-if="skin.description">{{ skin.description }}</p><dl><div><dt>{{ tr('skinAuthor') }}</dt><dd>{{ skin.author }}</dd></div><div><dt>{{ tr('skinLicense') }}</dt><dd>{{ skin.license }}</dd></div><div><dt>{{ tr('skinMinVersion') }}</dt><dd>{{ skin.minAppVersion }}</dd></div></dl><div class="skin-library-actions"><a v-if="skin.previewUrl" :href="skin.previewUrl" target="_blank" rel="noreferrer" class="text-link">{{ tr('skinPreview') }}</a><button class="text-danger" type="button" :disabled="removingSkinId === skin.id" @click="removeSkin(skin)">{{ removingSkinId === skin.id ? tr('skinRemoving') : tr('skinRemove') }}</button></div></div>
+              <div class="skin-preview" :class="`skin-preview--${skin.previewKind || 'custom'}`"><img v-if="skin.previewUrl" :src="skin.previewUrl" :alt="skinName(skin)" /><span v-else><Icon :name="skin.previewKind === 'night' ? 'moon' : 'sun'" :size="28" /></span><small>v{{ skin.version }}</small><b v-if="skin.builtIn" class="skin-builtin-badge">{{ tr('skinBuiltin') }}</b></div>
+              <div class="skin-library-copy"><div class="skin-library-title"><h3>{{ skinName(skin) }}</h3><span>{{ skin.id }}</span></div><p v-if="skinDescription(skin)">{{ skinDescription(skin) }}</p><dl><div><dt>{{ tr('skinAuthor') }}</dt><dd>{{ skin.author }}</dd></div><div><dt>{{ tr('skinLicense') }}</dt><dd>{{ skin.license }}</dd></div><div><dt>{{ tr('skinMinVersion') }}</dt><dd>{{ skin.minAppVersion }}</dd></div></dl><div class="skin-library-actions"><a v-if="skin.previewUrl" :href="skin.previewUrl" target="_blank" rel="noreferrer" class="text-link">{{ tr('skinPreview') }}</a><label v-if="!skin.builtIn" class="skin-enabled-control"><span>{{ skin.enabled === false ? tr('skinDisabled') : tr('skinEnabled') }}</span><input type="checkbox" :checked="skin.enabled !== false" :disabled="updatingSkinId === skin.id" @change="toggleSkinEnabled(skin)" /></label><span v-else class="skin-protected-label">{{ tr('skinProtected') }}</span><button v-if="!skin.builtIn" class="text-danger" type="button" :disabled="removingSkinId === skin.id" @click="removeSkin(skin)">{{ removingSkinId === skin.id ? tr('skinRemoving') : tr('skinRemove') }}</button></div></div>
             </article>
           </div>
           <div v-else class="skin-library-empty"><span><Icon name="compass" :size="24" /></span><strong>{{ tr('skinEmpty') }}</strong><p>{{ tr('skinEmptyLead') }}</p></div>
@@ -136,7 +137,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
-import { deleteSkinPackage, uploadSkinPackage, type SkinCatalogEntry } from "../services/skin-catalog.js";
+import { BUILTIN_SKIN_CATALOG, deleteSkinPackage, uploadSkinPackage, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 
 type Language = "zh" | "en" | "de" | "ru" | "ja";
@@ -189,6 +190,10 @@ const skinEntries = ref<SkinCatalogEntry[]>([]);
 const skinLoading = ref(false);
 const skinUploading = ref(false);
 const removingSkinId = ref("");
+const updatingSkinId = ref("");
+const skinDefaultId = ref("builtin.light");
+const skinDefaultSaving = ref(false);
+const enabledSkinEntries = computed(() => skinEntries.value.filter((skin) => skin.builtIn || skin.enabled !== false));
 const skinManagerError = ref("");
 const skinManagerNotice = ref("");
 const inviteForm = reactive({ channel: "", expiresInHours: 24, maxUses: 0 });
@@ -225,7 +230,22 @@ const copy = {
     server: "服务器",
     operations: "运维",
     skinLibrary: "皮肤",
-    skinLibraryLead: "上传并管理此实例访客可选择的自定义皮肤。",
+    skinLibraryLead: "查看访客可选的默认皮肤和实例自定义皮肤；支持导入皮肤包。",
+    skinDay: "默认日间模式",
+    skinNight: "默认夜间模式",
+    skinIllusia: "ILLUSIA风",
+    skinBuiltin: "内置",
+    skinProtected: "内置皮肤，不可移除",
+    skinDefault: "默认皮肤",
+    skinDefaultLead: "访客首次访问时使用；访客已有选择时保留其偏好。",
+    skinEnabled: "已启用",
+    skinDisabled: "已停用",
+    skinDefaultSaved: "默认皮肤已更新。",
+    skinEnabledNotice: "皮肤已启用并向访客开放。",
+    skinDisabledNotice: "皮肤已停用，不再向访客提供。",
+    skinDayDescription: "WebSpeak 默认的明亮日间外观。",
+    skinNightDescription: "WebSpeak 默认的深色夜间外观。",
+    skinIllusiaDescription: "覆盖首页、语音房间和演示页的 ILLUSIA 美术皮肤。",
     skinLibraryScope: "皮肤会作为可选项提供给访客；每位访客可在前台自行选择。管理后台始终保持原样式。",
     skinUpload: "导入皮肤包",
     skinUploading: "正在校验并导入…",
@@ -449,7 +469,22 @@ const copy = {
     server: "Server",
     operations: "Operations",
     skinLibrary: "Skins",
-    skinLibraryLead: "Upload and manage custom skins available to visitors of this instance.",
+    skinLibraryLead: "View the default and custom skins available to visitors; import instance-wide skin packages.",
+    skinDay: "Default day mode",
+    skinNight: "Default night mode",
+    skinIllusia: "ILLUSIA style",
+    skinBuiltin: "Built in",
+    skinProtected: "Built-in skin · cannot be removed",
+    skinDefault: "Default skin",
+    skinDefaultLead: "Used for first-time visitors; existing visitor choices are preserved.",
+    skinEnabled: "Enabled",
+    skinDisabled: "Disabled",
+    skinDefaultSaved: "Default skin updated.",
+    skinEnabledNotice: "Skin enabled and available to visitors.",
+    skinDisabledNotice: "Skin disabled and hidden from visitors.",
+    skinDayDescription: "WebSpeak's default light appearance.",
+    skinNightDescription: "WebSpeak's default dark appearance.",
+    skinIllusiaDescription: "ILLUSIA artwork for the home, voice room, and demo pages.",
     skinLibraryScope: "Skins are offered as visitor-selectable options. Each visitor chooses a skin on the public page; the admin console always keeps its own appearance.",
     skinUpload: "Import skin package",
     skinUploading: "Validating and importing…",
@@ -671,7 +706,22 @@ const germanCopy = {
   server: "Server",
   operations: "Betrieb",
   skinLibrary: "Skins",
-  skinLibraryLead: "Benutzerdefinierte Skins für Besucher dieser Instanz hochladen und verwalten.",
+  skinLibraryLead: "Standard- und benutzerdefinierte Skins für Besucher anzeigen und instanzweite Skin-Pakete importieren.",
+  skinDay: "Standard-Tagesmodus",
+  skinNight: "Standard-Nachtmodus",
+  skinIllusia: "ILLUSIA-Stil",
+  skinBuiltin: "Integriert",
+  skinProtected: "Integrierter Skin · nicht entfernbar",
+  skinDefault: "Standard-Skin",
+  skinDefaultLead: "Wird bei neuen Besuchern verwendet; bestehende Auswahl bleibt erhalten.",
+  skinEnabled: "Aktiviert",
+  skinDisabled: "Deaktiviert",
+  skinDefaultSaved: "Standardskin aktualisiert.",
+  skinEnabledNotice: "Skin aktiviert und für Besucher verfügbar.",
+  skinDisabledNotice: "Skin deaktiviert und für Besucher ausgeblendet.",
+  skinDayDescription: "Das standardmäßige helle WebSpeak-Design.",
+  skinNightDescription: "Das standardmäßige dunkle WebSpeak-Design.",
+  skinIllusiaDescription: "ILLUSIA-Grafiken für Startseite, Sprachraum und Demo.",
   skinLibraryScope: "Skins werden Besuchern zur Auswahl angeboten. Jeder Besucher wählt das Design auf der öffentlichen Seite; die Administrationsoberfläche bleibt unverändert.",
   skinUpload: "Skin-Paket importieren",
   skinUploading: "Wird geprüft und importiert…",
@@ -845,7 +895,22 @@ const russianCopy = {
   server: "Сервер",
   operations: "Операции",
   skinLibrary: "Оформление",
-  skinLibraryLead: "Загружайте и управляйте оформлением, доступным посетителям этого экземпляра.",
+  skinLibraryLead: "Просматривайте стандартное и пользовательское оформление и импортируйте пакеты для всего экземпляра.",
+  skinDay: "Стандартная дневная тема",
+  skinNight: "Стандартная ночная тема",
+  skinIllusia: "Стиль ILLUSIA",
+  skinBuiltin: "Встроено",
+  skinProtected: "Встроенная тема · нельзя удалить",
+  skinDefault: "Тема по умолчанию",
+  skinDefaultLead: "Используется при первом посещении; сохранённый выбор пользователя не меняется.",
+  skinEnabled: "Включена",
+  skinDisabled: "Отключена",
+  skinDefaultSaved: "Тема по умолчанию обновлена.",
+  skinEnabledNotice: "Тема включена и доступна посетителям.",
+  skinDisabledNotice: "Тема отключена и скрыта от посетителей.",
+  skinDayDescription: "Стандартное светлое оформление WebSpeak.",
+  skinNightDescription: "Стандартное тёмное оформление WebSpeak.",
+  skinIllusiaDescription: "Иллюстрации ILLUSIA для главной страницы, голосовой комнаты и демо.",
   skinLibraryScope: "Оформление предлагается посетителям на выбор; каждый выбирает его на публичной странице. Панель администратора сохраняет собственный стиль.",
   skinUpload: "Импортировать пакет оформления",
   skinUploading: "Проверка и импорт…",
@@ -984,7 +1049,22 @@ const japaneseCopy = {
   server: "サーバー",
   operations: "運用",
   skinLibrary: "スキン",
-  skinLibraryLead: "このインスタンスの訪問者が選択できるカスタムスキンを管理します。",
+  skinLibraryLead: "訪問者向けの標準スキンとカスタムスキンを表示し、インスタンス共通のパッケージを読み込みます。",
+  skinDay: "標準の昼モード",
+  skinNight: "標準の夜モード",
+  skinIllusia: "ILLUSIA スタイル",
+  skinBuiltin: "組み込み",
+  skinProtected: "組み込みスキン · 削除不可",
+  skinDefault: "デフォルトスキン",
+  skinDefaultLead: "初回訪問時に適用します。訪問者が選択済みの場合はその設定を維持します。",
+  skinEnabled: "有効",
+  skinDisabled: "無効",
+  skinDefaultSaved: "デフォルトスキンを更新しました。",
+  skinEnabledNotice: "スキンを有効にし、訪問者に公開しました。",
+  skinDisabledNotice: "スキンを無効にし、訪問者の選択肢から隠しました。",
+  skinDayDescription: "WebSpeak の標準ライト外観です。",
+  skinNightDescription: "WebSpeak の標準ダーク外観です。",
+  skinIllusiaDescription: "ホーム、ボイスルーム、デモ用の ILLUSIA アートです。",
   skinLibraryScope: "スキンは訪問者向けの選択肢として公開され、各訪問者が公開ページで選択します。管理画面の外観は変更されません。",
   skinUpload: "スキンパッケージを読み込む",
   skinUploading: "検証・読み込み中…",
@@ -1184,11 +1264,58 @@ async function loadSkinCatalog() {
   skinManagerError.value = "";
   try {
     const value = await getJson("/api/admin/skins");
-    skinEntries.value = Array.isArray(value.skins) ? value.skins : [];
+    const uploaded = Array.isArray(value.skins) ? value.skins as SkinCatalogEntry[] : [];
+    const protectedIds = new Set(BUILTIN_SKIN_CATALOG.map((skin) => skin.id));
+    skinEntries.value = [...BUILTIN_SKIN_CATALOG, ...uploaded.filter((skin) => !protectedIds.has(skin.id))];
+    skinDefaultId.value = typeof value.defaultSkinId === "string" ? value.defaultSkinId : "builtin.light";
   } catch {
     skinManagerError.value = tr("requestFailed");
   } finally {
     skinLoading.value = false;
+  }
+}
+function skinName(skin: SkinCatalogEntry): string {
+  if (skin.id === "builtin.light") return tr("skinDay");
+  if (skin.id === "builtin.dark") return tr("skinNight");
+  if (skin.id === "community.illusia-voice") return tr("skinIllusia");
+  return skin.name;
+}
+function skinDescription(skin: SkinCatalogEntry): string {
+  if (skin.id === "builtin.light") return tr("skinDayDescription");
+  if (skin.id === "builtin.dark") return tr("skinNightDescription");
+  if (skin.id === "community.illusia-voice") return tr("skinIllusiaDescription");
+  return skin.description || "";
+}
+async function saveSkinDefault() {
+  skinDefaultSaving.value = true;
+  skinManagerError.value = "";
+  skinManagerNotice.value = "";
+  try {
+    const result = await sendJson("/api/admin/skins/default", "PUT", { id: skinDefaultId.value });
+    skinDefaultId.value = typeof result.defaultSkinId === "string" ? result.defaultSkinId : "builtin.light";
+    skinManagerNotice.value = tr("skinDefaultSaved");
+  } catch {
+    skinManagerError.value = tr("operationFailed");
+    await loadSkinCatalog();
+  } finally {
+    skinDefaultSaving.value = false;
+  }
+}
+async function toggleSkinEnabled(skin: SkinCatalogEntry) {
+  updatingSkinId.value = skin.id;
+  skinManagerError.value = "";
+  skinManagerNotice.value = "";
+  try {
+    const result = await sendJson(`/api/admin/skins/${encodeURIComponent(skin.id)}/enabled`, "PUT", { enabled: skin.enabled === false });
+    const updated = result.skin as SkinCatalogEntry | undefined;
+    if (updated) Object.assign(skin, updated);
+    if (typeof result.defaultSkinId === "string") skinDefaultId.value = result.defaultSkinId;
+    skinManagerNotice.value = tr(skin.enabled === false ? "skinDisabledNotice" : "skinEnabledNotice");
+  } catch {
+    skinManagerError.value = tr("operationFailed");
+    await loadSkinCatalog();
+  } finally {
+    updatingSkinId.value = "";
   }
 }
 async function onSkinFileChanged(event: Event) {
@@ -1695,12 +1822,20 @@ async function parseResponse(response: Response) { const value = await response.
 .skin-library-page{display:grid;align-content:start;gap:16px}
 .skin-library-page>.page-heading,.skin-library-page>.skin-library-scope{margin:0}
 .skin-library-scope{display:flex;align-items:center;gap:9px}
+.skin-default-control{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 17px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#dce7e3);border-radius:12px}
+.skin-default-control strong{color:var(--admin-text,#20312d);font-size:13px}
+.skin-default-control p{margin:4px 0 0;color:var(--admin-muted,#687a74);font-size:11px}
+.skin-default-control select{min-width:min(100%,270px);padding:10px 12px;color:var(--admin-text,#20312d);background:var(--admin-input,#fff);border:1px solid var(--admin-border,#dce7e3);border-radius:9px;font:inherit}
 .skin-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:14px;align-content:start}
 .skin-library-card{display:grid;grid-template-columns:minmax(140px,.78fr) minmax(0,1.22fr);min-width:0;overflow:hidden;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#dce7e3);border-radius:14px;box-shadow:0 6px 20px rgba(20,60,53,.04)}
 .skin-preview{position:relative;display:grid;place-items:center;min-height:180px;overflow:hidden;color:#5f9f97;background:linear-gradient(145deg,#e5f5f1,#f5f8f7)}
+.skin-preview--day{color:#087e86;background:linear-gradient(145deg,#e8fbfb 0%,#c7f0ed 52%,#fff 100%)}
+.skin-preview--night{color:#b5e8df;background:linear-gradient(145deg,#122320 0%,#223a37 55%,#0b1514 100%)}
 .skin-preview img{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
 .skin-preview>span{display:grid;place-items:center;width:54px;height:54px;border:1px solid #cde8e2;border-radius:16px;background:rgba(255,255,255,.68)}
+.skin-preview--night>span{border-color:rgba(181,232,223,.32);background:rgba(225,255,249,.1)}
 .skin-preview small{position:absolute;right:9px;bottom:9px;padding:4px 7px;color:#f7fffd;background:rgba(17,40,37,.72);border-radius:6px;font-size:10px}
+.skin-builtin-badge{position:absolute;top:9px;left:9px;padding:4px 7px;color:#075f5d;background:rgba(240,255,252,.92);border:1px solid rgba(255,255,255,.72);border-radius:6px;font-size:10px}
 .skin-library-copy{display:flex;min-width:0;flex-direction:column;padding:14px}
 .skin-library-title{display:grid;gap:3px;min-width:0}
 .skin-library-title h3{margin:0;color:var(--admin-text,#20312d);font-size:15px}
@@ -1712,12 +1847,15 @@ async function parseResponse(response: Response) { const value = await response.
 .skin-library-copy dd{margin:0;color:var(--admin-text,#30423d);text-align:right;overflow-wrap:anywhere}
 .skin-library-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:13px}
 .skin-library-actions button,.skin-library-actions a{font-size:11px}
+.skin-protected-label{color:var(--admin-muted,#687a74);font-size:10px}
+.skin-enabled-control{display:inline-flex;align-items:center;gap:6px;color:var(--admin-muted,#687a74);font-size:10px;white-space:nowrap}
+.skin-enabled-control input{width:16px;height:16px;margin:0;accent-color:#07877e}
 .skin-library-empty,.skin-library-loading{display:grid;justify-items:center;gap:9px;padding:48px 18px;color:var(--admin-muted,#7d8d88);text-align:center;background:var(--admin-surface,#fff);border:1px dashed var(--admin-border,#dce7e3);border-radius:14px}
 .skin-library-empty>span{display:grid;place-items:center;width:46px;height:46px;color:#0b8075;background:#e5f5f1;border-radius:14px}
 .skin-library-empty strong{color:var(--admin-text,#263a35);font-size:14px}
 .skin-library-empty p{margin:0;font-size:11px}
 .skin-library-loading{display:flex;justify-content:center}
-@media(max-width:620px){.skin-library-card{grid-template-columns:minmax(0,1fr)}.skin-preview{min-height:190px;aspect-ratio:16/9}.skin-library-page>.page-heading{align-items:flex-start}.skin-library-page>.page-heading .primary-button{white-space:nowrap}}
+@media(max-width:620px){.skin-library-card{grid-template-columns:minmax(0,1fr)}.skin-preview{min-height:190px;aspect-ratio:16/9}.skin-library-page>.page-heading{align-items:flex-start}.skin-library-page>.page-heading .primary-button{white-space:nowrap}.skin-default-control{align-items:flex-start;flex-direction:column}.skin-default-control select{width:100%}}
 </style>
 
 <style scoped>

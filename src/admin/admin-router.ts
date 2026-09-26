@@ -123,7 +123,43 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   });
 
   router.get("/skins", async (_request, response) => {
-    response.json({ skins: await options.skinRegistry?.list() ?? [] });
+    response.json({
+      skins: await options.skinRegistry?.list() ?? [],
+      defaultSkinId: await options.skinRegistry?.getDefaultSkinId() ?? "builtin.light",
+    });
+  });
+
+  router.put("/skins/default", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    try {
+      if (!options.skinRegistry) throw new SkinRegistryError("Skin storage is unavailable.", "SKIN_STORAGE_UNAVAILABLE");
+      const id = typeof asRecord(request.body).id === "string" ? (asRecord(request.body).id as string).trim() : "";
+      const settings = await options.skinRegistry.setDefaultSkin(id);
+      response.json({ ok: true, defaultSkinId: settings.defaultSkinId });
+    } catch (error: unknown) {
+      if (error instanceof SkinRegistryError) {
+        response.status(error.code === "SKIN_DEFAULT_INVALID" ? 400 : 409).json({ ok: false, code: error.code, message: error.message });
+        return;
+      }
+      sendAdminError(response, error);
+    }
+  });
+
+  router.put("/skins/:id/enabled", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    try {
+      const id = typeof request.params.id === "string" ? request.params.id : "";
+      const body = asRecord(request.body);
+      if (!options.skinRegistry || typeof body.enabled !== "boolean") throw new SkinRegistryError("A skin and boolean enabled value are required.", "SKIN_ENABLE_INVALID");
+      const skin = await options.skinRegistry.setEnabled(id, body.enabled);
+      options.service.database.addAudit(body.enabled ? "ADMIN_SKIN_ENABLED" : "ADMIN_SKIN_DISABLED", { id });
+      response.json({ ok: true, skin, defaultSkinId: await options.skinRegistry.getDefaultSkinId() });
+    } catch (error: unknown) {
+      if (error instanceof SkinRegistryError) {
+        const status = error.code === "SKIN_NOT_FOUND" ? 404 : error.code === "SKIN_ENABLE_INVALID" ? 400 : 409;
+        response.status(status).json({ ok: false, code: error.code, message: error.message });
+        return;
+      }
+      sendAdminError(response, error);
+    }
   });
 
   router.put("/skins/:id", requireSameOriginBinary, requireCsrf(options.sessions), expressRaw({ type: "application/octet-stream", limit: "20mb" }), async (request, response) => {
@@ -135,7 +171,7 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       response.status(201).json({ ok: true, skin });
     } catch (error: unknown) {
       if (error instanceof SkinRegistryError) {
-        const status = error.code === "SKIN_LIMIT" || error.code === "SKIN_STORAGE_LIMIT" ? 409 : 400;
+        const status = error.code === "SKIN_LIMIT" || error.code === "SKIN_STORAGE_LIMIT" || error.code === "SKIN_BUILTIN_PROTECTED" ? 409 : 400;
         response.status(status).json({ ok: false, code: error.code, message: error.message });
         return;
       }
@@ -145,12 +181,20 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
 
   router.delete("/skins/:id", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
     const id = typeof request.params.id === "string" ? request.params.id : "";
-    if (!options.skinRegistry || !await options.skinRegistry.remove(id)) {
-      response.status(404).json({ ok: false, code: "SKIN_NOT_FOUND" });
-      return;
+    try {
+      if (!options.skinRegistry || !await options.skinRegistry.remove(id)) {
+        response.status(404).json({ ok: false, code: "SKIN_NOT_FOUND" });
+        return;
+      }
+      options.service.database.addAudit("ADMIN_SKIN_REMOVED", { id });
+      response.json({ ok: true });
+    } catch (error: unknown) {
+      if (error instanceof SkinRegistryError) {
+        response.status(error.code === "SKIN_BUILTIN_PROTECTED" ? 409 : 400).json({ ok: false, code: error.code, message: error.message });
+        return;
+      }
+      sendAdminError(response, error);
     }
-    options.service.database.addAudit("ADMIN_SKIN_REMOVED", { id });
-    response.json({ ok: true });
   });
 
   router.get("/sessions", (_request, response) => {

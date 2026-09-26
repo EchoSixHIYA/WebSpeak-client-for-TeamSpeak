@@ -1,6 +1,6 @@
 {
   "name": "webspeak-webclient",
-  "version": "0.2.4",
+  "version": "0.2.5-preview",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "test": "node --import tsx --test src/admin/skin-registry.test.ts web/src/services/skin-pack.test.ts",
+    "test": "node --import tsx --test src/admin/skin-registry.test.ts src/server/visitor-count.test.ts web/src/services/skin-catalog.test.ts web/src/services/skin-pack.test.ts",
     "start": "node dist/index.js",
     "web:dev": "cd web && npx vite --host",
     "web:build": "cd web && npx vite build",

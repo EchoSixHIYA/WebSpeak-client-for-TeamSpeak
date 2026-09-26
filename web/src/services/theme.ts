@@ -23,7 +23,7 @@ export function getStoredTheme(): ThemeMode {
   return value === "light" || value === "dark" || value === "system" ? value : "system";
 }
 
-export function applyTheme(theme: ThemeMode): void {
+export function applyTheme(theme: ThemeMode, options: { preserveCustomSkins?: boolean } = {}): void {
   if (typeof document === "undefined") return;
   activeThemeMode = theme;
   const root = document.documentElement;
@@ -33,6 +33,9 @@ export function applyTheme(theme: ThemeMode): void {
   // Built-in skin CSS is scoped to public roots and can never restyle /admin.
   root.dataset.theme = theme;
   document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
+    const currentSkin = clientRoot.dataset.wsSkin;
+    const isCustomSkin = currentSkin !== builtinSkins.light.manifest.id && currentSkin !== builtinSkins.dark.manifest.id;
+    if (options.preserveCustomSkins && currentSkin && isCustomSkin) return;
     clientRoot.dataset.wsSkin = activeSkin.manifest.id;
   });
 
@@ -69,7 +72,7 @@ applyTheme(getStoredTheme());
 if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
   const systemColorScheme = window.matchMedia("(prefers-color-scheme: dark)");
   const updateSystemSkin = () => {
-    if (activeThemeMode === "system") applyTheme("system");
+    if (activeThemeMode === "system") applyTheme("system", { preserveCustomSkins: true });
   };
   if (systemColorScheme.addEventListener) systemColorScheme.addEventListener("change", updateSystemSkin);
   else systemColorScheme.addListener?.(updateSystemSkin);

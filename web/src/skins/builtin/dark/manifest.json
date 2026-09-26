@@ -7,5 +7,5 @@
   "license": "AGPL-3.0-only",
   "description": "The built-in dark appearance for public WebSpeak pages.",
   "entry": "skin.css",
-  "minAppVersion": "0.2.4"
+  "minAppVersion": "0.2.5-preview"
 }
