@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
+    "test": "node --import tsx --test src/admin/skin-registry.test.ts web/src/services/skin-pack.test.ts",
     "start": "node dist/index.js",
     "web:dev": "cd web && npx vite --host",
     "web:build": "cd web && npx vite build",

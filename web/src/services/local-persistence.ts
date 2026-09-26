@@ -1,7 +1,9 @@
 const DB_NAME = "webspeak-local";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CURRENT_IDENTITY_KEY = "current";
 const PREFERENCES_KEY = "singleton";
+
+import type { InstalledSkin } from "./skin-pack.js";
 
 export interface StoredIdentity {
   id: string;
@@ -33,6 +35,7 @@ export interface LocalPreferences {
   schemaVersion: 1;
   locale?: "auto" | "zh-CN" | "en";
   theme?: "system" | "light" | "dark";
+  skinId?: string;
   microphoneMuted?: boolean;
   noiseSuppressionEnabled?: boolean;
   voxThreshold?: number;
@@ -65,6 +68,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains("preferences")) database.createObjectStore("preferences", { keyPath: "id" });
       if (!database.objectStoreNames.contains("favorites")) database.createObjectStore("favorites", { keyPath: "id" });
       if (!database.objectStoreNames.contains("recent")) database.createObjectStore("recent", { keyPath: "id" });
+      if (!database.objectStoreNames.contains("skins")) database.createObjectStore("skins", { keyPath: "id" });
     };
     request.onsuccess = () => {
       const database = request.result;
@@ -164,6 +168,47 @@ export async function saveLocalPreferences(preferences: LocalPreferences): Promi
   }
 }
 
+export async function listInstalledSkins(): Promise<InstalledSkin[]> {
+  try {
+    const skins = await request<InstalledSkin[]>("skins", "readonly", (store, resolve, reject) => {
+      const get = store.getAll();
+      get.onsuccess = () => resolve(get.result as InstalledSkin[]);
+      get.onerror = () => reject(get.error);
+    });
+    return skins.sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+export async function getInstalledSkin(id: string): Promise<InstalledSkin | null> {
+  try {
+    return await request<InstalledSkin | null>("skins", "readonly", (store, resolve, reject) => {
+      const get = store.get(id);
+      get.onsuccess = () => resolve((get.result as InstalledSkin | undefined) ?? null);
+      get.onerror = () => reject(get.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function saveInstalledSkin(skin: InstalledSkin): Promise<void> {
+  await request("skins", "readwrite", (store, resolve, reject) => {
+    const put = store.put(skin);
+    put.onsuccess = () => resolve(undefined);
+    put.onerror = () => reject(put.error);
+  });
+}
+
+export async function removeInstalledSkin(id: string): Promise<void> {
+  await request("skins", "readwrite", (store, resolve, reject) => {
+    const remove = store.delete(id);
+    remove.onsuccess = () => resolve(undefined);
+    remove.onerror = () => reject(remove.error);
+  });
+}
+
 export async function listFavorites(): Promise<FavoriteServer[]> {
   try {
     return await request<FavoriteServer[]>("favorites", "readonly", (store, resolve, reject) => {
@@ -243,7 +288,7 @@ async function removeRecentServer(id: string): Promise<void> {
 export async function clearLocalData(): Promise<void> {
   try {
     const database = await openDatabase();
-    await Promise.all(["identities", "preferences", "favorites", "recent"].map((storeName) => new Promise<void>((resolve, reject) => {
+    await Promise.all(["identities", "preferences", "favorites", "recent", "skins"].map((storeName) => new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(storeName, "readwrite");
       transaction.objectStore(storeName).clear();
       transaction.oncomplete = () => resolve();

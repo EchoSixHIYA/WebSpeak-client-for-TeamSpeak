@@ -43,6 +43,7 @@
 - [Deutsch](./docs/README.de.md)
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
+- [皮肤开发规范](./docs/SKIN_DEVELOPMENT.md)
 
 ## 社区 · Community
 

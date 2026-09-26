@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.light",
+  "name": "WebSpeak Light",
+  "version": "1.0.0",
+  "author": "WebSpeak",
+  "license": "AGPL-3.0-only",
+  "description": "The built-in light appearance for public WebSpeak pages.",
+  "entry": "skin.css",
+  "minAppVersion": "0.2.4"
+}

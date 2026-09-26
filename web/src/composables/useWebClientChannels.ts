@@ -113,7 +113,6 @@ export function useWebClientChannels({
     const source = currentChannel.value ? currentChannel.value.members : members;
     return source.map((member) => ({ ...member, isSelf: member.isSelf || member.id === clientId.value }));
   });
-  const roomMembers = computed(() => currentMembers.value.slice(0, 4));
   const memberChannels = computed<TreeChannel[]>(() => {
     if (channelTree.value.length) return channelTree.value;
     return [{
@@ -149,7 +148,6 @@ export function useWebClientChannels({
     currentChannelName,
     currentChannelDescription,
     currentMembers,
-    roomMembers,
     memberChannels,
     filteredMemberChannels,
     whisperTargets,

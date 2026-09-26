@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "community.aurora-voice",
+  "name": "Aurora Voice",
+  "version": "1.0.0",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "A compact example showing local artwork, full-page CSS styling, avatar frames, and localized copy.",
+  "entry": "skin.css",
+  "content": "content.json",
+  "preview": "assets/webspeak-mark.jpg",
+  "minAppVersion": "0.2.4"
+}

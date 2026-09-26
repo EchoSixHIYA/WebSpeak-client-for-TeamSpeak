@@ -13,6 +13,7 @@ import { resolveSafeOpenTarget } from "../security/open-target-policy.js";
 import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
+import type { SkinRegistry } from "../admin/skin-registry.js";
 
 export interface WebServerOptions {
   port: number;
@@ -22,6 +23,7 @@ export interface WebServerOptions {
   certDir?: string; // path to cert.pem + key.pem for HTTPS
   voiceBridgeOptions: VoiceBridgeOptions;
   adminService: AdminService;
+  skinRegistry?: SkinRegistry;
   logger: Logger;
   nextVisitorNumber?: () => number;
   visitorCount?: () => number;
@@ -95,6 +97,38 @@ export function createWebServer(options: WebServerOptions): WebServer {
       accelerationAvailable: acceleration.length > 0,
       accelerationRelays: acceleration.map((relay) => ({ id: relay.id, name: relay.name })),
     });
+  });
+
+  app.get("/api/skins", async (_request, response) => {
+    response.setHeader("Cache-Control", "no-cache");
+    response.json({ skins: await options.skinRegistry?.list() ?? [] });
+  });
+
+  app.get("/api/skins/:id/package", async (request, response) => {
+    const id = typeof request.params.id === "string" ? request.params.id : "";
+    const archive = await options.skinRegistry?.readArchive(id);
+    if (!archive) {
+      response.status(404).json({ ok: false, code: "SKIN_NOT_FOUND" });
+      return;
+    }
+    response.setHeader("Cache-Control", "no-cache");
+    response.setHeader("Content-Type", "application/octet-stream");
+    response.setHeader("Content-Disposition", `attachment; filename="${id}.wskin"`);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.send(archive);
+  });
+
+  app.get("/api/skins/:id/preview", async (request, response) => {
+    const id = typeof request.params.id === "string" ? request.params.id : "";
+    const preview = await options.skinRegistry?.readPreview(id);
+    if (!preview) {
+      response.status(404).end();
+      return;
+    }
+    response.setHeader("Cache-Control", "public, max-age=300");
+    response.setHeader("Content-Type", preview.mimeType);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.send(preview.bytes);
   });
 
   app.post("/api/join-ticket", async (request, response) => {
@@ -194,6 +228,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
     getCreatedSessions: () => voiceBridge.getCreatedCount(),
     getSessionSummaries: () => voiceBridge.getSessionSummaries(),
     terminateSession: (id) => voiceBridge.terminateSession(id),
+    skinRegistry: options.skinRegistry,
     version: options.version,
     logFile: options.logFile,
     startedAt,

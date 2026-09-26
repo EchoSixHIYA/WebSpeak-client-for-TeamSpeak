@@ -3,6 +3,7 @@ import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createAccelerationRelayServer } from "./server/acceleration-relay.js";
 import { normalizeScreenShareIceServers, type ScreenShareIceServer } from "./server/screen-share.js";
+import { SkinRegistry } from "./admin/skin-registry.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -67,6 +68,7 @@ async function main() {
       accelerationName: () => adminService.getAccelerationRelayName(),
     },
     adminService,
+    skinRegistry: new SkinRegistry(path.join(DATA_DIR, "skins")),
     logger,
     nextVisitorNumber: () => database.nextVisitorNumber(),
     visitorCount: () => database.getVisitorCount(),

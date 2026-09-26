@@ -239,40 +239,40 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-:global(html[data-theme="dark"]) .language-trigger,
-:global(:root[data-theme="dark"]) .language-trigger {
+:global(html[data-theme="dark"] .admin-root) .language-trigger,
+:global(:root[data-theme="dark"] .admin-root) .language-trigger {
   color: #a9d9d1;
   background: #203531;
   border-color: #38564f;
 }
 
-:global(html[data-theme="dark"]) .language-trigger:hover,
-:global(html[data-theme="dark"]) .language-switcher.open .language-trigger,
-:global(:root[data-theme="dark"]) .language-trigger:hover,
-:global(:root[data-theme="dark"]) .language-switcher.open .language-trigger {
+:global(html[data-theme="dark"] .admin-root) .language-trigger:hover,
+:global(html[data-theme="dark"] .admin-root) .language-switcher.open .language-trigger,
+:global(:root[data-theme="dark"] .admin-root) .language-trigger:hover,
+:global(:root[data-theme="dark"] .admin-root) .language-switcher.open .language-trigger {
   color: #10201d;
   background: #69d2c7;
   border-color: #69d2c7;
 }
 
-:global(html[data-theme="dark"]) .language-dropdown,
-:global(:root[data-theme="dark"]) .language-dropdown {
+:global(html[data-theme="dark"] .admin-root) .language-dropdown,
+:global(:root[data-theme="dark"] .admin-root) .language-dropdown {
   background: #172321;
   border-color: #30413d;
   box-shadow: 0 16px 36px rgba(0, 0, 0, .32);
 }
 
-:global(html[data-theme="dark"]) .language-option,
-:global(:root[data-theme="dark"]) .language-option {
+:global(html[data-theme="dark"] .admin-root) .language-option,
+:global(:root[data-theme="dark"] .admin-root) .language-option {
   color: #d7e7e3;
 }
 
-:global(html[data-theme="dark"]) .language-option:hover,
-:global(html[data-theme="dark"]) .language-option:focus-visible,
-:global(html[data-theme="dark"]) .language-option.selected,
-:global(:root[data-theme="dark"]) .language-option:hover,
-:global(:root[data-theme="dark"]) .language-option:focus-visible,
-:global(:root[data-theme="dark"]) .language-option.selected {
+:global(html[data-theme="dark"] .admin-root) .language-option:hover,
+:global(html[data-theme="dark"] .admin-root) .language-option:focus-visible,
+:global(html[data-theme="dark"] .admin-root) .language-option.selected,
+:global(:root[data-theme="dark"] .admin-root) .language-option:hover,
+:global(:root[data-theme="dark"] .admin-root) .language-option:focus-visible,
+:global(:root[data-theme="dark"] .admin-root) .language-option.selected {
   color: #69d2c7;
   background: #203531;
   border-color: #38564f;

@@ -1,0 +1,150 @@
+/* Built-in package: builtin.light. All rules stay inside the public client. */
+.ws-skin-root[data-ws-skin="builtin.light"] {
+  color-scheme: light;
+  --ws-page-bg: #f7f9f8;
+  --ws-surface-1: #fff;
+  --ws-surface-2: #f1f6f4;
+  --ws-text: #192120;
+  --ws-text-muted: #71807c;
+  --ws-accent: #006a64;
+  --ws-success: #65d879;
+  --ws-warning: #c89143;
+  --ws-danger: #c95a54;
+  --ws-border: #e4ece9;
+  --surface-0: var(--ws-page-bg);
+  --surface-1: var(--ws-surface-1);
+  --surface-2: var(--ws-surface-2);
+  --text-primary: var(--ws-text);
+  --text-muted: var(--ws-text-muted);
+  --accent: var(--ws-accent);
+  --success: var(--ws-success);
+  --warning: var(--ws-warning);
+  --danger: var(--ws-danger);
+  --border: var(--ws-border);
+}
+
+.ws-skin-root[data-ws-skin="builtin.light"] {
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .join-page {
+  color: var(--text-primary);
+  background-color: var(--surface-0);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .app-shell,
+.ws-skin-root[data-ws-skin="builtin.light"] .workspace {
+  background: var(--surface-1);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .workspace-header,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-panel,
+.ws-skin-root[data-ws-skin="builtin.light"] .voice-card,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-modal {
+  background: var(--surface-1);
+  border-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .workspace-header {
+  border-bottom-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .workspace-content {
+  color: var(--text-primary);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .join-card {
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .field-wrap,
+.ws-skin-root[data-ws-skin="builtin.light"] .message-composer,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-search,
+.ws-skin-root[data-ws-skin="builtin.light"] .mic-mode-switch,
+.ws-skin-root[data-ws-skin="builtin.light"] .mode-note {
+  background: var(--surface-2);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .field-wrap input,
+.ws-skin-root[data-ws-skin="builtin.light"] .message-composer input,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-search input,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-select {
+  color: var(--text-primary);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .room-hero {
+  background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--surface-1)), var(--surface-1) 75%);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .voice-card,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-panel,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-modal {
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .section-heading h2,
+.ws-skin-root[data-ws-skin="builtin.light"] .room-hero h1,
+.ws-skin-root[data-ws-skin="builtin.light"] .join-card h2,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-panel-heading h2,
+.ws-skin-root[data-ws-skin="builtin.light"] .message-meta strong,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-copy strong {
+  color: var(--text-primary);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .section-kicker,
+.ws-skin-root[data-ws-skin="builtin.light"] .card-kicker,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-label,
+.ws-skin-root[data-ws-skin="builtin.light"] .header-note,
+.ws-skin-root[data-ws-skin="builtin.light"] .section-counter,
+.ws-skin-root[data-ws-skin="builtin.light"] .message-meta time,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-copy span,
+.ws-skin-root[data-ws-skin="builtin.light"] .chat-empty,
+.ws-skin-root[data-ws-skin="builtin.light"] .join-description,
+.ws-skin-root[data-ws-skin="builtin.light"] .card-lead {
+  color: var(--text-muted);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .chat-panel,
+.ws-skin-root[data-ws-skin="builtin.light"] .chat-heading,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-header,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-footer,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-separator {
+  border-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .message-bubble {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-content,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-nav {
+  background: var(--surface-1);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-nav {
+  border-right-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-section h3,
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-header h2 {
+  color: var(--text-primary);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .settings-select {
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .audio-level-track,
+.ws-skin-root[data-ws-skin="builtin.light"] .meter i {
+  background: var(--border);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .member-presence {
+  border-color: var(--surface-1);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] .member-row:hover,
+.ws-skin-root[data-ws-skin="builtin.light"] .member-row:focus-within {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.ws-skin-root[data-ws-skin="builtin.light"] :focus-visible {
+  outline-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.ws-skin-root[data-ws-skin="builtin.light"],
+.ws-skin-root[data-ws-skin="builtin.light"] * {
+  scrollbar-color: #8fcfc7 transparent;
+  scrollbar-width: thin;
+}
+.ws-skin-root[data-ws-skin="builtin.light"] *::-webkit-scrollbar-thumb {
+  background: #a7d9d2;
+  background-clip: padding-box;
+  border-color: transparent;
+}
+.ws-skin-root[data-ws-skin="builtin.light"] *::-webkit-scrollbar-thumb:hover {
+  background: #6bbab1;
+}

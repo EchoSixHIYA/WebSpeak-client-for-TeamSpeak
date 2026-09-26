@@ -1,6 +1,22 @@
 export type ThemeMode = "system" | "light" | "dark";
 
+import lightManifest from "../skins/builtin/light/manifest.json";
+import lightCss from "../skins/builtin/light/skin.css?inline";
+import darkManifest from "../skins/builtin/dark/manifest.json";
+import darkCss from "../skins/builtin/dark/skin.css?inline";
+
 const THEME_KEY = "webspeak:theme";
+const SKIN_STYLE_ELEMENT_ID = "webspeak-active-built-in-skin";
+let activeThemeMode: ThemeMode = "system";
+
+const builtinSkins = {
+  light: { manifest: lightManifest, css: lightCss },
+  dark: { manifest: darkManifest, css: darkCss },
+} as const;
+
+export function getBuiltinSkinCss(theme: Exclude<ThemeMode, "system">): string {
+  return theme === "dark" ? builtinSkins.dark.css : builtinSkins.light.css;
+}
 
 export function getStoredTheme(): ThemeMode {
   const value = typeof localStorage === "undefined" ? "" : localStorage.getItem(THEME_KEY);
@@ -9,7 +25,26 @@ export function getStoredTheme(): ThemeMode {
 
 export function applyTheme(theme: ThemeMode): void {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.theme = theme;
+  activeThemeMode = theme;
+  const root = document.documentElement;
+  const activeSkin = isDarkTheme(theme) ? builtinSkins.dark : builtinSkins.light;
+
+  // Keep data-theme for the admin console's independent appearance rules.
+  // Built-in skin CSS is scoped to public roots and can never restyle /admin.
+  root.dataset.theme = theme;
+  document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
+    clientRoot.dataset.wsSkin = activeSkin.manifest.id;
+  });
+
+  let style = document.getElementById(SKIN_STYLE_ELEMENT_ID) as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = SKIN_STYLE_ELEMENT_ID;
+    style.dataset.skinPackage = activeSkin.manifest.id;
+    document.head.append(style);
+  }
+  style.dataset.skinPackage = activeSkin.manifest.id;
+  style.textContent = activeSkin.css;
 }
 
 export function saveTheme(theme: ThemeMode): void {
@@ -30,3 +65,12 @@ export function nextTheme(theme: ThemeMode): ThemeMode {
 }
 
 applyTheme(getStoredTheme());
+
+if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+  const systemColorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+  const updateSystemSkin = () => {
+    if (activeThemeMode === "system") applyTheme("system");
+  };
+  if (systemColorScheme.addEventListener) systemColorScheme.addEventListener("change", updateSystemSkin);
+  else systemColorScheme.addListener?.(updateSystemSkin);
+}

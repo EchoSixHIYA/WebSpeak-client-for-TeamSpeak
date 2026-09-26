@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.dark",
+  "name": "WebSpeak Dark",
+  "version": "1.0.0",
+  "author": "WebSpeak",
+  "license": "AGPL-3.0-only",
+  "description": "The built-in dark appearance for public WebSpeak pages.",
+  "entry": "skin.css",
+  "minAppVersion": "0.2.4"
+}

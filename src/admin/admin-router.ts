@@ -1,4 +1,4 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
+import { Router, raw as expressRaw, type NextFunction, type Request, type Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import type { Logger } from "../logger.js";
 import { AdminInputError, AdminService, type AdminSettingsInput, type RelayNodeInput } from "./admin-service.js";
@@ -6,6 +6,7 @@ import { AdminSessionStore, isSecureRequest } from "./admin-session.js";
 import { AdminLoginRateLimiter, waitFor } from "./login-rate-limit.js";
 import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
 import type { AdminSessionSummary } from "../server/voice-bridge.js";
+import { SkinRegistry, SkinRegistryError } from "./skin-registry.js";
 
 export interface AdminConnectionRecord {
   id: string;
@@ -34,6 +35,7 @@ export interface AdminRouterOptions {
   terminateSession?: (id: string) => Promise<boolean>;
   version?: string;
   logFile?: string;
+  skinRegistry?: SkinRegistry;
   startedAt: number;
 }
 
@@ -118,6 +120,37 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
 
   router.get("/server", (_request, response) => {
     response.json(options.service.getAdminSettings());
+  });
+
+  router.get("/skins", async (_request, response) => {
+    response.json({ skins: await options.skinRegistry?.list() ?? [] });
+  });
+
+  router.put("/skins/:id", requireSameOriginBinary, requireCsrf(options.sessions), expressRaw({ type: "application/octet-stream", limit: "20mb" }), async (request, response) => {
+    try {
+      const id = typeof request.params.id === "string" ? request.params.id : "";
+      if (!options.skinRegistry || !Buffer.isBuffer(request.body)) throw new SkinRegistryError("Skin storage is unavailable.", "SKIN_STORAGE_UNAVAILABLE");
+      const skin = await options.skinRegistry.save(request.body, id);
+      options.service.database.addAudit("ADMIN_SKIN_INSTALLED", { id: skin.id, version: skin.version });
+      response.status(201).json({ ok: true, skin });
+    } catch (error: unknown) {
+      if (error instanceof SkinRegistryError) {
+        const status = error.code === "SKIN_LIMIT" || error.code === "SKIN_STORAGE_LIMIT" ? 409 : 400;
+        response.status(status).json({ ok: false, code: error.code, message: error.message });
+        return;
+      }
+      sendAdminError(response, error);
+    }
+  });
+
+  router.delete("/skins/:id", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    const id = typeof request.params.id === "string" ? request.params.id : "";
+    if (!options.skinRegistry || !await options.skinRegistry.remove(id)) {
+      response.status(404).json({ ok: false, code: "SKIN_NOT_FOUND" });
+      return;
+    }
+    options.service.database.addAudit("ADMIN_SKIN_REMOVED", { id });
+    response.json({ ok: true });
   });
 
   router.get("/sessions", (_request, response) => {
@@ -314,6 +347,22 @@ function requireCsrf(sessions: AdminSessionStore) {
 function requireSameOrigin(request: Request, response: Response, next: NextFunction): void {
   if (!request.is("application/json")) {
     response.status(415).json({ ok: false, code: "JSON_REQUIRED" });
+    return;
+  }
+  const origin = request.header("origin");
+  const host = request.header("host");
+  try {
+    if (!origin || !host || new URL(origin).host !== host) throw new Error("origin mismatch");
+  } catch {
+    response.status(403).json({ ok: false, code: "ORIGIN_REJECTED" });
+    return;
+  }
+  next();
+}
+
+function requireSameOriginBinary(request: Request, response: Response, next: NextFunction): void {
+  if (!request.is("application/octet-stream")) {
+    response.status(415).json({ ok: false, code: "BINARY_REQUIRED" });
     return;
   }
   const origin = request.header("origin");

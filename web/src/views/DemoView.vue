@@ -1,47 +1,77 @@
 <template>
-  <div class="demo-page">
-    <header class="demo-header">
-      <div class="demo-brand"><span><Icon name="waveform" :size="21" /></span><div><strong>WebSpeak</strong><small>{{ copy.browserClient }}</small></div></div>
-      <div class="demo-tools"><span class="demo-badge">{{ copy.demoBadge }}</span><LanguageSwitcher v-model="language" :menu-label="copy.languageMenu" @change="persistLanguage" /><a href="/">{{ copy.back }}</a></div>
+  <div class="demo-page ws-skin-root" data-ws-part="app" data-ws-page="demo">
+    <header class="demo-header" data-ws-part="demo.header">
+      <div class="demo-brand" data-ws-part="demo.brand"><span><Icon name="waveform" :size="21" /></span><div><strong>WebSpeak</strong><small>{{ copy.browserClient }}</small></div></div>
+      <div class="demo-tools" data-ws-part="demo.header-tools"><span class="demo-badge" data-ws-part="demo.badge">{{ copy.demoBadge }}</span><SkinSwitcher v-model="activeSkinId" data-ws-part="demo.skin-switcher" :menu-label="copy.skinSelector" :options="skinOptions" @change="onSkinChange" /><LanguageSwitcher v-model="language" data-ws-part="demo.language-switcher" :menu-label="copy.languageMenu" @change="persistLanguage" /><a href="/" data-ws-part="demo.home-link">{{ copy.back }}</a></div>
     </header>
 
-    <div v-if="reconnecting" class="demo-reconnect" role="status"><Icon name="refresh" :size="17" /><span>{{ copy.reconnecting }}</span><button type="button" @click="reconnecting = false">{{ copy.restore }}</button></div>
-    <main class="demo-shell">
-      <aside class="demo-channel-panel">
-        <div class="demo-panel-title"><span>{{ copy.channels }}</span><strong>{{ selectedChannel.name }}</strong></div>
-        <div v-for="channel in channels" :key="channel.id" :class="['demo-channel', { active: selectedChannelId === channel.id }]">
-          <button type="button" @click="selectChannel(channel.id)"><Icon name="volume" :size="16" /><span>{{ channel.name }}</span><small>{{ channel.members.length }}</small></button>
-          <div class="demo-channel-members"><span v-for="member in channel.members" :key="member.id" :class="{ speaking: speakingId === member.id }"><i :style="avatarStyle(member.name)">{{ member.name[0] }}</i>{{ member.name }}</span></div>
+    <div v-if="reconnecting" class="demo-reconnect" data-ws-part="demo.reconnect" role="status"><Icon name="refresh" :size="17" /><span>{{ copy.reconnecting }}</span><button type="button" data-ws-part="demo.reconnect.restore" @click="reconnecting = false">{{ copy.restore }}</button></div>
+    <main class="demo-shell" data-ws-part="demo.layout">
+      <aside class="demo-channel-panel" data-ws-part="demo.channels">
+        <div class="demo-panel-title" data-ws-part="demo.channels.heading"><span>{{ copy.channels }}</span><strong>{{ selectedChannel.name }}</strong></div>
+        <div v-for="channel in channels" :key="channel.id" :class="['demo-channel', { active: selectedChannelId === channel.id }]" data-ws-part="demo.channel" :data-ws-state="selectedChannelId === channel.id ? 'active' : 'idle'">
+          <button type="button" data-ws-part="demo.channel.select" @click="selectChannel(channel.id)"><Icon name="volume" :size="16" /><span>{{ channel.name }}</span><small>{{ channel.members.length }}</small></button>
+          <div class="demo-channel-members" data-ws-part="demo.channel.members"><span v-for="member in channel.members" :key="member.id" :class="{ speaking: speakingId === member.id }"><i :style="avatarStyle(member.name)">{{ member.name[0] }}</i>{{ member.name }}</span></div>
         </div>
       </aside>
 
-      <section class="demo-main">
-        <div class="demo-hero"><div><span class="demo-live"><i></i>{{ copy.simulated }}</span><h1><Icon name="volume" :size="24" /> {{ selectedChannel.name }}</h1><p>{{ copy.heroLead }}</p><small><Icon name="users" :size="14" /> {{ selectedChannel.members.length }} {{ copy.online }}</small></div><div class="demo-wave" aria-hidden="true"><i v-for="bar in bars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
-        <div class="demo-section-heading"><span>{{ copy.voiceActivity }}</span><strong>{{ copy.speakingNow }}</strong></div>
-        <div class="demo-voice-grid"><article v-for="member in selectedChannel.members" :key="member.id" :class="['demo-voice-card', { speaking: speakingId === member.id }]" @click="speakingId = member.id"><i :style="avatarStyle(member.name)">{{ member.name[0] }}</i><strong>{{ member.name }}</strong><span>{{ speakingId === member.id ? copy.speaking : copy.connected }}</span></article></div>
+      <section class="demo-main" data-ws-part="demo.main">
+        <div class="demo-hero" data-ws-part="demo.hero"><div><span class="demo-live" data-ws-part="demo.live"><i></i>{{ copy.simulated }}</span><h1 data-ws-part="demo.hero.title"><Icon name="volume" :size="24" /> {{ selectedChannel.name }}</h1><p data-ws-part="demo.hero.description">{{ copy.heroLead }}</p><small data-ws-part="demo.hero.online"><Icon name="users" :size="14" /> {{ selectedChannel.members.length }} {{ copy.online }}</small></div><div class="demo-wave" data-ws-part="demo.wave" aria-hidden="true"><i v-for="bar in bars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
+        <div class="demo-section-heading" data-ws-part="demo.voice-heading"><span>{{ copy.voiceActivity }}</span><strong>{{ copy.speakingNow }}</strong></div>
+        <div class="demo-voice-grid" data-ws-part="demo.voice-grid"><article v-for="member in selectedChannel.members" :key="member.id" :class="['demo-voice-card', { speaking: speakingId === member.id }]" data-ws-part="demo.voice-card" :data-ws-state="speakingId === member.id ? 'speaking' : 'connected'" @click="speakingId = member.id"><i data-ws-part="demo.avatar" :style="avatarStyle(member.name)">{{ member.name[0] }}</i><strong data-ws-part="demo.member-name">{{ member.name }}</strong><span data-ws-part="demo.member-status">{{ speakingId === member.id ? copy.speaking : copy.connected }}</span></article></div>
 
-        <div class="demo-chat-head"><div><span>{{ copy.textChannel }}</span><strong># {{ selectedChannel.name }} {{ copy.chat }}</strong></div><div class="demo-tabs"><button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">{{ tab.label }}</button></div></div>
-        <div class="demo-messages"><div v-for="message in visibleMessages" :key="message.id" :class="['demo-message', { mine: message.mine }]" @dblclick="message.mine = !message.mine"><i :style="avatarStyle(message.author)">{{ message.author[0] }}</i><div><small>{{ message.author }} · {{ message.time }}</small><p>{{ messageText(message) }}</p></div></div><div v-if="!visibleMessages.length" class="demo-empty"><Icon name="message" :size="22" /><strong>{{ copy.emptyChat }}</strong></div></div>
-        <form class="demo-composer" @submit.prevent="sendMessage"><input v-model="draft" :placeholder="copy.placeholder" :aria-label="copy.placeholder" /><button type="submit" :disabled="!draft.trim()"><Icon name="send" :size="17" /></button></form>
+        <div class="demo-chat-head" data-ws-part="demo.chat.heading"><div><span>{{ copy.textChannel }}</span><strong># {{ selectedChannel.name }} {{ copy.chat }}</strong></div><div class="demo-tabs" data-ws-part="demo.chat.tabs"><button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" data-ws-part="demo.chat.tab" :data-ws-state="activeTab === tab.id ? 'active' : 'idle'" @click="activeTab = tab.id">{{ tab.label }}</button></div></div>
+        <div class="demo-messages" data-ws-part="demo.chat.messages"><div v-for="message in visibleMessages" :key="message.id" :class="['demo-message', { mine: message.mine }]" data-ws-part="demo.chat.message" :data-ws-state="message.mine ? 'mine' : 'other'" @dblclick="message.mine = !message.mine"><i :style="avatarStyle(message.author)">{{ message.author[0] }}</i><div><small>{{ message.author }} · {{ message.time }}</small><p>{{ messageText(message) }}</p></div></div><div v-if="!visibleMessages.length" class="demo-empty" data-ws-part="demo.chat.empty"><Icon name="message" :size="22" /><strong>{{ copy.emptyChat }}</strong></div></div>
+        <form class="demo-composer" data-ws-part="demo.chat.composer" @submit.prevent="sendMessage"><input v-model="draft" data-ws-part="demo.chat.input" :placeholder="copy.placeholder" :aria-label="copy.placeholder" /><button type="submit" data-ws-part="demo.chat.send" :disabled="!draft.trim()"><Icon name="send" :size="17" /></button></form>
       </section>
 
-      <aside class="demo-actions-panel"><div class="demo-panel-title"><span>{{ copy.voice }}</span><strong>{{ copy.simulationControls }}</strong></div><button type="button" @click="toggleSpeaking"><Icon name="mic" :size="17" /> {{ speakingId ? copy.stopSpeaking : copy.simulateSpeaking }}</button><button type="button" @click="poke = !poke"><Icon name="bell" :size="17" /> {{ copy.poke }}</button><button type="button" @click="reconnecting = true"><Icon name="refresh" :size="17" /> {{ copy.simulateReconnect }}</button><div class="demo-note"><Icon name="shield" :size="16" /><span>{{ copy.demoNote }}</span></div><div class="demo-user"><i :style="avatarStyle('illusia')">I</i><div><strong>illusia</strong><small>{{ copy.you }} · {{ copy.ready }}</small></div><span class="demo-green-dot"></span></div></aside>
+      <aside class="demo-actions-panel" data-ws-part="demo.actions"><div class="demo-panel-title" data-ws-part="demo.actions.heading"><span>{{ copy.voice }}</span><strong>{{ copy.simulationControls }}</strong></div><button type="button" data-ws-part="demo.action.speaking" @click="toggleSpeaking"><Icon name="mic" :size="17" /> {{ speakingId ? copy.stopSpeaking : copy.simulateSpeaking }}</button><button type="button" data-ws-part="demo.action.poke" @click="poke = !poke"><Icon name="bell" :size="17" /> {{ copy.poke }}</button><button type="button" data-ws-part="demo.action.reconnect" @click="reconnecting = true"><Icon name="refresh" :size="17" /> {{ copy.simulateReconnect }}</button><div class="demo-note" data-ws-part="demo.note"><Icon name="shield" :size="16" /><span>{{ copy.demoNote }}</span></div><div class="demo-user" data-ws-part="demo.user"><i :style="avatarStyle('illusia')">I</i><div><strong>illusia</strong><small>{{ copy.you }} · {{ copy.ready }}</small></div><span class="demo-green-dot"></span></div></aside>
     </main>
-    <div v-if="poke" class="demo-poke" role="status"><Icon name="bell" :size="17" /><span><strong>msicbot</strong> {{ copy.pokedYou }}</span><button type="button" @click="poke = false"><Icon name="close" :size="14" /></button></div>
+    <div v-if="poke" class="demo-poke" data-ws-part="demo.poke-notification" role="status"><Icon name="bell" :size="17" /><span><strong>msicbot</strong> {{ copy.pokedYou }}</span><button type="button" data-ws-part="demo.poke.dismiss" @click="poke = false"><Icon name="close" :size="14" /></button></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, shallowRef } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
+import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
+import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
+import { listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
+import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, getStoredSkinId } from "../services/skin-runtime.js";
+import type { InstalledSkin } from "../services/skin-pack.js";
+import { getStoredTheme, isDarkTheme } from "../services/theme.js";
 
 type Language = "zh" | "en" | "de" | "ru" | "ja";
 interface DemoMessage { id: number; author: string; time: string; text: string; zhText?: string; enText?: string; ruText?: string; jaText?: string; mine: boolean }
 type Tab = "channel" | "server";
 const storedLanguage = localStorage.getItem("webspeak:language");
 const language = ref<Language>(storedLanguage === "en" || storedLanguage === "de" || storedLanguage === "ru" || storedLanguage === "ja" ? storedLanguage : "zh");
-const copy = computed(() => language.value === "zh" ? zh : language.value === "de" ? de : language.value === "ru" ? ru : language.value === "ja" ? ja : en);
+const baseCopy = computed(() => language.value === "zh" ? zh : language.value === "de" ? de : language.value === "ru" ? ru : language.value === "ja" ? ja : en);
+const activeSkin = shallowRef<InstalledSkin | null>(null);
+const activeSkinId = ref(getStoredSkinId() ?? (isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const installedSkins = ref<InstalledSkin[]>([]);
+const catalogSkins = ref<SkinCatalogEntry[]>([]);
+const skinOptions = computed<SkinOption[]>(() => [
+  { value: BUILTIN_LIGHT_SKIN, label: copy.value.skinDay, icon: "sun" },
+  { value: BUILTIN_DARK_SKIN, label: copy.value.skinNight, icon: "moon" },
+  ...catalogSkins.value.map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
+  ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
+]);
+const copy = computed(() => {
+  const result = { ...baseCopy.value };
+  const content = activeSkin.value?.contentData;
+  if (!content) return result;
+  const fullLocale = language.value === "zh" ? "zh-CN" : language.value === "en" ? "en-US" : language.value === "de" ? "de-DE" : language.value === "ru" ? "ru-RU" : "ja-JP";
+  for (const locale of [...new Set([content.defaultLocale, language.value, fullLocale])]) {
+    for (const [key, value] of Object.entries(content.locales[locale]?.messages ?? {})) {
+      if (!key.startsWith("demo.")) continue;
+      const copyKey = key.slice("demo.".length) as keyof typeof result;
+      if (Object.prototype.hasOwnProperty.call(result, copyKey)) result[copyKey] = value;
+    }
+  }
+  return result;
+});
 const selectedChannelId = ref("quiet");
 const activeTab = ref<Tab>("channel");
 const speakingId = ref("illusia");
@@ -58,16 +88,32 @@ const messages = ref<DemoMessage[]>([
   { id: 1, author: "illusia", time: "10:24", text: "", zhText: "大家好，欢迎来到 WebSpeak。", enText: "Hello everyone, welcome to WebSpeak.", mine: true },
   { id: 2, author: "msicbot", time: "10:25", text: "", zhText: "语音和文字频道都已同步。", enText: "Voice and text channels are in sync.", mine: false },
 ]);
-const zh = { languageMenu: "语言", browserClient: "浏览器语音工作台", demoBadge: "演示 — 模拟数据", languageSwitch: "English", back: "返回主页", reconnecting: "连接中断，正在恢复…", restore: "恢复连接", channels: "频道", channel: "频道", simulated: "演示状态", heroLead: "这里展示 WebSpeak 的频道、语音和聊天交互。", online: "人在线", voiceActivity: "语音活动", speakingNow: "正在语音中", speaking: "正在说话…", connected: "已连接", textChannel: "文字频道", chat: "聊天", server: "服务器", emptyChat: "暂无消息", placeholder: "发送一条消息…", voice: "语音", simulationControls: "模拟控制", stopSpeaking: "停止说话", simulateSpeaking: "模拟发言", poke: "戳一戳", simulateReconnect: "模拟重连", demoNote: "此页面不会连接真实 TeamSpeak 服务器。", you: "你", ready: "已就绪", pokedYou: "戳了你一下" };
-const en = { languageMenu: "Language", browserClient: "Browser voice workspace", demoBadge: "Demo — simulated data", languageSwitch: "中文", back: "Back home", reconnecting: "Connection interrupted, recovering…", restore: "Restore", channels: "Channels", channel: "Channel", simulated: "Simulation", heroLead: "A preview of WebSpeak channels, voice, and chat interactions.", online: "online", voiceActivity: "VOICE ACTIVITY", speakingNow: "Speaking now", speaking: "Speaking…", connected: "Connected", textChannel: "TEXT CHANNEL", chat: "chat", server: "Server", emptyChat: "No messages yet", placeholder: "Send a message…", voice: "Voice", simulationControls: "Simulation controls", stopSpeaking: "Stop speaking", simulateSpeaking: "Simulate speaking", poke: "Poke", simulateReconnect: "Simulate reconnect", demoNote: "This page never connects to a real TeamSpeak server.", you: "You", ready: "Ready", pokedYou: "poked you" };
-const de = { languageMenu: "Sprache", browserClient: "Sprachbereich im Browser", demoBadge: "Demo — simulierte Daten", languageSwitch: "中文", back: "Zur Startseite", reconnecting: "Verbindung unterbrochen, Wiederherstellung…", restore: "Wiederherstellen", channels: "Kanäle", channel: "Kanal", simulated: "Simulation", heroLead: "Eine Vorschau auf Kanäle, Sprache und Chat von WebSpeak.", online: "online", voiceActivity: "SPRACHAKTIVITÄT", speakingNow: "Spricht gerade", speaking: "Spricht…", connected: "Verbunden", textChannel: "TEXTKANAL", chat: "Chat", server: "Server", emptyChat: "Noch keine Nachrichten", placeholder: "Nachricht senden…", voice: "Sprache", simulationControls: "Simulation steuern", stopSpeaking: "Sprechen stoppen", simulateSpeaking: "Sprechen simulieren", poke: "Anstupsen", simulateReconnect: "Verbindung simulieren", demoNote: "Diese Seite verbindet sich nie mit einem echten TeamSpeak-Server.", you: "Du", ready: "Bereit", pokedYou: "hat dich angestupst" };
-const ru = { languageMenu: "Язык", browserClient: "Голосовое пространство в браузере", demoBadge: "Демо — симуляция", languageSwitch: "中文", back: "На главную", reconnecting: "Соединение прервано, восстановление…", restore: "Восстановить", channels: "Каналы", channel: "Канал", simulated: "Симуляция", heroLead: "Предпросмотр каналов, голоса и чата WebSpeak.", online: "онлайн", voiceActivity: "ГОЛОСОВАЯ АКТИВНОСТЬ", speakingNow: "Сейчас говорят", speaking: "Говорит…", connected: "Подключён", textChannel: "ТЕКСТОВЫЙ КАНАЛ", chat: "чат", server: "Сервер", emptyChat: "Сообщений пока нет", placeholder: "Написать сообщение…", voice: "Голос", simulationControls: "Управление симуляцией", stopSpeaking: "Остановить речь", simulateSpeaking: "Симулировать речь", poke: "Толкнуть", simulateReconnect: "Симулировать переподключение", demoNote: "Эта страница не подключается к реальному серверу TeamSpeak.", you: "Вы", ready: "Готово", pokedYou: "толкнул вас" };
-const ja = { languageMenu: "言語", browserClient: "ブラウザ音声ワークスペース", demoBadge: "デモ — シミュレーション", languageSwitch: "中文", back: "ホームに戻る", reconnecting: "接続が中断されました。復旧中…", restore: "復旧", channels: "チャンネル", channel: "チャンネル", simulated: "シミュレーション", heroLead: "WebSpeak のチャンネル、音声、チャットのプレビューです。", online: "人がオンライン", voiceActivity: "音声アクティビティ", speakingNow: "発話中", speaking: "発話中…", connected: "接続済み", textChannel: "テキストチャンネル", chat: "チャット", server: "サーバー", emptyChat: "メッセージはありません", placeholder: "メッセージを送信…", voice: "音声", simulationControls: "シミュレーション操作", stopSpeaking: "発話を停止", simulateSpeaking: "発話をシミュレート", poke: "つつく", simulateReconnect: "再接続をシミュレート", demoNote: "このページは実際の TeamSpeak サーバーには接続しません。", you: "あなた", ready: "準備完了", pokedYou: "あなたをつつきました" };
+const zh = { languageMenu: "语言", skinSelector: "皮肤", skinDay: "日间", skinNight: "夜间", browserClient: "浏览器语音工作台", demoBadge: "演示 — 模拟数据", back: "返回主页", reconnecting: "连接中断，正在恢复…", restore: "恢复连接", channels: "频道", channel: "频道", simulated: "演示状态", heroLead: "这里展示 WebSpeak 的频道、语音和聊天交互。", online: "人在线", voiceActivity: "语音活动", speakingNow: "正在语音中", speaking: "正在说话…", connected: "已连接", textChannel: "文字频道", chat: "聊天", server: "服务器", emptyChat: "暂无消息", placeholder: "发送一条消息…", voice: "语音", simulationControls: "模拟控制", stopSpeaking: "停止说话", simulateSpeaking: "模拟发言", poke: "戳一戳", simulateReconnect: "模拟重连", demoNote: "此页面不会连接真实 TeamSpeak 服务器。", you: "你", ready: "已就绪", pokedYou: "戳了你一下" };
+const en = { languageMenu: "Language", skinSelector: "Skin", skinDay: "Day", skinNight: "Night", browserClient: "Browser voice workspace", demoBadge: "Demo — simulated data", back: "Back home", reconnecting: "Connection interrupted, recovering…", restore: "Restore", channels: "Channels", channel: "Channel", simulated: "Simulation", heroLead: "A preview of WebSpeak channels, voice, and chat interactions.", online: "online", voiceActivity: "VOICE ACTIVITY", speakingNow: "Speaking now", speaking: "Speaking…", connected: "Connected", textChannel: "TEXT CHANNEL", chat: "chat", server: "Server", emptyChat: "No messages yet", placeholder: "Send a message…", voice: "Voice", simulationControls: "Simulation controls", stopSpeaking: "Stop speaking", simulateSpeaking: "Simulate speaking", poke: "Poke", simulateReconnect: "Simulate reconnect", demoNote: "This page never connects to a real TeamSpeak server.", you: "You", ready: "Ready", pokedYou: "poked you" };
+const de = { languageMenu: "Sprache", skinSelector: "Design", skinDay: "Tag", skinNight: "Nacht", browserClient: "Sprachbereich im Browser", demoBadge: "Demo — simulierte Daten", back: "Zur Startseite", reconnecting: "Verbindung unterbrochen, Wiederherstellung…", restore: "Wiederherstellen", channels: "Kanäle", channel: "Kanal", simulated: "Simulation", heroLead: "Eine Vorschau auf Kanäle, Sprache und Chat von WebSpeak.", online: "online", voiceActivity: "SPRACHAKTIVITÄT", speakingNow: "Spricht gerade", speaking: "Spricht…", connected: "Verbunden", textChannel: "TEXTKANAL", chat: "Chat", server: "Server", emptyChat: "Noch keine Nachrichten", placeholder: "Nachricht senden…", voice: "Sprache", simulationControls: "Simulation steuern", stopSpeaking: "Sprechen stoppen", simulateSpeaking: "Sprechen simulieren", poke: "Anstupsen", simulateReconnect: "Verbindung simulieren", demoNote: "Diese Seite verbindet sich nie mit einem echten TeamSpeak-Server.", you: "Du", ready: "Bereit", pokedYou: "hat dich angestupst" };
+const ru = { languageMenu: "Язык", skinSelector: "Оформление", skinDay: "День", skinNight: "Ночь", browserClient: "Голосовое пространство в браузере", demoBadge: "Демо — симуляция", back: "На главную", reconnecting: "Соединение прервано, восстановление…", restore: "Восстановить", channels: "Каналы", channel: "Канал", simulated: "Симуляция", heroLead: "Предпросмотр каналов, голоса и чата WebSpeak.", online: "онлайн", voiceActivity: "ГОЛОСОВАЯ АКТИВНОСТЬ", speakingNow: "Сейчас говорят", speaking: "Говорит…", connected: "Подключён", textChannel: "ТЕКСТОВЫЙ КАНАЛ", chat: "чат", server: "Сервер", emptyChat: "Сообщений пока нет", placeholder: "Написать сообщение…", voice: "Голос", simulationControls: "Управление симуляцией", stopSpeaking: "Остановить речь", simulateSpeaking: "Симулировать речь", poke: "Толкнуть", simulateReconnect: "Симулировать переподключение", demoNote: "Эта страница не подключается к реальному серверу TeamSpeak.", you: "Вы", ready: "Готово", pokedYou: "толкнул вас" };
+const ja = { languageMenu: "言語", skinSelector: "スキン", skinDay: "昼", skinNight: "夜", browserClient: "ブラウザ音声ワークスペース", demoBadge: "デモ — シミュレーション", back: "ホームに戻る", reconnecting: "接続が中断されました。復旧中…", restore: "復旧", channels: "チャンネル", channel: "チャンネル", simulated: "シミュレーション", heroLead: "WebSpeak のチャンネル、音声、チャットのプレビューです。", online: "人がオンライン", voiceActivity: "音声アクティビティ", speakingNow: "発話中", speaking: "発話中…", connected: "接続済み", textChannel: "テキストチャンネル", chat: "チャット", server: "サーバー", emptyChat: "メッセージはありません", placeholder: "メッセージを送信…", voice: "音声", simulationControls: "シミュレーション操作", stopSpeaking: "発話を停止", simulateSpeaking: "発話をシミュレート", poke: "つつく", simulateReconnect: "再接続をシミュレート", demoNote: "このページは実際の TeamSpeak サーバーには接続しません。", you: "あなた", ready: "準備完了", pokedYou: "あなたをつつきました" };
 const tabs = computed(() => [{ id: "channel" as const, label: copy.value.channel }, { id: "server" as const, label: copy.value.server }]);
 const selectedChannel = computed(() => channels.find((channel) => channel.id === selectedChannelId.value) ?? channels[0]);
 const visibleMessages = computed(() => activeTab.value === "channel" ? messages.value : []);
 
-function persistLanguage() { localStorage.setItem("webspeak:language", language.value); }
+function persistLanguage() { localStorage.setItem("webspeak:language", language.value); void saveLocalPreferences({ schemaVersion: 1, language: language.value }); }
+async function onSkinChange(skinId: string) {
+  const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
+  activeSkin.value = await activateSkin(skinId, catalogSkin?.version);
+  activeSkinId.value = getStoredSkinId() ?? skinId;
+  void saveLocalPreferences({ schemaVersion: 1, skinId: activeSkinId.value });
+}
+onMounted(async () => {
+  const [preferences, installed, available] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), listPublicSkins()]);
+  installedSkins.value = installed;
+  catalogSkins.value = available;
+  const selectedId = getStoredSkinId() ?? preferences.skinId ?? activeSkinId.value;
+  activeSkinId.value = selectedId;
+  const catalogSkin = available.find((skin) => skin.id === selectedId);
+  activeSkin.value = await activateSkin(selectedId, catalogSkin?.version);
+  activeSkinId.value = getStoredSkinId() ?? selectedId;
+});
 function selectChannel(id: string) { selectedChannelId.value = id; activeTab.value = "channel"; }
 function toggleSpeaking() { speakingId.value = speakingId.value ? "" : selectedChannel.value.members[0]?.id ?? ""; }
 function messageText(message: DemoMessage): string { return language.value === "zh" ? message.zhText ?? message.text : language.value === "ru" ? message.ruText ?? message.enText ?? message.text : language.value === "ja" ? message.jaText ?? message.enText ?? message.text : message.enText ?? message.text; }
@@ -76,9 +122,9 @@ function avatarStyle(name: string) { let hash = 0; for (const char of name) hash
 </script>
 
 <style scoped>
-:global(*) { box-sizing: border-box; }
-:global(body) { margin: 0; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f9f8; color: #1c2b28; }
-.demo-page { min-height: 100dvh; padding: 0 28px 38px; background: radial-gradient(circle at 72% 12%, rgba(126, 213, 205, .18), transparent 26rem), #f7f9f8; }
+.demo-page, .demo-page * { box-sizing: border-box; }
+.demo-page { min-height: 100dvh; padding: 0 28px 38px; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 72% 12%, rgba(126, 213, 205, .18), transparent 26rem), #f7f9f8; color: #1c2b28; }
+.demo-page button, .demo-page input { font: inherit; }
 .demo-header { display: flex; align-items: center; justify-content: space-between; width: min(1380px, 100%); min-height: 82px; margin: 0 auto; }
 .demo-brand, .demo-tools, .demo-brand > div, .demo-tools { display: flex; align-items: center; }.demo-brand { gap: 10px; }.demo-brand > span { display: grid; place-items: center; width: 39px; height: 39px; color: #fff; background: #006a64; border-radius: 12px; }.demo-brand strong, .demo-brand small { display: block; }.demo-brand strong { color: #006a64; font-size: 18px; }.demo-brand small { margin-top: 2px; color: #84938e; font-size: 10px; }.demo-tools { gap: 15px; color: #68807a; font-size: 12px; }.demo-tools button, .demo-tools a { padding: 7px 10px; color: #006a64; background: #e1f2ee; border: 1px solid #cbe6e0; border-radius: 7px; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer; }.demo-badge { color: #2d7d50; font-weight: 700; }
 .demo-reconnect { display: flex; align-items: center; gap: 9px; width: min(1380px, 100%); margin: 0 auto 14px; padding: 11px 14px; color: #8b6537; background: #fff8e9; border: 1px solid #efd9aa; border-radius: 10px; }.demo-reconnect span { flex: 1; }.demo-reconnect button { padding: 6px 10px; color: #7d5d35; background: #fff; border: 1px solid #ead0a0; border-radius: 6px; cursor: pointer; }
@@ -98,6 +144,6 @@ function avatarStyle(name: string) { let hash = 0; for (const char of name) hash
 :global(:root[data-theme="dark"]) .demo-hero { background: linear-gradient(112deg, #173e3a, #172321); }
 :global(:root[data-theme="dark"]) .demo-message p, :global(:root[data-theme="dark"]) .demo-composer, :global(:root[data-theme="dark"]) .demo-actions-panel > button { background: #202f2c; color: #d7e7e3; }
 :global(:root[data-theme="dark"]) .demo-chat-head, :global(:root[data-theme="dark"]) .demo-user { border-color: #30413d; }
-@media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) .demo-channel-panel, :global(:root[data-theme="system"]) .demo-actions-panel, :global(:root[data-theme="system"]) .demo-main, :global(:root[data-theme="system"]) .demo-voice-card { background: #172321; border-color: #30413d; } }
-:global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible) { outline: 3px solid #69d2c7; outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :global(:root[data-theme="system"]) .demo-page .demo-channel-panel, :global(:root[data-theme="system"]) .demo-page .demo-actions-panel, :global(:root[data-theme="system"]) .demo-page .demo-main, :global(:root[data-theme="system"]) .demo-page .demo-voice-card { background: #172321; border-color: #30413d; } }
+.demo-page :where(button, a, input, select):focus-visible { outline: 3px solid #69d2c7; outline-offset: 2px; }
 </style>

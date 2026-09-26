@@ -23,7 +23,7 @@
     <div v-else class="admin-shell">
       <aside class="admin-sidebar">
         <div class="admin-brand"><span><Icon name="waveform" :size="22" /></span><div><strong>WebSpeak</strong><small>{{ tr('adminConsole') }}</small></div></div>
-        <nav><RouterLink to="/admin" exact-active-class="active"><Icon name="activity" :size="18" />{{ tr('overview') }}</RouterLink><RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('server') }}</RouterLink><RouterLink to="/admin/operations" active-class="active"><Icon name="users" :size="18" />{{ tr('operations') }}</RouterLink></nav>
+        <nav><RouterLink to="/admin" exact-active-class="active"><Icon name="activity" :size="18" />{{ tr('overview') }}</RouterLink><RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('server') }}</RouterLink><RouterLink to="/admin/operations" active-class="active"><Icon name="users" :size="18" />{{ tr('operations') }}</RouterLink><RouterLink to="/admin/skins" active-class="active"><Icon name="compass" :size="18" />{{ tr('skinLibrary') }}</RouterLink></nav>
         <div class="sidebar-bottom"><a href="/" target="_blank"><Icon name="share" :size="16" />{{ tr('openGuest') }}</a><button type="button" @click="logout"><Icon name="door" :size="16" />{{ tr('logout') }}</button></div>
       </aside>
 
@@ -34,12 +34,58 @@
         <section v-if="route.path === '/admin/server'" class="page-content server-page">
           <div class="page-heading"><div><h2>{{ tr('serverSettings') }}</h2><p>{{ tr('serverSettingsLead') }}</p></div><button class="primary-button" :disabled="submitting" @click="saveServerSettings">{{ submitting ? tr('saving') : tr('saveChanges') }}</button></div>
           <div class="settings-grid">
-            <article class="settings-card"><h3>{{ tr('teamSpeakTarget') }}</h3><div class="target-fields"><label><span>{{ tr('serverAddress') }}</span><input v-model.trim="serverForm.address" :placeholder="tr('serverPlaceholder')" /></label><label><span>{{ tr('serverPort') }}</span><input v-model.trim="serverForm.port" inputmode="numeric" type="text" maxlength="5" :placeholder="tr('serverPortPlaceholder')" /></label></div><div class="password-row"><label><span>{{ tr('serverPassword') }}</span><input v-model="serverForm.serverPassword" type="password" autocomplete="off" :disabled="serverForm.passwordAction !== 'replace'" :placeholder="serverForm.hasPassword ? tr('passwordConfigured') : tr('optionalPassword')" /></label><div class="password-actions"><button type="button" :class="{ active: serverForm.passwordAction === 'replace' }" @click="serverForm.passwordAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasPassword" type="button" :class="{ danger: serverForm.passwordAction === 'remove' }" @click="serverForm.passwordAction = 'remove'">{{ tr('remove') }}</button></div></div><button class="secondary-button" type="button" :disabled="testing" @click="testServerConnection"><span v-if="testing" class="spinner small"></span><Icon v-else name="activity" :size="17" />{{ testing ? tr('testing') : tr('testConnection') }}</button><div v-if="testResult" :class="['test-result', testResult.ok ? 'success' : 'error']"><Icon :name="testResult.ok ? 'check' : 'close'" :size="18" /><div><strong>{{ testResultTitle }}</strong><small>{{ testResultText }}</small></div></div></article>
-            <article class="settings-card"><h3>{{ tr('accessAndIdentity') }}</h3><fieldset><legend>{{ tr('accessMode') }}</legend><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset><label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label><div class="welcome-editor"><div class="welcome-editor-heading"><label><span>{{ tr('welcomeLanguage') }}</span><select v-model="welcomeLanguage"><option v-for="option in welcomeLanguageOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><small>{{ tr('welcomeLanguageHint') }}</small></div><label><span>{{ tr('welcomeText') }} · {{ selectedWelcomeLanguageLabel }}</span><textarea v-model="selectedWelcomeText" maxlength="500" rows="4" :placeholder="selectedWelcomeDefault"></textarea></label><small class="field-help">{{ tr('welcomeFallbackHint') }}</small></div></article>
-            <article class="settings-card advanced-card"><div><h3>{{ tr('advancedSettings') }}</h3><p class="card-help">{{ tr('advancedSettingsLead') }}</p></div><label class="choice toggle-choice"><input v-model="serverForm.webRtcEnabled" type="checkbox" @change="handleWebRtcToggle" /><span><strong>{{ tr('webrtcEnabled') }}</strong><small>{{ tr('webrtcEnabledLead') }}</small></span></label><div class="webrtc-port-fields"><div class="port-fields-heading"><strong>{{ tr('webrtcPortRange') }}</strong><small>{{ tr('webrtcPortRangeLead') }}</small></div><div class="port-inputs"><label><span>{{ tr('webrtcPortStart') }}</span><input v-model.number="serverForm.webRtcUdpStart" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label><label><span>{{ tr('webrtcPortEnd') }}</span><input v-model.number="serverForm.webRtcUdpEnd" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label></div></div><small class="field-help">{{ tr('webrtcApplyHint') }}</small></article>
-            <article class="settings-card relay-card"><div><h3>{{ tr('relaySettings') }}</h3><p class="card-help">{{ tr('relaySettingsLead') }}</p></div><div v-if="!serverForm.relayNodes.length" class="relay-empty">{{ tr('relayNodeEmpty') }}</div><div class="relay-node-list"><div v-for="(relay, index) in serverForm.relayNodes" :key="relay.id" class="relay-node"><div class="relay-node-heading"><label class="relay-enabled"><input v-model="relay.enabled" type="checkbox" /><strong>{{ relay.name || tr('relayUnnamed') }}</strong></label><button class="text-danger" type="button" @click="removeRelayNode(index)">{{ tr('remove') }}</button></div><div class="relay-fields"><label><span>{{ tr('relayName') }}</span><input v-model.trim="relay.name" maxlength="80" :placeholder="tr('relayNamePlaceholder')" /></label><label><span>{{ tr('relayTarget') }}</span><input v-model.trim="relay.target" maxlength="300" :placeholder="tr('relayTargetPlaceholder')" /></label><div class="password-row"><label><span>{{ tr('relayToken') }}</span><input v-model="relay.token" type="password" autocomplete="off" :disabled="relay.tokenAction !== 'replace'" :placeholder="relay.hasToken ? tr('relayTokenConfigured') : tr('relayTokenPlaceholder')" /></label><div class="password-actions"><button type="button" :class="{ active: relay.tokenAction === 'replace' }" @click="relay.tokenAction = 'replace'">{{ tr('change') }}</button><button v-if="relay.hasToken" type="button" :class="{ danger: relay.tokenAction === 'remove' }" @click="relay.tokenAction = 'remove'">{{ tr('remove') }}</button></div></div></div></div></div><button class="secondary-button relay-add" type="button" @click="addRelayNode">{{ tr('relayAdd') }}</button><small class="field-help">{{ tr('relayManagedHint') }}</small></article>
+            <details class="settings-card settings-accordion target-accordion" open>
+              <summary class="settings-accordion-header">
+                <span class="settings-accordion-heading"><strong>{{ tr('teamSpeakTarget') }}</strong><small>{{ serverForm.address || '—' }} · {{ serverForm.port || '—' }}</small></span>
+                <Icon name="chevron-down" :size="18" />
+              </summary>
+              <div class="settings-accordion-content">
+                <div class="target-settings-layout">
+                  <div class="target-fields">
+                    <label><span>{{ tr('serverAddress') }}</span><input v-model.trim="serverForm.address" :placeholder="tr('serverPlaceholder')" /></label>
+                    <label><span>{{ tr('serverPort') }}</span><input v-model.trim="serverForm.port" inputmode="numeric" type="text" maxlength="5" :placeholder="tr('serverPortPlaceholder')" /></label>
+                  </div>
+                  <div class="password-row">
+                    <label><span>{{ tr('serverPassword') }}</span><input v-model="serverForm.serverPassword" type="password" autocomplete="off" :disabled="serverForm.passwordAction !== 'replace'" :placeholder="serverForm.hasPassword ? tr('passwordConfigured') : tr('optionalPassword')" /></label>
+                    <div class="password-actions"><button type="button" :class="{ active: serverForm.passwordAction === 'replace' }" @click="serverForm.passwordAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasPassword" type="button" :class="{ danger: serverForm.passwordAction === 'remove' }" @click="serverForm.passwordAction = 'remove'">{{ tr('remove') }}</button></div>
+                  </div>
+                  <button class="secondary-button target-test-button" type="button" :disabled="testing" @click="testServerConnection"><span v-if="testing" class="spinner small"></span><Icon v-else name="activity" :size="17" />{{ testing ? tr('testing') : tr('testConnection') }}</button>
+                  <div v-if="testResult" :class="['test-result', 'target-test-result', testResult.ok ? 'success' : 'error']"><Icon :name="testResult.ok ? 'check' : 'close'" :size="18" /><div><strong>{{ testResultTitle }}</strong><small>{{ testResultText }}</small></div></div>
+                  <div class="target-runtime-block"><h4>{{ tr('runtimeFacts') }}</h4><dl class="target-runtime-facts"><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(serverForm.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ serverForm.lastTestLatencyMs == null ? '—' : `${serverForm.lastTestLatencyMs} ms` }}</dd></div><div><dt>{{ tr('internalPort') }}</dt><dd>3040</dd></div></dl></div>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-card settings-accordion">
+              <summary class="settings-accordion-header">
+                <span class="settings-accordion-heading"><strong>{{ tr('accessAndIdentity') }}</strong><small>{{ serverForm.accessMode === 'fixed' ? tr('fixedMode') : tr('openMode') }} · {{ serverForm.siteName || 'WebSpeak' }}</small></span>
+                <Icon name="chevron-down" :size="18" />
+              </summary>
+              <div class="settings-accordion-content">
+                <div class="access-settings-layout">
+                  <fieldset class="access-mode-fieldset"><legend>{{ tr('accessMode') }}</legend><label class="choice" :class="{ selected: serverForm.accessMode === 'fixed' }"><input v-model="serverForm.accessMode" type="radio" value="fixed" /><span><strong>{{ tr('fixedMode') }}</strong><small>{{ tr('fixedModeLead') }}</small></span></label><label class="choice" :class="{ selected: serverForm.accessMode === 'open' }"><input v-model="serverForm.accessMode" type="radio" value="open" /><span><strong>{{ tr('openMode') }}</strong><small>{{ tr('openModeLead') }}</small></span></label></fieldset>
+                  <div class="site-identity-fields">
+                    <label><span>{{ tr('siteName') }}</span><input v-model.trim="serverForm.siteName" maxlength="80" /></label>
+                    <div class="welcome-editor"><div class="welcome-editor-heading"><label><span>{{ tr('welcomeLanguage') }}</span><select v-model="welcomeLanguage"><option v-for="option in welcomeLanguageOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><small>{{ tr('welcomeLanguageHint') }}</small></div><label><span>{{ tr('welcomeText') }} · {{ selectedWelcomeLanguageLabel }}</span><textarea v-model="selectedWelcomeText" maxlength="500" rows="4" :placeholder="selectedWelcomeDefault"></textarea></label><small class="field-help">{{ tr('welcomeFallbackHint') }}</small></div>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-card settings-accordion advanced-card">
+              <summary class="settings-accordion-header">
+                <span class="settings-accordion-heading"><strong>{{ tr('advancedSettings') }}</strong><small>{{ tr('advancedSettingsLead') }}</small></span>
+                <span class="settings-accordion-statuses"><span class="settings-summary-chip"><i :class="{ active: serverForm.webRtcEnabled }"></i>{{ tr('webrtcSettings') }} · {{ serverForm.webRtcEnabled ? tr('enabledStatus') : tr('disabledStatus') }}</span><span class="settings-summary-chip"><i :class="{ active: serverForm.relayNodes.some((relay) => relay.enabled) }"></i>{{ tr('relaySettings') }} · {{ tr('relayNodeCount', { count: serverForm.relayNodes.length }) }}</span></span>
+                <Icon name="chevron-down" :size="18" />
+              </summary>
+              <div class="settings-accordion-content">
+                <div class="advanced-settings-grid">
+                  <section class="settings-subsection webrtc-card"><header class="settings-subsection-heading"><div><h4>{{ tr('webrtcSettings') }}</h4><p class="card-help">{{ tr('webrtcLead') }}</p></div></header><label class="choice toggle-choice" :class="{ selected: serverForm.webRtcEnabled }"><input v-model="serverForm.webRtcEnabled" type="checkbox" @change="handleWebRtcToggle" /><span><strong>{{ tr('webrtcEnabled') }}</strong><small>{{ tr('webrtcEnabledLead') }}</small></span></label><div class="webrtc-port-fields"><div class="port-fields-heading"><strong>{{ tr('webrtcPortRange') }}</strong><small>{{ tr('webrtcPortRangeLead') }}</small></div><div class="port-inputs"><label><span>{{ tr('webrtcPortStart') }}</span><input v-model.number="serverForm.webRtcUdpStart" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label><label><span>{{ tr('webrtcPortEnd') }}</span><input v-model.number="serverForm.webRtcUdpEnd" type="number" inputmode="numeric" min="1024" max="65535" :disabled="serverForm.webRtcEnabled" /></label></div></div><small class="field-help">{{ tr('webrtcApplyHint') }}</small></section>
+                  <section class="settings-subsection relay-card"><header class="settings-subsection-heading"><div><h4>{{ tr('relaySettings') }}</h4><p class="card-help">{{ tr('relaySettingsLead') }}</p></div></header><div v-if="!serverForm.relayNodes.length" class="relay-empty">{{ tr('relayNodeEmpty') }}</div><div class="relay-node-list"><div v-for="(relay, index) in serverForm.relayNodes" :key="relay.id" class="relay-node"><div class="relay-node-heading"><label class="relay-enabled"><input v-model="relay.enabled" type="checkbox" /><strong>{{ relay.name || tr('relayUnnamed') }}</strong></label><button class="text-danger" type="button" @click="removeRelayNode(index)">{{ tr('remove') }}</button></div><div class="relay-fields"><label><span>{{ tr('relayName') }}</span><input v-model.trim="relay.name" maxlength="80" :placeholder="tr('relayNamePlaceholder')" /></label><label><span>{{ tr('relayTarget') }}</span><input v-model.trim="relay.target" maxlength="300" :placeholder="tr('relayTargetPlaceholder')" /></label><div class="password-row"><label><span>{{ tr('relayToken') }}</span><input v-model="relay.token" type="password" autocomplete="off" :disabled="relay.tokenAction !== 'replace'" :placeholder="relay.hasToken ? tr('relayTokenConfigured') : tr('relayTokenPlaceholder')" /></label><div class="password-actions"><button type="button" :class="{ active: relay.tokenAction === 'replace' }" @click="relay.tokenAction = 'replace'">{{ tr('change') }}</button><button v-if="relay.hasToken" type="button" :class="{ danger: relay.tokenAction === 'remove' }" @click="relay.tokenAction = 'remove'">{{ tr('remove') }}</button></div></div></div></div></div><button class="secondary-button relay-add" type="button" @click="addRelayNode">{{ tr('relayAdd') }}</button><small class="field-help">{{ tr('relayManagedHint') }}</small></section>
+                </div>
+              </div>
+            </details>
           </div>
-          <article class="readonly-card"><h3>{{ tr('runtimeFacts') }}</h3><dl><div><dt>{{ tr('lastTest') }}</dt><dd>{{ formatDate(serverForm.lastTestAt) }}</dd></div><div><dt>{{ tr('latency') }}</dt><dd>{{ serverForm.lastTestLatencyMs == null ? '—' : `${serverForm.lastTestLatencyMs} ms` }}</dd></div><div><dt>{{ tr('internalPort') }}</dt><dd>3040</dd></div></dl></article>
         </section>
 
         <section v-else-if="route.path === '/admin/operations'" class="page-content operations-page">
@@ -54,6 +100,22 @@
             <article class="operation-card logs-card"><header><div><h3>{{ tr('logViewer') }}</h3><p>{{ tr('logViewerLead') }}</p></div><span v-if="!operations.logs.available" class="muted-label">{{ tr('logsUnavailable') }}</span></header><div v-if="operations.logs.sessions.length" class="connection-list"><div class="connection-history-heading"><strong>{{ tr('connectionHistory') }}</strong><small>{{ tr('connectionHistoryLead') }}</small></div><div v-for="record in operations.logs.sessions" :key="record.id" class="connection-row"><div class="connection-person"><strong>{{ record.nickname }}</strong><small>{{ record.target }}</small><small class="connection-route">{{ connectionRoute(record) }}</small></div><div class="connection-detail"><span :class="['connection-status', record.status]">{{ connectionStatusLabel(record.status) }}</span><small>{{ record.connectedAt ? tr('connectedAt') : tr('connectionAttemptedAt') }}：{{ formatDate(record.connectedAt || record.startedAt) }}</small><small>{{ tr('duration') }}：{{ formatAge(record.durationSeconds) }}</small><small v-if="record.disconnectedAt">{{ tr('disconnectedAt') }}：{{ formatDate(record.disconnectedAt) }}</small><small v-if="record.reason">{{ tr('failureReason') }}：{{ connectionFailureText(record.reason) }}</small><small v-if="record.failureDetail" class="failure-detail">{{ tr('failureDetail') }}：{{ record.failureDetail }}</small></div></div></div><div v-if="operations.logs.entries.length" class="log-list"><div v-for="(entry, index) in operations.logs.entries" :key="`${entry.timestamp}-${index}`" class="log-row"><span :class="['log-level', entry.level.toLowerCase()]">{{ entry.level }}</span><div><strong>{{ entry.message || '—' }}</strong><small>{{ formatDate(entry.timestamp) }}<template v-if="Object.keys(entry.context).length"> · {{ formatContext(entry.context) }}</template></small></div></div></div><div v-if="!operations.logs.sessions.length && !operations.logs.entries.length" class="operation-empty"><Icon name="activity" :size="22" /><span>{{ tr('noLogs') }}</span></div></article>
             <article class="operation-card audit-card"><header><div><h3>{{ tr('audit') }}</h3><p>{{ tr('auditLead') }}</p></div></header><ul class="event-list"><li v-for="event in operations.audit" :key="`${event.event}-${event.createdAt}`"><span><Icon name="check" :size="14" /></span><div><strong>{{ eventName(event.event) }}</strong><small>{{ formatDate(event.createdAt) }}</small></div></li><li v-if="!operations.audit.length" class="empty-event">{{ tr('auditEmpty') }}</li></ul></article>
           </div>
+        </section>
+
+        <section v-else-if="route.path === '/admin/skins'" class="page-content skin-library-page">
+          <div class="page-heading"><div><h2>{{ tr('skinLibrary') }}</h2><p>{{ tr('skinLibraryLead') }}</p></div><button class="primary-button" type="button" :disabled="skinUploading" @click="skinFileInput?.click()"><span v-if="skinUploading" class="spinner small"></span><Icon v-else name="share" :size="16" />{{ skinUploading ? tr('skinUploading') : tr('skinUpload') }}</button></div>
+          <input ref="skinFileInput" class="skin-file-input" type="file" accept=".wskin,application/zip" @change="onSkinFileChanged" />
+          <div class="alert info skin-library-scope"><Icon name="info" :size="16" /><span>{{ tr('skinLibraryScope') }}</span></div>
+          <div v-if="skinManagerError" class="alert error" role="alert">{{ skinManagerError }}</div>
+          <div v-if="skinManagerNotice" class="alert success" role="status">{{ skinManagerNotice }}</div>
+          <div v-if="skinLoading" class="skin-library-loading"><span class="spinner"></span>{{ tr('loading') }}</div>
+          <div v-else-if="skinEntries.length" class="skin-library-grid">
+            <article v-for="skin in skinEntries" :key="skin.id" class="skin-library-card">
+              <div class="skin-preview"><img v-if="skin.previewUrl" :src="skin.previewUrl" :alt="skin.name" /><span v-else><Icon name="compass" :size="28" /></span><small>v{{ skin.version }}</small></div>
+              <div class="skin-library-copy"><div class="skin-library-title"><h3>{{ skin.name }}</h3><span>{{ skin.id }}</span></div><p v-if="skin.description">{{ skin.description }}</p><dl><div><dt>{{ tr('skinAuthor') }}</dt><dd>{{ skin.author }}</dd></div><div><dt>{{ tr('skinLicense') }}</dt><dd>{{ skin.license }}</dd></div><div><dt>{{ tr('skinMinVersion') }}</dt><dd>{{ skin.minAppVersion }}</dd></div></dl><div class="skin-library-actions"><a v-if="skin.previewUrl" :href="skin.previewUrl" target="_blank" rel="noreferrer" class="text-link">{{ tr('skinPreview') }}</a><button class="text-danger" type="button" :disabled="removingSkinId === skin.id" @click="removeSkin(skin)">{{ removingSkinId === skin.id ? tr('skinRemoving') : tr('skinRemove') }}</button></div></div>
+            </article>
+          </div>
+          <div v-else class="skin-library-empty"><span><Icon name="compass" :size="24" /></span><strong>{{ tr('skinEmpty') }}</strong><p>{{ tr('skinEmptyLead') }}</p></div>
         </section>
 
         <section v-else class="page-content overview-page">
@@ -74,6 +136,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
+import { deleteSkinPackage, uploadSkinPackage, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 
 type Language = "zh" | "en" | "de" | "ru" | "ja";
@@ -121,6 +184,13 @@ interface AdminLog { timestamp: string | null; level: string; message: string; c
 interface AdminConnectionRecord { id: string; nickname: string; clientIp: string; target: string; relayName: string | null; relayTarget: string | null; startedAt: string; connectedAt: string | null; disconnectedAt: string | null; durationSeconds: number | null; status: "active" | "connecting" | "disconnected" | "failed"; reason: string | null; failureDetail: string | null }
 const operationsLoading = ref(false);
 const terminatingSession = ref("");
+const skinFileInput = ref<HTMLInputElement | null>(null);
+const skinEntries = ref<SkinCatalogEntry[]>([]);
+const skinLoading = ref(false);
+const skinUploading = ref(false);
+const removingSkinId = ref("");
+const skinManagerError = ref("");
+const skinManagerNotice = ref("");
 const inviteForm = reactive({ channel: "", expiresInHours: 24, maxUses: 0 });
 const createdInvite = ref<{ token: string; link: string } | null>(null);
 const webrtcPortNoticeOpen = ref(false);
@@ -154,6 +224,23 @@ const copy = {
     overview: "概览",
     server: "服务器",
     operations: "运维",
+    skinLibrary: "皮肤",
+    skinLibraryLead: "上传并管理此实例访客可选择的自定义皮肤。",
+    skinLibraryScope: "皮肤会作为可选项提供给访客；每位访客可在前台自行选择。管理后台始终保持原样式。",
+    skinUpload: "导入皮肤包",
+    skinUploading: "正在校验并导入…",
+    skinEmpty: "尚未导入自定义皮肤",
+    skinEmptyLead: "选择符合 WebSpeak 皮肤规范的 .wskin 文件开始使用。",
+    skinAuthor: "作者",
+    skinLicense: "许可证",
+    skinMinVersion: "最低版本",
+    skinPreview: "查看预览",
+    skinRemove: "移除",
+    skinRemoving: "正在移除…",
+    skinConfirmRemove: "确定从此实例中移除此皮肤吗？已选择该皮肤的访客会在下次加载时回退。",
+    skinReplaceConfirm: "已有同 ID 皮肤。要用这个版本替换吗？",
+    skinImported: "皮肤已导入并向访客开放。",
+    skinRemoved: "皮肤已从实例中移除。",
     openGuest: "打开访客页面",
     logout: "退出登录",
     gatewayRunning: "网关运行中",
@@ -196,6 +283,9 @@ const copy = {
     accessAndIdentity: "访问与站点信息",
     advancedSettings: "高级参数",
     advancedSettingsLead: "仅在需要时调整网关的高级传输参数。",
+    enabledStatus: "已启用",
+    disabledStatus: "未启用",
+    relayNodeCount: "{{count}} 个节点",
     webrtcSettings: "WebRTC 语音",
     webrtcLead: "由当前 WebSpeak 网关直接提供低延迟语音传输，无需配置其他服务器。",
     webrtcEnabled: "启用 WebRTC",
@@ -358,6 +448,23 @@ const copy = {
     overview: "Overview",
     server: "Server",
     operations: "Operations",
+    skinLibrary: "Skins",
+    skinLibraryLead: "Upload and manage custom skins available to visitors of this instance.",
+    skinLibraryScope: "Skins are offered as visitor-selectable options. Each visitor chooses a skin on the public page; the admin console always keeps its own appearance.",
+    skinUpload: "Import skin package",
+    skinUploading: "Validating and importing…",
+    skinEmpty: "No custom skins yet",
+    skinEmptyLead: "Choose a .wskin package that follows the WebSpeak skin specification.",
+    skinAuthor: "Author",
+    skinLicense: "License",
+    skinMinVersion: "Minimum version",
+    skinPreview: "Preview",
+    skinRemove: "Remove",
+    skinRemoving: "Removing…",
+    skinConfirmRemove: "Remove this skin from the instance? Visitors using it will fall back the next time they load the page.",
+    skinReplaceConfirm: "A skin with this ID already exists. Replace it with this package?",
+    skinImported: "Skin imported and made available to visitors.",
+    skinRemoved: "Skin removed from the instance.",
     openGuest: "Open guest page",
     logout: "Log out",
     gatewayRunning: "Gateway running",
@@ -400,6 +507,9 @@ const copy = {
     accessAndIdentity: "Access and site identity",
     advancedSettings: "Advanced settings",
     advancedSettingsLead: "Adjust gateway transport options only when needed.",
+    enabledStatus: "Enabled",
+    disabledStatus: "Disabled",
+    relayNodeCount: "{{count}} nodes",
     webrtcSettings: "WebRTC audio",
     webrtcLead: "Low-latency voice is provided by this WebSpeak gateway; no extra server is required.",
     webrtcEnabled: "Enable WebRTC",
@@ -560,6 +670,23 @@ const germanCopy = {
   overview: "Übersicht",
   server: "Server",
   operations: "Betrieb",
+  skinLibrary: "Skins",
+  skinLibraryLead: "Benutzerdefinierte Skins für Besucher dieser Instanz hochladen und verwalten.",
+  skinLibraryScope: "Skins werden Besuchern zur Auswahl angeboten. Jeder Besucher wählt das Design auf der öffentlichen Seite; die Administrationsoberfläche bleibt unverändert.",
+  skinUpload: "Skin-Paket importieren",
+  skinUploading: "Wird geprüft und importiert…",
+  skinEmpty: "Noch keine benutzerdefinierten Skins",
+  skinEmptyLead: "Wähle ein .wskin-Paket nach der WebSpeak-Skin-Spezifikation aus.",
+  skinAuthor: "Autor",
+  skinLicense: "Lizenz",
+  skinMinVersion: "Mindestversion",
+  skinPreview: "Vorschau",
+  skinRemove: "Entfernen",
+  skinRemoving: "Wird entfernt…",
+  skinConfirmRemove: "Diesen Skin aus der Instanz entfernen? Besucher wechseln beim nächsten Laden zurück.",
+  skinReplaceConfirm: "Ein Skin mit dieser ID ist bereits vorhanden. Durch dieses Paket ersetzen?",
+  skinImported: "Skin importiert und für Besucher freigegeben.",
+  skinRemoved: "Skin aus der Instanz entfernt.",
   openGuest: "Gastseite öffnen",
   logout: "Abmelden",
   gatewayRunning: "Gateway läuft",
@@ -601,6 +728,9 @@ const germanCopy = {
   accessAndIdentity: "Zugriff und Website-Informationen",
   advancedSettings: "Erweiterte Einstellungen",
   advancedSettingsLead: "Erweiterte Gateway-Transportparameter nur bei Bedarf ändern.",
+  enabledStatus: "Aktiviert",
+  disabledStatus: "Deaktiviert",
+  relayNodeCount: "{{count}} Knoten",
   webrtcSettings: "WebRTC-Audio",
   webrtcEnabled: "WebRTC aktivieren",
   webrtcPortRange: "WebRTC-UDP-Portbereich",
@@ -714,6 +844,23 @@ const russianCopy = {
   overview: "Обзор",
   server: "Сервер",
   operations: "Операции",
+  skinLibrary: "Оформление",
+  skinLibraryLead: "Загружайте и управляйте оформлением, доступным посетителям этого экземпляра.",
+  skinLibraryScope: "Оформление предлагается посетителям на выбор; каждый выбирает его на публичной странице. Панель администратора сохраняет собственный стиль.",
+  skinUpload: "Импортировать пакет оформления",
+  skinUploading: "Проверка и импорт…",
+  skinEmpty: "Пользовательское оформление ещё не добавлено",
+  skinEmptyLead: "Выберите файл .wskin, соответствующий спецификации WebSpeak.",
+  skinAuthor: "Автор",
+  skinLicense: "Лицензия",
+  skinMinVersion: "Мин. версия",
+  skinPreview: "Предпросмотр",
+  skinRemove: "Удалить",
+  skinRemoving: "Удаление…",
+  skinConfirmRemove: "Удалить оформление из этого экземпляра? При следующей загрузке посетители вернутся к стандартному.",
+  skinReplaceConfirm: "Оформление с таким ID уже существует. Заменить его этим пакетом?",
+  skinImported: "Оформление импортировано и доступно посетителям.",
+  skinRemoved: "Оформление удалено из экземпляра.",
   openGuest: "Открыть страницу гостя",
   logout: "Выйти",
   gatewayRunning: "Шлюз работает",
@@ -739,6 +886,9 @@ const russianCopy = {
   accessAndIdentity: "Доступ и данные сайта",
   advancedSettings: "Расширенные настройки",
   advancedSettingsLead: "Изменяйте расширенные параметры передачи только при необходимости.",
+  enabledStatus: "Включено",
+  disabledStatus: "Выключено",
+  relayNodeCount: "Узлов: {{count}}",
   webrtcEnabled: "Включить WebRTC",
   relaySettings: "Сервер ретрансляции",
   relaySettingsLead: "Настройте узлы ретрансляции для ускоренных подключений.",
@@ -833,6 +983,23 @@ const japaneseCopy = {
   overview: "概要",
   server: "サーバー",
   operations: "運用",
+  skinLibrary: "スキン",
+  skinLibraryLead: "このインスタンスの訪問者が選択できるカスタムスキンを管理します。",
+  skinLibraryScope: "スキンは訪問者向けの選択肢として公開され、各訪問者が公開ページで選択します。管理画面の外観は変更されません。",
+  skinUpload: "スキンパッケージを読み込む",
+  skinUploading: "検証・読み込み中…",
+  skinEmpty: "カスタムスキンはまだありません",
+  skinEmptyLead: "WebSpeak スキン仕様に準拠した .wskin ファイルを選択してください。",
+  skinAuthor: "作者",
+  skinLicense: "ライセンス",
+  skinMinVersion: "最低バージョン",
+  skinPreview: "プレビュー",
+  skinRemove: "削除",
+  skinRemoving: "削除中…",
+  skinConfirmRemove: "このインスタンスからスキンを削除しますか？利用中の訪問者は次回読み込み時に標準へ戻ります。",
+  skinReplaceConfirm: "同じ ID のスキンがあります。このパッケージで置き換えますか？",
+  skinImported: "スキンを読み込み、訪問者が選択できるようにしました。",
+  skinRemoved: "インスタンスからスキンを削除しました。",
   openGuest: "ゲストページを開く",
   logout: "ログアウト",
   gatewayRunning: "ゲートウェイ稼働中",
@@ -858,6 +1025,9 @@ const japaneseCopy = {
   accessAndIdentity: "アクセスとサイト情報",
   advancedSettings: "詳細設定",
   advancedSettingsLead: "必要な場合だけゲートウェイの詳細な転送設定を変更します。",
+  enabledStatus: "有効",
+  disabledStatus: "無効",
+  relayNodeCount: "{{count}} ノード",
   webrtcEnabled: "WebRTC を有効化",
   relaySettings: "中継サーバー",
   relaySettingsLead: "高速接続で使用する中継ノードを設定します。",
@@ -961,7 +1131,7 @@ const selectedWelcomeDefault = computed(() => serverForm.welcomeDefaults[welcome
 
 function tr(key: keyof typeof copy.zh, vars: Record<string, string | number> = {}): string { let value: string = language.value === "zh" ? copy.zh[key] : language.value === "de" ? germanCopy[key] ?? copy.en[key] ?? copy.zh[key] : language.value === "ru" ? russianCopy[key] ?? copy.en[key] ?? copy.zh[key] : language.value === "ja" ? japaneseCopy[key] ?? copy.en[key] ?? copy.zh[key] : copy.en[key] ?? copy.zh[key]; for (const [name, replacement] of Object.entries(vars)) value = value.replaceAll(`{{${name}}}`, String(replacement)); return value; }
 const passwordStrength = computed(() => Math.min(100, Math.max(8, newPassword.value.length * 5 + (/[\s\W]/.test(newPassword.value) ? 15 : 0))));
-const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : route.path === "/admin/operations" ? tr('operations') : tr('overview'));
+const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : route.path === "/admin/operations" ? tr('operations') : route.path === "/admin/skins" ? tr('skinLibrary') : tr('overview'));
 const testResultTitle = computed(() => {
   const result = testResult.value;
   if (!result) return "";
@@ -988,9 +1158,9 @@ const webrtcPortRangeText = computed(() => `${serverForm.webRtcUdpStart}–${ser
 
 onMounted(loadAdminView);
 watch(() => [serverForm.address, serverForm.port, serverForm.serverPassword, serverForm.passwordAction], () => { if (!testing.value && screen.value === "admin") testResult.value = null; });
-watch(() => route.path, () => { if (screen.value === "admin" && route.path === "/admin/operations") void loadOperations(); });
+watch(() => route.path, () => { if (screen.value === "admin" && route.path === "/admin/operations") void loadOperations(); else if (screen.value === "admin" && route.path === "/admin/skins") void loadSkinCatalog(); });
 
-async function loadAdminView() { loading.value = true; try { const session = await getJson("/api/admin/session"); if (!session.authenticated) { screen.value = "login"; if (route.path !== "/admin/login") await router.replace("/admin/login"); } else if (session.mustChangePassword) { csrfToken.value = String(session.csrfToken || ""); screen.value = "change-password"; if (route.path !== "/admin/change-password") await router.replace("/admin/change-password"); } else { csrfToken.value = String(session.csrfToken || ""); screen.value = "admin"; if (route.path === "/admin/login" || route.path === "/admin/change-password") await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); if (route.path === "/admin/operations") await loadOperations(); } } catch { errorMessage.value = tr('requestFailed'); } finally { loading.value = false; } }
+async function loadAdminView() { loading.value = true; try { const session = await getJson("/api/admin/session"); if (!session.authenticated) { screen.value = "login"; if (route.path !== "/admin/login") await router.replace("/admin/login"); } else if (session.mustChangePassword) { csrfToken.value = String(session.csrfToken || ""); screen.value = "change-password"; if (route.path !== "/admin/change-password") await router.replace("/admin/change-password"); } else { csrfToken.value = String(session.csrfToken || ""); screen.value = "admin"; if (route.path === "/admin/login" || route.path === "/admin/change-password") await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); if (route.path === "/admin/operations") await loadOperations(); if (route.path === "/admin/skins") await loadSkinCatalog(); } } catch { errorMessage.value = tr('requestFailed'); } finally { loading.value = false; } }
 async function login() { submitting.value = true; errorMessage.value = ""; try { const result = await sendJson("/api/admin/login", "POST", { username: loginUsername.value, password: loginPassword.value }, false); csrfToken.value = String(result.csrfToken || ""); loginPassword.value = ""; if (result.mustChangePassword) { screen.value = "change-password"; await router.replace("/admin/change-password"); } else { screen.value = "admin"; await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function changePassword() { errorMessage.value = ""; if (newPassword.value.length < 12) { errorMessage.value = tr('setupPasswordShort'); return; } if (newPassword.value !== confirmNewPassword.value) { errorMessage.value = tr('setupPasswordsMismatch'); return; } submitting.value = true; try { await sendJson("/api/admin/change-password", "POST", { newPassword: newPassword.value }); newPassword.value = ""; confirmNewPassword.value = ""; screen.value = "admin"; await router.replace("/admin"); await Promise.all([loadOverview(), loadServerSettings()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function logout() { try { await sendJson("/api/admin/logout", "POST", {}); } finally { csrfToken.value = ""; screen.value = "login"; await router.replace("/admin/login"); } }
@@ -1009,6 +1179,52 @@ function addRelayNode() { serverForm.relayNodes.push(createRelayNode()); serverF
 function removeRelayNode(index: number) { serverForm.relayNodes.splice(index, 1); serverForm.relaySettingsTouched = true; }
 async function loadServerSettings() { const value = await getJson("/api/admin/server"); const target = splitTeamSpeakTarget(value.target); Object.assign(serverForm, value, { address: target.address, port: target.port, serverPassword: "", passwordAction: "keep", welcomeTextDe: String(value.welcomeTextDe || ""), welcomeTextRu: String(value.welcomeTextRu || ""), welcomeTextJa: String(value.welcomeTextJa || ""), welcomeDefaults: { ...DEFAULT_WELCOME_TEXTS, ...(value.welcomeDefaults && typeof value.welcomeDefaults === "object" ? value.welcomeDefaults : {}) }, webRtcEnabled: value.webRtcEnabled === true, webRtcUdpStart: Number(value.webRtcUdpStart || 40000), webRtcUdpEnd: Number(value.webRtcUdpEnd || 40099), relayConfigured: value.relayConfigured === true, relayEnabled: value.relayEnabled === true, relayName: String(value.relayName || ""), relayTarget: String(value.relayTarget || ""), relayToken: "", relayTokenAction: "keep", hasRelayToken: value.hasRelayToken === true, relaySettingsTouched: false, relayNodes: mapRelayNodes(value.relayNodes) }); }
 async function loadOperations() { operationsLoading.value = true; try { const [sessions, invites, diagnostics, logs, audit] = await Promise.all([getJson("/api/admin/sessions"), getJson("/api/admin/invites"), getJson("/api/admin/diagnostics"), getJson("/api/admin/logs?limit=100"), getJson("/api/admin/audit?limit=50")]); operations.sessions = Array.isArray(sessions.sessions) ? sessions.sessions : []; operations.invites = Array.isArray(invites.invites) ? invites.invites : []; operations.diagnostics = { version: String(diagnostics.gateway?.version || ""), node: String(diagnostics.gateway?.node || ""), platform: String(diagnostics.gateway?.platform || ""), arch: String(diagnostics.gateway?.arch || ""), schemaVersion: Number(diagnostics.database?.schemaVersion || 0), createdSessions: Number(diagnostics.sessions?.created || 0) }; operations.logs = { available: Boolean(logs.available), entries: Array.isArray(logs.entries) ? logs.entries : [], sessions: Array.isArray(logs.sessions) ? logs.sessions : [] }; operations.audit = Array.isArray(audit.events) ? audit.events : []; } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { operationsLoading.value = false; } }
+async function loadSkinCatalog() {
+  skinLoading.value = true;
+  skinManagerError.value = "";
+  try {
+    const value = await getJson("/api/admin/skins");
+    skinEntries.value = Array.isArray(value.skins) ? value.skins : [];
+  } catch {
+    skinManagerError.value = tr("requestFailed");
+  } finally {
+    skinLoading.value = false;
+  }
+}
+async function onSkinFileChanged(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  skinManagerError.value = "";
+  skinManagerNotice.value = "";
+  skinUploading.value = true;
+  try {
+    const result = await uploadSkinPackage(file, csrfToken.value, (id) => !skinEntries.value.some((entry) => entry.id === id) || window.confirm(`${tr("skinReplaceConfirm")}\n${id}`));
+    if (!result) return;
+    skinManagerNotice.value = tr("skinImported");
+    await loadSkinCatalog();
+  } catch (error) {
+    skinManagerError.value = error instanceof Error ? error.message : tr("operationFailed");
+  } finally {
+    input.value = "";
+    skinUploading.value = false;
+  }
+}
+async function removeSkin(skin: SkinCatalogEntry) {
+  if (!window.confirm(`${tr("skinConfirmRemove")}\n${skin.name} (${skin.id})`)) return;
+  removingSkinId.value = skin.id;
+  skinManagerError.value = "";
+  skinManagerNotice.value = "";
+  try {
+    await deleteSkinPackage(skin.id, csrfToken.value);
+    skinManagerNotice.value = tr("skinRemoved");
+    await loadSkinCatalog();
+  } catch {
+    skinManagerError.value = tr("operationFailed");
+  } finally {
+    removingSkinId.value = "";
+  }
+}
 async function terminateSession(session: AdminSession) { if (!window.confirm(tr('confirmTerminate', { nickname: session.nickname }))) return; terminatingSession.value = session.id; errorMessage.value = ""; try { await sendJson(`/api/admin/sessions/${encodeURIComponent(session.id)}/terminate`, "POST", {}); await Promise.all([loadOperations(), loadOverview()]); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { terminatingSession.value = ""; } }
 async function createInvite() { submitting.value = true; errorMessage.value = ""; createdInvite.value = null; try { const result = await sendJson("/api/admin/invites", "POST", { channel: inviteForm.channel, expiresInHours: inviteForm.expiresInHours, maxUses: inviteForm.maxUses }); if (typeof result.token !== "string") throw new Error("INVITE_CREATE_FAILED"); createdInvite.value = { token: result.token, link: `${location.origin}/?invite=${encodeURIComponent(result.token)}` }; inviteForm.channel = ""; await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } finally { submitting.value = false; } }
 async function revokeInvite(invite: ManagedInvite) { if (!window.confirm(tr('confirmRevoke'))) return; try { await sendJson(`/api/admin/invites/${encodeURIComponent(invite.id)}/revoke`, "POST", {}); await loadOperations(); } catch (error) { errorMessage.value = errorText((error as ApiError).code); } }
@@ -1128,77 +1344,6 @@ async function parseResponse(response: Response) { const value = await response.
 .webrtc-card .card-help{margin:5px 0 0;color:#7e8c88;font-size:10px;line-height:1.5}.toggle-choice{margin:0}.webrtc-card>.field-help{margin-top:-8px}
 @media(max-width:520px){.target-fields{grid-template-columns:1fr}}
 
-/* Keep administration inside the browser viewport. Long data sets scroll in
-   their own cards instead of pushing the whole page below the fold. */
-.admin-shell{height:100dvh;min-height:100dvh;overflow:hidden}
-.admin-main{min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.admin-topbar{flex:0 0 auto}
-.page-content{flex:1 1 auto;min-height:0;overflow-y:auto}
-.operations-page{display:flex;flex-direction:column;width:min(1400px,calc(100% - 48px));height:calc(100dvh - 82px);overflow:hidden;padding-top:28px;padding-bottom:18px}
-.operations-page .page-heading{flex:0 0 auto;margin-bottom:16px}
-.operations-page .system-notice{flex:0 0 auto;margin-bottom:12px}
-.operations-page .operations-grid{min-width:0;min-height:0}
-.operations-primary{flex:0 0 auto;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr)}
-.operations-primary>.operation-card{min-height:0;overflow:hidden}
-.operations-primary .table-wrap{max-height:190px}
-.operations-primary .invite-list{max-height:132px;overflow-y:auto}
-.lower-operations{flex:1 1 0;grid-template-columns:minmax(210px,.9fr) minmax(0,1.1fr) minmax(210px,.9fr);margin-top:14px}
-.lower-operations>.operation-card{min-height:0}
-.diagnostics-card,.logs-card,.audit-card{overflow:hidden}
-.diagnostics-card{display:flex;flex-direction:column;overflow-y:auto}
-.diagnostics-card .secondary-button{margin-top:auto}
-.logs-card,.audit-card{display:flex;flex-direction:column}
-.logs-card .log-list,.audit-card .event-list{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto}
-
-@media(max-width:850px){
-  .admin-main{height:100%}
-  .operations-page{width:min(100% - 28px,700px);height:auto;min-height:calc(100dvh - 82px);overflow:visible}
-  .operations-page .lower-operations{flex:none}
-}
-
-/* Keep every admin surface inside the viewport. The page content and data
-   lists are the scroll containers, never the document body. */
-:global(html),:global(body),:global(#app){width:100%;height:100dvh;min-height:0;max-height:100dvh;overflow:hidden}
-.admin-root{height:100dvh;min-height:0;overflow:hidden}
-.login-page{height:100dvh;min-height:0;overflow:hidden}
-.login-card{max-height:calc(100dvh - 50px);overflow-y:auto}
-
-@media(max-width:850px){
-  .admin-shell{display:flex;flex-direction:column}
-  .admin-main{height:auto;flex:1 1 auto}
-}
-
-/* Keep static admin cards at their own height. Only long data collections
-   become scroll surfaces, so a busy event feed cannot stretch its neighbour
-   or turn the whole admin view into a second page. */
-.admin-main>.page-alert{flex:0 0 auto}
-.page-content{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;overflow:hidden}
-.overview-page{padding:28px 0 18px}
-.overview-page .import-notice{flex:0 0 auto;margin-top:0;margin-bottom:12px}
-.overview-page .hero-status{flex:0 0 auto;padding:24px}
-.overview-page .metric-grid{flex:0 0 auto;gap:12px;margin:14px 0}
-.overview-page .metric-grid article{padding:18px}
-.overview-page .overview-columns{flex:1 1 0;min-height:0;align-items:stretch;gap:14px}
-.target-health-card{align-self:start}
-.recent-events-card{display:flex;height:100%;min-height:0;flex-direction:column;overflow:hidden}
-.recent-events-card .event-list{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
-.server-page{padding:28px 0 18px}
-.server-page .page-heading{flex:0 0 auto;margin-bottom:14px}
-.server-page .settings-grid{flex:1 1 auto;min-height:0;align-items:stretch;gap:14px}
-.server-page .settings-card{min-height:0;overflow-y:auto;padding:20px}
-.server-page .readonly-card{flex:0 0 auto;margin-top:14px;padding:16px 20px}
-.server-page .readonly-card dl{gap:10px;margin-top:12px}
-.operations-page{height:auto;min-height:0}
-.operations-primary{flex:0 0 250px}
-.operations-primary>.operation-card{overflow-y:auto}
-.operations-primary>.operation-card{padding:14px 16px}
-.operations-primary .operation-card header p{line-height:1.3}
-.operations-primary .invite-form{gap:6px;margin-top:8px}
-.operations-primary label>span{margin-bottom:4px}
-.operations-primary input{height:34px;padding:7px 10px}
-.operations-primary .field-help{margin-top:-4px}
-.operations-primary .primary-button{min-height:34px}
-
 /* Theme all native scrollbars used by the admin surfaces. */
 :global(*){scrollbar-color:#8fcfc7 transparent;scrollbar-width:thin}
 :global(*::-webkit-scrollbar){width:8px;height:8px}
@@ -1209,25 +1354,6 @@ async function parseResponse(response: Response) { const value = await response.
 :global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb){background:#438f88;border-color:transparent}
 :global(:root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover){background:#69c7bc}
 
-@media(max-width:850px){
-  .page-content{width:min(100% - 28px,700px);padding-top:20px;padding-bottom:14px}
-  .overview-page .hero-status{padding:18px}
-  .overview-page .hero-status h2{font-size:24px}
-  .overview-page .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}
-  .overview-page .metric-grid article{padding:12px}
-  .overview-page .metric-grid article>span{top:10px;right:10px;width:28px;height:28px}
-  .overview-page .metric-grid strong{margin-top:9px;font-size:15px}
-  .overview-page .overview-columns{grid-template-rows:minmax(0,1fr) minmax(0,1fr);overflow:hidden}
-  .overview-page .target-health-card{align-self:stretch;min-height:0;overflow-y:auto}
-  .overview-page .recent-events-card{height:100%}
-  .server-page .settings-grid{grid-template-columns:1fr;grid-auto-rows:minmax(190px,1fr);overflow-y:auto}
-  .server-page .readonly-card dl{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .operations-page{height:100%;overflow:hidden}
-  .operations-page .operations-primary,.operations-page .lower-operations{grid-template-columns:1fr;min-height:0;overflow-y:auto;align-content:start}
-  .operations-page .operations-primary{grid-auto-rows:240px}
-  .operations-page .lower-operations{grid-auto-rows:190px}
-  .operations-page .lower-operations{flex:1 1 0}
-}
 .advanced-card{grid-column:1 / -1}
 .advanced-card .card-help{margin:5px 0 0;color:#7e8c88;font-size:10px;line-height:1.5}
 .advanced-card .toggle-choice{margin:0}
@@ -1277,63 +1403,21 @@ async function parseResponse(response: Response) { const value = await response.
 @media(max-width:520px){.advanced-card{grid-column:auto}.port-inputs{grid-template-columns:1fr}}
 @media(max-width:520px){.welcome-editor-heading{grid-template-columns:1fr;gap:6px}}
 
-/* Server settings are a short form, not a set of independent data feeds.
-   Let each card keep its natural height so a few extra pixels do not create
-   three nested scrollbars. The section itself is the only fallback scroll
-   surface when a small viewport cannot show the complete form. */
-.server-page{overflow-x:hidden;overflow-y:auto}
+/* Server settings keep their natural height; the main content area owns scrolling. */
+.server-page{min-width:0}
 .server-page .settings-grid{flex:0 0 auto;min-height:auto;align-items:start;overflow:visible;grid-auto-rows:auto}
 .server-page .settings-card{height:auto;min-height:0;overflow:visible;padding:16px;gap:12px}
 .server-page .settings-card input{height:40px}
 .server-page .settings-card .choice{padding:10px;gap:8px}
 .server-page .settings-card .choice small{margin-top:3px}
 .server-page .webrtc-port-fields{padding:12px;gap:8px}
-.server-page .readonly-card{margin-top:12px;padding:14px 16px}
-.server-page .readonly-card dl{gap:8px;margin-top:10px}
-
-@media(max-width:850px){
-  .server-page .settings-grid{overflow:visible;grid-auto-rows:auto}
-  .server-page .settings-card{overflow:visible}
-}
-
-/* Mobile admin pages should read like one continuous form. Keep the desktop
-   viewport shell untouched, but let the document grow vertically on narrow
-   screens instead of trapping content inside cards and nested panes. */
-@media(max-width:850px){
-  :global(html),:global(body),:global(#app){height:auto;min-height:100%;max-height:none;overflow:auto}
-  .admin-root{height:auto;min-height:100dvh;overflow:visible}
-  .admin-shell{height:auto;min-height:100dvh;overflow:visible}
-  .admin-main{height:auto;min-height:0;overflow:visible}
-  .page-content{display:block;height:auto;min-height:0;overflow:visible}
-  .login-page{height:auto;min-height:100dvh;overflow:visible}
-  .login-card{max-height:none;overflow:visible}
-
-  .overview-page{height:auto;min-height:0;overflow:visible}
-  .overview-page .overview-columns{grid-template-rows:auto;overflow:visible}
-  .overview-page .target-health-card,.overview-page .recent-events-card{height:auto;min-height:0;overflow:visible}
-  .overview-page .recent-events-card .event-list{max-height:none;overflow:visible}
-
-  .server-page{height:auto;min-height:0;overflow:visible}
-  .server-page .settings-grid{height:auto;overflow:visible}
-
-  .operations-page{height:auto;min-height:0;overflow:visible}
-  .operations-page .operations-primary,.operations-page .lower-operations{height:auto;min-height:0;overflow:visible;grid-auto-rows:auto;flex:none}
-  .operations-page .operation-card{height:auto;min-height:0;overflow:visible}
-  .operations-primary .table-wrap{max-height:none;overflow-x:auto;overflow-y:visible}
-  .operations-primary .invite-list{max-height:none;overflow:visible}
-  .logs-card .log-list,.audit-card .event-list{max-height:none;overflow:visible;flex:none}
-  .logs-card .log-list{width:100%;min-width:0}
-  .logs-card .log-row{min-width:0;max-width:100%;overflow:hidden}
-  .logs-card .log-row>div{width:0;max-width:100%;flex:1 1 auto;min-width:0;overflow:hidden}
-  .logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
-}
 
 /* Long log messages should wrap on every screen size instead of widening the
    log card or introducing page-level horizontal scrolling. */
 .logs-card .log-row{min-width:0}
 .logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
 
-.connection-list{display:grid;gap:7px;max-height:180px;margin-top:12px;overflow-y:auto}
+.connection-list{display:grid;gap:7px;margin-top:12px}
 .connection-history-heading{display:grid;gap:3px;padding:0 0 6px;border-bottom:1px solid #edf1ef}
 .connection-history-heading strong{font-size:10px}
 .connection-history-heading small{color:#899792;font-size:8px}
@@ -1363,20 +1447,11 @@ async function parseResponse(response: Response) { const value = await response.
 .language-link{margin-top:20px!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important}
 .login-actions .language-link{margin-top:0!important}
 
-/* Desktop server settings must keep their own scroll surface. The admin shell
-   is viewport-locked, so an unconstrained flex item can otherwise push the
-   relay card below the clipped page-content area. */
+/* Flexible fields must be allowed to shrink within responsive columns. */
 .settings-card,.relay-card,.relay-node,.relay-fields,.relay-node-heading,.relay-enabled,.relay-fields>label,.password-row,.password-row>label{min-width:0}
 .relay-enabled strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .relay-fields input{min-width:0}
 .password-actions{flex:0 0 auto}
-
-@media(min-width:851px){
-  .server-page{flex:1 1 auto;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto}
-  .server-page .settings-grid{min-width:0}
-  .settings-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .relay-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-}
 
 /* The application is zoomed up on large displays so the 1920×1080 layout
    stays readable. Compensate viewport heights for that zoom; otherwise a
@@ -1386,6 +1461,263 @@ async function parseResponse(response: Response) { const value = await response.
   :global(#app),.admin-root,.admin-shell,.admin-sidebar{height:calc(100dvh / var(--ui-scale));min-height:calc(100dvh / var(--ui-scale));max-height:calc(100dvh / var(--ui-scale))}
   .admin-main{height:100%;min-height:0}
 }
+
+/* Server settings: stacked, independently collapsible groups with related
+   controls arranged in columns when there is enough room. */
+.server-page .settings-grid{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:12px;flex:0 0 auto;min-height:0;overflow:visible}
+.server-page .settings-accordion{display:block;min-width:0;height:auto;overflow:visible;padding:0;border-radius:13px}
+.settings-accordion-header{display:flex;min-height:70px;align-items:center;gap:18px;padding:14px 18px;list-style:none;cursor:pointer}
+.settings-accordion-header::-webkit-details-marker{display:none}
+.settings-accordion-header:focus-visible{outline:3px solid color-mix(in srgb,var(--admin-accent) 42%,transparent);outline-offset:3px;border-radius:10px}
+.settings-accordion-heading{display:grid;min-width:0;flex:1 1 auto;gap:4px}
+.settings-accordion-heading strong{overflow:hidden;color:var(--admin-text);font-size:14px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+.settings-accordion-heading small{overflow:hidden;color:var(--admin-muted);font-size:10px;line-height:1.45;text-overflow:ellipsis;white-space:nowrap}
+.settings-accordion-header>.ui-icon{flex:none;color:var(--admin-muted);transition:transform .18s ease}
+.settings-accordion[open]>.settings-accordion-header{border-bottom:1px solid var(--admin-border)}
+.settings-accordion[open]>.settings-accordion-header>.ui-icon{transform:rotate(180deg)}
+.settings-accordion-statuses{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:0 1 auto;flex-wrap:wrap}
+.settings-summary-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;color:var(--admin-muted);background:var(--admin-raised);border:1px solid var(--admin-border);border-radius:999px;font-size:10px;line-height:1.2;white-space:nowrap}
+.settings-summary-chip i{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#87958f}
+.settings-summary-chip i.active{background:#50c879;box-shadow:0 0 0 3px color-mix(in srgb,#50c879 16%,transparent)}
+.settings-accordion-content{min-width:0;padding:16px 18px 18px}
+.target-settings-layout{display:grid;min-width:0;grid-template-columns:minmax(0,1fr) minmax(220px,280px);align-items:end;gap:12px}
+.access-settings-layout,.advanced-settings-grid{display:grid;min-width:0;grid-template-columns:minmax(0,1fr);align-items:start;gap:14px}
+.site-identity-fields{display:grid;min-width:0;align-content:start;gap:13px}
+.target-fields{grid-column:1;grid-row:1;grid-template-columns:minmax(0,1fr) 150px;gap:12px}
+.target-settings-layout>.password-row{grid-column:1/-1;grid-row:2;align-self:end}
+.target-settings-layout>.target-test-button{grid-column:2;grid-row:1;justify-self:stretch;width:100%;min-width:0;min-height:40px;align-self:end}
+.target-test-result{grid-column:1/-1;min-width:0;margin:0}
+.target-runtime-block{display:grid;grid-column:1/-1;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:12px;padding-top:2px}
+.target-runtime-block h4{margin:0;color:var(--admin-text);font-size:11px}
+.target-runtime-facts{display:grid;grid-column:2;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.target-runtime-facts>div{min-width:0;padding:9px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:8px}
+.target-runtime-facts>div:first-child{grid-column:auto}
+.target-runtime-facts dt{color:var(--admin-muted);font-size:9px}
+.target-runtime-facts dd{margin:4px 0 0;overflow-wrap:anywhere;color:var(--admin-text);font-size:11px;font-weight:700}
+.access-settings-layout{grid-template-columns:minmax(0,1fr)}
+.access-mode-fieldset{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-content:start;gap:9px;min-width:0;margin:0;padding:0;border:0}
+.access-mode-fieldset legend{grid-column:1/-1;margin-bottom:2px;color:var(--admin-muted);font-size:10px;font-weight:700}
+.site-identity-fields>label{display:grid;gap:6px}
+.site-identity-fields>label>span,.access-mode-fieldset .choice strong{color:var(--admin-text)}
+.site-identity-fields .welcome-editor{min-width:0;margin:0}
+.settings-subsection{display:grid;min-width:0;align-content:start;gap:12px;padding:15px;background:var(--admin-raised);border:1px solid var(--admin-border);border-radius:11px}
+.settings-subsection-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.settings-subsection-heading h4{margin:0;color:var(--admin-text);font-size:13px}
+.settings-subsection-heading .card-help{margin:4px 0 0;color:var(--admin-muted);font-size:10px;line-height:1.5}
+.settings-subsection .choice{margin:0;background:var(--admin-surface);border-color:var(--admin-border)}
+.settings-subsection .choice strong{color:var(--admin-text)}
+.settings-subsection .choice small{color:var(--admin-muted)}
+.settings-subsection .field-help{margin:0;color:var(--admin-muted);line-height:1.5}
+.settings-subsection .relay-fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.settings-subsection .relay-fields .password-row{grid-column:1/-1}
+.advanced-settings-grid>.relay-card,.advanced-settings-grid>.webrtc-card{grid-column:auto}
+.settings-subsection .relay-node{background:var(--admin-surface);border-color:var(--admin-border)}
+.settings-subsection .relay-empty{color:var(--admin-muted);background:var(--admin-surface);border-color:var(--admin-border)}
+
+/* One palette is shared by explicit dark mode and system dark mode. */
+.admin-root{--admin-page:#f4f8f6;--admin-surface:#fff;--admin-raised:#f6f9f8;--admin-field:#fff;--admin-text:#20302c;--admin-muted:#657873;--admin-border:#dfe8e5;--admin-accent:#087d74;--admin-accent-soft:#e4f3ef;color:var(--admin-text);background:var(--admin-page)}
+:global(html[data-theme="dark"] .admin-root){--admin-page:#101918;--admin-surface:#172321;--admin-raised:#202f2c;--admin-field:#111d1b;--admin-text:#e8f3f0;--admin-muted:#b6c8c2;--admin-border:#3a514b;--admin-accent:#79ddd1;--admin-accent-soft:#1b3935}
+@media(prefers-color-scheme:dark){:global(html[data-theme="system"] .admin-root){--admin-page:#101918;--admin-surface:#172321;--admin-raised:#202f2c;--admin-field:#111d1b;--admin-text:#e8f3f0;--admin-muted:#b6c8c2;--admin-border:#3a514b;--admin-accent:#79ddd1;--admin-accent-soft:#1b3935}}
+.admin-root .admin-main{color:var(--admin-text);background:var(--admin-page)}
+.admin-root .admin-topbar,.admin-root .settings-card,.admin-root .readonly-card,.admin-root .overview-card,.admin-root .operation-card,.admin-root .metric-grid article,.admin-root .setup-card,.admin-root .login-card{color:var(--admin-text);background:var(--admin-surface);border-color:var(--admin-border)}
+.admin-root .settings-card h3,.admin-root .settings-card h4,.admin-root .readonly-card h3,.admin-root .overview-card h3,.admin-root .operation-card h3,.admin-root .page-heading h2,.admin-root .admin-topbar h1,.admin-root .settings-card label>span,.admin-root .settings-card legend,.admin-root .settings-card .choice strong{color:var(--admin-text)}
+.admin-root .page-heading p,.admin-root .admin-topbar small,.admin-root .settings-card .card-help,.admin-root .settings-card .field-help,.admin-root .settings-card .choice small,.admin-root .settings-card .welcome-editor-heading>small,.admin-root .settings-card .port-fields-heading small,.admin-root .readonly-card dt,.admin-root .overview-card dt,.admin-root .metric-grid small,.admin-root .metric-grid em,.admin-root .overview-card header p,.admin-root .operation-card header p{color:var(--admin-muted)}
+.admin-root input:not([type="checkbox"]):not([type="radio"]),.admin-root textarea,.admin-root select{color:var(--admin-text);background:var(--admin-field);border-color:var(--admin-border)}
+.admin-root input::placeholder,.admin-root textarea::placeholder{color:var(--admin-muted);opacity:1}
+.admin-root input:disabled,.admin-root textarea:disabled,.admin-root select:disabled{color:var(--admin-muted);background:var(--admin-raised);border-color:var(--admin-border);opacity:1}
+.admin-root input[type="checkbox"],.admin-root input[type="radio"]{accent-color:var(--admin-accent)}
+.admin-root .settings-card .choice{color:var(--admin-text);background:var(--admin-raised);border-color:var(--admin-border)}
+.admin-root .settings-card .choice.selected{background:color-mix(in srgb,var(--admin-accent) 10%,var(--admin-surface));border-color:color-mix(in srgb,var(--admin-accent) 48%,var(--admin-border))}
+.admin-root .welcome-editor,.admin-root .webrtc-port-fields,.admin-root .relay-node,.admin-root .relay-empty,.admin-root .readonly-card dl div,.admin-root .overview-card dl div,.admin-root .event-list li,.admin-root .connection-row,.admin-root .connection-history-heading,.admin-root .diagnostic-list div,.admin-root .log-row,.admin-root .invite-row{color:var(--admin-text);background:var(--admin-raised);border-color:var(--admin-border)}
+.admin-root .welcome-editor select,.admin-root .welcome-editor textarea{color:var(--admin-text);background:var(--admin-field);border-color:var(--admin-border)}
+.admin-root .welcome-editor-heading>small,.admin-root .port-fields-heading small,.admin-root .field-help,.admin-root .relay-empty,.admin-root .target-runtime-facts dt,.admin-root .connection-person small,.admin-root .connection-detail small,.admin-root .connection-history-heading small,.admin-root .diagnostic-list dt,.admin-root .log-row small,.admin-root .invite-row small{color:var(--admin-muted)}
+.admin-root .settings-subsection{color:var(--admin-text);background:var(--admin-raised);border-color:var(--admin-border)}
+.admin-root .target-runtime-facts>div,.admin-root .settings-subsection .choice,.admin-root .settings-subsection .relay-node,.admin-root .settings-subsection .relay-empty{background:var(--admin-surface);border-color:var(--admin-border)}
+.admin-root .password-actions button{color:var(--admin-accent);background:var(--admin-accent-soft)}
+.admin-root .password-actions button.active,.admin-root .primary-button{color:#fff;background:#087d74}
+.admin-root .password-actions button.danger,.admin-root .danger-button,.admin-root .text-danger{color:#d66d65;background:color-mix(in srgb,#d66d65 12%,var(--admin-surface));border-color:color-mix(in srgb,#d66d65 30%,var(--admin-border))}
+.admin-root .secondary-button,.admin-root .admin-topbar button,.admin-root .admin-topbar .language-select,.admin-root .home-link{color:var(--admin-accent);background:var(--admin-accent-soft);border-color:var(--admin-border)}
+.admin-root .settings-accordion-header>.ui-icon{color:var(--admin-muted)}
+.admin-root .settings-summary-chip{color:var(--admin-muted);background:var(--admin-raised);border-color:var(--admin-border)}
+.admin-root .admin-sidebar nav a{color:#c2d8d3}
+.admin-root .admin-sidebar nav a.active{color:#eafffb;background:#0d615a}
+
+@media(max-width:1050px){
+  .target-settings-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .target-fields,.target-test-result,.target-runtime-block{grid-column:1/-1}
+  .target-settings-layout>.password-row{grid-column:1}
+  .target-settings-layout>.target-test-button{grid-column:2}
+  .access-settings-layout,.advanced-settings-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:850px){
+  .server-page .settings-grid{grid-template-columns:minmax(0,1fr);grid-auto-rows:auto;overflow:visible}
+  .settings-accordion-header{min-height:64px;gap:10px;padding:12px 14px}
+  .settings-accordion-statuses{justify-content:flex-start}
+  .settings-accordion-content{padding:13px 14px 15px}
+  .settings-subsection .relay-fields{grid-template-columns:minmax(0,1fr)}
+  .settings-subsection .relay-fields .password-row{grid-column:auto}
+}
+@media(max-width:560px){
+  .settings-accordion-header{align-items:flex-start;flex-wrap:wrap}
+  .settings-accordion-heading{flex-basis:calc(100% - 34px)}
+  .settings-accordion-statuses{order:3;width:100%;padding-right:25px}
+  .settings-accordion-header>.ui-icon{margin-left:auto}
+  .target-settings-layout{grid-template-columns:minmax(0,1fr)}
+  .target-fields,.port-inputs,.target-runtime-facts{grid-template-columns:minmax(0,1fr)}
+  .target-settings-layout>.password-row,.target-settings-layout>.target-test-button,.target-test-result,.target-runtime-block{grid-column:1}
+  .target-runtime-facts>div:first-child{grid-column:auto}
+  .target-runtime-block{grid-template-columns:minmax(0,1fr)}
+  .target-runtime-facts{grid-column:auto}
+  .target-settings-layout,.access-settings-layout,.advanced-settings-grid{gap:11px}
+  .access-mode-fieldset .choice{padding:10px}
+}
+
+/* Admin layout contract: the desktop shell stays in the viewport, the main
+   content is the only page-level scroller, and cards size to their content. */
+:global(html),:global(body),:global(#app){width:100%;height:100dvh;min-height:0;max-height:100dvh;overflow:hidden}
+.admin-root{min-height:0;overflow:hidden}
+.admin-shell{display:grid;min-height:0;grid-template-columns:236px minmax(0,1fr);overflow:hidden}
+.admin-main{display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden}
+.admin-topbar{flex:0 0 auto}
+.admin-main>.page-alert{flex:0 0 auto;margin:12px clamp(18px,2.4vw,44px) 0}
+.page-content{display:block;flex:1 1 auto;width:100%;max-width:none;min-width:0;min-height:0;margin:0;padding:clamp(18px,2vw,32px) clamp(18px,2.4vw,44px) 34px;overflow-x:hidden;overflow-y:auto}
+.login-page{height:100dvh;min-height:0;overflow:hidden}
+.login-card{max-height:calc(100dvh - 50px);overflow-y:auto}
+
+.overview-page{display:grid;align-content:start;grid-template-columns:minmax(0,1fr);gap:14px}
+.overview-page .import-notice,.overview-page .metric-grid{margin:0}
+.overview-page .hero-status{padding:clamp(18px,2vw,28px)}
+.overview-page .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.overview-page .overview-columns{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:14px}
+.overview-page .overview-card{min-width:0;height:auto;min-height:0;overflow:visible}
+.overview-page .target-health-card dl{grid-template-columns:repeat(3,minmax(0,1fr))}
+.overview-page .recent-events-card .event-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));max-height:none;overflow:visible}
+
+.server-page{min-width:0}
+.server-page .settings-grid{grid-template-columns:minmax(0,1fr);align-content:start;gap:12px}
+.server-page .settings-card{height:auto;min-height:0;overflow:visible}
+
+.operations-page{display:grid;align-content:start;gap:14px;width:auto;height:auto;min-height:0;padding-top:0;padding-bottom:0}
+.operations-page .page-heading,.operations-page .system-notice{margin:0}
+.operations-page .operations-grid{min-width:0;align-items:start;gap:14px}
+.operations-primary{grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr))}
+.lower-operations{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));margin-top:0}
+.operation-card{height:auto;min-height:0;overflow:visible}
+.operation-empty{min-height:84px}
+.operations-primary .table-wrap{max-height:min(42vh,420px);overflow:auto}
+.operations-primary .invite-list{max-height:min(32vh,280px);overflow-y:auto}
+.connection-list{max-height:min(34vh,280px);overflow-y:auto}
+.logs-card .log-list,.audit-card .event-list{max-height:min(38vh,340px);overflow-y:auto}
+.logs-card,.audit-card{min-height:0}
+.logs-card .log-row{min-width:0;max-width:100%}
+.logs-card .log-row>div{min-width:0;flex:1 1 auto}
+.logs-card .log-row strong,.logs-card .log-row small{overflow-wrap:anywhere;white-space:normal;word-break:break-word}
+
+@media(min-width:1101px){
+  .operations-page .invite-form{grid-template-columns:minmax(220px,1.2fr) minmax(280px,1fr) auto;align-items:end;gap:12px 16px}
+  .operations-page .invite-form>label{grid-column:1;grid-row:1}
+  .operations-page .invite-form-grid{grid-column:2;grid-row:1;align-self:end}
+  .operations-page .invite-form>.field-help{grid-column:1/3;grid-row:2}
+  .operations-page .invite-form>.primary-button{grid-column:3;grid-row:1;white-space:nowrap}
+  .operations-page .diagnostics-card{display:grid;grid-template-columns:minmax(0,1fr)}
+  .operations-page .diagnostics-card>header{grid-column:1/-1}
+  .operations-page .diagnostics-card>.diagnostic-list{grid-column:1;grid-row:2}
+  .operations-page .diagnostics-card>.secondary-button{grid-column:1;grid-row:3;justify-self:end;white-space:nowrap}
+}
+
+@media(max-width:1100px){
+  .target-settings-layout{grid-template-columns:minmax(0,1fr) minmax(180px,.42fr)}
+  .target-fields{grid-column:1;grid-row:1;grid-template-columns:minmax(0,1fr) 132px}
+  .target-settings-layout>.password-row{grid-column:1/-1;grid-row:2}
+  .target-settings-layout>.target-test-button{grid-column:2;grid-row:1}
+  .access-settings-layout,.advanced-settings-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:850px){
+  :global(html),:global(body),:global(#app){height:auto;min-height:100%;max-height:none;overflow:auto}
+  .admin-root{height:auto;min-height:100dvh;overflow:visible}
+  .admin-shell{display:flex;height:auto;min-height:100dvh;flex-direction:column;overflow:visible}
+  .admin-sidebar{position:static;width:100%;height:auto;min-height:0;flex-direction:row;align-items:center;padding:12px 16px}
+  .admin-sidebar .admin-brand{padding:0}
+  .admin-sidebar .admin-brand small{display:none}
+  .admin-sidebar nav{display:flex;margin-left:auto}
+  .sidebar-bottom{display:flex;margin:0 0 0 8px;padding:0;border:0}
+  .sidebar-bottom a{display:none}
+  .sidebar-bottom button{font-size:0}
+  .admin-main{height:auto;min-height:0;overflow:visible}
+  .admin-topbar{min-height:68px;padding:0 18px}
+  .admin-main>.page-alert{margin:10px 14px 0}
+  .page-content{display:block;width:100%;height:auto;min-height:0;padding:20px clamp(14px,3vw,28px) 28px;overflow:visible}
+  .login-page{height:auto;min-height:100dvh;overflow:visible}
+  .login-card{max-height:none;overflow:visible}
+  .overview-page{min-height:0}
+  .overview-page .metric-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:9px}
+  .overview-page .overview-columns{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+  .operations-page .operations-primary{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+  .operations-page .lower-operations{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+  .operations-page .operation-card{height:auto;min-height:0;overflow:visible}
+  .operations-primary .table-wrap{max-height:min(48vh,420px);overflow:auto}
+  .operations-primary .invite-list{max-height:min(38vh,320px);overflow-y:auto}
+  .connection-list{max-height:min(38vh,320px);overflow-y:auto}
+  .logs-card .log-list,.audit-card .event-list{max-height:min(45vh,380px);overflow-y:auto}
+}
+@media(max-width:560px){
+  .admin-topbar{gap:8px}
+  .admin-topbar>div:last-child{gap:5px}
+  .overview-page .hero-status{padding:18px}
+  .overview-page .hero-status h2{font-size:24px}
+  .overview-page .metric-grid article{padding:14px}
+  .overview-page .metric-grid article>span{top:11px;right:11px;width:30px;height:30px}
+  .overview-page .metric-grid strong{margin-top:10px;font-size:16px}
+  .overview-page .target-health-card dl{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+  .operations-page .operations-primary,.operations-page .lower-operations{grid-template-columns:minmax(0,1fr)}
+  .operations-page .operation-card{padding:16px}
+  .operations-page .table-wrap{margin-right:-16px;margin-left:-16px;margin-bottom:-16px}
+  .operations-page .invite-form-grid,.operations-page .diagnostic-list{grid-template-columns:minmax(0,1fr)}
+  .operations-page .generated-link{display:grid}
+  .operations-page .invite-row{align-items:flex-start;flex-direction:column}
+  .operations-page .invite-row-meta{width:100%;justify-content:flex-end}
+  .operations-page .connection-row{display:grid;gap:7px}
+  .operations-page .connection-detail{justify-items:start;text-align:left}
+  .target-settings-layout{grid-template-columns:minmax(0,1fr)}
+  .target-fields,.port-inputs,.target-runtime-facts{grid-template-columns:minmax(0,1fr)}
+  .target-fields{grid-column:1;grid-row:1}
+  .target-settings-layout>.password-row{grid-column:1;grid-row:2}
+  .target-settings-layout>.target-test-button{grid-column:1;grid-row:3;justify-self:stretch;width:100%}
+  .target-test-result{grid-column:1;grid-row:4}
+  .target-runtime-block{grid-column:1;grid-row:5}
+  .target-runtime-block{grid-template-columns:minmax(0,1fr)}
+  .target-runtime-facts{grid-column:auto}
+}
+</style>
+
+<style scoped>
+.skin-file-input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
+.skin-library-page{display:grid;align-content:start;gap:16px}
+.skin-library-page>.page-heading,.skin-library-page>.skin-library-scope{margin:0}
+.skin-library-scope{display:flex;align-items:center;gap:9px}
+.skin-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:14px;align-content:start}
+.skin-library-card{display:grid;grid-template-columns:minmax(140px,.78fr) minmax(0,1.22fr);min-width:0;overflow:hidden;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#dce7e3);border-radius:14px;box-shadow:0 6px 20px rgba(20,60,53,.04)}
+.skin-preview{position:relative;display:grid;place-items:center;min-height:180px;overflow:hidden;color:#5f9f97;background:linear-gradient(145deg,#e5f5f1,#f5f8f7)}
+.skin-preview img{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
+.skin-preview>span{display:grid;place-items:center;width:54px;height:54px;border:1px solid #cde8e2;border-radius:16px;background:rgba(255,255,255,.68)}
+.skin-preview small{position:absolute;right:9px;bottom:9px;padding:4px 7px;color:#f7fffd;background:rgba(17,40,37,.72);border-radius:6px;font-size:10px}
+.skin-library-copy{display:flex;min-width:0;flex-direction:column;padding:14px}
+.skin-library-title{display:grid;gap:3px;min-width:0}
+.skin-library-title h3{margin:0;color:var(--admin-text,#20312d);font-size:15px}
+.skin-library-title>span{overflow:hidden;color:var(--admin-muted,#7d8d88);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.skin-library-copy>p{margin:10px 0 0;color:var(--admin-muted,#687a74);font-size:11px;line-height:1.5}
+.skin-library-copy dl{display:grid;gap:5px;margin:12px 0 0}
+.skin-library-copy dl>div{display:flex;justify-content:space-between;gap:12px;font-size:10px}
+.skin-library-copy dt{color:var(--admin-muted,#879590)}
+.skin-library-copy dd{margin:0;color:var(--admin-text,#30423d);text-align:right;overflow-wrap:anywhere}
+.skin-library-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:13px}
+.skin-library-actions button,.skin-library-actions a{font-size:11px}
+.skin-library-empty,.skin-library-loading{display:grid;justify-items:center;gap:9px;padding:48px 18px;color:var(--admin-muted,#7d8d88);text-align:center;background:var(--admin-surface,#fff);border:1px dashed var(--admin-border,#dce7e3);border-radius:14px}
+.skin-library-empty>span{display:grid;place-items:center;width:46px;height:46px;color:#0b8075;background:#e5f5f1;border-radius:14px}
+.skin-library-empty strong{color:var(--admin-text,#263a35);font-size:14px}
+.skin-library-empty p{margin:0;font-size:11px}
+.skin-library-loading{display:flex;justify-content:center}
+@media(max-width:620px){.skin-library-card{grid-template-columns:minmax(0,1fr)}.skin-preview{min-height:190px;aspect-ratio:16/9}.skin-library-page>.page-heading{align-items:flex-start}.skin-library-page>.page-heading .primary-button{white-space:nowrap}}
 </style>
 
 <style scoped>
