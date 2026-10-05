@@ -159,7 +159,14 @@
           <div class="workspace-content" data-ws-part="voice.content">
             <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]" data-ws-part="voice.activity">
               <div class="voice-activity-artwork" data-ws-part="voice.activity.artwork" aria-hidden="true"></div>
-              <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2><span class="desktop-voice-title">{{ t('speakingNow') }}</span><span class="mobile-voice-title">{{ currentChannelName }}</span></h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
+              <div class="mobile-voice-sticky">
+                <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2><span class="desktop-voice-title">{{ t('speakingNow') }}</span><span class="mobile-voice-title">{{ currentChannelName }}</span></h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
+                <div class="mobile-voice-controls">
+                  <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
+                  <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
+                  <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
+                </div>
+              </div>
               <div v-if="screenShareError" class="screen-share-inline-error" data-ws-part="voice.screen-share-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
               <section v-if="screenShareViewing" ref="screenSharePlayerEl" class="screen-share-player" data-ws-part="voice.screen-player" role="region" :aria-label="t('screenShare')">
                 <div class="screen-share-player-stage" data-ws-part="voice.screen-player.stage">
@@ -203,11 +210,6 @@
                 <div class="whisper-strip-copy"><strong><Icon name="users" :size="15" /> {{ t('whisperTargets') }}</strong><span>{{ whisperTargets.map((member) => member.nickname).join('、') }}</span></div>
                 <button type="button" class="text-button" @click="clearWhisperTargets">{{ t('clearWhisperTargets') }}</button>
                 <button type="button" class="whisper-ptt-button" :class="{ active: whisperPttActive || whisperActive }" :aria-pressed="whisperPttActive || whisperActive" @pointerdown.prevent="onWhisperPttDown" @pointerup.prevent="onWhisperPttUp" @pointercancel.prevent="onWhisperPttUp" @lostpointercapture="onWhisperPttUp"><Icon name="mic" :size="18" /> {{ whisperPttActive || whisperActive ? t('releaseWhisper') : t('whisperHoldToTalk') }}</button>
-              </div>
-              <div class="mobile-voice-controls">
-                <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
-                <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
-                <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
               </div>
             </section>
 

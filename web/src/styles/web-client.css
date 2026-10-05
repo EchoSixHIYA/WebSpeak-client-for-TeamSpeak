@@ -559,6 +559,8 @@
   .breadcrumbs .crumb-muted, .breadcrumbs > .ui-icon { display: none; }
   .mobile-brand { display: inline; font-size: 18px; }
   .workspace-actions { flex: 0 0 auto; gap: 3px; }
+  .app-shell.mobile-view-voice .workspace-actions > .microphone-header-toggle,
+  .app-shell.mobile-view-voice .workspace-actions > .disconnect-button { display: none; }
   .workspace-actions .header-action { width: 36px; height: 36px; flex-basis: 36px; }
   .workspace-actions .workspace-skin-switcher, .workspace-actions .workspace-language { display: none; }
   .disconnect-button { width: 36px; height: 36px; min-height: 36px; margin-left: 0; padding: 0; justify-content: center; }
@@ -575,6 +577,7 @@
   .section-heading h2 { font-size: 22px; }
   .mobile-voice-title { display: inline; }
   .desktop-voice-title { display: none; }
+  .mobile-voice-sticky { position: sticky; top: 0; z-index: 5; margin: -14px -10px 14px; padding: 14px 10px 10px; background: color-mix(in srgb, var(--surface-1) 96%, transparent); border-bottom: 1px solid var(--border); backdrop-filter: blur(14px); }
   .voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
   .voice-card { position: relative; min-height: 136px; padding: 18px 8px 14px; border-radius: 16px; }
   .voice-avatar-wrap, .voice-avatar { width: 60px; height: 60px; }
@@ -585,7 +588,7 @@
   .app-shell .voice-card > span { margin-top: 4px; font-size: 11px; }
   .voice-member-action { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-muted); background: color-mix(in srgb, var(--surface-2) 78%, transparent); border-radius: 10px; cursor: pointer; }
   .voice-member-action:hover, .voice-member-action:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
-  .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
+  .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 12px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
   .mobile-voice-toggle, .mobile-voice-settings, .mobile-voice-leave, .mobile-member-leave { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; min-width: 0; padding: 0 11px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .mobile-voice-toggle { flex: 1 1 auto; }
   .mobile-voice-toggle.muted, .mobile-more-panel button.muted, .mobile-voice-toggle[aria-pressed="false"] { color: var(--danger); }
