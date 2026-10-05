@@ -194,6 +194,12 @@ test("the activity artwork layer floats above room content without intercepting 
   assert.match(css, /@media \(min-width: 741px\)\s*\{\s*\/\* Keep header menus above the independently stacked screen-share stage\. \*\/\s*\.app-shell \.workspace-header\s*\{\s*position: relative;\s*z-index: 40;/);
 });
 
+test("screen-share video stays inside the stage without affecting its intrinsic sizing", async () => {
+  const css = await readFile(new URL("../styles/web-client.css", import.meta.url), "utf8");
+  assert.match(css, /\.screen-share-player-stage\s*\{[^}]*position: relative;/);
+  assert.match(css, /\.screen-share-player-video\s*\{[^}]*position: absolute;[^}]*inset: 0;[^}]*width: 100%;[^}]*height: 100%;[^}]*object-fit: contain;/);
+});
+
 test("channel empty state removes its bubble ornament and keeps the text-channel label", async () => {
   const [view, chat] = await Promise.all([
     readFile(new URL("../views/WebClient.vue", import.meta.url), "utf8"),

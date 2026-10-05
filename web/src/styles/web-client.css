@@ -953,7 +953,7 @@
 .screen-share-settings-start { min-height: 35px; padding: 0 12px; font-size: 10px; }
 .screen-share-player { position: relative; margin-top: 17px; overflow: hidden; color: var(--text-primary); border: 1px solid var(--border); border-radius: 18px; background: var(--surface-1); box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 18%, transparent); }
 .screen-share-player-stage { position: relative; display: grid; width: 100%; min-height: 245px; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 12%, var(--surface-1)), var(--surface-2) 74%); }
-.screen-share-player-video { display: block; width: 100%; height: 100%; object-fit: contain; background: var(--surface-2); }
+.screen-share-player-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; background: var(--surface-2); }
 .screen-share-player-placeholder { display: flex; align-items: center; flex-direction: column; gap: 10px; max-width: 360px; padding: 30px; color: var(--text-muted); text-align: center; }
 .screen-share-player-placeholder-icon { display: grid; place-items: center; width: 58px; height: 58px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 36%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .screen-share-player-placeholder strong { color: var(--text-primary); font-size: 15px; }
