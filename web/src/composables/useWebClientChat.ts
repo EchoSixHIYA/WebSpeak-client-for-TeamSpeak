@@ -12,12 +12,16 @@ interface PrivateConversation {
   online: boolean;
 }
 
-function privateConversationKey(message: ChatMessage): string | null {
+export function privateConversationKeyForTarget(clientId: number, uid?: string, peerName = ""): string {
+  return uid ? `uid:${uid}` : `client:${JSON.stringify([clientId, peerName])}`;
+}
+
+export function privateConversationKey(message: ChatMessage): string | null {
   if (message.scope !== "private") return null;
-  if (message.conversationUid) return `uid:${message.conversationUid}`;
+  if (message.conversationUid) return privateConversationKeyForTarget(0, message.conversationUid);
   const clientId = Number(message.conversationId) || message.senderId;
   const peerName = message.conversationName || (message.isSelf ? "" : message.invokerName);
-  return clientId ? `client:${JSON.stringify([clientId, peerName])}` : null;
+  return clientId ? privateConversationKeyForTarget(clientId, undefined, peerName) : null;
 }
 
 interface UseWebClientChatOptions {
@@ -117,9 +121,9 @@ export function useWebClientChat({
     if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }
 
-  function openPrivateChat(targetClientId: number, targetUid?: string): void {
+  function openPrivateChat(targetClientId: number, targetUid?: string, targetName = "", conversationKey?: string): void {
     if ((!targetClientId && !targetUid) || (targetClientId > 0 && targetClientId === clientId.value)) return;
-    selectedPrivateConversationKey.value = targetUid ? `uid:${targetUid}` : `client:${targetClientId}`;
+    selectedPrivateConversationKey.value = conversationKey || privateConversationKeyForTarget(targetClientId, targetUid, targetName);
     tab.value = "private";
     if (isMobileViewport.value) mobileSection.value = "chat";
     closeMemberMenu();
