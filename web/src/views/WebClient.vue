@@ -128,7 +128,6 @@
             </div>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
             <button v-if="isMobileViewport" class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
-            <button v-if="isMobileViewport" type="button" class="header-action screen-wake-lock-action" :class="{ active: screenWakeLockState.active, pending: screenWakeLockState.requesting, unavailable: screenWakeLockState.unavailable }" :title="screenWakeLockControlLabel" :aria-label="screenWakeLockControlLabel" :aria-pressed="screenWakeLockState.enabled && !screenWakeLockState.unavailable" :disabled="!screenWakeLockState.supported" @click="toggleScreenWakeLock"><Icon :name="screenWakeLockState.active || screenWakeLockState.requesting ? 'sun' : 'moon'" :size="18" /></button>
             <button v-if="isMobileViewport" class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <SkinSwitcher v-model="activeSkinId" class="workspace-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
             <LanguageSwitcher v-model="language" class="workspace-language" :menu-label="t('languageMenu')" @change="persistLanguage" />
@@ -523,13 +522,7 @@ function t(key: string, variables: Record<string, string | number> = {}) {
 }
 const shouldKeepScreenAwake = computed(() => isMobileViewport.value && (voiceState.connected || voiceState.connecting || voiceState.reconnecting));
 const screenWakeLockState = ref<ScreenWakeLockSnapshot>({ supported: false, enabled: false, active: false, requesting: false, unavailable: false });
-const screenWakeLockControlLabel = computed(() => {
-  if (!screenWakeLockState.value.supported) return t("screenWakeLockUnsupported");
-  if (screenWakeLockState.value.unavailable) return t("screenWakeLockUnavailable");
-  return screenWakeLockState.value.enabled ? t("screenWakeLockDisable") : t("screenWakeLockEnable");
-});
 let screenWakeLockController: ScreenWakeLockController | undefined;
-let screenWakeLockManuallyDisabled = false;
 const {
   favoriteServers,
   recentServers,
@@ -901,42 +894,22 @@ const {
 });
 
 function doConnect(): void {
-  screenWakeLockManuallyDisabled = false;
-  enableScreenWakeLockForSession();
+  if (canJoin.value && !voiceState.connecting) enableScreenWakeLockForSession();
   connectToVoice();
 }
 
 function doDisconnect(): void {
-  screenWakeLockManuallyDisabled = false;
   screenWakeLockController?.disable();
   disconnectFromVoice();
 }
 
 function reconnectNow(): void {
-  screenWakeLockManuallyDisabled = false;
   enableScreenWakeLockForSession();
   reconnectVoice();
 }
 
 function enableScreenWakeLockForSession(): void {
   if (!isMobileViewport.value || !screenWakeLockController) return;
-  screenWakeLockController.enable();
-  if (!screenWakeLockController.supported) showToast(t("screenWakeLockUnsupported"));
-}
-
-function toggleScreenWakeLock(): void {
-  if (!screenWakeLockController?.supported) {
-    showToast(t("screenWakeLockUnsupported"));
-    return;
-  }
-
-  if (screenWakeLockState.value.enabled && !screenWakeLockState.value.unavailable) {
-    screenWakeLockManuallyDisabled = true;
-    screenWakeLockController.disable();
-    return;
-  }
-
-  screenWakeLockManuallyDisabled = false;
   screenWakeLockController.enable();
 }
 
@@ -978,8 +951,7 @@ watch(shouldKeepScreenAwake, (shouldKeep) => {
   if (!screenWakeLockController) return;
   if (!shouldKeep) {
     screenWakeLockController.disable();
-    screenWakeLockManuallyDisabled = false;
-  } else if (!screenWakeLockManuallyDisabled && !screenWakeLockState.value.enabled) {
+  } else if (!screenWakeLockState.value.enabled) {
     screenWakeLockController.enable();
   }
 });
