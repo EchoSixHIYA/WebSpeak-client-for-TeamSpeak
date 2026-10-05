@@ -161,11 +161,6 @@
               <div class="voice-activity-artwork" data-ws-part="voice.activity.artwork" aria-hidden="true"></div>
               <div class="mobile-voice-sticky">
                 <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2><span class="desktop-voice-title">{{ t('speakingNow') }}</span><span class="mobile-voice-title">{{ currentChannelName }}</span></h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
-                <div class="mobile-voice-controls">
-                  <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
-                  <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
-                  <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
-                </div>
               </div>
               <div v-if="screenShareError" class="screen-share-inline-error" data-ws-part="voice.screen-share-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
               <section v-if="screenShareViewing" ref="screenSharePlayerEl" class="screen-share-player" data-ws-part="voice.screen-player" role="region" :aria-label="t('screenShare')">
@@ -307,16 +302,23 @@
         <button type="button" class="danger" @click="doDisconnect"><Icon name="door" :size="18" /> {{ t('exit') }}</button>
       </section>
 
-      <nav class="mobile-nav" data-ws-part="voice.mobile-nav" :aria-label="t('mobileNavigation')">
-        <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
-        <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
-        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
-        <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
-      </nav>
+      <div :class="['mobile-bottom-dock', { 'has-voice-controls': isMobileViewport && mobileSection === 'voice' }]">
+        <div v-if="isMobileViewport && mobileSection === 'voice'" class="mobile-voice-controls" role="toolbar" :aria-label="t('desktopAudioControls')">
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
+          <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
+        </div>
+        <nav class="mobile-nav" data-ws-part="voice.mobile-nav" :aria-label="t('mobileNavigation')">
+          <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
+        </nav>
+      </div>
     </div>
 
     <div v-if="memberMenu && isMobileViewport" class="member-menu-backdrop" data-ws-part="voice.context-menu-backdrop" @click="memberMenu = null"></div>
-    <div v-if="memberMenu" class="member-context-menu" data-ws-part="voice.context-menu" :style="memberMenuStyle" @click.stop>
+    <div v-if="memberMenu" :class="['member-context-menu', { 'above-mobile-voice-dock': isMobileViewport && mobileSection === 'voice' }]" data-ws-part="voice.context-menu" :style="memberMenuStyle" @click.stop>
       <div class="member-menu-header" data-ws-part="voice.context-menu.header"><strong>{{ memberMenu.member.nickname }}</strong><button type="button" class="member-menu-close" :aria-label="t('close')" @click="memberMenu = null"><Icon name="close" :size="17" /></button></div>
       <label class="menu-volume"><span>{{ t('memberVolume') }}</span><input type="range" min="0" max="400" :value="(volumes[memberMenu.member.id] ?? 1) * 100" :style="rangeStyle((volumes[memberMenu.member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(memberMenu.member.id, $event)" /></label>
       <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
