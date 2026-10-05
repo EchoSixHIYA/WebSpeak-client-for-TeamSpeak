@@ -18,6 +18,7 @@ import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioStats, typ
 import { pingTeamSpeakSession } from "./network-probe.js";
 import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./acceleration-relay.js";
 import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenShareClientMessage, type ScreenShareIceServer, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
+import { findScreenShareSourceChannelId, ScreenShareDiscoveryCoordinator } from "./screen-share-discovery.js";
 
 const require = createRequire(import.meta.url);
 const { OpusEncoder } = require("@discordjs/opus") as {
@@ -143,6 +144,7 @@ interface WebClientEntry {
   webrtcPublicHost?: string;
   channelTree: unknown[];
   members: Map<number, ChannelMember>;
+  clientChannelIds: Map<number, bigint>;
   avatarCache: Map<string, string | null>;
   eventLog: ServerEvent[];
   opusEncoder: { encode(pcm: Buffer): Buffer } | null;
@@ -182,7 +184,7 @@ export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
   private readonly screenStreams = new Map<string, ScreenStreamRecord>();
-  private readonly screenStreamDiscoveryTargets = new Set<string>();
+  private readonly screenStreamDiscoveries = new ScreenShareDiscoveryCoordinator();
   private readonly identityLeases = new IdentityLeaseStore();
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -285,6 +287,7 @@ export class VoiceBridge {
         ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
         channelTree: [],
         members: new Map(),
+        clientChannelIds: new Map(),
         avatarCache: new Map(),
         eventLog: [],
         opusEncoder: null,
@@ -349,7 +352,9 @@ export class VoiceBridge {
         const normalizedSnapshot = normalizeDirectorySnapshot(snapshot, effectiveSelfId, selfChannelId, nickname, channelName);
         entry!.channelTree = mapChannelTree(normalizedSnapshot, entry!.avatarCache);
         entry!.members.clear();
+        entry!.clientChannelIds.clear();
         for (const client of normalizedSnapshot.clients) {
+          entry!.clientChannelIds.set(client.id, client.channelID);
           const avatar = client.uid ? entry!.avatarCache.get(client.uid) : undefined;
           entry!.members.set(client.id, {
             id: client.id,
@@ -475,6 +480,7 @@ export class VoiceBridge {
         directory.clear();
         entry!.channelTree = [];
         entry!.members.clear();
+        entry!.clientChannelIds.clear();
         entry!.whisperTargetIds.clear();
         entry!.whisperActive = false;
       };
@@ -542,7 +548,9 @@ export class VoiceBridge {
             refreshDirectory();
           }
           sendInitialState();
-          void this.discoverExistingTeamSpeakStreams(entry!);
+          void this.discoverExistingTeamSpeakStreams(entry!).catch((error: unknown) => {
+            this.logger.debug({ target: formatTeamSpeakTarget(entry!.target), err: error instanceof Error ? error.message : String(error) }, "Could not discover existing TeamSpeak screen streams");
+          });
         } catch (error: unknown) {
           const normalized = normalizeTeamSpeakError(error);
           const failureCode = clientConnectionFailureCode(normalized, serverPassword);
@@ -1126,29 +1134,33 @@ export class VoiceBridge {
   }
 
   /**
-   * A gateway session can connect after a native TeamSpeak stream has already
-   * started. TS6 does not replay that stream in the normal welcome snapshot;
-   * requeststreaminfo is the official client-protocol query for this case.
-   * Query each visible client once per TeamSpeak target, then let the normal
-   * raw notification path announce the discovered stream to web viewers.
+   * TS6 does not replay native streams in the welcome snapshot. Rescan on each
+   * newly connected gateway session; overlapping sessions are coalesced, while
+   * later sessions still get a fresh pass after earlier scans complete.
    */
-  private async discoverExistingTeamSpeakStreams(entry: WebClientEntry): Promise<void> {
+  private discoverExistingTeamSpeakStreams(entry: WebClientEntry): Promise<void> {
     const targetKey = teamSpeakTargetKey(entry.target);
-    if (this.screenStreamDiscoveryTargets.has(targetKey)) return;
-    this.screenStreamDiscoveryTargets.add(targetKey);
-    const clientIds = [...entry.members.keys()].filter((clientId) => Number.isInteger(clientId) && clientId > 0);
-    for (const clientId of clientIds) {
-      if (!entry.tsClient.isConnected()) return;
-      try {
-        await entry.tsClient.sendProtocolCommand(`requeststreaminfo clid=${clientId}`);
-      } catch (error: unknown) {
-        this.logger.debug({
-          target: formatTeamSpeakTarget(entry.target),
-          clientId,
-          err: error instanceof Error ? error.message : String(error),
-        }, "Could not query existing TeamSpeak screen stream");
+    return this.screenStreamDiscoveries.run(targetKey, async () => {
+      const queryEntry = entry.isAlive && entry.tsClient.isConnected()
+        ? entry
+        : [...this.entries.values()].find((candidate) => candidate.isAlive
+          && teamSpeakTargetKey(candidate.target) === targetKey
+          && candidate.tsClient.isConnected());
+      if (!queryEntry) return;
+      const clientIds = [...queryEntry.members.keys()].filter((clientId) => Number.isInteger(clientId) && clientId > 0);
+      for (const clientId of clientIds) {
+        if (!queryEntry.isAlive || !queryEntry.tsClient.isConnected()) return;
+        try {
+          await queryEntry.tsClient.sendProtocolCommand(`requeststreaminfo clid=${clientId}`);
+        } catch (error: unknown) {
+          this.logger.debug({
+            target: formatTeamSpeakTarget(queryEntry.target),
+            clientId,
+            err: error instanceof Error ? error.message : String(error),
+          }, "Could not query existing TeamSpeak screen stream");
+        }
       }
-    }
+    });
   }
 
   private describeScreenStream(stream: ScreenStreamRecord): ScreenShareStreamDescription {
@@ -1489,9 +1501,22 @@ export class VoiceBridge {
         browserStream.teamSpeakStreamId = streamId;
         return;
       }
-      const sourceEntry = [...this.entries.values()].find((candidate) => candidate.tsClient.getClientId() === sourceClientId);
+      const directorySources = [...this.entries.values()].map((candidate) => ({
+        targetKey: teamSpeakTargetKey(candidate.target),
+        clientChannelIds: candidate.clientChannelIds,
+      }));
+      const sourceChannelId = findScreenShareSourceChannelId(directorySources, targetKey, sourceClientId);
+      if (sourceChannelId === undefined) {
+        this.logger.debug({
+          target: formatTeamSpeakTarget(entry.target),
+          clientId: sourceClientId,
+          streamId,
+        }, "Could not determine native screen-share source channel");
+        return;
+      }
       const key = screenStreamKey(targetKey, streamId);
       const current = this.screenStreams.get(key);
+      const sourceChannelChanged = current !== undefined && current.channelId !== sourceChannelId;
       const stream: ScreenStreamRecord = current ?? {
         streamId,
         source: "teamspeak",
@@ -1504,12 +1529,13 @@ export class VoiceBridge {
         viewerCount: 0,
         viewers: [],
         targetKey,
-        channelId: sourceEntry?.tsClient.getChannelId() ?? entry.tsClient.getChannelId(),
+        channelId: sourceChannelId,
         ownerEntryId: "",
         viewerEntryIds: new Set(),
         nativeViewerClids: new Set(),
         sourceClientId,
       };
+      stream.channelId = sourceChannelId;
       stream.sourceClientId = sourceClientId;
       stream.ownerNickname = params.name || stream.ownerNickname;
       stream.name = params.name || stream.name;
@@ -1518,7 +1544,7 @@ export class VoiceBridge {
       // Every gateway session attached to the same TS target sees the same
       // raw notification. Only the first one should announce a new stream to
       // browsers; otherwise each connected user receives duplicate cards.
-      if (!current) {
+      if (!current || sourceChannelChanged) {
         this.broadcastScreenMessage(stream, { type: "screenShareStarted", stream: this.describeScreenStream(stream), owner: false });
       }
       return;
