@@ -539,6 +539,10 @@
    mobile surface its own touch-friendly scroll area. */
 .mobile-voice-controls, .voice-member-action, .member-action-button, .member-menu-backdrop { display: none; }
 .microphone-header-toggle.muted { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.screen-wake-lock-action.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.screen-wake-lock-action.pending { color: var(--accent); }
+.screen-wake-lock-action.unavailable { color: var(--danger); }
+.screen-wake-lock-action:disabled { cursor: not-allowed; opacity: .55; }
 .microphone-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
 .microphone-control .settings-label { margin-bottom: 4px; }
 .microphone-control .settings-hint { max-width: 390px; margin: 0; }
