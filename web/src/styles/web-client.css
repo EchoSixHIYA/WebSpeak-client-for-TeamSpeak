@@ -186,6 +186,20 @@
   .app-shell .voice-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 }
 
+.chat-history-notice {
+  position: relative;
+  z-index: 3;
+  margin: -12px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.app-shell.mobile-view-chat .chat-history-notice {
+  flex: 0 0 auto;
+  margin: 0 0 4px;
+}
+
 .screen-share-card-button { min-height: 28px; font-size: 10px; }
 .screen-share-settings-button { width: 28px; min-width: 28px; min-height: 28px; }
 
