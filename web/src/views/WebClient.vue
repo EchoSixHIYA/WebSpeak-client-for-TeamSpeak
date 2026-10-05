@@ -128,6 +128,7 @@
             </div>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
             <button v-if="isMobileViewport" class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
+            <button v-if="isMobileViewport" type="button" class="header-action screen-wake-lock-action" :class="{ active: screenWakeLockState.active, pending: screenWakeLockState.requesting, unavailable: screenWakeLockState.unavailable }" :title="screenWakeLockControlLabel" :aria-label="screenWakeLockControlLabel" :aria-pressed="screenWakeLockState.enabled && !screenWakeLockState.unavailable" :disabled="!screenWakeLockState.supported" @click="toggleScreenWakeLock"><Icon :name="screenWakeLockState.active || screenWakeLockState.requesting ? 'sun' : 'moon'" :size="18" /></button>
             <button v-if="isMobileViewport" class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <SkinSwitcher v-model="activeSkinId" class="workspace-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
             <LanguageSwitcher v-model="language" class="workspace-language" :menu-label="t('languageMenu')" @change="persistLanguage" />
@@ -389,6 +390,7 @@ import { useWebClientI18n } from "../composables/useWebClientI18n.js";
 import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfig.js";
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
+import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listInstalledSkins, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
@@ -440,7 +442,7 @@ const {
   stopMicrophoneTest,
   playNotification,
   connect,
-  reconnectNow,
+  reconnectNow: reconnectVoice,
   disconnect,
   switchChannel,
   moveClient,
@@ -519,6 +521,15 @@ function t(key: string, variables: Record<string, string | number> = {}) {
   if (template === undefined || !template.trim()) return translate(key, variables);
   return Object.entries(variables).reduce((value, [name, replacement]) => value.replaceAll(`{{${name}}}`, String(replacement)), template);
 }
+const shouldKeepScreenAwake = computed(() => isMobileViewport.value && (voiceState.connected || voiceState.connecting || voiceState.reconnecting));
+const screenWakeLockState = ref<ScreenWakeLockSnapshot>({ supported: false, enabled: false, active: false, requesting: false, unavailable: false });
+const screenWakeLockControlLabel = computed(() => {
+  if (!screenWakeLockState.value.supported) return t("screenWakeLockUnsupported");
+  if (screenWakeLockState.value.unavailable) return t("screenWakeLockUnavailable");
+  return screenWakeLockState.value.enabled ? t("screenWakeLockDisable") : t("screenWakeLockEnable");
+});
+let screenWakeLockController: ScreenWakeLockController | undefined;
+let screenWakeLockManuallyDisabled = false;
 const {
   favoriteServers,
   recentServers,
@@ -848,8 +859,8 @@ const {
 const {
   canJoin,
   currentServerTarget,
-  doConnect,
-  doDisconnect,
+  doConnect: connectToVoice,
+  doDisconnect: disconnectFromVoice,
   submitServerPassword,
   cancelServerPassword,
   selectChannel,
@@ -888,6 +899,47 @@ const {
   showToast,
   t,
 });
+
+function doConnect(): void {
+  screenWakeLockManuallyDisabled = false;
+  enableScreenWakeLockForSession();
+  connectToVoice();
+}
+
+function doDisconnect(): void {
+  screenWakeLockManuallyDisabled = false;
+  screenWakeLockController?.disable();
+  disconnectFromVoice();
+}
+
+function reconnectNow(): void {
+  screenWakeLockManuallyDisabled = false;
+  enableScreenWakeLockForSession();
+  reconnectVoice();
+}
+
+function enableScreenWakeLockForSession(): void {
+  if (!isMobileViewport.value || !screenWakeLockController) return;
+  screenWakeLockController.enable();
+  if (!screenWakeLockController.supported) showToast(t("screenWakeLockUnsupported"));
+}
+
+function toggleScreenWakeLock(): void {
+  if (!screenWakeLockController?.supported) {
+    showToast(t("screenWakeLockUnsupported"));
+    return;
+  }
+
+  if (screenWakeLockState.value.enabled && !screenWakeLockState.value.unavailable) {
+    screenWakeLockManuallyDisabled = true;
+    screenWakeLockController.disable();
+    return;
+  }
+
+  screenWakeLockManuallyDisabled = false;
+  screenWakeLockController.enable();
+}
+
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 const memberMenuStyle = computed(() => {
   if (!memberMenu.value) return {};
@@ -922,6 +974,21 @@ watch(() => voiceState.connected, (connected) => {
   recordCurrentServer();
 });
 
+watch(shouldKeepScreenAwake, (shouldKeep) => {
+  if (!screenWakeLockController) return;
+  if (!shouldKeep) {
+    screenWakeLockController.disable();
+    screenWakeLockManuallyDisabled = false;
+  } else if (!screenWakeLockManuallyDisabled && !screenWakeLockState.value.enabled) {
+    screenWakeLockController.enable();
+  }
+});
+
+watch(screenWakeLockState, (state, previousState) => {
+  if (!state.unavailable || previousState.unavailable || !shouldKeepScreenAwake.value) return;
+  showToast(t(state.supported ? "screenWakeLockUnavailable" : "screenWakeLockUnsupported"));
+});
+
 watch(() => voiceState.reconnecting, (reconnecting, wasReconnecting) => {
   if (reconnecting && !wasReconnecting) {
     playNotification("disconnected");
@@ -938,6 +1005,11 @@ let viewportChangeHandler: (() => void) | undefined;
 onMounted(() => {
   // The selected skin is applied to this public root, never to the admin DOM.
   applyTheme(themeMode.value);
+  screenWakeLockController = createScreenWakeLockController(
+    getScreenWakeLockApi(),
+    document,
+    (state) => { screenWakeLockState.value = state; },
+  );
   browserError.value = checkSupport() ?? "";
   void loadPublicConfig();
   void initializeSkin();
@@ -966,6 +1038,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   disconnect();
+  screenWakeLockController?.dispose();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
   if (toastTimer) clearTimeout(toastTimer);
