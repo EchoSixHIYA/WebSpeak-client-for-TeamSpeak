@@ -552,16 +552,10 @@ const {
   localizedWelcomeText,
   loadPublicConfig,
 } = useWebClientPublicConfig({ serverHost, serverPort, accelerationRelayId, language, t });
-type SkinMode = Exclude<ThemeMode, "system">;
-function resolveSkinMode(theme: ThemeMode): SkinMode {
-  return theme === "system" ? (isDarkTheme(theme) ? "dark" : "light") : theme;
-}
-
-const themeMode = ref<SkinMode>(resolveSkinMode(getStoredTheme()));
+const themeMode = ref<ThemeMode>(getStoredTheme());
 applyTheme(themeMode.value);
-if (localStorage.getItem("webspeak:theme") === "system") saveTheme(themeMode.value);
 const storedSkinId = getStoredSkinId();
-const activeSkinId = ref(storedSkinId ?? (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const activeSkinId = ref(storedSkinId ?? (isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
 const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN);
 const installedSkins = ref<InstalledSkin[]>([]);
 const catalogSkins = ref<SkinCatalogEntry[]>([]);
@@ -666,9 +660,16 @@ async function onSkinChange(skinId: string) {
   const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
   activeSkin.value = await activateSkin(skinId, catalogSkin?.version, appVersion.value);
   activeSkinId.value = getStoredSkinId() ?? skinId;
-  if (skinId === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
-  else if (skinId === BUILTIN_DARK_SKIN) themeMode.value = "dark";
-  else themeMode.value = resolveSkinMode(getStoredTheme());
+  if (activeSkinId.value === BUILTIN_LIGHT_SKIN) {
+    themeMode.value = "light";
+    saveTheme(themeMode.value);
+  } else if (activeSkinId.value === BUILTIN_DARK_SKIN) {
+    themeMode.value = "dark";
+    saveTheme(themeMode.value);
+  } else {
+    themeMode.value = getStoredTheme();
+    applyTheme(themeMode.value, { preserveCustomSkins: true });
+  }
   void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
 }
 
@@ -680,33 +681,44 @@ async function initializeSkin(): Promise<void> {
     catalogSkins.value = availableSkins;
     if (!localStorage.getItem("webspeak:theme")) {
       if (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark") {
-        themeMode.value = resolveSkinMode(preferences.theme);
+        themeMode.value = preferences.theme;
       }
       saveTheme(themeMode.value);
     }
     // Only a deliberate choice should override the instance default. The active
     // skin and local preference also contain automatically applied defaults.
     const savedSkinId = localStorage.getItem("webspeak:skin-choice");
-    const preferredSkinId = savedSkinId && isPublicSkinEnabled(savedSkinId)
-      ? savedSkinId
-      : getPublicDefaultSkinId();
+    const hasSavedSkinChoice = Boolean(savedSkinId && isPublicSkinEnabled(savedSkinId));
+    const configuredDefaultSkinId = hasSavedSkinChoice ? savedSkinId! : getPublicDefaultSkinId();
+    const preferredSkinId = !hasSavedSkinChoice && (configuredDefaultSkinId === BUILTIN_LIGHT_SKIN || configuredDefaultSkinId === BUILTIN_DARK_SKIN)
+      ? (isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN)
+      : configuredDefaultSkinId;
     const preferredSkin = availableSkins.find((skin) => skin.id === preferredSkinId);
     activeSkinId.value = preferredSkinId;
     // Apply the locally cached package (or fetch it if absent) before revealing
     // the page. The network catalog/version check must not block the first paint.
     activeSkin.value = await activateSkin(preferredSkinId, preferredSkin?.version, appVersion.value);
     activeSkinId.value = getStoredSkinId() ?? preferredSkinId;
-    if (activeSkinId.value === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
-    else if (activeSkinId.value === BUILTIN_DARK_SKIN) themeMode.value = "dark";
-    else themeMode.value = resolveSkinMode(getStoredTheme());
+    if (activeSkinId.value === BUILTIN_LIGHT_SKIN || activeSkinId.value === BUILTIN_DARK_SKIN) {
+      if (hasSavedSkinChoice && savedSkinId === activeSkinId.value) {
+        themeMode.value = activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : "light";
+        saveTheme(themeMode.value);
+      } else {
+        applyTheme(themeMode.value);
+      }
+    } else {
+      themeMode.value = getStoredTheme();
+      applyTheme(themeMode.value, { preserveCustomSkins: true });
+    }
     void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
   } catch {
     // Storage or package loading can fail on restricted browsers. Do not leave
     // the application hidden, and restore a usable built-in palette instead.
     activeSkin.value = null;
-    activeSkinId.value = themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+    activeSkinId.value = isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
     try {
       await activateSkin(activeSkinId.value, undefined, appVersion.value);
+      applyTheme(themeMode.value);
     } catch {
       applyTheme(themeMode.value);
     }
@@ -979,6 +991,8 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 let deviceChangeHandler: (() => void) | undefined;
 let viewportMediaQuery: MediaQueryList | undefined;
 let viewportChangeHandler: (() => void) | undefined;
+let colorSchemeMediaQuery: MediaQueryList | undefined;
+let colorSchemeChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   // The selected skin is applied to this public root, never to the admin DOM.
@@ -1013,12 +1027,24 @@ onMounted(() => {
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
+  colorSchemeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  colorSchemeChangeHandler = () => {
+    if (themeMode.value !== "system") return;
+    if (activeSkinId.value !== BUILTIN_LIGHT_SKIN && activeSkinId.value !== BUILTIN_DARK_SKIN) return;
+    activeSkinId.value = isDarkTheme("system") ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+  };
+  if (colorSchemeMediaQuery.addEventListener) colorSchemeMediaQuery.addEventListener("change", colorSchemeChangeHandler);
+  else colorSchemeMediaQuery.addListener?.(colorSchemeChangeHandler);
 });
 onUnmounted(() => {
   disconnect();
   screenWakeLockController?.dispose();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
+  if (colorSchemeMediaQuery && colorSchemeChangeHandler) {
+    if (colorSchemeMediaQuery.removeEventListener) colorSchemeMediaQuery.removeEventListener("change", colorSchemeChangeHandler);
+    else colorSchemeMediaQuery.removeListener?.(colorSchemeChangeHandler);
+  }
   if (toastTimer) clearTimeout(toastTimer);
 });
 
@@ -1046,9 +1072,9 @@ async function clearBrowserData(): Promise<void> {
   activeSkin.value = null;
   installedSkins.value = [];
   catalogSkins.value = await listPublicSkins();
-  themeMode.value = resolveSkinMode("system");
+  themeMode.value = "system";
   applyTheme(themeMode.value);
-  activeSkinId.value = themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+  activeSkinId.value = isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
   identityMaterial.value = "";
   rememberIdentity.value = false;
   clearServerHistory();

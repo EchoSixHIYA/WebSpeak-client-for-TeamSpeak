@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import Icon from "../components/Icon.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
@@ -40,7 +40,7 @@ import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "
 import { BUILTIN_ILLUSIA_SKIN_ID, getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, getStoredSkinId } from "../services/skin-runtime.js";
 import type { InstalledSkin } from "../services/skin-pack.js";
-import { getStoredTheme, isDarkTheme } from "../services/theme.js";
+import { applyTheme, getStoredTheme, isDarkTheme, saveTheme } from "../services/theme.js";
 
 type Language = "zh" | "en" | "de" | "ru" | "ja";
 const illusiaSkinLabels: Record<Language, string> = { zh: "ILLUSIA 风", en: "ILLUSIA style", de: "ILLUSIA-Stil", ru: "Стиль ILLUSIA", ja: "ILLUSIA スタイル" };
@@ -101,6 +101,8 @@ const ja = { languageMenu: "言語", skinSelector: "スキン", skinDay: "昼", 
 const tabs = computed(() => [{ id: "channel" as const, label: copy.value.channel }, { id: "server" as const, label: copy.value.server }]);
 const selectedChannel = computed(() => channels.find((channel) => channel.id === selectedChannelId.value) ?? channels[0]);
 const visibleMessages = computed(() => activeTab.value === "channel" ? messages.value : []);
+let systemColorScheme: MediaQueryList | undefined;
+let systemColorSchemeHandler: (() => void) | undefined;
 
 function persistLanguage() { localStorage.setItem("webspeak:language", language.value); void saveLocalPreferences({ schemaVersion: 1, language: language.value }); }
 async function onSkinChange(skinId: string) {
@@ -108,9 +110,20 @@ async function onSkinChange(skinId: string) {
   const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
   activeSkin.value = await activateSkin(skinId, catalogSkin?.version);
   activeSkinId.value = getStoredSkinId() ?? skinId;
+  if (activeSkinId.value === BUILTIN_LIGHT_SKIN) saveTheme("light");
+  else if (activeSkinId.value === BUILTIN_DARK_SKIN) saveTheme("dark");
+  else applyTheme(getStoredTheme(), { preserveCustomSkins: true });
   void saveLocalPreferences({ schemaVersion: 1, skinId: activeSkinId.value });
 }
 onMounted(async () => {
+  systemColorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+  systemColorSchemeHandler = () => {
+    if (getStoredTheme() !== "system") return;
+    if (activeSkinId.value !== BUILTIN_LIGHT_SKIN && activeSkinId.value !== BUILTIN_DARK_SKIN) return;
+    activeSkinId.value = isDarkTheme("system") ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+  };
+  if (systemColorScheme.addEventListener) systemColorScheme.addEventListener("change", systemColorSchemeHandler);
+  else systemColorScheme.addListener?.(systemColorSchemeHandler);
   const catalogPromise = listPublicSkins().catch(() => []);
   try {
     const [preferences, installed, available] = await Promise.all([loadLocalPreferences(), listInstalledSkins(), catalogPromise]);
@@ -119,15 +132,26 @@ onMounted(async () => {
     // Only a deliberate choice should override the instance default. The active
     // skin and local preference also contain automatically applied defaults.
     const savedSkinId = localStorage.getItem("webspeak:skin-choice");
-    const selectedId = savedSkinId && isPublicSkinEnabled(savedSkinId) ? savedSkinId : getPublicDefaultSkinId();
+    const hasSavedSkinChoice = Boolean(savedSkinId && isPublicSkinEnabled(savedSkinId));
+    const configuredDefaultSkinId = hasSavedSkinChoice ? savedSkinId! : getPublicDefaultSkinId();
+    const selectedId = !hasSavedSkinChoice && (configuredDefaultSkinId === BUILTIN_LIGHT_SKIN || configuredDefaultSkinId === BUILTIN_DARK_SKIN)
+      ? (isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN)
+      : configuredDefaultSkinId;
     const selectedSkin = available.find((skin) => skin.id === selectedId);
     activeSkinId.value = selectedId;
     activeSkin.value = await activateSkin(selectedId, selectedSkin?.version);
     activeSkinId.value = getStoredSkinId() ?? selectedId;
+    if (activeSkinId.value === BUILTIN_LIGHT_SKIN || activeSkinId.value === BUILTIN_DARK_SKIN) {
+      if (hasSavedSkinChoice && savedSkinId === activeSkinId.value) saveTheme(activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : "light");
+      else applyTheme(getStoredTheme());
+    } else {
+      applyTheme(getStoredTheme(), { preserveCustomSkins: true });
+    }
   } catch {
     activeSkin.value = null;
     activeSkinId.value = isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
     await activateSkin(activeSkinId.value).catch(() => undefined);
+    applyTheme(getStoredTheme());
   } finally {
     skinReady.value = true;
   }
@@ -142,6 +166,11 @@ onMounted(async () => {
     activeSkinId.value = getStoredSkinId() ?? selected.id;
     installedSkins.value = await listInstalledSkins();
   }).catch(() => undefined);
+});
+onUnmounted(() => {
+  if (!systemColorScheme || !systemColorSchemeHandler) return;
+  if (systemColorScheme.removeEventListener) systemColorScheme.removeEventListener("change", systemColorSchemeHandler);
+  else systemColorScheme.removeListener?.(systemColorSchemeHandler);
 });
 function selectChannel(id: string) { selectedChannelId.value = id; activeTab.value = "channel"; }
 function toggleSpeaking() { speakingId.value = speakingId.value ? "" : selectedChannel.value.members[0]?.id ?? ""; }
