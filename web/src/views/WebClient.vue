@@ -306,9 +306,9 @@
       </section>
 
       <nav class="mobile-nav" data-ws-part="voice.mobile-nav" :aria-label="t('mobileNavigation')">
+        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
-        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
       </nav>
     </div>
@@ -511,7 +511,7 @@ const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWU
 const toast = ref("");
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
-const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
+const mobileSection = ref<"channels" | "chat" | "voice" | "more">("voice");
 const isMobileViewport = ref(false);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
