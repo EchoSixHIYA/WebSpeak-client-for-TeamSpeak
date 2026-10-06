@@ -22,3 +22,12 @@
 - 分支：`fix/request-microphone-before-audio-resume`
 - 提交：`52a7bee`（`fix: request microphone before resuming audio context`）
 - PR #24：<https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/24>
+
+## 部署（2026-10-06）
+
+- 按 Timmy 要求，将麦克风权限请求顺序修复部署到当前运行的 Intel NUC 静态前端；保留先前部署的成员侧栏隐藏本机音频状态及移除两处提示文案。
+- 以服务器现有 `ts6-backstage-source.tar.gz` 定制源码为基线移植修复，保留 NUC 首页/PWA 图标元数据及 `screen-share-portrait-f54f514.css` 覆盖；部署 JS `assets/index-CqHFA_lr.js` 和同步更新的 AGPL 源码归档。现有 CSS 哈希不变。
+- 部署前快照：`/home/timmy/webspeak/backups/20261006-142005-CST-mic-permission/`，包含原首页、原源码归档、候选首页/JS/源码归档及 `SHA256SUMS`。
+- 公网首页、新 JS、CSS、源码归档均 HTTP 200；线上 JS 与候选 SHA-256 一致，首页继续引用竖屏共享覆盖。健康端点为 `ok`/版本 `0.2.5`；WebSpeak 容器 `StartedAt` 未变，重启次数为 0；未重启 WebSpeak 或 Caddy。
+- 需要刷新或重新打开页面加载新 bundle。未能在真实手机语音会话中实测权限弹窗。
+- PR #24 的 `verify` 与 `docker-smoke` 在代码提交 `2c193e1` 上均通过；后续日志提交触发的检查状态需另行回读。
