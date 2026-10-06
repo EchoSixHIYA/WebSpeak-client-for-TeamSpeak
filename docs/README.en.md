@@ -234,7 +234,7 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain.
 
 | Area | Requirement or note |
 | --- | --- |
-| Browser | Use a current Chrome, Edge, or other modern browser with WebRTC support. Microphone and window audio normally require HTTPS. |
+| Browser | Use a current Chrome, Edge, or other modern browser with WebRTC support. The browser requests microphone access when you join a voice session; if denied, allow it in site settings and retry. Microphone and window audio normally require HTTPS. |
 | TeamSpeak network | The WebSpeak host must reach the target TeamSpeak server; the default voice port is `9987`. |
 | Web network | The service uses `3040/TCP`; public deployments should expose the page and WebSocket through an HTTPS reverse proxy. |
 | IPv6 | Write literal targets as `[2001:db8::1]#9987`. The host/container needs routed IPv6, IPv6 enabled in the OS and Node.js, and the relevant firewall rules. |

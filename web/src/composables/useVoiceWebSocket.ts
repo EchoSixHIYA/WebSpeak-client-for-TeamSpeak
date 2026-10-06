@@ -4,6 +4,7 @@ import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wa
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
+import { requestMediaBeforeAudioResume } from "../services/microphone-start.js";
 
 const micCaptureWorkletUrl = "/mic-capture-worklet.js";
 const SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS = 15_000;
@@ -759,14 +760,14 @@ export function useVoiceWebSocket() {
 
   async function startMicrophone(): Promise<void> {
     const ctx = getAudioCtx();
-    if (ctx.state === "suspended") {
-      try { await ctx.resume(); } catch { /* the audio context notice explains the silence */ }
-    }
     // Acquire the replacement stream before tearing down the current graph so
     // changing devices does not interrupt an active microphone on failure.
     let nextStream: MediaStream;
     try {
-      nextStream = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints() });
+      nextStream = await requestMediaBeforeAudioResume(
+        () => navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints() }),
+        () => ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
+      );
       audioPermission.value = "granted";
       clearMicrophoneError();
     } catch (error) {
