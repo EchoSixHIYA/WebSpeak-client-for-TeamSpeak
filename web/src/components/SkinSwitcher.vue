@@ -189,6 +189,18 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   .skin-dropdown { min-width: 190px; }
 }
 
+@media (max-width: 740px) {
+  .skin-switcher.mobile-skin-switcher .skin-dropdown {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-height: min(45vh, 280px);
+    margin-top: 8px;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+}
+
 .skin-switcher.mobile-skin-switcher .skin-trigger {
   width: 100%;
   min-height: 44px;

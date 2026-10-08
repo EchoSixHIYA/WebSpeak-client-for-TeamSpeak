@@ -688,6 +688,8 @@
   .mobile-voice-settings { width: 56px; padding-inline: 4px; }
   .mobile-voice-toggle { flex: 1 1 0; min-width: 44px; padding-inline: 4px; }
   .mobile-voice-toggle span { display: none; }
+  .mobile-voice-toggle { flex: 1 1 0; min-width: 0; padding-inline: 6px; }
+  .mobile-voice-controls .mobile-voice-toggle span { display: inline; }
   .mobile-member-controls .mobile-voice-toggle { flex: 1 1 0; min-height: 50px; }
   .mobile-voice-settings span { display: none; }
   .join-content { gap: 18px; }
