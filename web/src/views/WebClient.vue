@@ -67,13 +67,16 @@
               <input id="nickname" v-model="nickname" autocomplete="nickname" maxlength="30" :placeholder="t('nicknamePlaceholder')" autofocus />
             </div>
 
-            <label class="field-label" data-ws-part="home.field-label" for="channel">{{ t('targetChannel') }} <span>{{ t('optional') }}</span></label>
-            <div class="field-wrap" data-ws-part="home.field">
-              <Icon name="hash" :size="17" />
-              <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
-            </div>
-
-            <details class="identity-options" data-ws-part="home.identity"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label></details><p v-if="rememberIdentity" class="identity-warning">{{ t('rememberIdentityConcurrentWarning') }}</p>
+            <details class="identity-options" data-ws-part="home.identity">
+              <summary>{{ t('identityOptions') }}</summary>
+              <label class="field-label" data-ws-part="home.field-label" for="channel">{{ t('targetChannel') }} <span>{{ t('optional') }}</span></label>
+              <div class="field-wrap" data-ws-part="home.field">
+                <Icon name="hash" :size="17" />
+                <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
+              </div>
+              <label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label>
+            </details>
+            <p v-if="rememberIdentity" class="identity-warning">{{ t('rememberIdentityConcurrentWarning') }}</p>
 
             <button class="primary-button connect-button" data-ws-part="home.connect" :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
