@@ -3,7 +3,7 @@ import { RnnoiseWorkletNode, loadRnnoise } from "@sapphi-red/web-noise-suppresso
 import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
-import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
+import { loadChatHistory, loadLocalPreferences, normalizeChatHistoryServerKey, saveChatHistoryMessage, saveLocalPreferences } from "../services/local-persistence.js";
 
 const micCaptureWorkletUrl = "/mic-capture-worklet.js";
 const SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS = 15_000;
@@ -188,10 +188,13 @@ export interface ChatMessage {
   conversationId?: string;
   senderId?: number;
   senderUid?: string;
+  conversationUid?: string;
+  conversationName?: string;
   invokerName: string;
   message: string;
   timestamp: number;
   isSelf?: boolean;
+  isHistory?: boolean;
 }
 
 export interface ServerEvent {
@@ -339,6 +342,7 @@ export function useVoiceWebSocket() {
   const members = reactive<ChannelMember[]>([]);
   const channels = reactive<ChannelInfo[]>([]);
   const chatMessages = reactive<ChatMessage[]>([]);
+  let chatHistoryServerKey = "";
   const serverEvents = reactive<ServerEvent[]>([]);
   const pokeNotifications = reactive<{ id: string; invokerId: number; invokerUid: string; invokerName: string; message: string; timestamp: number }[]>([]);
   let connectionSequence = 0;
@@ -347,6 +351,12 @@ export function useVoiceWebSocket() {
   const pendingLatencyProbes = new Map<string, { startedAt: number; resolve: (result: LatencyProbeResult | null) => void; timer: ReturnType<typeof setTimeout> }>();
   let commandSequence = 0;
   const pendingCommands = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+
+  function appendChatMessage(message: ChatMessage): void {
+    chatMessages.push(message);
+    if (chatHistoryServerKey) void saveChatHistoryMessage(chatHistoryServerKey, message);
+  }
+
   let webrtcPeer: RTCPeerConnection | null = null;
   let webrtcOutputElement: SinkAudioElement | null = null;
   let webrtcPlaybackStream: MediaStream | null = null;
@@ -1522,6 +1532,7 @@ export function useVoiceWebSocket() {
     lastConnection = { target, channel, nickname, serverPassword, ...(identity ? { identity } : {}), rememberIdentity, accelerated, accelerationRelayId };
     identityMaterial.value = identity;
     const sequence = ++connectionSequence;
+    chatHistoryServerKey = normalizeChatHistoryServerKey(target);
     state.error = "";
     state.errorCode = "";
     // Audio diagnostics belong to the previous session, never to the new one.
@@ -1531,8 +1542,9 @@ export function useVoiceWebSocket() {
     state.reconnecting = false;
     state.reconnectAttempt = 0;
     state.reconnectFailed = false;
-    void audioPreferencesReady.then(() => {
+    void Promise.all([audioPreferencesReady, loadChatHistory(chatHistoryServerKey)]).then(([, history]) => {
       if (sequence !== connectionSequence) return;
+      chatMessages.push(...history.map((message) => ({ ...message, isHistory: true })));
       void openTicketedConnection(sequence, target, channel, nickname, serverPassword, inviteToken, accelerated);
     });
   }
@@ -1679,6 +1691,7 @@ export function useVoiceWebSocket() {
     rejectPendingCommands(new Error("语音连接已关闭"));
     const keepRememberedIdentity = lastConnection?.rememberIdentity === true;
     if (!preserveConnection) lastConnection = null;
+    if (!preserveConnection) chatHistoryServerKey = "";
     stopMicrophone();
     clearMicrophoneError();
     clearAudioNotice();
@@ -2495,11 +2508,13 @@ export function useVoiceWebSocket() {
         // Older gateways and TeamSpeak channel notifications may use 0 as
         // the broadcast sentinel. It must not be compared with a channel id.
         const incomingTargetId = rawTargetId && rawTargetId !== "0" ? rawTargetId : undefined;
-        chatMessages.push({
+        appendChatMessage({
           id: `remote-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           scope: incomingScope,
           ...(incomingTargetId ? { targetId: incomingTargetId } : {}),
           ...(incomingScope === "private" ? { conversationId: String(Number(msg.invokerId) || 0) } : {}),
+          ...(incomingScope === "private" && typeof msg.senderUid === "string" ? { conversationUid: msg.senderUid } : {}),
+          ...(incomingScope === "private" ? { conversationName: String(msg.invokerName || "Unknown") } : {}),
           senderId: Number(msg.invokerId) || undefined,
           senderUid: typeof msg.senderUid === "string" ? msg.senderUid : undefined,
           invokerName: String(msg.invokerName || "Unknown"),
@@ -2700,7 +2715,7 @@ export function useVoiceWebSocket() {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 500) return;
     sendCmd("sendTextMessage", { message: trimmed });
-    chatMessages.push({
+    appendChatMessage({
       id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       scope: "channel",
       ...(targetId ? { targetId } : {}),
@@ -2716,14 +2731,29 @@ export function useVoiceWebSocket() {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 500) return;
     sendCmd("sendServerMessage", { message: trimmed });
-    chatMessages.push({ id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, scope: "server", senderId: state.tsClientId, invokerName: "你", message: trimmed, timestamp: Date.now(), isSelf: true });
+    appendChatMessage({ id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, scope: "server", senderId: state.tsClientId, invokerName: "你", message: trimmed, timestamp: Date.now(), isSelf: true });
   }
 
-  function sendPrivateMessage(clientId: number, message: string, targetId = ""): void {
+  function sendPrivateMessage(clientId: number, message: string, targetId = "", conversationUid = "", conversationName = ""): void {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 500) return;
     sendCmd("sendPrivateMessage", { clientId, message: trimmed });
-    chatMessages.push({ id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, scope: "private", targetId, conversationId: String(clientId), senderId: state.tsClientId, invokerName: "你", message: trimmed, timestamp: Date.now(), isSelf: true });
+    const conversation = members.find((member) => member.id === clientId);
+    const resolvedConversationUid = conversationUid || conversation?.uid;
+    const resolvedConversationName = conversationName || conversation?.nickname;
+    appendChatMessage({
+      id: `self-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      scope: "private",
+      targetId,
+      conversationId: String(clientId),
+      ...(resolvedConversationUid ? { conversationUid: resolvedConversationUid } : {}),
+      ...(resolvedConversationName ? { conversationName: resolvedConversationName } : {}),
+      senderId: state.tsClientId,
+      invokerName: "你",
+      message: trimmed,
+      timestamp: Date.now(),
+      isSelf: true,
+    });
   }
 
   function sendPoke(clientId: number, message = ""): void {
