@@ -4,14 +4,30 @@ import type { ChannelInfo, ChannelMember, ChatMessage } from "./useVoiceWebSocke
 export type WebClientChatTab = "channel" | "server" | "private" | "events";
 
 interface PrivateConversation {
+  key: string;
   id: number;
+  uid?: string;
   name: string;
   lastMessage: number;
+  online: boolean;
+}
+
+export function privateConversationKeyForTarget(clientId: number, uid?: string, peerName = ""): string {
+  return uid ? `uid:${uid}` : `client:${JSON.stringify([clientId, peerName])}`;
+}
+
+export function privateConversationKey(message: ChatMessage): string | null {
+  if (message.scope !== "private") return null;
+  if (message.conversationUid) return privateConversationKeyForTarget(0, message.conversationUid);
+  const clientId = Number(message.conversationId) || message.senderId;
+  const peerName = message.conversationName || (message.isSelf ? "" : message.invokerName);
+  return clientId ? privateConversationKeyForTarget(clientId, undefined, peerName) : null;
 }
 
 interface UseWebClientChatOptions {
   messages: ChatMessage[];
   members: ChannelMember[];
+  channels: ChannelInfo[];
   currentChannel: Readonly<Ref<ChannelInfo | undefined>>;
   currentChannelName: Readonly<Ref<string>>;
   selectedChannelId: Ref<string>;
@@ -21,7 +37,7 @@ interface UseWebClientChatOptions {
   closeMemberMenu: () => void;
   sendTextMessage: (text: string, targetId?: string) => void;
   sendServerMessage: (text: string) => void;
-  sendPrivateMessage: (clientId: number, text: string, conversationId?: string) => void;
+  sendPrivateMessage: (clientId: number, text: string, conversationId?: string, conversationUid?: string, conversationName?: string) => void;
   notifyPrivateMessage: () => void;
   t: (key: string, variables?: Record<string, string | number>) => string;
 }
@@ -29,6 +45,7 @@ interface UseWebClientChatOptions {
 export function useWebClientChat({
   messages,
   members,
+  channels,
   currentChannel,
   currentChannelName,
   selectedChannelId,
@@ -43,30 +60,45 @@ export function useWebClientChat({
   t,
 }: UseWebClientChatOptions) {
   const tab = ref<WebClientChatTab>("channel");
-  const privateClientId = ref(0);
+  const selectedPrivateConversationKey = ref("");
   const messageDraft = ref("");
   const listElement = ref<HTMLElement | null>(null);
 
   const conversations = computed<PrivateConversation[]>(() => {
     const byConversation = new Map<string, PrivateConversation>();
+    const allMembers = [...members, ...channels.flatMap((channel) => channel.members ?? [])];
+    const activeConversationKeys = new Set(messages
+      .filter((message) => !message.isHistory)
+      .map(privateConversationKey)
+      .filter((key): key is string => key !== null));
     for (const message of messages) {
-      if (message.scope !== "private" || !message.conversationId) continue;
-      const id = Number(message.conversationId);
-      if (!id) continue;
-      const member = members.find((candidate) => candidate.id === id);
-      const existing = byConversation.get(message.conversationId);
-      byConversation.set(message.conversationId, {
-        id,
-        name: member?.nickname ?? existing?.name ?? message.invokerName,
+      const key = privateConversationKey(message);
+      if (!key) continue;
+      const id = Number(message.conversationId) || message.senderId || 0;
+      const uid = message.conversationUid;
+      const member = uid
+        ? allMembers.find((candidate) => candidate.uid === uid)
+        : activeConversationKeys.has(key) ? allMembers.find((candidate) => candidate.id === id) : undefined;
+      const existing = byConversation.get(key);
+      const messageName = message.conversationName || (message.isSelf ? "" : message.invokerName);
+      byConversation.set(key, {
+        key,
+        id: member?.id ?? (uid ? 0 : id),
+        ...(uid ? { uid } : {}),
+        name: member?.nickname ?? (messageName || existing?.name || t("privateMessage")),
         lastMessage: Math.max(existing?.lastMessage ?? 0, message.timestamp),
+        online: Boolean(member),
       });
     }
     return [...byConversation.values()].sort((left, right) => right.lastMessage - left.lastMessage);
   });
 
+  const selectedPrivateConversation = computed(() => conversations.value.find((conversation) => conversation.key === selectedPrivateConversationKey.value));
+  const privateConversationOnline = computed(() => selectedPrivateConversation.value?.online ?? false);
+
   const visibleMessages = computed(() => {
     if (tab.value === "server") return messages.filter((message) => message.scope === "server");
-    if (tab.value === "private") return messages.filter((message) => message.scope === "private" && message.conversationId === String(privateClientId.value));
+    if (tab.value === "private") return messages.filter((message) => privateConversationKey(message) === selectedPrivateConversationKey.value);
     if (tab.value !== "channel") return [];
     const channelId = currentChannel.value?.id;
     return messages.filter((message) => message.scope === "channel" && (!message.targetId || message.targetId === "0" || !channelId || message.targetId === channelId));
@@ -79,17 +111,19 @@ export function useWebClientChat({
       ? t("serverChat")
       : tab.value === "events"
         ? t("eventLog")
-        : conversations.value.find((conversation) => conversation.id === privateClientId.value)?.name ?? t("privateMessage"));
-  const placeholder = computed(() => tab.value === "private" ? t("privateMessagePlaceholder") : tab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
+        : selectedPrivateConversation.value?.name ?? t("privateMessage"));
+  const placeholder = computed(() => tab.value === "private"
+    ? privateConversationOnline.value ? t("privateMessagePlaceholder") : t("privateChatOffline")
+    : tab.value === "server" ? t("serverMessagePlaceholder") : t("sendMessagePlaceholder"));
 
   function scrollToEnd(): void {
     const list = listElement.value;
     if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }
 
-  function openPrivateChat(targetClientId: number): void {
-    if (!targetClientId || targetClientId === clientId.value) return;
-    privateClientId.value = targetClientId;
+  function openPrivateChat(targetClientId: number, targetUid?: string, targetName = "", conversationKey?: string): void {
+    if ((!targetClientId && !targetUid) || (targetClientId > 0 && targetClientId === clientId.value)) return;
+    selectedPrivateConversationKey.value = conversationKey || privateConversationKeyForTarget(targetClientId, targetUid, targetName);
     tab.value = "private";
     if (isMobileViewport.value) mobileSection.value = "chat";
     closeMemberMenu();
@@ -100,19 +134,24 @@ export function useWebClientChat({
     if (!messageDraft.value.trim()) return;
     if (tab.value === "channel") sendTextMessage(messageDraft.value, currentChannel.value?.id ?? selectedChannelId.value);
     else if (tab.value === "server") sendServerMessage(messageDraft.value);
-    else if (tab.value === "private" && privateClientId.value) sendPrivateMessage(privateClientId.value, messageDraft.value, String(privateClientId.value));
+    else if (tab.value === "private") {
+      const conversation = selectedPrivateConversation.value;
+      if (!conversation?.online || !conversation.id) return;
+      sendPrivateMessage(conversation.id, messageDraft.value, String(conversation.id), conversation.uid, conversation.name);
+    }
     messageDraft.value = "";
   }
 
-  watch([() => messages.length, tab, privateClientId], () => { void nextTick(scrollToEnd); });
+  watch([() => messages.length, tab, selectedPrivateConversationKey], () => { void nextTick(scrollToEnd); });
   watch(() => messages.length, (length, previousLength) => {
     const latest = messages[length - 1];
-    if (latest && length > previousLength && latest.scope === "private" && !latest.isSelf) notifyPrivateMessage();
+    if (latest && length > previousLength && latest.scope === "private" && !latest.isSelf && !latest.isHistory) notifyPrivateMessage();
   });
 
   return {
     tab,
-    privateClientId,
+    privateConversationKey: selectedPrivateConversationKey,
+    privateConversationOnline,
     messageDraft,
     listElement,
     conversations,

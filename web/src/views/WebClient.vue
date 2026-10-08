@@ -67,13 +67,16 @@
               <input id="nickname" v-model="nickname" autocomplete="nickname" maxlength="30" :placeholder="t('nicknamePlaceholder')" autofocus />
             </div>
 
-            <label class="field-label" data-ws-part="home.field-label" for="channel">{{ t('targetChannel') }} <span>{{ t('optional') }}</span></label>
-            <div class="field-wrap" data-ws-part="home.field">
-              <Icon name="hash" :size="17" />
-              <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
-            </div>
-
-            <details class="identity-options" data-ws-part="home.identity"><summary>{{ t('identityOptions') }}</summary><label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label></details><p v-if="rememberIdentity" class="identity-warning">{{ t('rememberIdentityConcurrentWarning') }}</p>
+            <details class="identity-options" data-ws-part="home.identity">
+              <summary>{{ t('identityOptions') }}</summary>
+              <label class="field-label" data-ws-part="home.field-label" for="channel">{{ t('targetChannel') }} <span>{{ t('optional') }}</span></label>
+              <div class="field-wrap" data-ws-part="home.field">
+                <Icon name="hash" :size="17" />
+                <input id="channel" v-model="channel" :placeholder="t('emptyDefault')" @keyup.enter="doConnect" />
+              </div>
+              <label class="remember-identity"><input v-model="rememberIdentity" type="checkbox" /><span><strong>{{ t('rememberIdentity') }}</strong><small>{{ t('rememberIdentityHint') }}</small></span></label>
+            </details>
+            <p v-if="rememberIdentity" class="identity-warning">{{ t('rememberIdentityConcurrentWarning') }}</p>
 
             <button class="primary-button connect-button" data-ws-part="home.connect" :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting" type="submit">
               <span v-if="voiceState.connecting" class="button-spinner"></span>
@@ -127,7 +130,6 @@
               </section>
             </div>
             <button class="header-action" :title="t('copyInvite')" @click="doShare"><Icon name="share" :size="18" /></button>
-            <button v-if="isMobileViewport" class="header-action microphone-header-toggle" :class="{ muted: microphoneMuted }" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
             <button v-if="isMobileViewport" class="header-action" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click="settingsOpen = true"><Icon name="settings" :size="18" /></button>
             <SkinSwitcher v-model="activeSkinId" class="workspace-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
             <LanguageSwitcher v-model="language" class="workspace-language" :menu-label="t('languageMenu')" @change="persistLanguage" />
@@ -159,7 +161,9 @@
           <div class="workspace-content" data-ws-part="voice.content">
             <section :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]" data-ws-part="voice.activity">
               <div class="voice-activity-artwork" data-ws-part="voice.activity.artwork" aria-hidden="true"></div>
-              <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2><span class="desktop-voice-title">{{ t('speakingNow') }}</span><span class="mobile-voice-title">{{ currentChannelName }}</span></h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
+              <div class="mobile-voice-sticky">
+                <div class="section-heading" data-ws-part="voice.activity-heading"><div><span class="section-kicker">{{ t('voiceActivity') }}</span><h2><span class="desktop-voice-title">{{ t('speakingNow') }}</span><span class="mobile-voice-title">{{ currentChannelName }}</span></h2></div><span class="section-counter">{{ t('onlineShort', { count: currentMembers.length }) }}</span></div>
+              </div>
               <div v-if="screenShareError" class="screen-share-inline-error" data-ws-part="voice.screen-share-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
               <section v-if="screenShareViewing" ref="screenSharePlayerEl" class="screen-share-player" data-ws-part="voice.screen-player" role="region" :aria-label="t('screenShare')">
                 <div class="screen-share-player-stage" data-ws-part="voice.screen-player.stage">
@@ -179,14 +183,19 @@
                 </div>
               </section>
               <div v-if="currentMembers.length" class="voice-grid" data-ws-part="voice.members">
-                <article v-for="member in currentMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]" data-ws-part="voice.member" :data-ws-state="member.isSelf ? 'self' : isSpeaking(member) ? 'speaking' : 'connected'" :data-ws-member-id="member.id" :data-ws-speaking="isSpeaking(member) ? 'true' : 'false'" :data-ws-self="member.isSelf ? 'true' : 'false'">
+                <article v-for="member in currentMembers" :key="member.id" :class="['voice-card', { speaking: isSpeaking(member), self: member.isSelf }]" data-ws-part="voice.member" :data-ws-state="member.away === true ? 'away' : member.isSelf ? 'self' : isSpeaking(member) ? 'speaking' : 'connected'" :data-ws-member-id="member.id" :data-ws-speaking="isSpeaking(member) ? 'true' : 'false'" :data-ws-self="member.isSelf ? 'true' : 'false'">
                   <button v-if="isMobileViewport && !member.isSelf" type="button" class="voice-member-action" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="17" /></button>
                   <div :class="['voice-avatar-wrap', { 'screen-share-avatar-wrap': screenShareStreamForMember(member) }]" data-ws-part="voice.member.avatar-wrap">
                     <div :class="['voice-avatar', { speaking: isSpeaking(member) }]" data-ws-part="voice.member.avatar" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}</div>
                     <span v-if="screenShareStreamForMember(member)" class="screen-share-live-indicator" data-ws-part="voice.member.live-indicator"><span class="screen-share-wave" aria-hidden="true"><i v-for="bar in screenShareIndicatorBars" :key="bar" :style="{ height: `${bar}px` }"></i></span><span>{{ t('sharingScreen') }}</span></span>
                     <button v-if="member.isSelf && (screenShareActive || screenShareStarting)" type="button" class="screen-share-stop-button" data-ws-part="voice.member.stop-share" :aria-label="t('stopScreenShare')" :title="t('stopScreenShare')" @click.stop="stopScreenShare"><Icon name="close" :size="14" /></button>
                   </div>
-                  <strong data-ws-part="voice.member.name">{{ member.isSelf ? t('you') : member.nickname }}</strong><span data-ws-part="voice.member.status">{{ isSpeaking(member) ? t('speaking') : member.isSelf ? t('connectedYou') : t('connected') }}</span>
+                  <strong data-ws-part="voice.member.name">{{ member.isSelf ? t('you') : member.nickname }}</strong><span data-ws-part="voice.member.status">{{ member.away === true ? t('away') : isSpeaking(member) ? t('speaking') : member.away === false ? member.isSelf ? t('connectedYou') : t('connected') : t('statusUnknown') }}</span>
+                  <div class="voice-member-flags" :aria-label="t('memberStates')">
+                    <span v-if="member.away" class="away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span>
+                    <span :class="{ muted: member.inputMuted === true, unknown: member.inputMuted === undefined }" :title="member.inputMuted === undefined ? t('statusUnknown') : member.inputMuted ? t('inputMuted') : t('microphoneActive')" :aria-label="member.inputMuted === undefined ? t('statusUnknown') : member.inputMuted ? t('inputMuted') : t('microphoneActive')"><Icon :name="member.inputMuted === undefined ? 'info' : member.inputMuted ? 'mic-off' : 'mic'" :size="13" /></span>
+                    <span :class="{ muted: member.outputMuted === true, unknown: member.outputMuted === undefined }" :title="member.outputMuted === undefined ? t('statusUnknown') : member.outputMuted ? t('outputMuted') : t('outputActive')" :aria-label="member.outputMuted === undefined ? t('statusUnknown') : member.outputMuted ? t('outputMuted') : t('outputActive')"><Icon :name="member.outputMuted === undefined ? 'info' : member.outputMuted ? 'volume-off' : 'volume'" :size="13" /></span>
+                  </div>
                   <div v-if="member.isSelf || screenShareStreamForMember(member)" class="screen-share-card-actions" data-ws-part="voice.member.share-actions">
                     <template v-if="member.isSelf && !screenShareActive && !screenShareStarting">
                       <div class="screen-share-start-actions">
@@ -205,8 +214,8 @@
                 <button type="button" class="whisper-ptt-button" :class="{ active: whisperPttActive || whisperActive }" :aria-pressed="whisperPttActive || whisperActive" @pointerdown.prevent="onWhisperPttDown" @pointerup.prevent="onWhisperPttUp" @pointercancel.prevent="onWhisperPttUp" @lostpointercapture="onWhisperPttUp"><Icon name="mic" :size="18" /> {{ whisperPttActive || whisperActive ? t('releaseWhisper') : t('whisperHoldToTalk') }}</button>
               </div>
               <div class="mobile-voice-controls">
-                <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
-                <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
+                <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :title="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ t('microphone') }}</span></button>
+                <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="t('speaker')" :title="outputMuted ? t('outputMuted') : t('speaker')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ t('speaker') }}</span></button>
                 <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
               </div>
             </section>
@@ -215,7 +224,7 @@
               <div class="chat-tabs" data-ws-part="voice.chat.tabs" role="tablist" :aria-label="t('chatTabs')">
                 <button type="button" data-ws-part="voice.chat.tab" :data-ws-state="chatTab === 'channel' ? 'active' : 'idle'" :class="{ active: chatTab === 'channel' }" @click="chatTab = 'channel'"><Icon name="hash" :size="15" /> {{ currentChannelName }}</button>
                 <button type="button" data-ws-part="voice.chat.tab" :data-ws-state="chatTab === 'server' ? 'active' : 'idle'" :class="{ active: chatTab === 'server' }" @click="chatTab = 'server'"><Icon name="server" :size="15" /> {{ t('serverChat') }}</button>
-                <button v-for="conversation in privateConversations" :key="conversation.id" type="button" data-ws-part="voice.chat.tab" :data-ws-state="chatTab === 'private' && privateClientId === conversation.id ? 'active' : 'idle'" :class="{ active: chatTab === 'private' && privateClientId === conversation.id }" @click="openPrivateChat(conversation.id)"><Icon name="message" :size="15" /> {{ conversation.name }}</button>
+                <button v-for="conversation in privateConversations" :key="conversation.key" type="button" data-ws-part="voice.chat.tab" :data-ws-state="chatTab === 'private' && privateConversationKey === conversation.key ? 'active' : 'idle'" :class="{ active: chatTab === 'private' && privateConversationKey === conversation.key }" :title="conversation.online ? undefined : t('privateChatOffline')" @click="openPrivateChat(conversation.id, conversation.uid, conversation.name, conversation.key)"><Icon name="message" :size="15" /> {{ conversation.name }}</button>
                 <button type="button" data-ws-part="voice.chat.tab" :data-ws-state="chatTab === 'events' ? 'active' : 'idle'" :class="{ active: chatTab === 'events' }" @click="chatTab = 'events'"><Icon name="bell" :size="15" /> {{ t('eventLog') }}</button>
               </div>
               <div class="section-heading chat-heading" data-ws-part="voice.chat.heading"><div><span class="section-kicker">{{ chatTabLabel }}</span><h2><Icon :name="chatTab === 'server' ? 'server' : chatTab === 'events' ? 'bell' : chatTab === 'private' ? 'message' : 'hash'" :size="20" /> {{ chatTitle }}</h2></div><span class="section-counter">{{ chatTab === 'events' ? t('eventCount', { count: serverEvents.length }) : t('messageCount', { count: visibleChatMessages.length }) }}</span></div>
@@ -228,13 +237,13 @@
                 <template v-for="message in visibleChatMessages" :key="message.id">
                   <article v-if="chatTab !== 'events'" :class="['message-row', { mine: message.isSelf }]" data-ws-part="voice.chat.message" :data-ws-state="message.isSelf ? 'mine' : 'other'">
                 <div class="message-avatar" data-ws-part="voice.chat.message-avatar" :style="avatarStyle(message.invokerName, message.isSelf, messageAvatar(message))">{{ messageAvatar(message) ? '' : avatarInitial(message.invokerName) }}</div>
-                  <div class="message-body" data-ws-part="voice.chat.message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble" data-ws-part="voice.chat.message-bubble">{{ message.message }}</div></div>
+                  <div class="message-body" data-ws-part="voice.chat.message-body"><div class="message-meta"><strong>{{ message.isSelf ? t('you') : message.invokerName }}</strong><span v-if="!message.isSelf && messageMember(message)?.away" class="message-away-badge" :title="t('away')"><Icon name="clock" :size="12" />{{ t('away') }}</span><time>{{ formatTime(message.timestamp) }}</time></div><div class="message-bubble" data-ws-part="voice.chat.message-bubble">{{ message.message }}</div></div>
                   </article>
                 </template>
               </div>
                <form v-if="chatTab !== 'events'" class="message-composer" data-ws-part="voice.chat.composer" @submit.prevent="submitMessage">
-                 <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
-                 <button class="send-button" type="submit" :disabled="!messageDraft.trim()" :title="t('send')"><Icon name="send" :size="18" /></button>
+                  <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" :disabled="chatTab === 'private' && !privateConversationOnline" />
+                  <button class="send-button" type="submit" :disabled="!messageDraft.trim() || (chatTab === 'private' && !privateConversationOnline)" :title="t('send')"><Icon name="send" :size="18" /></button>
                </form>
              </section>
           </div>
@@ -256,7 +265,11 @@
               <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" data-ws-part="voice.member-row" :data-ws-state="draggedMember?.id === member.id ? 'dragging' : isSpeaking(member) ? 'speaking' : 'connected'" :draggable="!member.isSelf" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
                 <div :class="['member-avatar', { speaking: isSpeaking(member) }]" data-ws-part="voice.member-row.avatar" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span class="member-presence"></span></div>
                 <div class="member-copy" data-ws-part="voice.member-row.copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away ? t('away') : isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') }}</span></div>
-                <div class="member-flags" data-ws-part="voice.member-row.flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
+                <div class="member-flags" data-ws-part="voice.member-row.flags" :aria-label="t('memberStates')"><span v-if="member.away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span v-if="member.inputMuted && !member.isSelf" :title="t('inputMuted')" :aria-label="t('inputMuted')"><Icon name="mic-off" :size="13" /></span><span v-if="member.outputMuted && !member.isSelf" :title="t('outputMuted')" :aria-label="t('outputMuted')"><Icon name="volume-off" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
+              <div v-for="member in channelItem.members" :key="`${channelItem.id}-${member.id}`" :class="['member-row', { dragging: draggedMember?.id === member.id }]" data-ws-part="voice.member-row" :data-ws-state="draggedMember?.id === member.id ? 'dragging' : member.away === true ? 'away' : isSpeaking(member) ? 'speaking' : 'connected'" :draggable="!member.isSelf" @dragstart="onMemberDragStart(member, $event)" @dragend="onMemberDragEnd" @pointerdown="onMemberPointerDown(member, $event)" @pointermove="onMemberPointerMove($event)" @pointerup="onMemberPointerUp($event)" @pointercancel="onMemberPointerCancel($event)" @contextmenu.prevent="openMemberMenu(member, $event)">
+                <div :class="['member-avatar', { speaking: isSpeaking(member), away: member.away === true }]" data-ws-part="voice.member-row.avatar" :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}<span :class="['member-presence', { away: member.away === true, unknown: member.away === undefined }]" :title="member.away === undefined ? t('statusUnknown') : member.away ? t('away') : t('available')"></span></div>
+                <div class="member-copy" data-ws-part="voice.member-row.copy"><strong>{{ memberDisplayName(member) }}</strong><span>{{ member.away === true ? t('away') : member.away === false ? isSpeaking(member) ? t('speaking') : member.isSelf ? t('yourDevice') : t('memberOnline') : t('statusUnknown') }}</span></div>
+                <div class="member-flags" data-ws-part="voice.member-row.flags" :aria-label="t('memberStates')"><span v-if="member.away" class="away" :title="t('away')" :aria-label="t('away')"><Icon name="clock" :size="13" /></span><span :class="{ muted: member.inputMuted === true, unknown: member.inputMuted === undefined }" :title="member.inputMuted === undefined ? t('statusUnknown') : member.inputMuted ? t('inputMuted') : t('microphoneActive')" :aria-label="member.inputMuted === undefined ? t('statusUnknown') : member.inputMuted ? t('inputMuted') : t('microphoneActive')"><Icon :name="member.inputMuted === undefined ? 'info' : member.inputMuted ? 'mic-off' : 'mic'" :size="13" /></span><span :class="{ muted: member.outputMuted === true, unknown: member.outputMuted === undefined }" :title="member.outputMuted === undefined ? t('statusUnknown') : member.outputMuted ? t('outputMuted') : t('outputActive')" :aria-label="member.outputMuted === undefined ? t('statusUnknown') : member.outputMuted ? t('outputMuted') : t('outputActive')"><Icon :name="member.outputMuted === undefined ? 'info' : member.outputMuted ? 'volume-off' : 'volume'" :size="13" /></span><span v-if="member.channelCommander" :title="t('channelCommander')" :aria-label="t('channelCommander')"><Icon name="shield" :size="13" /></span></div>
                 <div class="member-volume" data-ws-part="voice.member-row.volume"><Icon :name="(volumes[member.id] ?? 1) === 0 ? 'volume-off' : 'volume'" :size="14" /><input type="range" min="0" max="400" :value="(volumes[member.id] ?? 1) * 100" :style="rangeStyle((volumes[member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(member.id, $event)" /></div>
                 <button v-if="isMobileViewport && !member.isSelf" type="button" class="member-action-button" :aria-label="t('moreMemberOptions')" @click.stop="openMemberActions(member)"><Icon name="more" :size="18" /></button>
               </div>
@@ -268,6 +281,9 @@
         <div v-if="isMobileViewport" class="mobile-member-controls" role="toolbar" :aria-label="t('desktopAudioControls')">
           <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="20" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
           <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="20" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
+          <button type="button" class="mobile-voice-away" :class="{ active: away }" :title="away ? t('available') : t('away')" :aria-label="away ? t('available') : t('away')" :aria-pressed="away" @click="toggleManualAway"><Icon :name="away ? 'clock' : 'check'" :size="18" /></button>
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :title="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="20" /><span>{{ t('microphone') }}</span></button>
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="t('speaker')" :title="outputMuted ? t('outputMuted') : t('speaker')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="20" /><span>{{ t('speaker') }}</span></button>
           <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="18" /></button>
         </div>
         <div v-if="!isMobileViewport" class="desktop-audio-dock" data-ws-part="voice.audio-dock" role="toolbar" :aria-label="t('desktopAudioControls')">
@@ -298,26 +314,43 @@
       <section v-if="mobileSection === 'more'" class="mobile-more-panel" data-ws-part="voice.mobile-more">
         <span class="section-kicker">{{ t('mobileMore') }}</span>
         <h2>{{ t('mobileMore') }}</h2>
-        <button type="button" :class="{ muted: microphoneMuted }" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button>
+        <button type="button" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button>
+        <button type="button" :class="{ muted: outputMuted }" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /> {{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</button>
+        <button type="button" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :aria-pressed="!microphoneMuted" :title="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /> {{ t('microphone') }}</button>
         <button type="button" @click="settingsOpen = true"><Icon name="settings" :size="18" /> {{ t('audioSettings') }}</button>
+        <button type="button" :class="{ away: away }" :aria-pressed="away" @click="toggleManualAway"><Icon :name="away ? 'clock' : 'check'" :size="18" /> {{ away ? t('available') : t('away') }}</button>
         <SkinSwitcher v-model="activeSkinId" class="mobile-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
         <div class="language-menu-row"><Icon name="globe" :size="18" /><span>{{ t('languageMenu') }}</span><LanguageSwitcher v-model="language" :menu-label="t('languageMenu')" @change="persistLanguage" /></div>
         <button type="button" class="danger" @click="doDisconnect"><Icon name="door" :size="18" /> {{ t('exit') }}</button>
       </section>
 
+      <div :class="['mobile-bottom-dock', { 'has-voice-controls': isMobileViewport && mobileSection === 'voice' }]">
+        <div v-if="isMobileViewport && mobileSection === 'voice'" class="mobile-voice-controls" role="toolbar" :aria-label="t('desktopAudioControls')">
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /><span>{{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</span></button>
+          <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ outputMuted ? t('unmuteOutput') : t('muteOutput') }}</span></button>
+          <button type="button" class="mobile-voice-away" :class="{ active: away }" :title="away ? t('available') : t('away')" :aria-label="away ? t('available') : t('away')" :aria-pressed="away" @click="toggleManualAway"><Icon :name="away ? 'clock' : 'check'" :size="18" /></button>
+          <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button>
+        </div>
+        <nav class="mobile-nav" data-ws-part="voice.mobile-nav" :aria-label="t('mobileNavigation')">
+          <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
+          <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
+        </nav>
+      </div>
       <nav class="mobile-nav" data-ws-part="voice.mobile-nav" :aria-label="t('mobileNavigation')">
+        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'channels' }" @click="mobileSection = 'channels'"><Icon name="volume" :size="18" /><span>{{ t('mobileChannels') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'chat' }" @click="mobileSection = 'chat'"><Icon name="message" :size="18" /><span>{{ t('mobileChat') }}</span></button>
-        <button type="button" :class="{ active: mobileSection === 'voice' }" @click="mobileSection = 'voice'"><Icon name="mic" :size="18" /><span>{{ t('mobileVoice') }}</span></button>
         <button type="button" :class="{ active: mobileSection === 'more' }" @click="mobileSection = 'more'"><Icon name="more" :size="18" /><span>{{ t('mobileMore') }}</span></button>
       </nav>
     </div>
 
     <div v-if="memberMenu && isMobileViewport" class="member-menu-backdrop" data-ws-part="voice.context-menu-backdrop" @click="memberMenu = null"></div>
-    <div v-if="memberMenu" class="member-context-menu" data-ws-part="voice.context-menu" :style="memberMenuStyle" @click.stop>
+    <div v-if="memberMenu" :class="['member-context-menu', { 'above-mobile-voice-dock': isMobileViewport && mobileSection === 'voice' }]" data-ws-part="voice.context-menu" :style="memberMenuStyle" @click.stop>
       <div class="member-menu-header" data-ws-part="voice.context-menu.header"><strong>{{ memberMenu.member.nickname }}</strong><button type="button" class="member-menu-close" :aria-label="t('close')" @click="memberMenu = null"><Icon name="close" :size="17" /></button></div>
       <label class="menu-volume"><span>{{ t('memberVolume') }}</span><input type="range" min="0" max="400" :value="(volumes[memberMenu.member.id] ?? 1) * 100" :style="rangeStyle((volumes[memberMenu.member.id] ?? 1) / 4, 1)" :aria-label="t('memberVolume')" @input="onVolInput(memberMenu.member.id, $event)" /></label>
-      <button type="button" @click="openPrivateChat(memberMenu.member.id); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
+      <button type="button" @click="openPrivateChat(memberMenu.member.id, memberMenu.member.uid, memberMenu.member.nickname); memberMenu = null"><Icon name="message" :size="15" /> {{ t('privateMessage') }}</button>
       <button type="button" @click="pokeMember(memberMenu.member); memberMenu = null"><Icon name="bell" :size="15" /> {{ t('poke') }}</button>
       <button type="button" @click="toggleWhisperTarget(memberMenu.member); memberMenu = null"><Icon name="mic" :size="15" /> {{ whisperTargetIds.has(memberMenu.member.id) ? t('removeWhisperTarget') : t('setWhisperTarget') }}</button>
       <button type="button" @click="copyMemberName(memberMenu.member); memberMenu = null"><Icon name="copy" :size="15" /> {{ t('copyNickname') }}</button>
@@ -368,7 +401,8 @@
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
       <section class="settings-modal" data-ws-part="voice.audio-settings" role="dialog" aria-modal="true" :aria-labelledby="'settings-title'">
         <div class="settings-main"><header class="settings-header"><h2 id="settings-title">{{ t('audioConfiguration') }}</h2><button class="round-icon" :title="t('close')" @click="settingsOpen = false"><Icon name="close" :size="19" /></button></header><div class="settings-content">
-          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><label v-if="isMobileViewport" class="mobile-noise-toggle"><span><strong>{{ t('noiseSuppression') }}</strong><small>{{ t('noiseSuppressionHint') }}</small></span><input type="checkbox" :checked="noiseSuppressionEnabled" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionToggle" /></label><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <section class="settings-section"><h3><Icon name="mic" :size="20" /> {{ t('inputDevice') }}</h3><label class="settings-label" for="input-device">{{ t('microphone') }}</label><select id="input-device" class="settings-select" :value="selectedInputDeviceId" :disabled="!inputDevices.length" @change="onInputDeviceChange"><option value="">{{ t('defaultMicrophone') }}</option><option v-for="(device, index) in inputDevices" :key="device.deviceId || `microphone-${index}`" :value="device.deviceId">{{ device.label || t('microphoneNumber', { index: index + 1 }) }}</option></select><p v-if="audioSettingsError" class="settings-error">{{ localizedMessage(audioSettingsError) }}</p><p class="audio-diagnostic"><span>{{ t('permission') }}</span><strong :class="`permission-${audioPermission}`">{{ audioPermission === 'granted' ? t('permissionGranted') : audioPermission === 'denied' ? t('permissionDenied') : t('permissionUnknown') }}</strong></p><div class="microphone-control"><div><label class="settings-label">{{ t('microphoneState') }}</label><p class="settings-hint">{{ microphoneMuted ? t('microphoneMutedHint') : t('microphoneActiveHint') }}</p></div><button type="button" class="microphone-toggle" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="16" /> {{ isMobileViewport ? t('microphone') : microphoneMuted ? t('unmuteMic') : t('muteMic') }}</button></div><label v-if="isMobileViewport" class="mobile-noise-toggle"><span><strong>{{ t('noiseSuppression') }}</strong><small>{{ t('noiseSuppressionHint') }}</small></span><input type="checkbox" :checked="noiseSuppressionEnabled" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionToggle" /></label><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('inputVolume') }}</label><strong>{{ Math.round(inputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="onInputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('voxThreshold') }}</label><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div><input class="settings-range" type="range" min="1" max="80" :value="voxThreshold * 1000" :style="rangeStyle(voxThreshold, 0.08)" :aria-label="t('voxThreshold')" @input="onVoxThreshold" /><div class="audio-level-row"><span>{{ t('micLevel') }}</span><strong>{{ Math.round(micLevel * 100) }}%</strong></div><div class="audio-level-track"><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div><div class="mic-test"><div class="mic-test-header"><strong>{{ t('microphoneTest') }}</strong><button type="button" @click="toggleMicTest">{{ microphoneTestActive ? t('stopTest') : t('startTest') }}</button></div><div class="meter"><i v-for="index in 24" :key="index" :class="{ active: microphoneTestActive && index <= micMeterBars }" :style="{ height: `${meterBarHeight(index) }px` }"></i></div><div class="meter-labels"><span>{{ t('silence') }}</span><span>{{ t('optimal') }}</span><span>{{ t('loud') }}</span></div><p class="settings-hint">{{ t('localMicTestHint') }}</p><audio v-if="testAudioUrl" class="test-audio" :src="testAudioUrl" controls :aria-label="t('microphoneTest')"></audio></div></section>
+          <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? (voiceState.microphoneError ? t('audioUnavailable') : t('audioReady')) : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><p v-if="voiceState.microphoneError" class="settings-error">{{ localizedMessage(voiceState.microphoneError) }}</p></section>
           <div class="settings-separator"></div><section class="settings-section"><h3><Icon name="volume" :size="20" /> {{ t('outputVolume') }}</h3><label v-if="outputDeviceSupported" class="settings-label" for="output-device">{{ t('outputDevice') }}</label><select v-if="outputDeviceSupported" id="output-device" class="settings-select" :value="selectedOutputDeviceId" :disabled="!outputDevices.length" @change="onOutputDeviceChange"><option value="">{{ t('defaultOutput') }}</option><option v-for="(device, index) in outputDevices" :key="device.deviceId || `speaker-${index}`" :value="device.deviceId">{{ device.label || t('speakerNumber', { index: index + 1 }) }}</option></select><p v-else class="mode-note"><Icon name="info" :size="16" /><span>{{ t('outputDeviceUnsupported') }}</span></p><template v-if="isMobileViewport"><div class="settings-range-row"><label class="settings-label">{{ t('speakers') }}</label><strong>{{ Math.round(outputVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('outputVolume')" @input="onOutputVolume" /></template><div class="settings-range-row"><label class="settings-label">{{ t('notificationVolume') }}</label><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div><input class="settings-range" type="range" min="0" max="100" :value="notificationVolume * 100" :style="rangeStyle(notificationVolume, 1)" :aria-label="t('notificationVolume')" @input="onNotificationVolume" /><div class="audio-diagnostic"><span>{{ t('audioStatus') }}</span><strong>{{ audioContextState === 'running' ? (voiceState.microphoneError ? t('audioUnavailable') : t('audioReady')) : audioContextState === 'suspended' ? t('audioSuspended') : t('audioUnknown') }}</strong></div><p v-if="voiceState.microphoneError" class="settings-error">{{ localizedMessage(voiceState.microphoneError) }}</p><div class="mode-note"><Icon name="shield" :size="16" /><span>{{ t('audioPrivacy') }}</span></div></section>
         </div><footer class="settings-footer"><button class="primary-button save-button" @click="settingsOpen = false">{{ t('done') }}</button></footer></div>
       </section>
@@ -396,6 +430,7 @@ import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfi
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
+import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, listInstalledSkins, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
@@ -511,7 +546,7 @@ const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWU
 const toast = ref("");
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
-const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
+const mobileSection = ref<"channels" | "chat" | "voice" | "more">("voice");
 const isMobileViewport = ref(false);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -552,16 +587,10 @@ const {
   localizedWelcomeText,
   loadPublicConfig,
 } = useWebClientPublicConfig({ serverHost, serverPort, accelerationRelayId, language, t });
-type SkinMode = Exclude<ThemeMode, "system">;
-function resolveSkinMode(theme: ThemeMode): SkinMode {
-  return theme === "system" ? (isDarkTheme(theme) ? "dark" : "light") : theme;
-}
-
-const themeMode = ref<SkinMode>(resolveSkinMode(getStoredTheme()));
+const themeMode = ref<ThemeMode>(getStoredTheme());
 applyTheme(themeMode.value);
-if (localStorage.getItem("webspeak:theme") === "system") saveTheme(themeMode.value);
 const storedSkinId = getStoredSkinId();
-const activeSkinId = ref(storedSkinId ?? (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
+const activeSkinId = ref(storedSkinId ?? (isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
 const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN);
 const installedSkins = ref<InstalledSkin[]>([]);
 const catalogSkins = ref<SkinCatalogEntry[]>([]);
@@ -636,6 +665,7 @@ const {
   setInputDevice,
   setOutputDevice,
   setMicrophoneMuted,
+  playNotification,
   startMicrophoneTest,
   stopMicrophoneTest,
   startAccompaniment,
@@ -666,9 +696,16 @@ async function onSkinChange(skinId: string) {
   const catalogSkin = catalogSkins.value.find((skin) => skin.id === skinId);
   activeSkin.value = await activateSkin(skinId, catalogSkin?.version, appVersion.value);
   activeSkinId.value = getStoredSkinId() ?? skinId;
-  if (skinId === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
-  else if (skinId === BUILTIN_DARK_SKIN) themeMode.value = "dark";
-  else themeMode.value = resolveSkinMode(getStoredTheme());
+  if (activeSkinId.value === BUILTIN_LIGHT_SKIN) {
+    themeMode.value = "light";
+    saveTheme(themeMode.value);
+  } else if (activeSkinId.value === BUILTIN_DARK_SKIN) {
+    themeMode.value = "dark";
+    saveTheme(themeMode.value);
+  } else {
+    themeMode.value = getStoredTheme();
+    applyTheme(themeMode.value, { preserveCustomSkins: true });
+  }
   void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
 }
 
@@ -680,33 +717,44 @@ async function initializeSkin(): Promise<void> {
     catalogSkins.value = availableSkins;
     if (!localStorage.getItem("webspeak:theme")) {
       if (preferences.theme === "system" || preferences.theme === "light" || preferences.theme === "dark") {
-        themeMode.value = resolveSkinMode(preferences.theme);
+        themeMode.value = preferences.theme;
       }
       saveTheme(themeMode.value);
     }
     // Only a deliberate choice should override the instance default. The active
     // skin and local preference also contain automatically applied defaults.
     const savedSkinId = localStorage.getItem("webspeak:skin-choice");
-    const preferredSkinId = savedSkinId && isPublicSkinEnabled(savedSkinId)
-      ? savedSkinId
-      : getPublicDefaultSkinId();
+    const hasSavedSkinChoice = Boolean(savedSkinId && isPublicSkinEnabled(savedSkinId));
+    const configuredDefaultSkinId = hasSavedSkinChoice ? savedSkinId! : getPublicDefaultSkinId();
+    const preferredSkinId = !hasSavedSkinChoice && (configuredDefaultSkinId === BUILTIN_LIGHT_SKIN || configuredDefaultSkinId === BUILTIN_DARK_SKIN)
+      ? (isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN)
+      : configuredDefaultSkinId;
     const preferredSkin = availableSkins.find((skin) => skin.id === preferredSkinId);
     activeSkinId.value = preferredSkinId;
     // Apply the locally cached package (or fetch it if absent) before revealing
     // the page. The network catalog/version check must not block the first paint.
     activeSkin.value = await activateSkin(preferredSkinId, preferredSkin?.version, appVersion.value);
     activeSkinId.value = getStoredSkinId() ?? preferredSkinId;
-    if (activeSkinId.value === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
-    else if (activeSkinId.value === BUILTIN_DARK_SKIN) themeMode.value = "dark";
-    else themeMode.value = resolveSkinMode(getStoredTheme());
+    if (activeSkinId.value === BUILTIN_LIGHT_SKIN || activeSkinId.value === BUILTIN_DARK_SKIN) {
+      if (hasSavedSkinChoice && savedSkinId === activeSkinId.value) {
+        themeMode.value = activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : "light";
+        saveTheme(themeMode.value);
+      } else {
+        applyTheme(themeMode.value);
+      }
+    } else {
+      themeMode.value = getStoredTheme();
+      applyTheme(themeMode.value, { preserveCustomSkins: true });
+    }
     void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
   } catch {
     // Storage or package loading can fail on restricted browsers. Do not leave
     // the application hidden, and restore a usable built-in palette instead.
     activeSkin.value = null;
-    activeSkinId.value = themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+    activeSkinId.value = isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
     try {
       await activateSkin(activeSkinId.value, undefined, appVersion.value);
+      applyTheme(themeMode.value);
     } catch {
       applyTheme(themeMode.value);
     }
@@ -829,7 +877,8 @@ const {
 });
 const {
   tab: chatTab,
-  privateClientId,
+  privateConversationKey,
+  privateConversationOnline,
   messageDraft,
   listElement: chatListEl,
   conversations: privateConversations,
@@ -842,6 +891,7 @@ const {
 } = useWebClientChat({
   messages: chatMessages,
   members,
+  channels,
   currentChannel,
   currentChannelName,
   selectedChannelId,
@@ -909,6 +959,20 @@ function doDisconnect(): void {
   disconnectFromVoice();
 }
 
+function toggleManualAway(): void {
+  mobileAwayController?.preserveManualStatus();
+  toggleAway();
+}
+
+function messageMember(message: ChatMessage): ChannelMember | undefined {
+  if (!message.senderId && !message.senderUid) return undefined;
+  const candidates = memberChannels.value.flatMap((channelItem) => channelItem.members);
+  const matches = (member: ChannelMember) =>
+    (message.senderId ? member.id === message.senderId : true) &&
+    (!message.senderUid || member.uid === message.senderUid);
+  return candidates.find(matches) ?? members.find(matches);
+}
+
 function reconnectNow(): void {
   enableScreenWakeLockForSession();
   reconnectVoice();
@@ -948,6 +1012,7 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
   if (!remember && material) identityMaterial.value = "";
 });
 watch(() => voiceState.connected, (connected) => {
+  mobileAwayController?.sync();
   if (!connected) return;
   playNotification("connected");
   recordCurrentServer();
@@ -979,6 +1044,9 @@ watch(() => voiceState.reconnectFailed, (failed, wasFailed) => {
 let deviceChangeHandler: (() => void) | undefined;
 let viewportMediaQuery: MediaQueryList | undefined;
 let viewportChangeHandler: (() => void) | undefined;
+let mobileAwayController: MobileAwayController | undefined;
+let colorSchemeMediaQuery: MediaQueryList | undefined;
+let colorSchemeChangeHandler: (() => void) | undefined;
 
 onMounted(() => {
   // The selected skin is applied to this public root, never to the admin DOM.
@@ -1010,15 +1078,40 @@ onMounted(() => {
     isMobileViewport.value = viewportMediaQuery?.matches ?? false;
     if (!isMobileViewport.value) memberMenu.value = null;
     else if (accompanimentActive.value) void stopAccompaniment();
+    mobileAwayController?.sync();
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
+  mobileAwayController = createMobileAwayController(document, window, {
+    isMobileClient: () => isMobileViewport.value && (
+      navigator.maxTouchPoints > 0 ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+      window.matchMedia("(any-pointer: coarse)").matches
+    ),
+    isConnected: () => voiceState.connected,
+    isAway: () => away.value,
+    setAway: (nextAway) => setAway(nextAway, ""),
+  });
+  mobileAwayController.sync();
+  colorSchemeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  colorSchemeChangeHandler = () => {
+    if (themeMode.value !== "system") return;
+    if (activeSkinId.value !== BUILTIN_LIGHT_SKIN && activeSkinId.value !== BUILTIN_DARK_SKIN) return;
+    activeSkinId.value = isDarkTheme("system") ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+  };
+  if (colorSchemeMediaQuery.addEventListener) colorSchemeMediaQuery.addEventListener("change", colorSchemeChangeHandler);
+  else colorSchemeMediaQuery.addListener?.(colorSchemeChangeHandler);
 });
 onUnmounted(() => {
   disconnect();
   screenWakeLockController?.dispose();
+  mobileAwayController?.dispose();
   if (deviceChangeHandler) navigator.mediaDevices?.removeEventListener("devicechange", deviceChangeHandler);
   if (viewportMediaQuery && viewportChangeHandler) viewportMediaQuery.removeEventListener?.("change", viewportChangeHandler);
+  if (colorSchemeMediaQuery && colorSchemeChangeHandler) {
+    if (colorSchemeMediaQuery.removeEventListener) colorSchemeMediaQuery.removeEventListener("change", colorSchemeChangeHandler);
+    else colorSchemeMediaQuery.removeListener?.(colorSchemeChangeHandler);
+  }
   if (toastTimer) clearTimeout(toastTimer);
 });
 
@@ -1046,9 +1139,9 @@ async function clearBrowserData(): Promise<void> {
   activeSkin.value = null;
   installedSkins.value = [];
   catalogSkins.value = await listPublicSkins();
-  themeMode.value = resolveSkinMode("system");
+  themeMode.value = "system";
   applyTheme(themeMode.value);
-  activeSkinId.value = themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
+  activeSkinId.value = isDarkTheme(themeMode.value) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
   identityMaterial.value = "";
   rememberIdentity.value = false;
   clearServerHistory();

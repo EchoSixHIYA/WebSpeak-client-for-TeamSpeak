@@ -7,6 +7,8 @@ import darkCss from "../skins/builtin/dark/skin.css?inline";
 
 const THEME_KEY = "webspeak:theme";
 const SKIN_STYLE_ELEMENT_ID = "webspeak-active-built-in-skin";
+const LIGHT_THEME_COLOR = "#006a64";
+const DARK_THEME_COLOR = "#101918";
 let activeThemeMode: ThemeMode = "system";
 
 const builtinSkins = {
@@ -27,11 +29,20 @@ export function applyTheme(theme: ThemeMode, options: { preserveCustomSkins?: bo
   if (typeof document === "undefined") return;
   activeThemeMode = theme;
   const root = document.documentElement;
-  const activeSkin = isDarkTheme(theme) ? builtinSkins.dark : builtinSkins.light;
+  const dark = isDarkTheme(theme);
+  const activeSkin = dark ? builtinSkins.dark : builtinSkins.light;
 
   // Keep data-theme for the admin console's independent appearance rules.
   // Built-in skin CSS is scoped to public roots and can never restyle /admin.
   root.dataset.theme = theme;
+  root.style.colorScheme = dark ? "dark" : "light";
+  let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!themeColor) {
+    themeColor = document.createElement("meta");
+    themeColor.name = "theme-color";
+    document.head.append(themeColor);
+  }
+  themeColor.content = dark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
   document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
     const currentSkin = clientRoot.dataset.wsSkin;
     const isCustomSkin = currentSkin !== builtinSkins.light.manifest.id && currentSkin !== builtinSkins.dark.manifest.id;
