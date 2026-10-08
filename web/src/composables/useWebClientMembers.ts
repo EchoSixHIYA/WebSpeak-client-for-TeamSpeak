@@ -39,8 +39,15 @@ export function useWebClientMembers({
   showToast,
   t,
 }: UseWebClientMembersOptions) {
-  const away = ref(false);
-  const awayMessage = ref("");
+  const selfMember = computed(() => {
+    for (const channel of channels.value) {
+      const member = channel.members.find((candidate) => candidate.isSelf);
+      if (member) return member;
+    }
+    return members.find((member) => member.isSelf);
+  });
+  const away = computed(() => selfMember.value?.away === true);
+  const awayMessage = computed(() => selfMember.value?.awayMessage ?? "");
   const memberMenu = ref<MemberMenuState | null>(null);
   const memberMoveMenuOpen = ref(false);
   const draggedMember = ref<ChannelMember | null>(null);
@@ -243,9 +250,9 @@ export function useWebClientMembers({
   }
 
   function toggleAway(): void {
-    away.value = !away.value;
-    awayMessage.value = away.value ? (window.prompt(t("awayPrompt"), awayMessage.value) ?? "") : "";
-    setAway(away.value, awayMessage.value);
+    const nextAway = !away.value;
+    const message = nextAway ? (window.prompt(t("awayPrompt"), awayMessage.value) ?? "") : "";
+    setAway(nextAway, message);
   }
 
   function isSpeaking(member: ChannelMember): boolean {

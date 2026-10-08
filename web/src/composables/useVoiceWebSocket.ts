@@ -1385,7 +1385,7 @@ export function useVoiceWebSocket() {
     }
   }
 
-  function playNotification(kind: "connected" | "disconnected" | "poke" | "private" | "reconnectFailed"): void {
+  function playNotification(kind: "connected" | "disconnected" | "poke" | "private" | "reconnectFailed" | "microphoneOn" | "microphoneOff"): void {
     if (notificationVolume.value <= 0 || outputMuted.value || effectiveOutputVolume() <= 0 || typeof window === "undefined") return;
     try {
       const ctx = getAudioCtx();
@@ -1396,6 +1396,8 @@ export function useVoiceWebSocket() {
         poke: [740, 980],
         private: [600, 760],
         reconnectFailed: [300, 220],
+        microphoneOn: [880, 1_100],
+        microphoneOff: [620, 440],
       };
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();

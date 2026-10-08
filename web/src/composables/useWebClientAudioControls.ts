@@ -20,6 +20,7 @@ interface UseWebClientAudioControlsOptions {
   setInputDevice: (deviceId: string) => Promise<void>;
   setOutputDevice: (deviceId: string) => Promise<void>;
   setMicrophoneMuted: (muted: boolean) => void;
+  playNotification: (kind: "microphoneOn" | "microphoneOff") => void;
   startMicrophoneTest: () => Promise<void>;
   stopMicrophoneTest: () => void;
   startAccompaniment: () => Promise<void>;
@@ -50,6 +51,7 @@ export function useWebClientAudioControls({
   setInputDevice,
   setOutputDevice,
   setMicrophoneMuted,
+  playNotification,
   startMicrophoneTest,
   stopMicrophoneTest,
   startAccompaniment,
@@ -130,8 +132,10 @@ export function useWebClientAudioControls({
   }
 
   function toggleMicrophone(): void {
-    setMicrophoneMuted(!microphoneMuted.value);
-    showToast(t(microphoneMuted.value ? "microphoneMuted" : "microphoneActive"));
+    const nextMuted = !microphoneMuted.value;
+    playNotification(nextMuted ? "microphoneOff" : "microphoneOn");
+    setMicrophoneMuted(nextMuted);
+    showToast(t(nextMuted ? "microphoneMuted" : "microphoneActive"));
   }
 
   async function toggleAccompaniment(): Promise<void> {

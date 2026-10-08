@@ -327,6 +327,7 @@ export class VoiceBridge {
       const avatarRequests = new Set<string>();
       let avatarRefreshTimer: ReturnType<typeof setTimeout> | null = null;
       let avatarRefreshRunning = false;
+      let directoryStatusRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
       const sendJson = (message: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
@@ -602,6 +603,12 @@ export class VoiceBridge {
         scheduleMemberAvatarRefresh();
       });
 
+      tsClient.on("directoryClientsSnapshot", (clients: Parameters<DirectorySynchronizer["applyClientListSnapshot"]>[0]) => {
+        directory.applyClientListSnapshot(clients);
+        refreshDirectory();
+        if (tsReady && initialStateSent) sendJson({ type: "channelList", channels: entry!.channelTree });
+      });
+
       tsClient.on("clientEnter", (info) => {
         const candidateSelfId = tsClient.getClientId();
         if (candidateSelfId > 0 && info.id === candidateSelfId) {
@@ -611,6 +618,11 @@ export class VoiceBridge {
         const wasKnown = entry!.members.has(info.id);
         directory.applyClientEnter(info);
         refreshDirectory();
+        if (directoryStatusRefreshTimer) clearTimeout(directoryStatusRefreshTimer);
+        directoryStatusRefreshTimer = setTimeout(() => {
+          directoryStatusRefreshTimer = null;
+          void tsClient.refreshDirectoryClients();
+        }, 300);
         if (tsReady && initialStateSent) {
           sendJson({ type: "channelList", channels: entry!.channelTree });
           if (!wasKnown) sendJson({ type: "memberEnter", id: info.id, nickname: info.nickname, uid: info.uid, isSelf: info.id === selfId });

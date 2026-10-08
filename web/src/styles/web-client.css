@@ -343,9 +343,8 @@
   .app-shell { grid-template-rows: minmax(0, 1fr) 220px; }
 }
 
-/* Desktop audio controls live in the member rail so the workspace header
-   stays focused on navigation. Mobile keeps its existing controls below the
-   voice cards and in the More panel. */
+/* Desktop audio controls live in the member rail; mobile voice controls are
+   docked directly above the fixed bottom navigation. */
 .header-tools { align-items: center; }
 .header-action, .round-icon { line-height: 0; }
 .guide-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #006a64; background: #edf7f4; border: 1px solid #d7ebe6; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
@@ -454,7 +453,7 @@
 .whisper-strip-copy span { overflow: hidden; color: #71837d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .whisper-ptt-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; color: #fff; background: #006a64; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: none; user-select: none; }
 .whisper-ptt-button.active { background: #2f9d5c; box-shadow: 0 0 0 4px rgba(47,157,92,.16); }
-.mobile-nav, .mobile-more-panel { display: none; }
+.mobile-bottom-dock, .mobile-nav, .mobile-more-panel { display: none; }
 .mobile-voice-title { display: none; }
 .mobile-section-hidden { display: block; }
 
@@ -476,7 +475,9 @@
   .mobile-more-panel button { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; color: var(--text-primary); background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; text-align: left; cursor: pointer; }
   .mobile-more-panel button:hover { color: var(--accent); border-color: var(--accent); }
   .mobile-more-panel button.danger { color: var(--danger); }
-  .mobile-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; min-height: 68px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-top: 1px solid var(--border); box-shadow: 0 -7px 20px color-mix(in srgb, var(--text-primary) 8%, transparent); backdrop-filter: blur(14px); }
+  .mobile-bottom-dock { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom, 0px); background: color-mix(in srgb, var(--surface-1) 94%, transparent); border-top: 1px solid var(--border); box-shadow: 0 -7px 20px color-mix(in srgb, var(--text-primary) 8%, transparent); backdrop-filter: blur(14px); }
+  .mobile-nav { position: static; display: grid; flex: 0 0 74px; grid-template-columns: repeat(4, 1fr); gap: 2px; width: 100%; height: 74px; min-height: 74px; padding: 6px 8px; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; }
+  .mobile-bottom-dock.has-voice-controls .mobile-nav { border-top: 1px solid var(--border); }
   .mobile-nav button { display: grid; place-items: center; gap: 3px; min-width: 0; color: var(--text-muted); background: transparent; border-radius: 8px; font-size: 11px; cursor: pointer; }
   .mobile-nav button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 700; }
   .mobile-nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -551,14 +552,18 @@
 @media (max-width: 740px) {
   :global(html), :global(body), :global(#app) { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
   .web-client { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; }
-  .app-shell { height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
-  .app-shell .workspace { height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - 74px - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 74px - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell { --mobile-nav-height: 74px; --mobile-voice-controls-height: 64px; height: 100dvh; height: 100svh; min-height: 100dvh; min-height: 100svh; max-height: 100dvh; max-height: 100svh; padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell.mobile-view-voice { padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-voice-controls-height) + env(safe-area-inset-bottom, 0px)); }
+  .app-shell .workspace { height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom, 0px)); height: calc(100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom, 0px)); min-height: 0; max-height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - var(--mobile-nav-height) - env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+  .app-shell.mobile-view-voice .workspace { height: calc(100dvh - var(--mobile-nav-height) - var(--mobile-voice-controls-height) - env(safe-area-inset-bottom, 0px)); height: calc(100svh - var(--mobile-nav-height) - var(--mobile-voice-controls-height) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - var(--mobile-nav-height) - var(--mobile-voice-controls-height) - env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - var(--mobile-nav-height) - var(--mobile-voice-controls-height) - env(safe-area-inset-bottom, 0px)); }
   .app-shell .workspace-scroll { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
   .workspace-header { min-height: calc(60px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 14px 0; box-sizing: border-box; position: sticky; top: 0; z-index: 6; background: color-mix(in srgb, var(--surface-1) 94%, transparent); backdrop-filter: blur(14px); }
   .breadcrumbs { flex: 1 1 auto; min-width: 0; gap: 6px; font-size: 13px; }
   .breadcrumbs .crumb-muted, .breadcrumbs > .ui-icon { display: none; }
   .mobile-brand { display: inline; font-size: 18px; }
   .workspace-actions { flex: 0 0 auto; gap: 3px; }
+  .app-shell.mobile-view-voice .workspace-actions > .microphone-header-toggle,
+  .app-shell.mobile-view-voice .workspace-actions > .disconnect-button { display: none; }
   .workspace-actions .header-action { width: 36px; height: 36px; flex-basis: 36px; }
   .workspace-actions .workspace-skin-switcher, .workspace-actions .workspace-language { display: none; }
   .disconnect-button { width: 36px; height: 36px; min-height: 36px; margin-left: 0; padding: 0; justify-content: center; }
@@ -575,6 +580,7 @@
   .section-heading h2 { font-size: 22px; }
   .mobile-voice-title { display: inline; }
   .desktop-voice-title { display: none; }
+  .mobile-voice-sticky { position: sticky; top: 0; z-index: 5; margin: -14px -10px 14px; padding: 14px 10px 10px; background: color-mix(in srgb, var(--surface-1) 96%, transparent); border-bottom: 1px solid var(--border); backdrop-filter: blur(14px); }
   .voice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
   .voice-card { position: relative; min-height: 136px; padding: 18px 8px 14px; border-radius: 16px; }
   .voice-avatar-wrap, .voice-avatar { width: 60px; height: 60px; }
@@ -585,7 +591,7 @@
   .app-shell .voice-card > span { margin-top: 4px; font-size: 11px; }
   .voice-member-action { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--text-muted); background: color-mix(in srgb, var(--surface-2) 78%, transparent); border-radius: 10px; cursor: pointer; }
   .voice-member-action:hover, .voice-member-action:active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); }
-  .mobile-voice-controls { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
+  .mobile-voice-controls { display: flex; flex: 0 0 var(--mobile-voice-controls-height); align-items: stretch; gap: 8px; height: var(--mobile-voice-controls-height); min-height: var(--mobile-voice-controls-height); margin: 0; padding: 8px 14px; background: var(--surface-2); border: 0; border-bottom: 1px solid var(--border); border-radius: 0; }
   .mobile-voice-toggle, .mobile-voice-settings, .mobile-voice-leave, .mobile-member-leave { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; min-width: 0; padding: 0 11px; color: var(--accent); background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .mobile-voice-toggle { flex: 1 1 auto; }
   .mobile-voice-toggle.muted, .mobile-more-panel button.muted, .mobile-voice-toggle[aria-pressed="false"] { color: var(--danger); }
@@ -632,11 +638,12 @@
   .mobile-more-panel { width: calc(100% - 28px); max-height: none; margin: 16px auto 0; padding: 18px; border-radius: 18px; overflow-y: auto; }
   .mobile-more-panel h2 { font-size: 25px; }
   .mobile-more-panel button { min-height: 52px; font-size: 14px; }
-  .mobile-nav { min-height: 74px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .mobile-nav { height: var(--mobile-nav-height); min-height: var(--mobile-nav-height); flex-basis: var(--mobile-nav-height); padding: 8px; }
   .mobile-nav button { min-height: 52px; font-size: 12px; }
 
   .member-menu-backdrop { position: fixed; z-index: 39; inset: 0; display: block; background: rgba(13, 29, 26, .38); backdrop-filter: blur(2px); }
   .member-context-menu { z-index: 40; left: 10px !important; right: 10px; top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; min-width: 0; max-height: calc(100svh - 100px); padding: 12px; border-radius: 18px; box-shadow: 0 18px 42px rgba(13, 38, 33, .25); }
+  .member-context-menu.above-mobile-voice-dock { bottom: calc(74px + 64px + env(safe-area-inset-bottom, 0px)) !important; }
   .member-menu-header strong { padding: 4px 8px 11px; font-size: 16px; }
   .member-menu-close { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; padding: 0 !important; color: var(--text-muted); background: var(--surface-2); border-radius: 10px; }
   .member-context-menu button { min-height: 50px; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
@@ -679,6 +686,8 @@
   .disconnect-button { width: 32px; height: 32px; }
   .room-hero { padding-inline: 16px; }
   .mobile-voice-settings { width: 56px; padding-inline: 4px; }
+  .mobile-voice-toggle { flex: 1 1 0; min-width: 44px; padding-inline: 4px; }
+  .mobile-voice-toggle span { display: none; }
   .mobile-voice-toggle { flex: 1 1 0; min-width: 0; padding-inline: 6px; }
   .mobile-voice-controls .mobile-voice-toggle span { display: inline; }
   .mobile-member-controls .mobile-voice-toggle { flex: 1 1 0; min-height: 50px; }
@@ -1227,5 +1236,111 @@
 
   .promise-item {
     padding: 10px 12px;
+  }
+}
+
+.member-flags,
+.voice-member-flags {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.member-flags {
+  flex: 0 0 auto;
+}
+
+.member-flags > span,
+.voice-member-flags > span {
+  display: inline-grid;
+  place-items: center;
+  color: var(--success);
+}
+
+.member-flags > span.muted,
+.voice-member-flags > span.muted {
+  color: var(--danger);
+}
+
+.member-flags > span.unknown,
+.voice-member-flags > span.unknown {
+  color: var(--text-muted);
+}
+
+.member-flags > span.away,
+.voice-member-flags > span.away {
+  color: var(--warning);
+}
+
+.member-presence.away {
+  background: var(--warning);
+}
+
+.member-presence.unknown {
+  background: var(--text-muted);
+}
+
+.voice-member-flags {
+  position: relative;
+  z-index: 3;
+  min-height: 15px;
+  margin-top: 6px;
+}
+
+.message-away-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-1));
+  border-radius: 5px;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mobile-voice-away {
+  display: inline-flex;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-width: 42px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--text-muted);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.mobile-voice-away.active,
+.mobile-more-panel button.away {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+@media (max-width: 740px) {
+  .desktop-audio-dock,
+  .member-volume,
+  .member-panel-tip {
+    display: none;
+  }
+
+  .member-flags {
+    gap: 5px;
+  }
+
+  .member-flags > span {
+    min-width: 14px;
+  }
+
+  .mobile-voice-away {
+    min-height: 50px;
+    align-self: center;
   }
 }
