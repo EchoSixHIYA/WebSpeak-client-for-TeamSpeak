@@ -1,8 +1,8 @@
 # WebSpeak 皮肤开发规范
 
-本文说明仍受支持的 v1 视觉皮肤、v2 声明式布局皮肤和 v3 开放皮肤。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。自定义界面不依赖固定宿主控件目录；交互通过逐项授权的宿主动作实现。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及正在接入的 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 已加入插件清单、插件文件校验和本地缓存，但作者代码尚未执行。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
-当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 插件运行时是目标阶段，尚未实现或获安全批准；它必须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v3 的示例包或 Wasm 输出原型描述成已完成的全量插件系统。
+当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 插件运行时尚未实现或获安全批准；当前实现只校验并缓存清单、JS/CSS 和包内素材，不执行作者代码。完整运行时仍须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v4 包格式、v3 示例包或 Wasm 输出原型描述成已完成的全量插件系统。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -28,6 +28,10 @@ assets/preview.jpg            # 可选：管理后台显示的预览图，也可
 assets/background.webp        # 可选：页面艺术素材
 assets/brand.woff2            # 可选：自带字体
 components.json               # v3 可选：声明式组件或完整页面 surface
+plugins.json                  # v4 必需：插件入口、页面、模式、权限与包内文件
+plugins/<plugin-id>/index.js  # v4 插件代码，目前只校验和缓存
+plugins/<plugin-id>/style.css # v4 可选：插件样式，目前只校验和缓存
+plugins/<plugin-id>/assets/   # v4 插件专属的本地图片或字体素材
 ```
 
 所有资源路径使用 `/`，区分大小写，并相对于包根目录。CSS 的 `url()` 使用同样的包根相对路径，例如 `url("assets/background.webp")`。不得使用机器本地路径、站点绝对路径或远程 URL。
@@ -146,6 +150,31 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 组件树有硬上限：components.json 256 KiB。schema v1/v2 上限为 32 个组件、每组件 256 个模板节点、16 层深度和 100 条重复记录；schema v3 上限为 128 个组件、每组件 2048 个模板节点、32 层深度和 250 条重复记录，并允许 64 个本地标量状态与 64 个动作。图片资源只能从包内引用，CSS 不能读取外部 URL、脚本或浏览器存储。宿主动作需显式权限，并只能绑定可信的用户事件；输入或 change 事件不能触发宿主动作。focus/blur、hover 和 drag-start/over 等被动事件只可改动组件本地状态，不能触发语音操作。
 
 注意：v3 CSS 和 surface 可以隐藏或遮挡普通语音控件。权限和返回标准界面提示由宿主在皮肤根之外绘制；其他界面控件仍受皮肤排版影响。测试时务必确保麦克风、设置、退出语音、屏幕共享操作和移动端导航仍有可达路径。组件演示页 /demo 使用合成数据，加入频道和聊天动作只更新演示状态；它不支持宿主控件或整页替换。
+
+### schemaVersion 4：插件包描述（运行时尚未启用）
+
+v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。JS、CSS 和素材均不会被此阶段的 WebSpeak 运行时加载或执行，因此 v4 当前只是可验证的包协议，不能作为可运行插件发布。
+
+```json
+{
+  "schemaVersion": 4,
+  "packageType": "open-skin",
+  "id": "community.example-plugin-skin",
+  "name": "Example plugin skin",
+  "version": "1.0.0",
+  "author": "Example author",
+  "license": "MIT",
+  "entry": "skin.css",
+  "plugins": "plugins.json",
+  "minAppVersion": "0.2.7-preview"
+}
+```
+
+`plugins.json` 顶层 `schemaVersion` 当前为 `1`，并包含 1–64 个插件。每个插件声明 `id`、`name`、`version`、`apiVersion: 1`、`page`（`home` 或 `voice`）、`mode`（`widget` 或 `surface`）、必需的 `entry`、可选的 `style`、素材路径数组 `assets` 和 `permissions`。入口及样式必须位于 `plugins/<id>/`；素材必须位于该插件自己的 `assets/` 子目录，只能是本地图片或 woff2 字体。插件不能共享文件；同一公开页面最多有一个 `surface`，且必须申请 `ui.surface.replace`。其余权限只能从 `src/shared/skin-plugin.ts` 的现有权限表中选择。
+
+`plugins.json` 不超过 256 KiB；每个入口 JS 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。沙箱 iframe、可信事件捕获、MessageChannel 能力桥、逐插件授权、撤销和生命周期隔离仍未完成；不得通过增加识别格式而提前开启脚本执行。
+
+当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过其 iframe 去调整其他插件或宿主恢复控件。
 
 ## 首页内容和文案
 

@@ -331,6 +331,17 @@ test("schema version 3 supports arbitrary public layouts and validated declarati
   await assert.rejects(importSkinPack(makeSkinV3(missingAsset, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_ASSET_INVALID");
 });
 
+test("schema version 3 permits an open visual skin without a components document", async () => {
+  const bytes = zipSync({
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 3, packageType: "open-skin" })),
+    "skin.css": strToU8('[data-ws-part="app"] { position: fixed; }'),
+  });
+  const skin = await importSkinPack(new File([bytes.slice().buffer as ArrayBuffer], "v3-visual-only.wskin"));
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.pluginData, undefined);
+  assert.match(skin.css, /position: fixed/);
+});
+
 test("schema version 3 accepts a schema v2 full-page surface with host widgets", async () => {
   const components = {
     schemaVersion: 2,
@@ -360,6 +371,34 @@ test("schema version 3 accepts a schema v2 full-page surface with host widgets",
   assert.deepEqual(skin.pluginData?.components[0].root.children?.map((node) => node.widget), [
     "voice.channel-panel", "voice.member-cards", "voice.chat-panel", "voice.audio-controls",
   ]);
+});
+
+test("schema version 4 validates and caches isolated plugin package files without executing them", async () => {
+  const skin = await importSkinPack(makeSkinV4());
+  const entry = "plugins/voice-toolbar/index.js";
+  const style = "plugins/voice-toolbar/style.css";
+  const icon = "plugins/voice-toolbar/assets/icon.png";
+  assert.equal(skin.schemaVersion, 4);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.runtimePlugins?.plugins[0].id, "voice-toolbar");
+  assert.equal(await skin.runtimePluginFiles?.[entry].text(), "export const render = () => document.createElement('button');");
+  assert.equal(await skin.runtimePluginFiles?.[style].text(), ".toolbar { color: teal; }");
+  assert.equal(skin.runtimePluginFiles?.[icon].type, "image/png");
+  assert.equal(skin.assets[icon], undefined, "plugin assets stay in the isolated plugin file set");
+  assert.match(skin.css, /position: fixed/);
+
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { includeEntry: false })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_FILE_MISSING",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { extra: { "plugins/unlisted/rogue.js": strToU8("export {};") } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_FILE_UNSUPPORTED",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { entryBytes: new Uint8Array(256 * 1024 + 1) })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE",
+  );
 });
 
 test("the distributable KAAK v3 package validates end to end", async () => {
@@ -418,4 +457,35 @@ function makeSkinV3(components: unknown, css: string, assets: Record<string, Uin
   };
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin-v3.wskin", { type: "application/octet-stream" });
+}
+
+function makeSkinV4(
+  pluginDocument: unknown = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.js",
+      style: "plugins/voice-toolbar/style.css",
+      assets: ["plugins/voice-toolbar/assets/icon.png"],
+      permissions: ["session.channels.read"],
+    }],
+  },
+  options: { includeEntry?: boolean; entryBytes?: Uint8Array; extra?: Record<string, Uint8Array> } = {},
+): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", plugins: "plugins.json" })),
+    "skin.css": strToU8('[data-ws-part="app"] { position: fixed; color: teal; }'),
+    "plugins.json": strToU8(JSON.stringify(pluginDocument)),
+    "plugins/voice-toolbar/style.css": strToU8(".toolbar { color: teal; }"),
+    "plugins/voice-toolbar/assets/icon.png": new Uint8Array([1, 2, 3, 4]),
+    ...options.extra,
+  };
+  if (options.includeEntry !== false) packageFiles["plugins/voice-toolbar/index.js"] = options.entryBytes ?? strToU8("export const render = () => document.createElement('button');");
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v4.wskin", { type: "application/octet-stream" });
 }

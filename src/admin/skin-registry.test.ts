@@ -177,6 +177,77 @@ test("server accepts v3 declarative components and rejects unapproved capability
   await assert.rejects(registry.save(unsafeArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_PLUGIN_INVALID");
 });
 
+test("server accepts a v3 open visual skin without a components document", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-v3-visual-only-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const archive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, schemaVersion: 3, packageType: "open-skin", content: undefined, preview: undefined }))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { position: fixed; }')],
+  ]);
+  const saved = await registry.save(archive, "sample-skin");
+  assert.equal(saved.id, "sample-skin");
+  assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+});
+
+test("server validates v4 plugin manifests and package files without executing author code", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-v4-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const manifestV4 = {
+    ...manifest,
+    schemaVersion: 4,
+    packageType: "open-skin",
+    content: undefined,
+    preview: undefined,
+    plugins: "plugins.json",
+  };
+  const plugins = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.js",
+      style: "plugins/voice-toolbar/style.css",
+      assets: ["plugins/voice-toolbar/assets/icon.png"],
+      permissions: ["session.channels.read"],
+    }],
+  };
+  const archive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV4))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { position: fixed; }')],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+    ["plugins/voice-toolbar/index.js", Buffer.from("export const render = () => document.createElement('button');")],
+    ["plugins/voice-toolbar/style.css", Buffer.from(".toolbar { color: teal; }")],
+    ["plugins/voice-toolbar/assets/icon.png", Buffer.from([1, 2, 3, 4])],
+  ]);
+  const saved = await registry.save(archive, "sample-skin");
+  assert.equal(saved.id, "sample-skin");
+  assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+
+  const missingEntry = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV4))],
+    ["skin.css", Buffer.from("[data-ws-part=app] { color: teal; }")],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+  ]);
+  await assert.rejects(registry.save(missingEntry, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_RUNTIME_PLUGIN_FILE_MISSING");
+
+  const unlistedScript = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV4))],
+    ["skin.css", Buffer.from("[data-ws-part=app] { color: teal; }")],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+    ["plugins/voice-toolbar/index.js", Buffer.from("export {};")],
+    ["plugins/voice-toolbar/style.css", Buffer.from(".toolbar { color: teal; }")],
+    ["plugins/voice-toolbar/assets/icon.png", Buffer.from([1, 2, 3, 4])],
+    ["plugins/other/rogue.js", Buffer.from("export {};")],
+  ]);
+  await assert.rejects(registry.save(unlistedScript, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_FILE_UNSUPPORTED");
+});
+
 test("skin registry rejects path traversal and mismatched local ZIP headers", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-invalid-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
