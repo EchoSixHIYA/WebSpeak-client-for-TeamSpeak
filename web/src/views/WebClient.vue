@@ -11,6 +11,16 @@
     data-ws-part="app"
     :data-ws-page="showVoiceShell ? 'voice' : 'home'"
   >
+    <SkinPluginOutlet
+      v-if="activeSkin?.pluginData"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :document="activeSkin.pluginData"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :data="skinPluginContext"
+      :assets="activeSkin.assets"
+      :actions="skinPluginActions"
+    />
     <!-- Connection / welcome screen -->
     <section
       v-if="!showVoiceShell"
@@ -916,6 +926,7 @@
 import { observeMobileViewport } from "../services/mobile-viewport.js";
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
@@ -1446,6 +1457,82 @@ async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<vo
 
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
+const opaqueFavoriteTokenById = new Map<string, string>();
+const skinPluginFavoriteTargets = new Map<string, QuickServer>();
+const skinPluginFavorites = computed(() => {
+  const targets = quickServers.value.filter((server) => server.isFavorite);
+  const activeIds = new Set(targets.map((server) => server.id));
+  for (const id of opaqueFavoriteTokenById.keys()) if (!activeIds.has(id)) opaqueFavoriteTokenById.delete(id);
+  skinPluginFavoriteTargets.clear();
+  return targets.map((server) => {
+    let token = opaqueFavoriteTokenById.get(server.id);
+    if (!token) {
+      token = globalThis.crypto?.randomUUID?.() ?? `favorite-${Math.random().toString(36).slice(2)}`;
+      opaqueFavoriteTokenById.set(server.id, token);
+    }
+    skinPluginFavoriteTargets.set(token, server);
+    return { id: token, label: server.label, current: isQuickServerTarget(server), kind: "favorite" };
+  });
+});
+
+const skinPluginContext = computed(() => ({
+  session: {
+    status: {
+      connected: voiceState.connected,
+      connecting: voiceState.connecting,
+      channelId: currentChannel.value?.id ?? "",
+      channelName: currentChannelName.value,
+      userName: nickname.value,
+    },
+    channels: channelTree.value.map((item) => ({
+      id: item.id,
+      name: item.name,
+      parentId: item.parentID,
+      depth: item.depth,
+      memberCount: item.members.length,
+      current: item.id === currentChannel.value?.id,
+    })),
+    members: memberChannels.value.flatMap((item) => item.members.map((member) => ({
+      id: String(member.id),
+      name: member.nickname,
+      channelId: item.id,
+      status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
+      speaking: speakingIds.has(member.id),
+      self: member.id === voiceState.tsClientId,
+    }))),
+  },
+  favorites: { items: skinPluginFavorites.value },
+  chat: {
+    messages: chat.visibleMessages.value.filter((message) => message.scope === "channel").map((message) => ({
+      id: message.id,
+      author: message.invokerName,
+      text: message.message,
+      time: new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      kind: message.isSelf ? "self" : "message",
+      channelId: message.targetId ?? currentChannel.value?.id ?? "",
+    })),
+  },
+}));
+
+const skinPluginActions = {
+  "voice.joinChannel": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.channelId !== "string") return;
+    const target = channelTree.value.find((item) => item.id === args.channelId);
+    if (target && target.id !== currentChannel.value?.id) selectChannel(target);
+  },
+  "favorites.switch": (args: Record<string, string | number | boolean>) => {
+    if (accessMode.value !== "open" || typeof args.favoriteId !== "string") return;
+    const target = skinPluginFavoriteTargets.get(args.favoriteId);
+    if (target?.isFavorite) connectQuickServer(target);
+  },
+  "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.text !== "string" || !currentChannel.value?.id) return;
+    const text = args.text.trim();
+    if (!text || text.length > 1000 || text.includes("\u0000")) return;
+    void sendTextMessage(text, currentChannel.value.id);
+  },
+};
+
 watch(() => pokeNotifications.length, (length, previousLength) => {
   const latest = pokeNotifications[length - 1];
   if (!latest || length <= previousLength) return;
@@ -1657,3 +1744,5 @@ function resolveSkinMessages(skin: InstalledSkin | null, locale: Language): Reco
 <style scoped src="../styles/web-client.css"></style>
 
 <style scoped src="../styles/web-client-mobile.css"></style>
+
+<style src="../styles/skin-plugin.css"></style>

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "packageType": "open-skin",
+  "id": "community.kaak-voice",
+  "name": "KAAK",
+  "version": "2.0.0",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "An open, channel-forward voice skin with safe declarative channel navigation.",
+  "entry": "skin.css",
+  "components": "components.json",
+  "content": "content.json",
+  "minAppVersion": "0.2.7-preview"
+}

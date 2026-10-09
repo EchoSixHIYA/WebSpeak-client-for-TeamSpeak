@@ -1,5 +1,6 @@
 import type { SkinCatalogEntry as SharedSkinCatalogEntry } from "../shared/skin-catalog.js";
 import { parseSkinLayoutJson } from "../shared/skin-layout.js";
+import { listSkinPluginAssetPaths, parseSkinPluginJson, type SkinPluginDocument } from "../shared/skin-plugin.js";
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -41,11 +42,12 @@ interface SkinArchiveEntry {
 }
 
 type ParsedSkinManifest = Omit<SkinCatalogEntry, "installedAt" | "previewUrl" | "previewMimeType" | "enabled"> & {
-  schemaVersion: 1 | 2;
-  packageType?: "layout-skin";
+  schemaVersion: 1 | 2 | 3;
+  packageType?: "layout-skin" | "open-skin";
   entry: string;
   layout?: string;
   content?: string;
+  components?: string;
   preview?: string;
 };
 
@@ -226,7 +228,7 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
   let previewBytes: Buffer | undefined;
   let previewMime: string | undefined;
   for (const [packagePath, data] of fileBytes) {
-    if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.preview].includes(packagePath)) continue;
+    if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.preview].includes(packagePath)) continue;
     const mimeType = imageMime(packagePath) ?? (packagePath.toLowerCase().endsWith(".woff2") ? "font/woff2" : null);
     if (!mimeType) throw new SkinRegistryError(`Unsupported package file: ${packagePath}`, "SKIN_FILE_UNSUPPORTED");
     if (mimeType.startsWith("image/") && data.byteLength > MAX_IMAGE_BYTES) throw new SkinRegistryError("Each image must be smaller than 16 MiB.", "SKIN_IMAGE_SIZE");
@@ -244,6 +246,16 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
     if (!layout || layout.byteLength > 128 * 1024) throw new SkinRegistryError("layout.json is missing or exceeds 128 KiB.", "SKIN_LAYOUT_SIZE");
     try { parseSkinLayoutJson(decodeUtf8(layout, "layout.json is not valid UTF-8.")); }
     catch (error) { throw new SkinRegistryError("layout.json is invalid: " + (error instanceof Error ? error.message : "unknown layout error"), "SKIN_LAYOUT_INVALID"); }
+  }
+  if (manifest.components) {
+    const components = fileBytes.get(manifest.components);
+    if (!components || components.byteLength > MAX_CONTENT_BYTES) throw new SkinRegistryError("components.json is missing or exceeds 256 KiB.", "SKIN_PLUGIN_SIZE");
+    let document: SkinPluginDocument;
+    try { document = parseSkinPluginJson(decodeUtf8(components, "components.json is not valid UTF-8.")); }
+    catch (error) { throw new SkinRegistryError("components.json is invalid: " + (error instanceof Error ? error.message : "unknown plugin error"), "SKIN_PLUGIN_INVALID"); }
+    for (const assetPath of listSkinPluginAssetPaths(document)) {
+      if (!fileBytes.has(assetPath) || !imageMime(assetPath)) throw new SkinRegistryError(`Component image asset is missing or unsupported: ${assetPath}`, "SKIN_PLUGIN_ASSET_INVALID");
+    }
   }
   if (manifest.preview) {
     previewBytes = fileBytes.get(manifest.preview);
@@ -377,9 +389,10 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SkinRegistryError("manifest.json must be an object.", "SKIN_MANIFEST_INVALID");
   const value = raw as Record<string, unknown>;
   const schemaVersion = value.schemaVersion;
-  if (schemaVersion !== 1 && schemaVersion !== 2) throw new SkinRegistryError("The skin schema version or ID is unsupported.", "SKIN_SCHEMA_VERSION");
-  if (schemaVersion === 2) {
+  if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) throw new SkinRegistryError("The skin schema version or ID is unsupported.", "SKIN_SCHEMA_VERSION");
+  if (schemaVersion >= 2) {
     const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
+    if (schemaVersion === 3) { fields.delete("permissions"); fields.add("components"); }
     const unknown = Object.keys(value).find((key) => !fields.has(key));
     if (unknown) throw new SkinRegistryError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
   }
@@ -393,7 +406,8 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   if (schemaVersion === 2 && (value.packageType !== "layout-skin" || !Array.isArray(value.permissions) || value.permissions.length !== 0)) {
     throw new SkinRegistryError("Layout skin packages must declare the layout-skin type and no executable permissions.", "SKIN_PERMISSION_INVALID");
   }
-  if (schemaVersion === 1 && (value.layout !== undefined || value.packageType !== undefined || value.permissions !== undefined)) {
+  if (schemaVersion === 3 && value.packageType !== "open-skin") throw new SkinRegistryError("Version 3 skin packages must declare the open-skin type.", "SKIN_MANIFEST_INVALID");
+  if (schemaVersion === 1 && (value.layout !== undefined || value.packageType !== undefined || value.permissions !== undefined || value.components !== undefined)) {
     throw new SkinRegistryError("Version 1 skin packages cannot declare layout or plugin fields.", "SKIN_SCHEMA_VERSION");
   }
   const version = read("version", 32);
@@ -401,15 +415,16 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version) || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(minAppVersion)) throw new SkinRegistryError("Skin and minimum app versions must use semantic version format.", "SKIN_MANIFEST_INVALID");
   const entry = read("entry", 120);
   const readOptional = (key: string, max: number): string | undefined => value[key] == null ? undefined : read(key, max);
-  const layout = schemaVersion === 2 ? read("layout", 120) : undefined;
+  const layout = schemaVersion === 2 ? read("layout", 120) : schemaVersion === 3 && value.layout != null ? read("layout", 120) : undefined;
   const content = readOptional("content", 120);
+  const components = schemaVersion === 3 ? read("components", 120) : undefined;
   const preview = readOptional("preview", 120);
-  for (const candidate of [entry, layout, content, preview].filter((item): item is string => Boolean(item))) if (!isSafePackagePath(candidate)) throw new SkinRegistryError("The manifest references an unsafe path.", "SKIN_PATH_INVALID");
-  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (preview && !imageMime(preview))) throw new SkinRegistryError("The CSS entry, layout, content, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
-  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
+  for (const candidate of [entry, layout, content, components, preview].filter((item): item is string => Boolean(item))) if (!isSafePackagePath(candidate)) throw new SkinRegistryError("The manifest references an unsafe path.", "SKIN_PATH_INVALID");
+  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (components && !components.toLowerCase().endsWith(".json")) || (preview && !imageMime(preview))) throw new SkinRegistryError("The CSS entry, layout, content, plugin components, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
+  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(components ? [components] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
   if (new Set(declaredFiles).size !== declaredFiles.length) throw new SkinRegistryError("Manifest files must use separate package paths.", "SKIN_MANIFEST_INVALID");
   const description = readOptional("description", 400);
-  return { schemaVersion, ...(schemaVersion === 2 ? { packageType: "layout-skin" as const } : {}), id, name: read("name", 80), version, author: read("author", 80), license: read("license", 80), minAppVersion, entry, ...(layout ? { layout } : {}), ...(content ? { content } : {}), ...(preview ? { preview } : {}), ...(description ? { description } : {}) };
+  return { schemaVersion, ...(schemaVersion === 2 ? { packageType: "layout-skin" as const } : schemaVersion === 3 ? { packageType: "open-skin" as const } : {}), id, name: read("name", 80), version, author: read("author", 80), license: read("license", 80), minAppVersion, entry, ...(layout ? { layout } : {}), ...(content ? { content } : {}), ...(components ? { components } : {}), ...(preview ? { preview } : {}), ...(description ? { description } : {}) };
 }
 
 function singleRootPrefix(paths: string[]): string {

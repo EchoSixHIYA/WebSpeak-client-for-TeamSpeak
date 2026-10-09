@@ -1,15 +1,14 @@
 {
-  "schemaVersion": 2,
-  "packageType": "layout-skin",
+  "schemaVersion": 3,
+  "packageType": "open-skin",
   "id": "community.illusia-voice",
   "name": "ILLUSIA风",
-  "version": "1.0.29",
+  "version": "2.0.0",
   "author": "WebSpeak Project",
   "license": "All rights reserved",
-  "description": "A bright original-character art skin for the home, voice room, and demo pages.",
+  "description": "A bright original-character art skin with a safe declarative live-channel badge.",
   "entry": "skin.css",
-  "layout": "layout.json",
-  "permissions": [],
+  "components": "components.json",
   "preview": "assets/background-composite.webp",
   "minAppVersion": "0.2.7-preview"
 }

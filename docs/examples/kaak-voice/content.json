@@ -1,0 +1,10 @@
+{
+  "defaultLocale": "zh-CN",
+  "locales": {
+    "zh-CN": { "home": { "brandName": "KAAK" } },
+    "en": { "home": { "brandName": "KAAK" } },
+    "de": { "home": { "brandName": "KAAK" } },
+    "ru": { "home": { "brandName": "KAAK" } },
+    "ja": { "home": { "brandName": "KAAK" } }
+  }
+}

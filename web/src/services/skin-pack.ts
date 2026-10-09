@@ -3,6 +3,7 @@ import selectorParser from "postcss-selector-parser";
 import valueParser from "postcss-value-parser";
 import { unzipSync } from "fflate";
 import { parseSkinLayoutJson, type SkinLayoutDocument } from "../../../src/shared/skin-layout.js";
+import { listSkinPluginAssetPaths, parseSkinPluginJson, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 
 const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_EXPANDED_BYTES = 50 * 1024 * 1024;
@@ -52,8 +53,8 @@ const ZIP_EOCD = 0x06054b50;
 const ZIP_CENTRAL_FILE = 0x02014b50;
 
 export interface SkinManifest {
-  schemaVersion: 1 | 2;
-  packageType?: "layout-skin";
+  schemaVersion: 1 | 2 | 3;
+  packageType?: "layout-skin" | "open-skin";
   id: string;
   name: string;
   version: string;
@@ -64,6 +65,7 @@ export interface SkinManifest {
   layout?: string;
   permissions?: [];
   content?: string;
+  components?: string;
   minAppVersion: string;
   preview?: string;
 }
@@ -94,6 +96,7 @@ export interface InstalledSkin extends SkinManifest {
   assets: Record<string, Blob>;
   contentData?: SkinContent;
   layoutData?: SkinLayoutDocument;
+  pluginData?: SkinPluginDocument;
   previewBlob?: Blob;
   warnings: string[];
   installedAt: number;
@@ -153,7 +156,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
 
   const assets: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
   for (const [path, bytes] of files) {
-    if (["manifest.json", manifest.entry, manifest.layout, manifest.content].includes(path)) continue;
+    if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components].includes(path)) continue;
     const mimeType = assetMimeType(path);
     if (!mimeType) throw new SkinPackError(`Unsupported package file: ${path}`, "SKIN_FILE_UNSUPPORTED");
     if (mimeType.startsWith("font/") && bytes.byteLength > MAX_FONT_BYTES) throw new SkinPackError("Fonts must be smaller than 4 MiB.", "SKIN_FONT_SIZE");
@@ -166,6 +169,17 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     const contentBytes = files.get(manifest.content);
     if (!contentBytes || contentBytes.byteLength > MAX_CONTENT_BYTES) throw new SkinPackError("content.json is missing or exceeds 256 KiB.", "SKIN_CONTENT_SIZE");
     contentData = parseContent(contentBytes);
+  }
+
+  let pluginData: SkinPluginDocument | undefined;
+  if (manifest.components) {
+    const componentsBytes = files.get(manifest.components);
+    if (!componentsBytes || componentsBytes.byteLength > MAX_CONTENT_BYTES) throw new SkinPackError("components.json is missing or exceeds 256 KiB.", "SKIN_PLUGIN_SIZE");
+    try { pluginData = parseSkinPluginJson(decoder.decode(componentsBytes)); }
+    catch (error) { throw new SkinPackError("components.json is invalid: " + (error instanceof Error ? error.message : "unknown plugin error"), "SKIN_PLUGIN_INVALID"); }
+    for (const assetPath of listSkinPluginAssetPaths(pluginData)) {
+      if (!assets[assetPath]?.type.startsWith("image/")) throw new SkinPackError(`Component image asset is missing or unsupported: ${assetPath}`, "SKIN_PLUGIN_ASSET_INVALID");
+    }
   }
 
   let layoutData: SkinLayoutDocument | undefined;
@@ -186,8 +200,8 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     previewBlob = new Blob([previewBytes], { type: previewMime });
   }
 
-  const compiled = compileSkinCss(decoder.decode(cssBytes), manifest.id, assets);
-  return { ...manifest, css: compiled.css, assets, contentData, layoutData, previewBlob, warnings: compiled.warnings, installedAt: Date.now() };
+  const compiled = compileSkinCss(decoder.decode(cssBytes), manifest.id, assets, manifest.schemaVersion);
+  return { ...manifest, css: compiled.css, assets, contentData, layoutData, pluginData, previewBlob, warnings: compiled.warnings, installedAt: Date.now() };
 }
 
 export function resolveSkinCssAssets(css: string, assets: Record<string, Blob>): { css: string; objectUrls: string[] } {
@@ -333,9 +347,10 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SkinPackError("manifest.json must be an object.", "SKIN_MANIFEST_INVALID");
   const raw = value as Record<string, unknown>;
   const schemaVersion = raw.schemaVersion;
-  if (schemaVersion !== 1 && schemaVersion !== 2) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
-  if (schemaVersion === 2) {
+  if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
+  if (schemaVersion >= 2) {
     const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
+    if (schemaVersion === 3) { fields.delete("permissions"); fields.add("components"); }
     const unknown = Object.keys(raw).find((key) => !fields.has(key));
     if (unknown) throw new SkinPackError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
   }
@@ -348,28 +363,32 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (schemaVersion === 2 && (raw.packageType !== "layout-skin" || !Array.isArray(raw.permissions) || raw.permissions.length !== 0)) {
     throw new SkinPackError("Layout skin packages must declare the layout-skin type and no executable permissions.", "SKIN_PERMISSION_INVALID");
   }
-  if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined)) {
+  if (schemaVersion === 3 && raw.packageType !== "open-skin") {
+    throw new SkinPackError("Version 3 skin packages must declare the open-skin type.", "SKIN_MANIFEST_INVALID");
+  }
+  if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined || raw.components !== undefined)) {
     throw new SkinPackError("Version 1 skin packages cannot declare layout or plugin fields.", "SKIN_SCHEMA_VERSION");
   }
   const id = stringField("id", 80)!;
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(id) || id.startsWith("builtin.")) throw new SkinPackError("Skin IDs must be unique lowercase IDs and cannot use the reserved builtin. prefix.", "SKIN_ID_INVALID");
   const entry = stringField("entry", 120)!;
-  const layout = schemaVersion === 2 ? stringField("layout", 120)! : undefined;
+  const layout = schemaVersion >= 2 ? stringField("layout", 120, schemaVersion === 2)! : undefined;
+  const components = schemaVersion === 3 ? stringField("components", 120)! : undefined;
   const content = stringField("content", 120, false);
   const preview = stringField("preview", 120, false);
-  for (const path of [entry, layout, content, preview].filter((item): item is string => Boolean(item))) {
+  for (const path of [entry, layout, content, components, preview].filter((item): item is string => Boolean(item))) {
     if (path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === "..")) throw new SkinPackError(`manifest.json has an unsafe path: ${path}`, "SKIN_PATH_INVALID");
   }
   const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
   const version = stringField("version", 32)!;
   const minAppVersion = stringField("minAppVersion", 32)!;
   if (!semver.test(version) || !semver.test(minAppVersion)) throw new SkinPackError("Skin and minimum app versions must use semantic version format.", "SKIN_MANIFEST_INVALID");
-  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The CSS entry, layout, content, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
-  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
+  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (components && !components.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The CSS entry, layout, content, or plugin components path is invalid.", "SKIN_MANIFEST_INVALID");
+  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(components ? [components] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
   if (new Set(declaredFiles).size !== declaredFiles.length) throw new SkinPackError("Manifest files must use separate package paths.", "SKIN_MANIFEST_INVALID");
   return {
     schemaVersion,
-    ...(schemaVersion === 2 ? { packageType: "layout-skin" as const, permissions: [] as [] } : {}),
+    ...(schemaVersion === 2 ? { packageType: "layout-skin" as const, permissions: [] as [] } : schemaVersion === 3 ? { packageType: "open-skin" as const } : {}),
     id,
     name: stringField("name", 80)!,
     version,
@@ -379,6 +398,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
     entry,
     layout,
     content,
+    components,
     minAppVersion,
     preview,
   };
@@ -438,7 +458,7 @@ function parseContent(bytes: Uint8Array): SkinContent {
   return { defaultLocale: root.defaultLocale, locales };
 }
 
-function compileSkinCss(source: string, id: string, assets: Record<string, Blob>): { css: string; warnings: string[] } {
+function compileSkinCss(source: string, id: string, assets: Record<string, Blob>, schemaVersion: SkinManifest["schemaVersion"]): { css: string; warnings: string[] } {
   const size = new TextEncoder().encode(source).byteLength;
   if (!size || size > MAX_CSS_BYTES) throw new SkinPackError("The CSS entry must be between 1 byte and 512 KiB.", "SKIN_CSS_SIZE");
   let root: postcss.Root;
@@ -486,7 +506,7 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
   root.walkRules((rule: Rule) => {
     if (hasKeyframesAncestor(rule)) return;
     if (rule.parent?.type === "rule") throw rule.error("Nested style rules are not supported; use flat selectors.");
-    if (!selectorUsesPublicHook(rule.selector)) throw rule.error("Skin selectors must use :root, [data-ws-page], or [data-ws-part] so they stay attached to WebSpeak's stable visual interface.");
+    if (!selectorUsesPublicHook(rule.selector, schemaVersion === 3)) throw rule.error("Skin selectors must use :root, [data-ws-page], [data-ws-part], or [data-ws-plugin-part] so they stay attached to WebSpeak's stable visual interface.");
     if (targetsOnlyOptionalVisualParts(rule.selector)) hideableRules.add(rule);
     try {
       rule.selector = selectorParser((selectors) => {
@@ -543,7 +563,7 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
     if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)) {
       throw declaration.error("Custom skin variables must use the --skin- prefix so they cannot replace WebSpeak's structural tokens.");
     }
-    if (isLayoutAffectingProperty(property)) {
+    if (schemaVersion < 3 && isLayoutAffectingProperty(property)) {
       throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");
     }
     if (property === "font-family") warnings.add("Custom fonts can change localized text wrapping; verify every WebSpeak language before publishing.");
@@ -551,7 +571,7 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
       throw declaration.error("Executable CSS values are not allowed.");
     }
     const compactValue = valueParser(value).nodes.filter((node) => node.type !== "space" && node.type !== "comment").map((node) => node.value ?? "").join("").toLowerCase();
-    if (["display", "visibility", "opacity", "pointer-events", "clip-path", "mask", "mask-image"].includes(property) && /\b(?:var|attr)\s*\(/i.test(value)) {
+    if (schemaVersion < 3 && ["display", "visibility", "opacity", "pointer-events", "clip-path", "mask", "mask-image"].includes(property) && /\b(?:var|attr)\s*\(/i.test(value)) {
       if (!canHideTarget) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
     }
     const removesVisual = property === "all"
@@ -561,15 +581,16 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
       || (property === "pointer-events" && compactValue === "none")
       || (property === "clip-path" && /inset\(\s*50%/.test(compactValue))
       || (property === "mask" && /(?:alpha\(0\)|luminance\(0\))/.test(compactValue));
-    if (removesVisual && !canHideTarget) {
+    if (removesVisual && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be hidden or reset; required controls and their containers must remain available.");
     }
     const visuallyRemoves = (property === "transform" && /scale(?:3d)?\(\s*0(?:\s*[,)]|\s*\))/i.test(value))
       || (property === "clip-path" && /inset\(\s*50%/i.test(value))
       || (property === "filter" && /(?:opacity|brightness)\(\s*0(?:%|\s*[,)]|\s*\))/i.test(value));
-    if (visuallyRemoves && !canHideTarget) {
+    if (visuallyRemoves && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be visually removed.");
     }
+    if (schemaVersion === 3 && removesVisual) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
     if (/\bz-index\s*:\s*(?:[1-9]\d{4,}|-\d{4,})\b/i.test(`${property}:${value}`) || (property === "position" && value === "fixed")) warnings.add("Fixed positioning or extreme stacking may cover important controls; check the preview on desktop and mobile.");
     const withScopedNames = rewriteScopedNames(value, property, keyframeNames, fontFamilyNames);
     declaration.value = rewriteAssetUrls(withScopedNames, (assetPath) => {
@@ -597,16 +618,16 @@ function targetsOnlyOptionalVisualParts(selector: string): boolean {
   }
 }
 
-function selectorUsesPublicHook(selector: string): boolean {
+function selectorUsesPublicHook(selector: string, allowCustomClasses = false): boolean {
   try {
     const parsed = selectorParser().astSync(selector);
     return parsed.nodes.length > 0 && parsed.nodes.every((item) => {
       let scoped = false;
       let usesPrivateName = false;
       item.walk((node) => {
-        if (node.type === "attribute" && ["data-ws-part", "data-ws-page"].includes(node.attribute.toLowerCase())) scoped = true;
+        if (node.type === "attribute" && ["data-ws-part", "data-ws-page", ...(allowCustomClasses ? ["data-ws-plugin-part"] : [])].includes(node.attribute.toLowerCase())) scoped = true;
         if (node.type === "pseudo" && node.value.toLowerCase() === ":root") scoped = true;
-        if (node.type === "class" || node.type === "id") usesPrivateName = true;
+        if (!allowCustomClasses && (node.type === "class" || node.type === "id")) usesPrivateName = true;
       });
       return scoped && !usesPrivateName;
     });

@@ -1,0 +1,969 @@
+/* KAAK is an original dark voice-client treatment built from WebSpeak's public skin hooks. */
+:root {
+  --skin-kaak-page: #111319;
+  --skin-kaak-rail: #0d0f14;
+  --skin-kaak-sidebar: #171a22;
+  --skin-kaak-surface: #1d212b;
+  --skin-kaak-raised: #252a36;
+  --skin-kaak-line: #303644;
+  --skin-kaak-text: #e5e9f2;
+  --skin-kaak-muted: #9aa4b5;
+  --skin-kaak-accent: #8495ff;
+  --skin-kaak-accent-soft: rgba(132, 149, 255, .16);
+  --skin-kaak-green: #55d6a0;
+  --skin-kaak-red: #f07783;
+  --skin-kaak-amber: #e8b866;
+  --skin-kaak-shadow: 0 18px 48px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+  color: var(--skin-kaak-text);
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-page="home"] {
+  background-image:
+    radial-gradient(ellipse at 86% 12%, rgba(72, 86, 159, .2), transparent 36%),
+    radial-gradient(ellipse at 10% 88%, rgba(36, 114, 125, .13), transparent 32%);
+}
+
+[data-ws-page="voice"],
+[data-ws-page="demo"] {
+  background-image: radial-gradient(ellipse at 70% 0%, rgba(62, 73, 129, .11), transparent 38%);
+}
+
+/* Global selectors retain the host's focus order and control geometry. */
+:root [data-ws-part="skin.trigger"],
+:root [data-ws-part="language.trigger"],
+:root [data-ws-part="skin.menu"],
+:root [data-ws-part="language.menu"],
+:root [data-ws-part="skin.option"],
+:root [data-ws-part="language.option"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 10px;
+  background-color: var(--skin-kaak-surface);
+}
+
+:root [data-ws-part="skin.trigger"]:hover,
+:root [data-ws-part="skin.trigger"]:focus-visible,
+:root [data-ws-part="language.trigger"]:hover,
+:root [data-ws-part="language.trigger"]:focus-visible,
+:root [data-ws-part="skin.option"][aria-selected="true"],
+:root [data-ws-part="language.option"][aria-selected="true"] {
+  color: #ffffff;
+  border-color: rgba(132, 149, 255, .62);
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-part="control"]:focus-visible,
+[data-ws-part="voice.favorite-servers.server"]:focus-visible,
+[data-ws-part="voice.favorite-servers.strip.server"]:focus-visible,
+[data-ws-part="voice.channel-group.heading"]:focus-visible,
+[data-ws-part="voice.chat.tab"]:focus-visible,
+[data-ws-part="voice.audio-dock.microphone"] button:focus-visible,
+[data-ws-part="voice.audio-dock.output"] button:focus-visible {
+  outline: 2px solid var(--skin-kaak-accent);
+  outline-offset: 2px;
+}
+
+/* Connection page: a quiet dark entry surface, without discovery or store content. */
+:root [data-ws-part="home"] {
+  color: var(--skin-kaak-text);
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-part="home.header"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 16px;
+  background-color: rgba(23, 26, 34, .92);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .22);
+}
+
+[data-ws-part="home"] [data-ws-part="home.brand"],
+[data-ws-part="home"] [data-ws-part="home.hero.title"],
+[data-ws-part="home"] [data-ws-part="home.join-title"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="home"] [data-ws-part="home.hero.title"] em,
+[data-ws-part="home"] [data-ws-part="home.hero.eyebrow"],
+[data-ws-part="home"] [data-ws-part="home.brand"] strong {
+  color: var(--skin-kaak-accent);
+}
+
+[data-ws-part="home"] [data-ws-part="home.hero.description"],
+[data-ws-part="home"] [data-ws-part="home.join-description"],
+[data-ws-part="home"] [data-ws-part="home.brand"] small,
+[data-ws-part="home"] [data-ws-part="home.footer"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="home.feature"],
+[data-ws-part="home.visitors"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 13px;
+  background-color: rgba(29, 33, 43, .86);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025);
+}
+
+[data-ws-part="home"] [data-ws-part="home.feature"] b {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="home"] [data-ws-part="home.feature"] small {
+  color: var(--skin-kaak-muted);
+}
+
+:root [data-ws-part="home"] [data-ws-part="home.visitors"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  background-color: var(--skin-kaak-surface);
+  background-image: none;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+}
+
+:root [data-ws-part="home"] [data-ws-part="home.footer"] {
+  color: var(--skin-kaak-muted);
+  border-color: var(--skin-kaak-line);
+  background-color: transparent;
+}
+
+[data-ws-part="home.join-card"],
+[data-ws-part="home.identity-import-dialog"],
+[data-ws-part="home.community-dialog"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 18px;
+  background-color: var(--skin-kaak-sidebar);
+  box-shadow: var(--skin-kaak-shadow);
+}
+
+[data-ws-part="home.form"],
+[data-ws-part="home.identity"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="home.field"],
+[data-ws-part="home.server-target"],
+[data-ws-part="home.identity-import.textarea"],
+[data-ws-part="home.identity-import.drop-zone"],
+[data-ws-part="voice.member-panel.search"],
+[data-ws-part="voice.chat.composer"],
+[data-ws-part="voice.favorite-servers.dialog.input"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 9px;
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-part="home.field"]:focus-within,
+[data-ws-part="home.identity-import.textarea"]:focus-within,
+[data-ws-part="voice.member-panel.search"]:focus-within,
+[data-ws-part="voice.chat.composer"]:focus-within,
+[data-ws-part="voice.favorite-servers.dialog.input"]:focus-within {
+  border-color: rgba(132, 149, 255, .72);
+  box-shadow: 0 0 0 2px rgba(132, 149, 255, .12);
+}
+
+[data-ws-part="home.field"] input,
+[data-ws-part="home.field"] textarea,
+[data-ws-part="home.server-target"] input,
+[data-ws-part="home.identity-import.textarea"] textarea,
+[data-ws-part="voice.member-panel.search"] input,
+[data-ws-part="voice.chat.composer"] input,
+[data-ws-part="voice.favorite-servers.dialog.input"] input {
+  color: var(--skin-kaak-text);
+  background-color: transparent;
+}
+
+[data-ws-part="home.field"] input::placeholder,
+[data-ws-part="home.field"] textarea::placeholder,
+[data-ws-part="voice.member-panel.search"] input::placeholder,
+[data-ws-part="voice.chat.composer"] input::placeholder {
+  color: #7f899a;
+}
+
+[data-ws-part="home.connect"],
+[data-ws-part="home.identity-import.submit"],
+[data-ws-part="home.identity-import.file-button"] {
+  color: #111319;
+  border-color: var(--skin-kaak-accent);
+  border-radius: 10px;
+  background-color: var(--skin-kaak-accent);
+  box-shadow: 0 7px 20px rgba(91, 107, 205, .24);
+}
+
+[data-ws-part="home.connect"]:hover,
+[data-ws-part="home.identity-import.submit"]:hover,
+[data-ws-part="home.identity-import.file-button"]:hover {
+  color: #080a10;
+  background-color: #a5b0ff;
+}
+
+[data-ws-part="home.security-note"],
+[data-ws-part="home.notice"] {
+  color: var(--skin-kaak-muted);
+  border-color: var(--skin-kaak-line);
+  border-radius: 10px;
+  background-color: rgba(29, 33, 43, .8);
+}
+
+/* Voice shell: the existing quick-server rail and TeamSpeak channel tree form the left navigation. */
+[data-ws-part="voice.shell"] {
+  color: var(--skin-kaak-text);
+  background-color: var(--skin-kaak-page);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025);
+}
+
+[data-ws-part="voice.favorite-servers.rail"] {
+  color: var(--skin-kaak-muted);
+  border-color: #222630;
+  background-color: var(--skin-kaak-rail);
+}
+
+[data-ws-part="voice.favorite-servers.server"],
+[data-ws-part="voice.favorite-servers.add"],
+[data-ws-part="voice.favorite-servers.strip.server"],
+[data-ws-part="voice.favorite-servers.strip.add"] {
+  color: var(--skin-kaak-muted);
+  border-color: transparent;
+  border-radius: 13px;
+  background-color: #1a1d25;
+}
+
+[data-ws-part="voice.favorite-servers.server"]:hover,
+[data-ws-part="voice.favorite-servers.server"][data-ws-state="current"],
+[data-ws-part="voice.favorite-servers.strip.server"]:hover,
+[data-ws-part="voice.favorite-servers.strip.server"][data-ws-state="current"],
+[data-ws-part="voice.favorite-servers.add"]:hover,
+[data-ws-part="voice.favorite-servers.strip.add"]:hover {
+  color: #ffffff;
+  border-color: rgba(132, 149, 255, .55);
+  border-radius: 11px;
+  background-color: var(--skin-kaak-accent-soft);
+  box-shadow: 0 0 0 1px rgba(132, 149, 255, .12);
+}
+
+[data-ws-part="voice.favorite-servers.avatar"] {
+  color: #eef0ff;
+  border-radius: 11px;
+  background-color: #343b52;
+}
+
+[data-ws-part="voice.favorite-servers.tooltip"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 10px;
+  background-color: var(--skin-kaak-raised);
+  box-shadow: var(--skin-kaak-shadow);
+}
+
+[data-ws-part="voice.favorite-servers.favorite-toggle"],
+[data-ws-part="voice.favorite-servers.strip.favorite-toggle"],
+[data-ws-part="voice.favorite-servers.current-toggle"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.favorite-servers.favorite-toggle"][data-ws-state="saved"],
+[data-ws-part="voice.favorite-servers.strip.favorite-toggle"][data-ws-state="saved"],
+[data-ws-part="voice.favorite-servers.current-toggle"][data-ws-state="saved"] {
+  color: var(--skin-kaak-amber);
+}
+
+[data-ws-part="voice.member-panel"] {
+  color: var(--skin-kaak-text);
+  border-color: #282d38;
+  background-color: var(--skin-kaak-sidebar);
+}
+
+[data-ws-part="voice.member-panel.heading"],
+[data-ws-part="voice.member-panel.channels"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.member-panel.search"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025);
+}
+
+[data-ws-part="voice.channel-group"] {
+  color: var(--skin-kaak-muted);
+  border-color: rgba(112, 122, 146, .18);
+}
+
+[data-ws-part="voice.channel-group.heading"] {
+  color: var(--skin-kaak-muted);
+  border-color: transparent;
+  border-radius: 8px;
+  background-color: transparent;
+}
+
+[data-ws-part="voice.channel-group.heading"]:hover,
+[data-ws-part="voice.channel-group.heading"][data-ws-state="current"] {
+  color: #eef0ff;
+  border-color: rgba(132, 149, 255, .3);
+  background-color: var(--skin-kaak-accent-soft);
+  box-shadow: inset 2px 0 0 var(--skin-kaak-accent);
+}
+
+[data-ws-part="voice.channel-group.heading"] small {
+  color: #818b9e;
+}
+
+[data-ws-part="voice.channel-group.members"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.member-row"] {
+  color: var(--skin-kaak-muted);
+  border-color: transparent;
+  border-radius: 9px;
+  background-color: transparent;
+}
+
+[data-ws-part="voice.member-row"][data-ws-state="speaking"] {
+  color: var(--skin-kaak-text);
+  border-color: rgba(85, 214, 160, .28);
+  background-color: rgba(85, 214, 160, .08);
+  box-shadow: inset 2px 0 0 var(--skin-kaak-green);
+}
+
+[data-ws-part="voice.member-row.avatar"],
+[data-ws-part="voice.member.avatar"] {
+  color: #eef0ff;
+  border-radius: 50%;
+  background-color: #343b52;
+}
+
+[data-ws-part="voice.member-row.avatar"][data-ws-speaking="true"],
+[data-ws-part="voice.member.avatar"][data-ws-speaking="true"] {
+  outline: 2px solid var(--skin-kaak-green);
+  outline-offset: 2px;
+}
+
+[data-ws-part="voice.member-row.copy"],
+[data-ws-part="voice.member.name"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.member-row.copy"] span,
+[data-ws-part="voice.member.status"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.member-row.flags"],
+[data-ws-part="voice.member-row.volume"] {
+  color: #8791a2;
+  accent-color: var(--skin-kaak-accent);
+}
+
+/* Center workspace and voice/chat surfaces. */
+[data-ws-part="voice.workspace"] {
+  color: var(--skin-kaak-text);
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-part="voice.header"] {
+  color: var(--skin-kaak-text);
+  border-color: #292e39;
+  background-color: #151820;
+}
+
+[data-ws-part="voice.breadcrumbs"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.header-actions"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.favorite-servers.current-toggle"]:hover,
+[data-ws-part="voice.header-actions"] [data-ws-part="control"]:hover {
+  color: #ffffff;
+  border-color: rgba(132, 149, 255, .34);
+  border-radius: 8px;
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-part="voice.scroll"],
+[data-ws-part="voice.content"] {
+  color: var(--skin-kaak-text);
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-part="voice.activity"],
+[data-ws-part="voice.chat"] {
+  color: var(--skin-kaak-text);
+  border-color: #2c3240;
+  border-radius: 15px;
+  background-color: var(--skin-kaak-sidebar);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .16);
+}
+
+[data-ws-part="voice.activity-heading"],
+[data-ws-part="voice.chat.heading"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.activity-heading"] {
+  border-color: rgba(132, 149, 255, .3);
+}
+
+[data-ws-part="voice.chat.tabs"] {
+  color: var(--skin-kaak-muted);
+  border-color: #2d3340;
+  background-color: #171a22;
+}
+
+[data-ws-part="voice.chat.tab"] {
+  color: var(--skin-kaak-muted);
+  border-color: transparent;
+  border-radius: 8px;
+  background-color: transparent;
+}
+
+[data-ws-part="voice.chat.tab"]:hover,
+[data-ws-part="voice.chat.tab"][data-ws-state="active"] {
+  color: #f1f2ff;
+  border-color: rgba(132, 149, 255, .35);
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-part="voice.chat.messages"] {
+  color: var(--skin-kaak-text);
+  background-color: #171a22;
+}
+
+[data-ws-part="voice.chat.message"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.chat.message-avatar"] {
+  color: #eef0ff;
+  border-radius: 50%;
+  background-color: #343b52;
+}
+
+[data-ws-part="voice.chat.message-body"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.chat.message-bubble"] {
+  color: var(--skin-kaak-text);
+  border-color: #303644;
+  border-radius: 12px;
+  background-color: #252a35;
+}
+
+[data-ws-part="voice.chat.message"][data-ws-state="mine"] [data-ws-part="voice.chat.message-bubble"] {
+  color: #f2f3ff;
+  border-color: rgba(132, 149, 255, .28);
+  background-color: rgba(77, 90, 159, .28);
+}
+
+[data-ws-part="voice.chat.empty"] {
+  color: var(--skin-kaak-muted);
+  border-color: #303644;
+  border-radius: 13px;
+  background-color: #1a1e27;
+}
+
+[data-ws-part="voice.chat.composer"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .025);
+}
+
+[data-ws-part="voice.chat.composer"] input {
+  color: var(--skin-kaak-text);
+  background-color: transparent;
+}
+
+[data-ws-part="voice.chat.composer"] input::placeholder {
+  color: #7f899a;
+}
+
+[data-ws-part="voice.audio-dock"] {
+  color: var(--skin-kaak-text);
+  border-color: #303644;
+  border-radius: 14px;
+  background-color: #191d26;
+  box-shadow: var(--skin-kaak-shadow);
+}
+
+[data-ws-part="voice.audio-dock.microphone"] button,
+[data-ws-part="voice.audio-dock.output"] button {
+  color: #e1e5ef;
+  border-color: #3b4252;
+  border-radius: 10px;
+  background-color: #262b36;
+}
+
+[data-ws-part="voice.audio-dock.microphone"] button:hover,
+[data-ws-part="voice.audio-dock.output"] button:hover {
+  color: #ffffff;
+  border-color: rgba(132, 149, 255, .5);
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-part="voice.audio-dock.microphone"] button[aria-pressed="false"] {
+  color: #ffffff;
+  border-color: rgba(240, 119, 131, .58);
+  background-color: rgba(240, 119, 131, .16);
+}
+
+[data-ws-part="voice.audio-dock.microphone-panel"],
+[data-ws-part="voice.audio-dock.output-panel"],
+[data-ws-part="voice.audio-settings"],
+[data-ws-part="voice.favorite-servers.dialog"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 12px;
+  background-color: var(--skin-kaak-raised);
+  box-shadow: var(--skin-kaak-shadow);
+}
+
+[data-ws-part="voice.audio-dock.microphone-panel"] input,
+[data-ws-part="voice.audio-dock.output-panel"] input,
+[data-ws-part="voice.member-row.volume"] input,
+[data-ws-part="voice.screen-player.volume"] input {
+  accent-color: var(--skin-kaak-accent);
+}
+
+[data-ws-part="voice.connection-status"] {
+  color: #ffe0e2;
+  border-color: rgba(240, 119, 131, .36);
+  border-radius: 10px;
+  background-color: rgba(108, 39, 49, .32);
+}
+
+[data-ws-part="voice.audio-status"],
+[data-ws-part="voice.favorite-servers.switch-status"] {
+  color: #fff1d3;
+  border-color: rgba(232, 184, 102, .32);
+  border-radius: 10px;
+  background-color: rgba(91, 69, 35, .28);
+}
+
+[data-ws-part="voice.screen-share-error"] {
+  color: #ffe0e2;
+  border-color: rgba(240, 119, 131, .36);
+  border-radius: 9px;
+  background-color: rgba(108, 39, 49, .32);
+}
+
+[data-ws-part="voice.members.empty"],
+[data-ws-part="voice.member-panel.channels"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.member"][data-ws-state="speaking"] {
+  border-color: rgba(85, 214, 160, .5);
+  border-radius: 14px;
+  background-color: rgba(85, 214, 160, .08);
+  box-shadow: 0 0 0 1px rgba(85, 214, 160, .08), 0 10px 28px rgba(0, 0, 0, .18);
+}
+
+[data-ws-part="voice.member"][data-ws-state="self"] {
+  border-color: rgba(132, 149, 255, .34);
+  border-radius: 14px;
+  background-color: rgba(132, 149, 255, .08);
+}
+
+[data-ws-part="voice.member.status"],
+[data-ws-part="voice.member-row.volume"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="voice.member.share-actions"],
+[data-ws-part="voice.member.stop-share"],
+[data-ws-part="voice.screen-player.controls"],
+[data-ws-part="voice.whisper-strip"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 10px;
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="voice.screen-player"] {
+  color: var(--skin-kaak-text);
+  border-color: #3b4252;
+  border-radius: 15px;
+  background-color: #090b10;
+  box-shadow: var(--skin-kaak-shadow);
+}
+
+[data-ws-part="voice.screen-player.stage"],
+[data-ws-part="voice.screen-player.placeholder"] {
+  color: var(--skin-kaak-muted);
+  border-color: #303644;
+  border-radius: 11px;
+  background-color: #11141b;
+}
+
+[data-ws-part="voice.screen-player.live"] {
+  color: var(--skin-kaak-green);
+}
+
+[data-ws-part="voice.screen-player.source"],
+[data-ws-part="voice.screen-player.viewers"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="voice.screen-player.exit"] {
+  color: #ffffff;
+  border-color: rgba(240, 119, 131, .45);
+  border-radius: 8px;
+  background-color: rgba(108, 39, 49, .7);
+}
+
+/* Demo page uses the same public palette without importing KOOK service features. */
+[data-ws-part="demo.header"],
+[data-ws-part="demo.channels"],
+[data-ws-part="demo.chat.heading"],
+[data-ws-part="demo.chat.messages"],
+[data-ws-part="demo.actions"],
+[data-ws-part="demo.user"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 12px;
+  background-color: var(--skin-kaak-sidebar);
+}
+
+[data-ws-part="demo.main"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 12px;
+  background-color: var(--skin-kaak-sidebar);
+}
+
+[data-ws-part="demo.brand"],
+[data-ws-part="demo.hero.title"],
+[data-ws-part="demo.channels.heading"],
+[data-ws-part="demo.actions.heading"],
+[data-ws-part="demo.voice-heading"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="demo.header"] [data-ws-part="demo.brand"] strong,
+[data-ws-part="demo.channels"] [data-ws-part="demo.channels.heading"] strong,
+[data-ws-part="demo.actions"] [data-ws-part="demo.actions.heading"] strong,
+[data-ws-part="demo.main"] [data-ws-part="demo.voice-heading"] strong,
+[data-ws-part="demo.main"] [data-ws-part="demo.chat.heading"] strong,
+[data-ws-part="demo.voice-card"] [data-ws-part="demo.member-name"] {
+  color: var(--skin-kaak-text);
+}
+
+[data-ws-part="demo.header"] [data-ws-part="demo.brand"] small,
+[data-ws-part="demo.channels"] [data-ws-part="demo.channels.heading"] span,
+[data-ws-part="demo.actions"] [data-ws-part="demo.actions.heading"] span,
+[data-ws-part="demo.main"] [data-ws-part="demo.voice-heading"] span,
+[data-ws-part="demo.main"] [data-ws-part="demo.chat.heading"] span,
+[data-ws-part="demo.voice-card"] [data-ws-part="demo.member-status"],
+[data-ws-part="demo.header"] [data-ws-part="demo.header-tools"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.badge"],
+[data-ws-part="demo.live"],
+[data-ws-part="demo.hero.online"] {
+  color: var(--skin-kaak-green);
+}
+
+[data-ws-part="demo.hero"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 11px;
+  background: linear-gradient(112deg, #222a38, #1a252c);
+}
+
+[data-ws-part="demo.hero.description"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.wave"] i {
+  background-color: var(--skin-kaak-accent);
+}
+
+[data-ws-part="demo.wave"] i:nth-child(3n) {
+  background-color: var(--skin-kaak-green);
+}
+
+[data-ws-part="demo.channel"],
+[data-ws-part="demo.voice-card"],
+[data-ws-part="demo.chat.message"],
+[data-ws-part="demo.chat.empty"],
+[data-ws-part="demo.note"] {
+  color: var(--skin-kaak-text);
+  border-color: #303644;
+  border-radius: 10px;
+  background-color: var(--skin-kaak-surface);
+}
+
+[data-ws-part="demo.channel"] [data-ws-part="demo.channel.select"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.channel"] [data-ws-part="demo.channel.select"] small,
+[data-ws-part="demo.channels"] [data-ws-part="demo.channel.members"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.channel.members"] span {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.channel.members"] i,
+[data-ws-part="demo.avatar"] {
+  color: #ffffff;
+}
+
+[data-ws-part="demo.channel"][data-ws-state="active"],
+[data-ws-part="demo.voice-card"][data-ws-state="speaking"] {
+  border-color: rgba(132, 149, 255, .5);
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-part="demo.chat.messages"] [data-ws-part="demo.chat.message"] small {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.chat.messages"] [data-ws-part="demo.chat.message"] p {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="demo.chat.messages"] [data-ws-part="demo.chat.message"][data-ws-state="mine"] p {
+  color: #ffffff;
+  background-color: #4653a1;
+}
+
+[data-ws-part="demo.chat.composer"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 9px;
+  background-color: var(--skin-kaak-page);
+}
+
+[data-ws-part="demo.chat.composer"] [data-ws-part="demo.chat.input"] {
+  color: var(--skin-kaak-text);
+  background-color: transparent;
+}
+
+[data-ws-part="demo.chat.composer"] [data-ws-part="demo.chat.input"]::placeholder {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.chat.send"] {
+  color: #ffffff;
+  border-color: var(--skin-kaak-accent);
+  background-color: var(--skin-kaak-accent);
+}
+
+[data-ws-part="demo.header-tools"] [data-ws-part="demo.home-link"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="demo.reconnect"] {
+  color: #ffe7b9;
+  border-color: rgba(232, 184, 102, .32);
+  background-color: rgba(91, 69, 35, .35);
+}
+
+[data-ws-part="demo.reconnect.restore"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="demo.user"] {
+  border-color: var(--skin-kaak-line);
+}
+
+[data-ws-part="demo.actions"] [data-ws-part="demo.user"] small {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.poke-notification"] {
+  color: var(--skin-kaak-text);
+  border-color: rgba(232, 184, 102, .32);
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="demo.poke.dismiss"] {
+  color: var(--skin-kaak-muted);
+}
+
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.poke"],
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.reconnect"],
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.speaking"],
+[data-ws-part="demo.chat.tabs"] [data-ws-part="demo.chat.tab"],
+[data-ws-part="demo.chat.send"] {
+  color: var(--skin-kaak-text);
+  border-color: var(--skin-kaak-line);
+  border-radius: 9px;
+  background-color: var(--skin-kaak-raised);
+}
+
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.poke"]:hover,
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.reconnect"]:hover,
+[data-ws-part="demo.actions"] [data-ws-part="demo.action.speaking"]:hover,
+[data-ws-part="demo.chat.tabs"] [data-ws-part="demo.chat.tab"][data-ws-state="active"] {
+  color: #ffffff;
+  border-color: rgba(132, 149, 255, .5);
+  background-color: var(--skin-kaak-accent-soft);
+}
+
+/* Open-skin example: a declarative room sidebar replaces the host channel tree on desktop. */
+@media (min-width: 981px) {
+  [data-ws-page="voice"] [data-ws-part="voice.member-panel.heading"],
+  [data-ws-page="voice"] [data-ws-part="voice.member-panel.search"],
+  [data-ws-page="voice"] [data-ws-part="voice.member-panel.channels"] {
+    display: none;
+  }
+
+  [data-ws-page="voice"] .ws-plugin-component[data-ws-plugin-part="kaak-room-sidebar"] {
+    position: fixed;
+    z-index: 18;
+    top: 0;
+    bottom: 94px;
+    left: 68px;
+    width: 318px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 22px 15px 16px;
+    color: var(--skin-kaak-text);
+    border-right: 1px solid var(--skin-kaak-line);
+    background: linear-gradient(180deg, rgba(27, 30, 40, .99), rgba(19, 22, 30, .99));
+    scrollbar-color: #3d4352 transparent;
+    scrollbar-width: thin;
+  }
+
+  [data-ws-page="voice"] [data-ws-part="voice.audio-dock"] {
+    position: fixed;
+    z-index: 22;
+    bottom: 12px;
+    left: 80px;
+    width: 294px;
+  }
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.heading"] {
+  display: grid;
+  gap: 5px;
+  margin: 0 4px 18px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--skin-kaak-line);
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.eyebrow"] {
+  color: var(--skin-kaak-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-title"] {
+  margin: 0;
+  color: var(--skin-kaak-text);
+  font-size: 16px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channels"] {
+  display: grid;
+  gap: 5px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-row"] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  color: var(--skin-kaak-muted);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-row"]:hover,
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-row"][aria-pressed="true"] {
+  color: #f5f6ff;
+  border-color: rgba(132, 149, 255, .28);
+  background: var(--skin-kaak-accent-soft);
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-name"] {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-count"] {
+  color: var(--skin-kaak-muted);
+  font-size: 11px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.members"] {
+  margin-top: 24px;
+  padding-top: 15px;
+  border-top: 1px solid var(--skin-kaak-line);
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.member-title"] {
+  margin: 0 4px 10px;
+  color: var(--skin-kaak-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.member-list"] {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.member-row"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 5px 9px;
+  color: var(--skin-kaak-text);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .025);
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.member-name"] {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.speaking-indicator"] {
+  color: var(--skin-kaak-green);
+  font-size: 10px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-room-sidebar.channel-row"]:focus-visible {
+  outline: 2px solid var(--skin-kaak-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 980px) {
+  [data-ws-page="voice"] .ws-plugin-component[data-ws-plugin-part="kaak-room-sidebar"] {
+    display: none;
+  }
+}

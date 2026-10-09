@@ -1,5 +1,15 @@
 <template>
   <div :class="['demo-page', 'ws-skin-root', { 'skin-initializing': !skinReady }]" :lang="language" data-ws-part="app" data-ws-page="demo">
+    <SkinPluginOutlet
+      v-if="activeSkin?.pluginData"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :document="activeSkin.pluginData"
+      page="demo"
+      :data="skinPluginContext"
+      :assets="activeSkin.assets"
+      :actions="skinPluginActions"
+    />
     <header class="demo-header" data-ws-part="demo.header">
       <div class="demo-brand" data-ws-part="demo.brand"><span><Icon name="waveform" :size="21" /></span><div><strong>WebSpeak</strong><small>{{ copy.browserClient }}</small></div></div>
       <div class="demo-tools" data-ws-part="demo.header-tools"><span class="demo-badge" data-ws-part="demo.badge">{{ copy.demoBadge }}</span><SkinSwitcher v-model="activeSkinId" data-ws-part="demo.skin-switcher" :menu-label="copy.skinSelector" :options="skinOptions" @change="onSkinChange" /><LanguageSwitcher v-model="language" data-ws-part="demo.language-switcher" :menu-label="copy.languageMenu" @change="persistLanguage" /><a href="/" data-ws-part="demo.home-link">{{ copy.back }}</a></div>
@@ -53,6 +63,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
+import "../styles/skin-plugin.css";
+import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
@@ -125,6 +137,35 @@ function toggleSpeaking() { speakingId.value = speakingId.value ? "" : selectedC
 function messageText(message: DemoMessage): string { return language.value === "zh" ? message.zhText ?? message.text : language.value === "ru" ? message.ruText ?? message.enText ?? message.text : language.value === "ja" ? message.jaText ?? message.enText ?? message.text : message.enText ?? message.text; }
 function sendMessage() { const text = draft.value.trim(); if (!text) return; messages.value.push({ id: Date.now(), author: "illusia", time: "now", text, mine: true }); draft.value = ""; }
 function avatarStyle(name: string) { let hash = 0; for (const char of name) hash = char.charCodeAt(0) + ((hash << 5) - hash); const colors = ["#168f83", "#7b9ed0", "#b99070", "#8b78b9"]; return { background: colors[Math.abs(hash) % colors.length] }; }
+
+const skinPluginContext = computed(() => ({
+  session: {
+    status: { connected: true, connecting: false, channelId: selectedChannel.value.id, channelName: selectedChannel.value.name, userName: "illusia" },
+    channels: channels.map((channel, depth) => ({ id: channel.id, name: channel.name, parentId: "", depth, memberCount: channel.members.length, current: channel.id === selectedChannel.value.id })),
+    members: selectedChannel.value.members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      channelId: selectedChannel.value.id,
+      status: member.id === speakingId.value ? "speaking" : "online",
+      speaking: member.id === speakingId.value,
+      self: member.id === "illusia",
+    })),
+  },
+  favorites: { items: [] },
+  chat: { messages: visibleMessages.value.map((message) => ({ id: String(message.id), author: message.author, text: messageText(message), time: message.time, kind: message.mine ? "self" : "message", channelId: selectedChannel.value.id })) },
+}));
+
+const skinPluginActions = {
+  "voice.joinChannel": (args: Record<string, string | number | boolean>) => {
+    if (typeof args.channelId === "string" && channels.some((channel) => channel.id === args.channelId)) selectChannel(args.channelId);
+  },
+  "favorites.switch": (_args: Record<string, string | number | boolean>) => undefined,
+  "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
+    if (typeof args.text !== "string" || args.text.length > 1000) return;
+    draft.value = args.text;
+    sendMessage();
+  },
+};
 </script>
 
 <style scoped>

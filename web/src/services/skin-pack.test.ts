@@ -4,6 +4,7 @@ import test from "node:test";
 import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
+import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 
 const manifest = {
   schemaVersion: 1,
@@ -127,18 +128,19 @@ test("skin content supports localized interface message overrides and includes t
   assert.ok(skin.assets["assets/preview.png"]);
 });
 
-test("the ILLUSIA v2 example and bundled package import without replacing WebSpeak's base translations", async () => {
+test("the ILLUSIA v3 example and bundled package import without replacing WebSpeak's base translations", async () => {
   const exampleBytes = await readFile(new URL("../../../docs/examples/illusia-voice.wskin", import.meta.url));
   const bundledBytes = await readFile(new URL("../../public/skins/illusia-voice.wskin", import.meta.url));
   assert.deepEqual(bundledBytes, exampleBytes);
   const skin = await importSkinPack(new File([exampleBytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "1.0.29");
-  assert.equal(skin.schemaVersion, 2);
-  assert.equal(skin.packageType, "layout-skin");
-  assert.deepEqual(skin.permissions, []);
-  assert.deepEqual(skin.layoutData, { schemaVersion: 1, pages: {} });
+  assert.equal(skin.version, "2.0.0");
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.layoutData, undefined);
+  assert.equal(skin.pluginData?.components[0].id, "illusia-now-playing");
+  assert.deepEqual(skin.pluginData?.components[0].permissions, ["session.status.read"]);
   assert.equal(skin.minAppVersion, "0.2.7-preview");
   assert.equal(skin.contentData, undefined);
   assert.equal(skin.previewBlob?.type, "image/webp");
@@ -160,6 +162,7 @@ test("the ILLUSIA v2 example and bundled package import without replacing WebSpe
   assert.match(skin.css, /language\.option/);
   assert.match(skin.css, /data-ws-skin-id="community\.illusia-voice"/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.rail"/);
+  assert.match(skin.css, /data-ws-plugin-part="illusia-now-playing\.channel-name"/);
   assert.match(skin.css, /data-ws-part="home\.server-history\.item"/);
   assert.match(skin.css, /data-ws-part="home\.server-history\.favorite-toggle"\]\[data-ws-state="saved"\]/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.favorite-toggle"\]\[data-ws-state="saved"\]/);
@@ -191,7 +194,8 @@ test("the ILLUSIA v2 example and bundled package import without replacing WebSpe
   assert.match(skin.css, /@media \(max-width: 1100px\)[\s\S]*?voice\.chat\.empty[^{}]*\{[^}]*background-position:\s*0 0, right 8px center, center, center 8px;[^}]*background-size:\s*22px 22px, 260px 220px, cover, min\(300px, 66vw\) auto/s);
   assert.match(skin.css, /@media \(max-width: 1100px\)[\s\S]*?voice\.chat\.empty[^{}]*data-ws-state="messages-empty"[^{}]*\{[^}]*background-position:\s*0 0, right center, center, center 8px;[^}]*background-size:\s*22px 22px, 260px 220px, cover, min\(300px, 66vw\) auto/s);
   assert.doesNotMatch(skin.css, /data-ws-state="messages-empty"[^{}]*\{[^}]*color: transparent/s);
-  assert.doesNotMatch(skin.css, /(?:^|[;{\s])(?:position|inset|top|right|bottom|left|width|height|min-height|padding|z-index|transform)\s*:/);
+  assert.match(skin.css, /illusia-now-playing[^{}]*\{[^}]*position:\s*fixed/);
+  assert.match(skin.css, /illusia-now-playing[^{}]*\{[^}]*background-image:[^;]*assets%2Fbanner-mascot-blob\.webp/);
   assert.doesNotMatch(skin.css, /\[data-ws-part="home\.join-card"\]\s*\{[^}]*animation:/);
   assert.doesNotMatch(skin.css, /\[data-ws-part="home\.join-card"\]\s*\{\s*animation: none;/);
   assert.match(skin.css, /home\.footer[\s\S]*?footer-wave\.png/);
@@ -289,6 +293,54 @@ test("schema version 2 skin packages load only validated declarative layouts wit
   );
 });
 
+test("schema version 3 supports arbitrary public layouts and validated declarative plugin components", async () => {
+  const components = {
+    schemaVersion: 1,
+    components: [{
+      id: "channel-list",
+      name: "Channel list",
+      page: "voice",
+      accessibleName: "TeamSpeak channels",
+      permissions: ["session.channels.read", "session.channel.join"],
+      actions: { join: { type: "voice.joinChannel", args: { channelId: "{{channel.id}}" } } },
+      root: {
+        tag: "nav",
+        repeat: { path: "session.channels", as: "channel" },
+        children: [{ tag: "button", part: "row", events: { dblclick: "join" }, children: [{ text: "{{channel.name}}" }] }],
+      },
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV3(components, `
+    [data-ws-part="voice.channel-group"] { display: none; }
+    .channel-row[data-ws-plugin-part="channel-list.row"] { position: fixed; inset: 10px; width: 240px; order: 1; }
+  `));
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.pluginData?.components[0].id, "channel-list");
+  assert.equal(skin.pluginData?.components[0].root.children?.[0].events?.dblclick, "join");
+  assert.match(skin.css, /position: fixed/);
+  assert.match(skin.css, /display: none/);
+  assert.ok(skin.warnings.some((warning) => warning.includes("hides an interface part")));
+
+  const unsafe = structuredClone(components) as typeof components;
+  unsafe.components[0].permissions = ["network.fetch"];
+  await assert.rejects(importSkinPack(makeSkinV3(unsafe, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_INVALID");
+  await assert.rejects(importSkinPack(makeSkinV3({ schemaVersion: 1, components: [] }, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_INVALID");
+  const missingAsset = structuredClone(components) as unknown as SkinPluginDocument;
+  missingAsset.components[0].root = { tag: "img", asset: "assets/missing.webp" };
+  await assert.rejects(importSkinPack(makeSkinV3(missingAsset, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_ASSET_INVALID");
+});
+
+test("the distributable KAAK v3 package validates end to end", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/kaak-voice.wskin", import.meta.url));
+  const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.kaak-voice");
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.pluginData?.components[0].id, "kaak-room-sidebar");
+  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-room-sidebar.channel-row"'));
+});
+
 function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = {}): File {
   const packageFiles: Record<string, Uint8Array> = {
     "manifest.json": strToU8(JSON.stringify({
@@ -304,4 +356,15 @@ function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = 
   };
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin-v2.wskin", { type: "application/octet-stream" });
+}
+
+function makeSkinV3(components: unknown, css: string, assets: Record<string, Uint8Array> = {}): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 3, packageType: "open-skin", components: "components.json" })),
+    "skin.css": strToU8(css),
+    "components.json": strToU8(JSON.stringify(components)),
+    ...assets,
+  };
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v3.wskin", { type: "application/octet-stream" });
 }

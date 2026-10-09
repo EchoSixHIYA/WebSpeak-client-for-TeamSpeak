@@ -134,6 +134,49 @@ test("server accepts validated declarative v2 layouts and rejects permissions or
   await assert.rejects(registry.save(unknownComponentArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_LAYOUT_INVALID");
 });
 
+test("server accepts v3 declarative components and rejects unapproved capability declarations", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-v3-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const manifestV3 = {
+    ...manifest,
+    schemaVersion: 3,
+    packageType: "open-skin",
+    content: undefined,
+    preview: undefined,
+    components: "components.json",
+  };
+  const components = {
+    schemaVersion: 1,
+    components: [{
+      id: "channels",
+      name: "Channels",
+      page: "voice",
+      accessibleName: "TeamSpeak channels",
+      permissions: ["session.channels.read", "session.channel.join"],
+      actions: { join: { type: "voice.joinChannel", args: { channelId: "{{channel.id}}" } } },
+      root: { tag: "nav", repeat: { path: "session.channels", as: "channel" }, children: [{ tag: "button", events: { dblclick: "join" }, children: [{ text: "{{channel.name}}" }] }] },
+    }],
+  };
+  const archive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV3))],
+    ["skin.css", Buffer.from('[data-ws-part="voice.channel-group"] { display: none; }')],
+    ["components.json", Buffer.from(JSON.stringify(components))],
+  ]);
+  const saved = await registry.save(archive, "sample-skin");
+  assert.equal(saved.id, "sample-skin");
+  assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+
+  const unapproved = structuredClone(components) as typeof components;
+  unapproved.components[0].permissions = ["network.fetch"];
+  const unsafeArchive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV3))],
+    ["skin.css", Buffer.from("[data-ws-part=app] { color: red; }")],
+    ["components.json", Buffer.from(JSON.stringify(unapproved))],
+  ]);
+  await assert.rejects(registry.save(unsafeArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_PLUGIN_INVALID");
+});
+
 test("skin registry rejects path traversal and mismatched local ZIP headers", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-invalid-"));
   context.after(() => rm(directory, { recursive: true, force: true }));

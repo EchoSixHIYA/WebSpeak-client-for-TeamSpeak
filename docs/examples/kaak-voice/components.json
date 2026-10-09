@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "id": "kaak-room-sidebar",
+      "name": "KAAK 频道侧栏 / channel sidebar",
+      "page": "voice",
+      "accessibleName": "频道与在线成员 / Channels and online members",
+      "permissions": [
+        "session.channels.read",
+        "session.members.read",
+        "session.channel.join"
+      ],
+      "actions": {
+        "join-channel": {
+          "type": "voice.joinChannel",
+          "args": {
+            "channelId": "{{channel.id}}"
+          }
+        }
+      },
+      "root": {
+        "tag": "aside",
+        "part": "panel",
+        "className": "kaak-room-sidebar",
+        "children": [
+          {
+            "tag": "header",
+            "part": "heading",
+            "className": "kaak-sidebar-heading",
+            "children": [
+              { "tag": "small", "part": "eyebrow", "children": [{ "text": "KAAK · VOICE SPACE" }] },
+              { "tag": "h2", "part": "channel-title", "children": [{ "text": "频道 / Channels" }] }
+            ]
+          },
+          {
+            "tag": "nav",
+            "part": "channels",
+            "attributes": { "aria-label": "语音频道 / Voice channels" },
+            "children": [
+              {
+                "tag": "div",
+                "part": "channel-item",
+                "repeat": { "path": "session.channels", "as": "channel" },
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "channel-row",
+                    "className": "kaak-channel-row",
+                    "attributes": {
+                      "type": "button",
+                      "aria-pressed": "{{channel.current}}",
+                      "aria-label": "双击加入 / Double-click to join {{channel.name}}"
+                    },
+                    "events": {
+                      "dblclick": "join-channel",
+                      "keydown": "join-channel"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "channel-name",
+                        "className": "kaak-channel-name",
+                        "children": [{ "text": "{{channel.name}}" }]
+                      },
+                      {
+                        "tag": "small",
+                        "part": "channel-count",
+                        "className": "kaak-channel-count",
+                        "children": [{ "text": "{{channel.memberCount}}" }]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "members",
+            "className": "kaak-member-section",
+            "children": [
+              {
+                "tag": "h3",
+                "part": "member-title",
+                "className": "kaak-member-title",
+                "children": [{ "text": "在线成员 / Members" }]
+              },
+              {
+                "tag": "ul",
+                "part": "member-list",
+                "className": "kaak-member-list",
+                "children": [
+                  {
+                    "tag": "li",
+                    "part": "member-row",
+                    "className": "kaak-member-row",
+                    "repeat": { "path": "session.members", "as": "member" },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "member-name",
+                        "className": "kaak-member-name",
+                        "children": [{ "text": "{{member.name}}" }]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "speaking-indicator",
+                        "className": "kaak-speaking-indicator",
+                        "when": { "path": "member.speaking", "equals": true },
+                        "attributes": { "aria-label": "正在说话 / Speaking" },
+                        "children": [{ "text": "说话中 / speaking" }]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
