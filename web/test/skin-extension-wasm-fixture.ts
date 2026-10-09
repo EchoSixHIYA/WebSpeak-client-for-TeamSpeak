@@ -96,6 +96,40 @@ export function createSkinExtensionWasmUiOutputProbe(output = '{"type":"root"}',
   ]);
 }
 
+/** Reads the host-provided bounded local state/event JSON once and echoes it through UI output. */
+export function createSkinExtensionWasmUiInputProbe(readTwice = false): Uint8Array {
+  const readInput = [
+    0x41, 0,
+    0x41, ...signedLeb128(8 * 1024),
+    0x10, 0,
+  ];
+  const body = [
+    1, 1, 0x7f, // one i32 local for input length
+    ...readInput,
+    0x21, 0, // local.set 0
+    ...(readTwice ? [...readInput, 0x1a] : []),
+    0x41, 0,
+    0x20, 0,
+    0x10, 1, // ui_emit_json(0, input_length)
+    0x1a,
+    0x41, 7,
+    0x0b,
+  ];
+  return Uint8Array.from([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+    ...section(1, [2, 0x60, 2, 0x7f, 0x7f, 1, 0x7f, 0x60, 0, 1, 0x7f]),
+    ...section(2, [
+      3,
+      ...name("env"), ...name("memory"), 0x02, 0x01, 1, 64,
+      ...name("env"), ...name("ui_input_read"), 0x00, 0,
+      ...name("env"), ...name("ui_emit_json"), 0x00, 0,
+    ]),
+    ...section(3, [1, 1]),
+    ...section(7, [1, ...name("run"), 0, 2]),
+    ...section(10, [1, body.length, ...body]),
+  ]);
+}
+
 /** Tries to alter the copied snapshot before returning; host results must remain host-owned. */
 export function createSkinExtensionWasmStatusMutationProbe(): Uint8Array {
   return singleRunModule([1, 1, 0x7f, 0x41, 0x00, 0x41, 0x80, 0x02, 0x10, 0x00,

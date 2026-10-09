@@ -22,7 +22,7 @@ const WASM_HEADER = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00] as const;
 const SCALAR_VALUE_TYPES = new Set([0x7f, 0x7e, 0x7d, 0x7c]);
 const BOUNDED_VECTOR_COUNTS = new Map<number, number>([
   [1, 128], // types
-  [2, 3], // memory, one optional capability import, and one optional UI output import
+  [2, 4], // memory, one optional capability, one UI input, and one UI output import
   [3, SKIN_EXTENSION_WASM_FUNCTION_LIMIT],
   [6, 128], // globals
   [7, 64], // exports; the runner later requires exactly run
@@ -313,6 +313,7 @@ export function validateSkinExtensionWasmBytes(source: Uint8Array): void {
 
 export interface SkinExtensionWasmModuleMetadata {
   usesSessionStatus: boolean;
+  usesUiInput: boolean;
   usesUiOutput: boolean;
   memoryMaximumPages: number;
 }
@@ -364,6 +365,7 @@ export function validateSkinExtensionWasmImportsAndExports(
   let memoryMaximumPages = SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES;
   let hasMemory = false;
   let usesSessionStatus = false;
+  let usesUiInput = false;
   let usesUiOutput = false;
   let hasExports = false;
 
@@ -376,8 +378,8 @@ export function validateSkinExtensionWasmImportsAndExports(
 
     if (sectionId === 2) {
       const count = readU32(bytes, offset, end);
-      if (count.value < 1 || count.value > 3) {
-        throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module must import one host memory and may import one capability and one UI output function.");
+      if (count.value < 1 || count.value > 4) {
+        throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module must import one host memory and may import the bounded status, UI input, and UI output functions.");
       }
       let cursor = count.next;
       for (let index = 0; index < count.value; index += 1) {
@@ -393,6 +395,8 @@ export function validateSkinExtensionWasmImportsAndExports(
           cursor = typeIndex.next;
           if (fieldName.value === "session_status_read" && !usesSessionStatus) {
             usesSessionStatus = true;
+          } else if (fieldName.value === "ui_input_read" && !usesUiInput) {
+            usesUiInput = true;
           } else if (fieldName.value === "ui_emit_json" && !usesUiOutput) {
             usesUiOutput = true;
           } else {
@@ -441,5 +445,5 @@ export function validateSkinExtensionWasmImportsAndExports(
   if (usesSessionStatus && !grantedPermissions.includes("session.status.read")) {
     throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_PERMISSION_INVALID", "The module imports session status without an approved session.status.read capability.");
   }
-  return { usesSessionStatus, usesUiOutput, memoryMaximumPages };
+  return { usesSessionStatus, usesUiInput, usesUiOutput, memoryMaximumPages };
 }

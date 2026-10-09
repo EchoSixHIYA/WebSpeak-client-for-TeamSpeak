@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSSRApp } from "vue";
+import { createRenderer, createSSRApp, nextTick } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import {
@@ -77,6 +77,126 @@ test("generated UI supports broad safe markup, ARIA/data attributes, and inert c
   assert.equal(document.components[0].root.tag, "kook-server-rail");
   assert.equal(document.components[0].root.children?.[0].tag, "a");
   assert.equal(document.components[0].root.children?.[1].tag, "button");
+});
+
+test("generated UI schema 5 carries bounded state and named callbacks for a trusted host event loop", () => {
+  const source = JSON.stringify({
+    schemaVersion: 5,
+    components: [{
+      id: "server-rail",
+      name: "Server rail",
+      page: "voice",
+      accessibleName: "Saved voice servers",
+      state: { expanded: false, selected: "home" },
+      root: {
+        tag: "nav",
+        children: [{
+          tag: "button",
+          attributes: { type: "button", "aria-pressed": false },
+          events: { click: "select-server" },
+          children: [{ text: "Home" }],
+        }],
+      },
+    }],
+  });
+  const document = parseSkinExtensionUiOutput(source);
+  const component = document.components[0];
+  assert.equal(component.runtimeCallbacks, true);
+  assert.deepEqual({ ...component.state }, { expanded: false, selected: "home" });
+  assert.equal(component.root.children?.[0].events?.click, "select-server");
+});
+
+test("generated UI callbacks reject unsupported events, malformed IDs, and password inputs", () => {
+  const schema5 = (root: Record<string, unknown>) => JSON.stringify({
+    schemaVersion: 5,
+    components: [{ id: "runtime-ui", name: "Runtime UI", page: "voice", accessibleName: "Runtime UI", root }],
+  });
+  expectOutputError(schema5({ tag: "button", events: { animationstart: "run" } }), "SKIN_EXTENSION_UI_OUTPUT_SCHEMA");
+  expectOutputError(schema5({ tag: "button", events: { click: "../run" } }), "SKIN_EXTENSION_UI_OUTPUT_SCHEMA");
+  expectOutputError(schema5({ tag: "input", attributes: { type: "password" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+  expectOutputError(generatedOutput("runtime-ui", { tag: "button", events: { click: "run" } }), "SKIN_EXTENSION_UI_OUTPUT_SCHEMA");
+});
+
+test("SkinPluginOutlet emits callback data only for a trusted user event", async () => {
+  interface HostNode {
+    type: string;
+    props: Record<string, unknown>;
+    text: string;
+    children: HostNode[];
+    parent?: HostNode;
+  }
+  const createHostNode = (type: string, text = ""): HostNode => ({ type, props: {}, text, children: [] });
+  const renderer = createRenderer<HostNode, HostNode>({
+    patchProp(node, key, _previous, next) { node.props[key] = next; },
+    insert(node, parent, anchor) {
+      node.parent = parent;
+      const oldIndex = parent.children.indexOf(node);
+      if (oldIndex >= 0) parent.children.splice(oldIndex, 1);
+      const anchorIndex = anchor ? parent.children.indexOf(anchor) : -1;
+      parent.children.splice(anchorIndex >= 0 ? anchorIndex : parent.children.length, 0, node);
+    },
+    remove(node) {
+      const parent = node.parent;
+      if (!parent) return;
+      const index = parent.children.indexOf(node);
+      if (index >= 0) parent.children.splice(index, 1);
+      node.parent = undefined;
+    },
+    createElement: (type) => createHostNode(type),
+    createText: (text) => createHostNode("#text", text),
+    createComment: (text) => createHostNode("#comment", text),
+    setText(node, text) { node.text = text; },
+    setElementText(node, text) { node.children = []; node.text = text; },
+    parentNode: (node) => node.parent ?? null,
+    nextSibling(node) {
+      if (!node.parent) return null;
+      const index = node.parent.children.indexOf(node);
+      return node.parent.children[index + 1] ?? null;
+    },
+  });
+  const document: SkinPluginDocument = {
+    schemaVersion: 3,
+    components: [{
+      id: "base", name: "Base", page: "voice", accessibleName: "Base", permissions: [], actions: {}, root: { tag: "p", children: [{ text: "Base" }] },
+    }],
+  };
+  const emitted: unknown[] = [];
+  const host = createHostNode("root");
+  const app = renderer.createApp(SkinPluginOutlet, {
+    skinId: "community.test",
+    skinVersion: "1.0.0",
+    document,
+    extensionOutput: JSON.stringify({
+      schemaVersion: 5,
+      components: [{
+        id: "server-rail", name: "Server rail", page: "voice", accessibleName: "Saved voice servers",
+        state: { expanded: false },
+        root: { tag: "button", attributes: { type: "button" }, events: { click: "select-server" }, children: [{ text: "Home" }] },
+      }],
+    }),
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+    "onExtension-event": (payload: unknown) => emitted.push(payload),
+  });
+  app.mount(host);
+  await nextTick();
+  const findButton = (node: HostNode): HostNode | undefined => node.type === "button" ? node : node.children.map(findButton).find(Boolean);
+  const button = findButton(host);
+  const describe = (node: HostNode): string => `${node.type}[${node.text}](${node.children.map(describe).join(",")})`;
+  assert.ok(button, describe(host));
+  const onClick = button.props.onClick as (event: Event) => void;
+  onClick({ isTrusted: false, target: null } as unknown as Event);
+  assert.equal(emitted.length, 0, "script-created events must not reach extension logic");
+  onClick({ isTrusted: true, target: null } as unknown as Event);
+  assert.equal(emitted.length, 1);
+  const payload = emitted[0] as { skinId: string; componentId: string; input: { state: Record<string, unknown>; event: Record<string, unknown> } };
+  assert.equal(payload.skinId, "community.test");
+  assert.equal(payload.componentId, "server-rail");
+  assert.deepEqual({ ...payload.input.state }, { expanded: false });
+  assert.deepEqual(payload.input.event, { componentId: "server-rail", handlerId: "select-server", eventName: "click" });
+  app.unmount();
 });
 
 test("generated UI rejects executable elements, event handlers, and network/navigation sinks", () => {

@@ -91,6 +91,8 @@ export interface SkinPluginComponent {
   accessibleName: string;
   permissions: SkinPluginPermission[];
   state?: Record<string, string | number | boolean>;
+  /** Internal marker used only for generated Wasm views; rejected by package JSON validation. */
+  runtimeCallbacks?: boolean;
   actions: Record<string, SkinPluginActionDefinition>;
   root: SkinPluginNode;
 }

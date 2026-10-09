@@ -11,6 +11,7 @@ import {
   type SkinPluginNode,
 } from "../../../src/shared/skin-plugin.js";
 import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
+import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
 
 type Scalar = string | number | boolean;
@@ -40,6 +41,7 @@ export default defineComponent({
   emits: {
     "surface-change": (_active: boolean) => typeof _active === "boolean",
     "restore-skin": () => true,
+    "extension-event": (_payload: unknown) => true,
   },
   setup(props, { emit }) {
     const denied = ref(false);
@@ -146,6 +148,28 @@ export default defineComponent({
       if (handler) void Promise.resolve(handler(args, component)).catch(() => undefined);
     }
 
+    function dispatchRuntimeCallback(component: SkinPluginComponent, handlerId: string, eventName: string, event: Event, state: Record<string, Scalar>): void {
+      if (!component.runtimeCallbacks) return;
+      const callbackEvent: Record<string, unknown> = { componentId: component.id, handlerId, eventName };
+      if (typeof KeyboardEvent !== "undefined" && event instanceof KeyboardEvent) callbackEvent.key = event.key;
+      if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLInputElement) {
+        if (["password", "file", "hidden"].includes(event.target.type)) return;
+        if (event.target.type === "checkbox") callbackEvent.checked = event.target.checked;
+        else if (event.target.value.length <= 2_048) callbackEvent.value = event.target.value;
+      } else if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLTextAreaElement) {
+        if (event.target.value.length <= 2_048) callbackEvent.value = event.target.value;
+      } else if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLSelectElement
+        && event.target.value.length <= 2_048) {
+        callbackEvent.value = event.target.value;
+      }
+      try {
+        const input = parseSkinExtensionUiInput({ schemaVersion: 1, state: { ...state }, event: callbackEvent });
+        emit("extension-event", { skinId: props.skinId, componentId: component.id, input });
+      } catch {
+        // Overlarge or malformed local state stays local and is not passed to the extension guest.
+      }
+    }
+
     function assetUrl(path: string): string | undefined {
       const current = props.assets[path];
       if (!(current instanceof Blob)) return undefined;
@@ -217,7 +241,7 @@ export default defineComponent({
         if (!propName) continue;
         attrs[propName] = (event: Event) => {
           if (!event.isTrusted) return;
-          if ((eventName === "keydown" || eventName === "keyup") && event instanceof KeyboardEvent
+          if (!component.runtimeCallbacks && (eventName === "keydown" || eventName === "keyup") && event instanceof KeyboardEvent
             && event.key !== "Enter" && event.key !== " " && event.key !== "Escape") return;
           if (eventName === "contextmenu" || eventName === "dragover") event.preventDefault();
           if (node.bindValue && eventName === "input" && (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
@@ -226,7 +250,8 @@ export default defineComponent({
             state[node.bindValue] = event.target instanceof HTMLInputElement && event.target.type === "checkbox" ? event.target.checked : event.target.value;
           }
           if (eventName === "submit") event.preventDefault();
-          dispatch(component, actionId, context, state);
+          if (component.runtimeCallbacks) dispatchRuntimeCallback(component, actionId, eventName, event, state);
+          else dispatch(component, actionId, context, state);
         };
       }
       if (node.bindValue && !node.events?.input && !node.events?.change) {

@@ -16,6 +16,10 @@ import {
   SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES,
   validateSkinExtensionWasmBytes,
 } from "./skin-extension-wasm-policy.js";
+import {
+  parseSkinExtensionUiInput,
+  SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES,
+} from "../../../src/shared/skin-extension-ui-input.js";
 
 export const SKIN_EXTENSION_WASM_RUNTIME_ENABLED = false as const;
 
@@ -30,6 +34,7 @@ export interface SkinExtensionWasmSandboxResult {
   result: number | string;
   linearMemoryBytes: number;
   statusReadCount: number;
+  uiInputReadCount: number;
   uiOutput: string | null;
   sessionSnapshot?: SkinExtensionSessionStatus;
 }
@@ -38,6 +43,8 @@ export interface SkinExtensionWasmSandboxOptions {
   manifest: unknown;
   approval: unknown;
   wasmBytes: Uint8Array;
+  /** Bounded local component state and optional safe fields from a trusted UI event. */
+  uiInput?: unknown;
   readSessionStatus: (signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>;
   /** This prototype is available only to the development security harness. */
   prototypeOnly: true;
@@ -77,6 +84,11 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
   validateSkinExtensionWasmBytes(options.wasmBytes);
   const grantedPermissions = manifest.permissions.filter((permission) =>
     isSkinExtensionPermissionApproved(approval, manifest.id, permission));
+  const uiInput = parseSkinExtensionUiInput(options.uiInput ?? { schemaVersion: 1, state: {}, event: null });
+  const uiInputJson = JSON.stringify(uiInput);
+  if (new TextEncoder().encode(uiInputJson).byteLength > SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES) {
+    throw new SkinExtensionWasmSandboxError("SKIN_EXTENSION_WASM_UI_INPUT_INVALID", "The local UI input exceeds its bounded size.");
+  }
   const wasmBytes = options.wasmBytes.slice();
   const worker = new Worker(new URL("./skin-extension-wasm-worker.ts", import.meta.url), {
     type: "module",
@@ -175,7 +187,7 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
       return;
     }
     if (message.type === "complete") {
-      const expectedKeys = ["type", "result", "linearMemoryBytes", "statusReadCount", "uiOutput"];
+      const expectedKeys = ["type", "result", "linearMemoryBytes", "statusReadCount", "uiInputReadCount", "uiOutput"];
       if (Object.keys(message).length !== expectedKeys.length
         || Object.keys(message).some((key) => !expectedKeys.includes(key))
         || (typeof message.result !== "number" && typeof message.result !== "string")
@@ -185,12 +197,15 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
         || !Number.isSafeInteger(message.linearMemoryBytes) || (message.linearMemoryBytes as number) < 0
         || (message.linearMemoryBytes as number) > SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES * 64 * 1024
         || !Number.isSafeInteger(message.statusReadCount) || (message.statusReadCount as number) < 0
-        || (message.statusReadCount as number) > SKIN_EXTENSION_WASM_STATUS_READ_LIMIT) {
+        || (message.statusReadCount as number) > SKIN_EXTENSION_WASM_STATUS_READ_LIMIT
+        || !Number.isSafeInteger(message.uiInputReadCount) || (message.uiInputReadCount as number) < 0
+        || (message.uiInputReadCount as number) > 1) {
         finish("invalid-result", new SkinExtensionWasmSandboxError("SKIN_EXTENSION_WASM_RESULT_INVALID", "The Wasm worker returned a result outside its allowed shape."));
         return;
       }
       complete({ result: message.result as number | string, linearMemoryBytes: message.linearMemoryBytes as number,
-        statusReadCount: message.statusReadCount as number, uiOutput: message.uiOutput as string | null,
+        statusReadCount: message.statusReadCount as number, uiInputReadCount: message.uiInputReadCount as number,
+        uiOutput: message.uiOutput as string | null,
         ...(approvedSessionStatus ? { sessionSnapshot: approvedSessionStatus } : {}) });
       return;
     }
@@ -206,7 +221,7 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
   startupTimer = window.setTimeout(() => finish("startup-timeout", new SkinExtensionWasmSandboxError("SKIN_EXTENSION_WASM_STARTUP_TIMEOUT", "The Wasm worker did not finish initialization in time.")), SKIN_EXTENSION_WASM_STARTUP_TIMEOUT_MS);
 
   const bytes = wasmBytes.buffer.slice(wasmBytes.byteOffset, wasmBytes.byteOffset + wasmBytes.byteLength) as ArrayBuffer;
-  worker.postMessage({ type: "run", bytes, approvedPermissions: grantedPermissions }, [bytes]);
+  worker.postMessage({ type: "run", bytes, approvedPermissions: grantedPermissions, input: uiInputJson }, [bytes]);
 
   return {
     ready,
