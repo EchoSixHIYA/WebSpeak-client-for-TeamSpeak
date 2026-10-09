@@ -53,6 +53,7 @@
     <template v-else-if="name === 'plus'">
       <path d="M12 5v14M5 12h14" />
     </template>
+    <path v-else-if="name === 'star'" d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" />
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" />
     <path v-else-if="name === 'hash'" d="M9 3 7 21M17 3l-2 18M4 9h16M3 15h16" />

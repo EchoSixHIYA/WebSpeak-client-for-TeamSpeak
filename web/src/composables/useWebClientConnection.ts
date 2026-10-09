@@ -32,7 +32,7 @@ interface UseWebClientConnectionOptions {
   rememberIdentity: Readonly<Ref<boolean>>;
   identityMaterial: Ref<string>;
   accelerationRelayId: Ref<string>;
-  inviteToken: string;
+  inviteToken: Ref<string>;
   selectedChannelId: Ref<string>;
   channels: Readonly<Ref<TreeChannel[]>>;
   clientId: Readonly<Ref<number>>;
@@ -113,7 +113,7 @@ export function useWebClientConnection({
       serverPassword.value,
       rememberIdentity.value ? identityMaterial.value : "",
       rememberIdentity.value,
-      inviteToken,
+      inviteToken.value,
       Boolean(accelerationRelayId.value),
       accelerationRelayId.value,
     );

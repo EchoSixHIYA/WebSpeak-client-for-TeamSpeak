@@ -28,7 +28,7 @@ export function useWebClientPublicConfig({
   const initialized = ref(false);
   const mobileMode = ref(false);
   const siteName = ref("WebSpeak");
-  const appVersion = ref("0.2.6");
+  const appVersion = ref("0.2.7-preview");
   const visitorNumber = ref<number | null>(null);
   const visitorTotal = ref<number | null>(null);
   const accelerationRelays = ref<RelayOption[]>([]);

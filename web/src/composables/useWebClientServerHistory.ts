@@ -3,7 +3,7 @@ import {
   listFavorites,
   listRecentServers,
   recordRecentServer,
-  removeFavorite,
+  removeFavorite as deleteFavorite,
   saveFavorite,
   type FavoriteServer,
   type RecentServer,
@@ -65,27 +65,44 @@ export function useWebClientServerHistory({
     if (savedNickname && !nickname.value.trim()) nickname.value = savedNickname;
   }
 
+  async function saveFavoriteServer(
+    address: string,
+    label = address,
+    savedNickname = nickname.value.trim(),
+    channelHint = channel.value.trim(),
+  ): Promise<void> {
+    const normalizedAddress = address.trim();
+    if (!normalizedAddress) return;
+    const id = serverKey(normalizedAddress);
+    const favorite: FavoriteServer = {
+      id,
+      label: label.trim() || normalizedAddress,
+      address: normalizedAddress,
+      ...(savedNickname ? { nickname: savedNickname } : {}),
+      ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
+      ...(channelHint ? { lastChannelHint: { name: channelHint } } : {}),
+    };
+    await saveFavorite(favorite);
+    favoriteServers.value = [...favoriteServers.value.filter((item) => item.id !== id), favorite]
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  async function removeFavoriteServer(id: string): Promise<void> {
+    await deleteFavorite(id);
+    favoriteServers.value = favoriteServers.value.filter((favorite) => favorite.id !== id);
+  }
+
   async function toggleFavorite(): Promise<void> {
     const address = currentTarget.value;
     if (!address) return;
     const id = serverKey(address);
     const existing = favoriteServers.value.find((favorite) => favorite.id === id);
     if (existing) {
-      await removeFavorite(id);
-      favoriteServers.value = favoriteServers.value.filter((favorite) => favorite.id !== id);
+      await removeFavoriteServer(id);
       showToast(t("removedFavoriteToast"));
       return;
     }
-    const favorite: FavoriteServer = {
-      id,
-      label: address,
-      address,
-      ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}),
-      ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
-      ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}),
-    };
-    await saveFavorite(favorite);
-    favoriteServers.value = [...favoriteServers.value, favorite].sort((left, right) => left.label.localeCompare(right.label));
+    await saveFavoriteServer(address, address);
     showToast(t("savedFavoriteToast"));
   }
 
@@ -101,6 +118,8 @@ export function useWebClientServerHistory({
     loadSavedServers,
     recordCurrentServer,
     selectLocalServer,
+    saveFavoriteServer,
+    removeFavoriteServer,
     toggleFavorite,
     clearServerHistory,
   };

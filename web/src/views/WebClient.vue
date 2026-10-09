@@ -8,15 +8,11 @@
     ]"
     :style="{ '--ws-viewport-height': `${mobileViewport.height}px`, '--ws-viewport-top': `${mobileViewport.top}px` }"
     data-ws-part="app"
-    :data-ws-page="
-      voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
-        ? 'voice'
-        : 'home'
-    "
+    :data-ws-page="showVoiceShell ? 'voice' : 'home'"
   >
     <!-- Connection / welcome screen -->
     <section
-      v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed"
+      v-if="!showVoiceShell"
       class="join-page"
       data-ws-part="home"
     >
@@ -306,9 +302,104 @@
       v-else
       :class="['app-shell', `mobile-view-${mobileSection}`]"
       :data-performance-open="performancePanelOpen ? 'true' : 'false'"
+      :data-favorite-rail="accessMode === 'open' ? 'true' : 'false'"
       data-ws-part="voice.shell"
       @click="memberMenu = null"
     >
+      <aside
+        v-if="accessMode === 'open'"
+        class="favorite-server-rail"
+        data-ws-part="voice.favorite-servers.rail"
+        :aria-label="t('favoriteServers')"
+      >
+        <div class="favorite-server-rail-list" data-ws-part="voice.favorite-servers.rail.list">
+          <div
+            v-for="favorite in favoriteServers"
+            :key="favorite.id"
+            class="favorite-server-rail-item"
+            data-ws-part="voice.favorite-servers.rail.item"
+          >
+            <button
+              type="button"
+              :class="['favorite-server-button', { active: isFavoriteTarget(favorite) }]"
+              data-ws-part="voice.favorite-servers.server"
+              :data-ws-state="isFavoriteTarget(favorite) ? 'current' : 'idle'"
+              :title="favorite.label + '\n' + favorite.address"
+              :aria-label="t('switchToFavorite', { server: favorite.label })"
+              :aria-pressed="isFavoriteTarget(favorite)"
+              :disabled="voiceState.connecting"
+              @click.stop="connectFavoriteServer(favorite)"
+            >
+              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(favorite.label)">{{ avatarInitial(favorite.label) }}</span>
+              <span class="favorite-server-tooltip" data-ws-part="voice.favorite-servers.tooltip"><strong>{{ favorite.label }}</strong><small>{{ favorite.address }}</small></span>
+            </button>
+            <button
+              type="button"
+              class="favorite-server-remove"
+              data-ws-part="voice.favorite-servers.remove"
+              :aria-label="t('removeFavoriteForServer', { server: favorite.label })"
+              :title="t('removeFavorite')"
+              @click.stop="removeFavoriteFromRail(favorite)"
+            >
+              <Icon name="close" :size="12" />
+            </button>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="favorite-server-add"
+          data-ws-part="voice.favorite-servers.add"
+          :aria-label="t('addFavoriteServer')"
+          :title="t('addFavoriteServer')"
+          @click.stop="favoriteServerDialogOpen = true"
+        ><Icon name="plus" :size="20" /></button>
+      </aside>
+
+      <nav
+        v-if="accessMode === 'open'"
+        class="favorite-server-strip"
+        data-ws-part="voice.favorite-servers.strip"
+        :aria-label="t('favoriteServers')"
+      >
+        <button
+          v-for="favorite in favoriteServers"
+          :key="favorite.id"
+          type="button"
+          :class="['favorite-server-strip-button', { active: isFavoriteTarget(favorite) }]"
+          data-ws-part="voice.favorite-servers.strip.server"
+          :data-ws-state="isFavoriteTarget(favorite) ? 'current' : 'idle'"
+          :aria-label="t('switchToFavorite', { server: favorite.label })"
+          :aria-pressed="isFavoriteTarget(favorite)"
+          :disabled="voiceState.connecting"
+          @click="connectFavoriteServer(favorite)"
+        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(favorite.label)">{{ avatarInitial(favorite.label) }}</span><span>{{ favorite.label }}</span></button>
+        <button
+          type="button"
+          class="favorite-server-strip-add"
+          data-ws-part="voice.favorite-servers.strip.add"
+          :aria-label="t('addFavoriteServer')"
+          :title="t('addFavoriteServer')"
+          @click="favoriteServerDialogOpen = true"
+        ><Icon name="plus" :size="18" /></button>
+      </nav>
+
+      <div
+        v-if="isMobileViewport && (favoriteSwitchPending || favoriteSwitchFailed)"
+        :class="['favorite-switch-banner', 'favorite-switch-mobile-banner', { failed: favoriteSwitchFailed }]"
+        data-ws-part="voice.favorite-servers.switch-status"
+        :data-ws-state="favoriteSwitchFailed ? 'failed' : 'connecting'"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="favorite-switch-indicator"><Icon :name="favoriteSwitchFailed ? 'info' : 'server'" :size="17" /></span>
+        <span class="favorite-switch-copy">
+          <strong>{{ favoriteSwitchFailed ? t('favoriteConnectionFailed', { server: favoriteSwitchLabel }) : t('favoriteSwitching', { server: favoriteSwitchLabel }) }}</strong>
+          <small v-if="favoriteSwitchPending">{{ t('connecting') }}</small>
+          <small v-else>{{ favoriteSwitchError || t('quickConnectFailed') }}</small>
+        </span>
+        <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
+      </div>
+
       <main
         class="workspace"
         data-ws-part="voice.workspace"
@@ -344,6 +435,16 @@
                 name="share"
                 :size="18"
             /></button>
+            <button
+              v-if="accessMode === 'open'"
+              :class="['header-action', 'favorite-current-toggle', { active: isFavorite }]"
+              data-ws-part="voice.favorite-servers.current-toggle"
+              :data-ws-state="isFavorite ? 'saved' : 'unsaved'"
+              :title="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+              :aria-label="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+              :aria-pressed="isFavorite"
+              @click="toggleFavorite"
+            ><Icon name="star" :size="18" /></button>
             <button
               v-if="isMobileViewport"
               class="header-action microphone-header-toggle"
@@ -382,7 +483,7 @@
             <button
               class="disconnect-button"
               :aria-label="t('exit')"
-              @click="doDisconnect"
+              @click="leaveVoiceWorkspace"
               ><Icon
                 name="door"
                 :size="17"
@@ -390,6 +491,23 @@
             >
           </div>
         </header>
+
+        <div
+          v-if="!isMobileViewport && (favoriteSwitchPending || favoriteSwitchFailed)"
+          :class="['favorite-switch-banner', { failed: favoriteSwitchFailed }]"
+          data-ws-part="voice.favorite-servers.switch-status"
+          :data-ws-state="favoriteSwitchFailed ? 'failed' : 'connecting'"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="favorite-switch-indicator"><Icon :name="favoriteSwitchFailed ? 'info' : 'server'" :size="17" /></span>
+          <span class="favorite-switch-copy">
+            <strong>{{ favoriteSwitchFailed ? t('favoriteConnectionFailed', { server: favoriteSwitchLabel }) : t('favoriteSwitching', { server: favoriteSwitchLabel }) }}</strong>
+            <small v-if="favoriteSwitchPending">{{ t('connecting') }}</small>
+            <small v-else>{{ favoriteSwitchError || t('quickConnectFailed') }}</small>
+          </span>
+          <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
+        </div>
 
         <ScreenShareSettingsDialog
           v-if="screenShareSettingsOpen"
@@ -423,7 +541,7 @@
             ><button
               type="button"
               class="text-button"
-              @click="doDisconnect"
+              @click="leaveVoiceWorkspace"
               >{{ t("back") }}</button
             ></div
           >
@@ -551,7 +669,7 @@
                   @click="toggleOutputMute"
                   ><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ t("speaker") }}</span></button
                 >
-                <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button
+                <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="leaveVoiceWorkspace"><Icon name="door" :size="17" /></button
                 >
               </div>
             </section>
@@ -589,7 +707,7 @@
         <div v-if="isMobileViewport" class="mobile-member-controls" role="toolbar" :aria-label="t('desktopAudioControls')">
           <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :title="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="20" /><span>{{ t('microphone') }}</span></button>
           <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="t('speaker')" :title="outputMuted ? t('outputMuted') : t('speaker')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="20" /><span>{{ t('speaker') }}</span></button>
-          <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="18" /></button>
+          <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="leaveVoiceWorkspace"><Icon name="door" :size="18" /></button>
         </div>
         <AudioDock
           v-if="!isMobileViewport"
@@ -647,7 +765,7 @@
         <button
           type="button"
           class="danger"
-          @click="doDisconnect"
+          @click="leaveVoiceWorkspace"
           ><Icon
             name="door"
             :size="18"
@@ -732,8 +850,17 @@
       v-model="serverPasswordDialog.password"
       :error-code="serverPasswordDialog.errorCode"
       :t="t"
-      @cancel="cancelServerPassword"
+      @cancel="cancelFavoriteServerPassword"
       @submit="submitServerPassword"
+    />
+
+    <FavoriteServerDialog
+          :open="favoriteServerDialogOpen"
+          :busy="favoriteDialogBusy"
+          :default-nickname="nickname"
+          :t="t"
+          @close="favoriteServerDialogOpen = false"
+      @submit="submitFavoriteServerDraft"
     />
 
     <!-- Audio settings modal -->
@@ -782,6 +909,7 @@ import JoinForm from "../components/web-client/JoinForm.vue";
 import ChatPanel from "../components/web-client/ChatPanel.vue";
 import WebClientHeader from "../components/web-client/WebClientHeader.vue";
 import IdentityImportDialog from "../components/web-client/IdentityImportDialog.vue";
+import FavoriteServerDialog, { type FavoriteServerDraft } from "../components/web-client/FavoriteServerDialog.vue";
 import { usePublicSkin } from "../composables/usePublicSkin.js";
 import { useWebClientIdentity } from "../composables/useWebClientIdentity.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
@@ -798,14 +926,14 @@ import { useWebClientI18n } from "../composables/useWebClientI18n.js";
 import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfig.js";
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
-import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
+import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
-import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
+import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
   state: voiceState,
@@ -892,7 +1020,7 @@ const { panelOpen: performancePanelOpen } = performance;
 
 const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
-const inviteToken = query.get("invite") ?? "";
+const inviteToken = ref(query.get("invite") ?? "");
 const initialTarget = initialServerTarget();
 const nickname = ref(localStorage.getItem("webspeak:nickname") ?? "");
 const channel = ref(initialChannel);
@@ -905,6 +1033,11 @@ const browserError = ref("");
 const memberQuery = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
+const favoriteServerDialogOpen = ref(false);
+const favoriteDialogBusy = ref(false);
+const favoriteSwitchPending = ref(false);
+const favoriteSwitchFailed = ref(false);
+const favoriteSwitchError = ref("");
 const channelPasswordDialog = reactive({ open: false, channelId: "", password: "", error: "", submitting: false });
 const serverPasswordDialog = reactive({ open: false, password: "", errorCode: "" });
 const qqModalOpen = ref(false);
@@ -946,6 +1079,8 @@ const {
   loadSavedServers,
   recordCurrentServer,
   selectLocalServer,
+  saveFavoriteServer,
+  removeFavoriteServer,
   toggleFavorite,
   clearServerHistory,
 } = useWebClientServerHistory({ serverHost, serverPort, nickname, channel, rememberIdentity, identityMaterial, t, showToast });
@@ -1192,6 +1327,99 @@ const {
   showToast,
   t,
 });
+
+const showVoiceShell = computed(() => Boolean(
+  voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
+  || favoriteSwitchPending.value || favoriteSwitchFailed.value,
+));
+const favoriteSwitchLabel = computed(() => favoriteServers.value.find((favorite) =>
+  favorite.id === currentServerTarget().toLocaleLowerCase(),
+)?.label ?? currentServerTarget());
+
+function isFavoriteTarget(favorite: FavoriteServer): boolean {
+  return favorite.id === currentServerTarget().toLocaleLowerCase();
+}
+
+function connectFavoriteServer(favorite: FavoriteServer): void {
+  if (accessMode.value !== "open" || voiceState.connecting || (voiceState.connected && isFavoriteTarget(favorite))) return;
+  const target = splitTeamSpeakTarget(favorite.address);
+  serverHost.value = target.address;
+  serverPort.value = target.port || DEFAULT_TEAM_SPEAK_PORT;
+  nickname.value = favorite.nickname?.trim() || nickname.value.trim();
+  channel.value = favorite.lastChannelHint?.name ?? "";
+  serverPassword.value = "";
+  accelerationRelayId.value = "";
+  inviteToken.value = "";
+  selectedChannelId.value = "";
+  serverPasswordDialog.open = false;
+  serverPasswordDialog.password = "";
+  serverPasswordDialog.errorCode = "";
+  favoriteServerDialogOpen.value = false;
+  beginFavoriteConnection();
+}
+
+function beginFavoriteConnection(): void {
+  favoriteSwitchPending.value = true;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
+  doConnect();
+  if (!voiceState.connecting && !voiceState.connected) failFavoriteConnection(t("quickConnectFailed"));
+}
+
+function failFavoriteConnection(message: string): void {
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = true;
+  favoriteSwitchError.value = message;
+}
+
+function cancelFavoriteServerPassword(): void {
+  cancelServerPassword();
+  if (favoriteSwitchPending.value) failFavoriteConnection(t("quickConnectFailed"));
+}
+
+function leaveVoiceWorkspace(): void {
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
+  doDisconnect();
+}
+
+function removeFavoriteFromRail(favorite: FavoriteServer): void {
+  void removeFavoriteServer(favorite.id).then(() => showToast(t("removedFavoriteToast")));
+}
+
+async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<void> {
+  if (favoriteDialogBusy.value || voiceState.connecting || accessMode.value !== "open") return;
+  const port = draft.port || DEFAULT_TEAM_SPEAK_PORT;
+  if (!draft.address || !draft.nickname || !isValidTeamSpeakPort(port)) {
+    showToast(t("quickConnectFailed"));
+    return;
+  }
+
+  const parsed = splitTeamSpeakTarget(draft.address, port);
+  serverHost.value = parsed.address;
+  serverPort.value = parsed.port || DEFAULT_TEAM_SPEAK_PORT;
+  nickname.value = draft.nickname;
+  channel.value = draft.channel;
+  serverPassword.value = "";
+  accelerationRelayId.value = "";
+  inviteToken.value = "";
+  selectedChannelId.value = "";
+  serverPasswordDialog.open = false;
+  serverPasswordDialog.password = "";
+  serverPasswordDialog.errorCode = "";
+
+  favoriteDialogBusy.value = true;
+  try {
+    const target = currentServerTarget();
+    await saveFavoriteServer(target, draft.label || target, nickname.value, channel.value);
+    favoriteServerDialogOpen.value = false;
+    beginFavoriteConnection();
+  } finally {
+    favoriteDialogBusy.value = false;
+  }
+}
+
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
 watch(() => pokeNotifications.length, (length, previousLength) => {
@@ -1214,10 +1442,17 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
 });
 watch(() => voiceState.connected, (connected) => {
   if (!connected) return;
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
   playNotification("connected");
   recordCurrentServer();
 });
-watch(() => voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed, (roomVisible) => {
+watch(() => voiceState.errorCode, (code) => {
+  if (!favoriteSwitchPending.value || !code || code === "SERVER_PASSWORD_REQUIRED" || code === "INVALID_SERVER_PASSWORD") return;
+  failFavoriteConnection(localizedMessage(voiceState.error) || t("quickConnectFailed"));
+});
+watch(() => showVoiceShell.value, (roomVisible) => {
   if (roomVisible) resetIdentityOperations();
 }, { flush: "sync" });
 

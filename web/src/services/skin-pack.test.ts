@@ -132,7 +132,8 @@ test("the ILLUSIA visual-only example imports without replacing WebSpeak's base 
   const skin = await importSkinPack(new File([bytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "1.0.27");
+  assert.equal(skin.version, "1.0.28");
+  assert.equal(skin.minAppVersion, "0.2.7-preview");
   assert.equal(skin.contentData, undefined);
   assert.equal(skin.previewBlob?.type, "image/webp");
   assert.ok(skin.assets["assets/background-composite.webp"]);
@@ -152,6 +153,10 @@ test("the ILLUSIA visual-only example imports without replacing WebSpeak's base 
   assert.match(skin.css, /language\.menu[^{}]*\[role="listbox"\]/);
   assert.match(skin.css, /language\.option/);
   assert.match(skin.css, /data-ws-skin-id="community\.illusia-voice"/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.rail"/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.strip\.server"\]\[data-ws-state="current"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog"\]\s*\{[^}]*background:\s*linear-gradient/s);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog\.input"\]:focus-visible\s*\{[^}]*box-shadow:/s);
   assert.match(skin.css, /data-ws-part="home\.join-card\.waveform"/);
   assert.match(skin.css, /data-ws-part="home\.join-card\.sonar"/);
   assert.match(skin.css, /data-ws-part="home\.join-card"\]\s*\{[^}]*background-image:\s*url\("wskin-asset:assets%2Fbanner-mascot-blob\.webp"\)/s);

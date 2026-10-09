@@ -33,7 +33,7 @@ export async function activateStoredSkin(): Promise<InstalledSkin | null> {
   return activateSkin(selectedId);
 }
 
-export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.6", options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
+export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.7-preview", options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
   // An already retired page must not cancel a newer page's activation.
   options.signal?.throwIfAborted();
   pendingActivation?.cancel();
