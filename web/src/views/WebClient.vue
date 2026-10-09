@@ -1507,6 +1507,34 @@ const skinPluginContext = computed(() => ({
       channelId: message.targetId ?? currentChannel.value?.id ?? "",
     })),
   },
+  audio: {
+    status: {
+      microphoneMuted: microphoneMuted.value,
+      outputMuted: outputMuted.value,
+    },
+  },
+  whisper: {
+    status: {
+      active: whisperActive.value,
+      targetCount: whisperTargetIds.size,
+    },
+  },
+  screenShare: {
+    status: {
+      active: screenShareActive.value,
+      starting: screenShareStarting.value,
+      viewing: screenShareViewing.value,
+    },
+    streams: screenShareStreams.map((stream) => ({
+      streamId: stream.streamId,
+      source: stream.source,
+      ownerClientId: stream.ownerClientId ?? 0,
+      ownerNickname: stream.ownerNickname,
+      name: stream.name,
+      audio: stream.audio,
+      viewerCount: stream.viewerCount,
+    })),
+  },
 }));
 
 const skinPluginActions = {
@@ -1531,6 +1559,31 @@ const skinPluginActions = {
     if (!text || text.length > 1000 || text.includes("\u0000")) return;
     void sendTextMessage(text, currentChannel.value.id);
   },
+  "voice.toggleMicrophone": () => { if (voiceState.connected) toggleMicrophone(); },
+  "voice.toggleOutputMute": () => { if (voiceState.connected) toggleOutputMute(); },
+  "voice.setOutputVolume": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.volume !== "number" || !Number.isFinite(args.volume)) return;
+    setOutputVolume(Math.max(0, Math.min(1, args.volume)));
+  },
+  "voice.disconnect": () => { if (voiceState.connected || voiceState.connecting) doDisconnect(); },
+  "voice.setAway": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.away !== "boolean") return;
+    const message = typeof args.message === "string" ? args.message.slice(0, 200) : "";
+    setAway(args.away, message);
+  },
+  "voice.setWhisperActive": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.active !== "boolean") return;
+    setWhisperActive(args.active);
+  },
+  "voice.startScreenShare": () => {
+    if (voiceState.connected && !screenShareActive.value && !screenShareStarting.value) void startScreenShare();
+  },
+  "voice.stopScreenShare": () => { if (screenShareActive.value) stopScreenShare(); },
+  "voice.joinScreenShare": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.streamId !== "string") return;
+    if (screenShareStreams.some((stream) => stream.streamId === args.streamId)) joinScreenShare(args.streamId);
+  },
+  "voice.leaveScreenShare": () => { if (screenShareViewing.value) leaveScreenShare(); },
 };
 
 const skinPluginWidgets = {

@@ -41,7 +41,7 @@ function errorCode(run: () => unknown, expected: string): void {
 
 test("skin plugin accepts a bounded channel list with a double-click host action", () => {
   const parsed = parseSkinPluginDocument(validDocument());
-  assert.equal(parsed.schemaVersion, 2, "legacy documents normalize to the current component schema");
+  assert.equal(parsed.schemaVersion, 1, "legacy documents retain their original capability boundary");
   assert.equal(parsed.components[0].mode, "widget");
   assert.equal(parsed.components[0].root.repeat?.path, "session.channels");
   assert.equal(parsed.components[0].root.children?.[0].events?.dblclick, "join");
@@ -187,6 +187,65 @@ test("skin plugin never dispatches host actions from typing or selection changes
   const document = validDocument();
   document.components[0].root.children![0].events = { change: "join" };
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_EVENT_INVALID");
+});
+
+test("component schema v3 exposes composable interaction patterns and permission-gated voice actions", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].permissions = [
+    "audio.microphone.control", "audio.output.control", "audio.status.read", "voice.disconnect", "voice.presence.write",
+    "voice.whisper.control", "voice.whisper.status.read", "voice.screenShare.control", "voice.screenShare.read", "voice.screenShare.status.read",
+  ];
+  document.components[0].state = { menuopen: false, volume: 0.5, awaymessage: "" };
+  document.components[0].actions = {
+    "toggle-menu": { type: "ui.toggleState", args: { key: "menuopen" } },
+    microphone: { type: "voice.toggleMicrophone", args: {} },
+    speaker: { type: "voice.toggleOutputMute", args: {} },
+    volume: { type: "voice.setOutputVolume", args: { volume: "{{state.volume}}" } },
+    disconnect: { type: "voice.disconnect", args: {} },
+    away: { type: "voice.setAway", args: { away: true, message: "{{state.awaymessage}}" } },
+    whisper: { type: "voice.setWhisperActive", args: { active: true } },
+    "start-share": { type: "voice.startScreenShare", args: {} },
+    "stop-share": { type: "voice.stopScreenShare", args: {} },
+    "join-share": { type: "voice.joinScreenShare", args: { streamId: "{{share.streamId}}" } },
+    "leave-share": { type: "voice.leaveScreenShare", args: {} },
+  };
+  document.components[0].root = {
+    tag: "main",
+    attributes: { "data-layout": "room", "aria-label": "Custom voice page" },
+    children: [
+      { tag: "button", events: { contextmenu: "toggle-menu", pointerenter: "toggle-menu" }, children: [{ text: "Menu" }] },
+      { tag: "button", events: { click: "microphone" }, children: [{ text: "Microphone" }] },
+      { tag: "button", events: { click: "speaker" }, children: [{ text: "Speaker" }] },
+      { tag: "button", events: { click: "volume" }, children: [{ text: "Volume" }] },
+      { tag: "button", events: { click: "disconnect" }, children: [{ text: "Disconnect" }] },
+      { tag: "button", events: { click: "away" }, children: [{ text: "Away" }] },
+      { tag: "button", events: { click: "whisper" }, children: [{ text: "Whisper" }] },
+      { tag: "button", events: { click: "start-share" }, children: [{ text: "Share" }] },
+      { tag: "button", events: { click: "stop-share" }, children: [{ text: "Stop sharing" }] },
+      { tag: "div", repeat: { path: "screenShare.streams", as: "share" }, children: [
+        { tag: "button", events: { click: "join-share" }, children: [{ text: "{{share.name}}" }] },
+      ] },
+      { tag: "button", events: { click: "leave-share" }, children: [{ text: "Leave share" }] },
+    ],
+  };
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.schemaVersion, 3);
+  assert.equal(parsed.components[0].root.children?.[0].events?.contextmenu, "toggle-menu");
+  assert.equal(parsed.components[0].actions["join-share"].type, "voice.joinScreenShare");
+  assert.equal(parsed.components[0].root.children?.[9].repeat?.path, "screenShare.streams");
+
+  const passiveVoiceControl = structuredClone(document);
+  passiveVoiceControl.components[0].root.children![0].events = { pointerenter: "microphone" };
+  errorCode(() => parseSkinPluginDocument(passiveVoiceControl), "SKIN_PLUGIN_EVENT_INVALID");
+
+  const missingPermission = structuredClone(document);
+  missingPermission.components[0].permissions = missingPermission.components[0].permissions.filter((item) => item !== "audio.microphone.control");
+  errorCode(() => parseSkinPluginDocument(missingPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const oldSchema = structuredClone(document);
+  oldSchema.schemaVersion = 2;
+  errorCode(() => parseSkinPluginDocument(oldSchema), "SKIN_PLUGIN_SCHEMA_UNSUPPORTED");
 });
 
 test("skin plugin JSON parser enforces a bounded document size and valid JSON", () => {

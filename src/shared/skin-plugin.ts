@@ -2,13 +2,13 @@
  * Extension authors provide a bounded component tree and action declarations,
  * never executable HTML, JavaScript, or browser APIs.
  */
-export const SKIN_PLUGIN_SCHEMA_VERSION = 2 as const;
-export const SKIN_PLUGIN_SUPPORTED_SCHEMA_VERSIONS = Object.freeze([1, 2] as const);
+export const SKIN_PLUGIN_SCHEMA_VERSION = 3 as const;
+export const SKIN_PLUGIN_SUPPORTED_SCHEMA_VERSIONS = Object.freeze([1, 2, 3] as const);
 export const SKIN_PLUGIN_DOCUMENT_LIMIT_BYTES = 256 * 1024;
-export const SKIN_PLUGIN_COMPONENT_LIMIT = 32;
-export const SKIN_PLUGIN_NODE_LIMIT = 256;
-export const SKIN_PLUGIN_TREE_DEPTH_LIMIT = 16;
-export const SKIN_PLUGIN_REPEAT_LIMIT = 100;
+export const SKIN_PLUGIN_COMPONENT_LIMIT = 128;
+export const SKIN_PLUGIN_NODE_LIMIT = 2048;
+export const SKIN_PLUGIN_TREE_DEPTH_LIMIT = 32;
+export const SKIN_PLUGIN_REPEAT_LIMIT = 250;
 
 export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.surface.replace": Object.freeze({ policyVersion: 1, description: "Replace the built-in public page with a custom skin surface; the host recovery controls remain available." }),
@@ -22,6 +22,16 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "servers.quickList.read": Object.freeze({ policyVersion: 1, description: "Read favorite and recent server labels and opaque local identifiers, without server addresses or credentials." }),
   "servers.quickList.switch": Object.freeze({ policyVersion: 1, description: "Switch to a user-selected favorite or recent server through the host connection flow." }),
   "session.channel.join": Object.freeze({ policyVersion: 1, description: "Request joining a visible TeamSpeak channel through the host; the demo page only changes simulated state." }),
+  "audio.status.read": Object.freeze({ policyVersion: 1, description: "Read the user's own microphone and speaker mute states." }),
+  "audio.microphone.control": Object.freeze({ policyVersion: 1, description: "Toggle the user's own microphone through WebSpeak's audio pipeline." }),
+  "audio.output.control": Object.freeze({ policyVersion: 1, description: "Toggle or adjust the user's local speaker output." }),
+  "voice.presence.write": Object.freeze({ policyVersion: 1, description: "Set the user's own away status through the connected TeamSpeak session." }),
+  "voice.whisper.control": Object.freeze({ policyVersion: 1, description: "Enable or disable the user's existing TeamSpeak whisper target selection." }),
+  "voice.disconnect": Object.freeze({ policyVersion: 1, description: "Disconnect the user's current TeamSpeak voice session." }),
+  "voice.whisper.status.read": Object.freeze({ policyVersion: 1, description: "Read whether whisper is active and how many existing targets are selected." }),
+  "voice.screenShare.status.read": Object.freeze({ policyVersion: 1, description: "Read the user's own screen-share state." }),
+  "voice.screenShare.read": Object.freeze({ policyVersion: 1, description: "Read visible screen-share names, owners, audio flags, and viewer counts." }),
+  "voice.screenShare.control": Object.freeze({ policyVersion: 1, description: "Start or stop the user's screen share, or join/leave a visible share through the host." }),
 } as const);
 
 export type SkinPluginPermission = keyof typeof SKIN_PLUGIN_PERMISSIONS;
@@ -42,8 +52,16 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.disconnect-control",
 ] as const);
 export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
-export type SkinPluginEvent = "click" | "dblclick" | "change" | "input" | "submit" | "keydown";
-export type SkinPluginAction = "ui.setState" | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage";
+export type SkinPluginEvent =
+  | "click" | "dblclick" | "change" | "input" | "submit" | "keydown"
+  | "keyup" | "contextmenu" | "focus" | "blur" | "pointerdown" | "pointerup"
+  | "pointerenter" | "pointerleave" | "dragstart" | "dragover" | "drop";
+export type SkinPluginAction =
+  | "ui.setState" | "ui.toggleState"
+  | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage"
+  | "voice.toggleMicrophone" | "voice.toggleOutputMute" | "voice.setOutputVolume"
+  | "voice.disconnect" | "voice.setAway" | "voice.setWhisperActive"
+  | "voice.startScreenShare" | "voice.stopScreenShare" | "voice.joinScreenShare" | "voice.leaveScreenShare";
 
 export interface SkinPluginActionDefinition {
   type: SkinPluginAction;
@@ -78,7 +96,7 @@ export interface SkinPluginComponent {
 }
 
 export interface SkinPluginDocument {
-  schemaVersion: 1 | typeof SKIN_PLUGIN_SCHEMA_VERSION;
+  schemaVersion: 1 | 2 | typeof SKIN_PLUGIN_SCHEMA_VERSION;
   components: SkinPluginComponent[];
 }
 
@@ -95,33 +113,72 @@ export class SkinPluginValidationError extends Error {
 }
 
 const ELEMENTS = new Set([
-  "article", "aside", "button", "circle", "code", "dd", "details", "div", "dl", "dt", "em", "figcaption", "figure", "footer", "form",
-  "g", "h1", "h2", "h3", "h4", "header", "hr", "img", "input", "label", "li", "line", "main", "nav", "ol", "option",
-  "output", "p", "path", "polyline", "rect", "section", "select", "small", "span", "strong", "summary", "svg", "textarea", "time", "ul",
+  "article", "aside", "b", "blockquote", "br", "button", "caption", "circle", "cite", "code", "dd", "del", "details", "div", "dl", "dt",
+  "em", "fieldset", "figcaption", "figure", "footer", "form", "g", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "input",
+  "kbd", "label", "legend", "li", "line", "main", "mark", "nav", "ol", "option", "output", "p", "path", "polyline", "pre", "progress", "q",
+  "rect", "s", "section", "select", "small", "span", "strong", "sub", "summary", "sup", "svg", "table", "tbody", "td", "textarea", "th", "thead",
+  "time", "tr", "u", "ul", "wbr",
 ]);
-const VOID_ELEMENTS = new Set(["circle", "hr", "img", "input", "line", "path", "polyline", "rect"]);
+const VOID_ELEMENTS = new Set(["br", "circle", "hr", "img", "input", "line", "path", "polyline", "rect", "wbr"]);
 const ATTRIBUTES = new Set([
-  "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "class", "colspan", "fill",
-  "height", "max", "min", "name", "placeholder", "role", "rowspan", "stroke", "stroke-linecap", "stroke-linejoin", "stroke-width",
-  "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
+  "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",
+  "minlength", "multiple", "name", "open", "placeholder", "required", "role", "rows", "rowspan", "stroke", "stroke-linecap", "stroke-linejoin",
+  "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
 ]);
-const EVENTS = new Set<string>(["click", "dblclick", "change", "input", "submit", "keydown"]);
-const ACTIONS = new Set<string>(["ui.setState", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage"]);
+const EVENTS = new Set<string>([
+  "click", "dblclick", "change", "input", "submit", "keydown", "keyup", "contextmenu", "focus", "blur", "pointerdown", "pointerup",
+  "pointerenter", "pointerleave", "dragstart", "dragover", "drop",
+]);
+const V3_EVENTS = new Set<string>([
+  "keyup", "contextmenu", "focus", "blur", "pointerdown", "pointerup", "pointerenter", "pointerleave", "dragstart", "dragover", "drop",
+]);
+const PASSIVE_EVENTS = new Set<string>(["focus", "blur", "pointerenter", "pointerleave", "dragstart", "dragover"]);
+const ACTIONS = new Set<string>([
+  "ui.setState", "ui.toggleState", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage",
+  "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
+  "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
+]);
+const V3_ACTIONS = new Set<string>([
+  "ui.toggleState", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "voice.disconnect", "voice.setAway",
+  "voice.setWhisperActive", "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
+]);
 const PERMISSIONS = new Set<string>(Object.keys(SKIN_PLUGIN_PERMISSIONS));
 const HOST_WIDGETS = new Set<string>(SKIN_PLUGIN_HOST_WIDGETS);
 const ACTION_ARGS: Record<SkinPluginAction, ReadonlySet<string>> = {
   "ui.setState": new Set(["key", "value"]),
+  "ui.toggleState": new Set(["key"]),
   "voice.joinChannel": new Set(["channelId"]),
   "favorites.switch": new Set(["favoriteId"]),
   "quickServers.switch": new Set(["quickServerId"]),
   "chat.sendMessage": new Set(["text"]),
+  "voice.toggleMicrophone": new Set([]),
+  "voice.toggleOutputMute": new Set([]),
+  "voice.setOutputVolume": new Set(["volume"]),
+  "voice.disconnect": new Set([]),
+  "voice.setAway": new Set(["away", "message"]),
+  "voice.setWhisperActive": new Set(["active"]),
+  "voice.startScreenShare": new Set([]),
+  "voice.stopScreenShare": new Set([]),
+  "voice.joinScreenShare": new Set(["streamId"]),
+  "voice.leaveScreenShare": new Set([]),
 };
 const ACTION_PERMISSION: Record<SkinPluginAction, SkinPluginPermission | null> = {
   "ui.setState": null,
+  "ui.toggleState": null,
   "voice.joinChannel": "session.channel.join",
   "favorites.switch": "favorites.switch",
   "quickServers.switch": "servers.quickList.switch",
   "chat.sendMessage": "chat.channel.send",
+  "voice.toggleMicrophone": "audio.microphone.control",
+  "voice.toggleOutputMute": "audio.output.control",
+  "voice.setOutputVolume": "audio.output.control",
+  "voice.disconnect": "voice.disconnect",
+  "voice.setAway": "voice.presence.write",
+  "voice.setWhisperActive": "voice.whisper.control",
+  "voice.startScreenShare": "voice.screenShare.control",
+  "voice.stopScreenShare": "voice.screenShare.control",
+  "voice.joinScreenShare": "voice.screenShare.control",
+  "voice.leaveScreenShare": "voice.screenShare.control",
 };
 const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
   "session.channels": "session.channels.read",
@@ -129,6 +186,7 @@ const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
   "favorites.items": "favorites.read",
   "servers.quickList": "servers.quickList.read",
   "chat.messages": "chat.channel.read",
+  "screenShare.streams": "voice.screenShare.read",
 };
 const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "current"]),
@@ -136,8 +194,19 @@ const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "favorites.items": new Set(["id", "label", "current", "kind"]),
   "servers.quickList": new Set(["id", "label", "current", "kind", "favorite"]),
   "chat.messages": new Set(["id", "author", "text", "time", "kind", "channelId"]),
+  "screenShare.streams": new Set(["streamId", "source", "ownerClientId", "ownerNickname", "name", "audio", "viewerCount"]),
 };
 const SESSION_STATUS_FIELDS = new Set(["connected", "connecting", "serverLabel", "channelId", "channelName", "userName"]);
+const CONTEXT_FIELDS: Record<string, ReadonlySet<string>> = {
+  "audio.status": new Set(["microphoneMuted", "outputMuted"]),
+  "screenShare.status": new Set(["active", "starting", "viewing"]),
+  "whisper.status": new Set(["active", "targetCount"]),
+};
+const CONTEXT_PERMISSIONS: Record<string, SkinPluginPermission> = {
+  "audio.status": "audio.status.read",
+  "screenShare.status": "voice.screenShare.status.read",
+  "whisper.status": "voice.whisper.status.read",
+};
 
 function fail(code: string, message: string): never { throw new SkinPluginValidationError(code, message); }
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
@@ -171,6 +240,11 @@ function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>,
       found.add("session.status.read");
       continue;
     }
+    const contextPath = path.slice(0, 2).join(".");
+    if (path.length === 3 && CONTEXT_FIELDS[contextPath]?.has(path[2])) {
+      found.add(CONTEXT_PERMISSIONS[contextPath]);
+      continue;
+    }
     const collectionPath = path.slice(0, 2).join(".");
     const permission = COLLECTION_PERMISSION[collectionPath];
     if (permission && (path.length === 2 || (path.length === 3 && COLLECTION_FIELDS[collectionPath].has(path[2])))) {
@@ -188,12 +262,12 @@ function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>,
 export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
   if (!isRecord(input)) fail("SKIN_PLUGIN_DOCUMENT_INVALID", "components.json must contain an object.");
   onlyKeys(input, new Set(["schemaVersion", "components"]), "components.json");
-  if (!SKIN_PLUGIN_SUPPORTED_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2) || !Array.isArray(input.components)
-    || !input.components.length || input.components.length > SKIN_PLUGIN_COMPONENT_LIMIT) {
+  if (!SKIN_PLUGIN_SUPPORTED_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3) || !Array.isArray(input.components)
+    || !input.components.length || input.components.length > (input.schemaVersion === 3 ? SKIN_PLUGIN_COMPONENT_LIMIT : 32)) {
     fail("SKIN_PLUGIN_DOCUMENT_INVALID", "components.json uses an unsupported schema or component count.");
   }
   const ids = new Set<string>();
-  const inputSchemaVersion = input.schemaVersion as 1 | 2;
+  const inputSchemaVersion = input.schemaVersion as 1 | 2 | 3;
   const components = input.components.map((rawComponent, componentIndex): SkinPluginComponent => {
     if (!isRecord(rawComponent)) fail("SKIN_PLUGIN_COMPONENT_INVALID", `Component ${componentIndex} must be an object.`);
     onlyKeys(rawComponent, new Set(["id", "name", "page", "mode", "accessibleName", "permissions", "actions", "state", "root"]), "Skin plugin component");
@@ -208,7 +282,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
     if (mode === "surface" && page === "demo") fail("SKIN_PLUGIN_COMPONENT_INVALID", "Page surfaces are supported only for the home and voice client pages.");
     const name = boundedText(rawComponent.name, "component.name", 80);
     const accessibleName = boundedText(rawComponent.accessibleName, "component.accessibleName", 120);
-    if (!Array.isArray(rawComponent.permissions) || rawComponent.permissions.length > 11) fail("SKIN_PLUGIN_PERMISSION_INVALID", "Each component may request at most eleven explicit permissions.");
+    if (!Array.isArray(rawComponent.permissions) || rawComponent.permissions.length > (inputSchemaVersion >= 3 ? 32 : 11)) fail("SKIN_PLUGIN_PERMISSION_INVALID", "A component requests too many explicit permissions.");
     const permissions: SkinPluginPermission[] = [];
     for (const permission of rawComponent.permissions) {
       if (typeof permission !== "string" || !PERMISSIONS.has(permission)) fail("SKIN_PLUGIN_PERMISSION_UNKNOWN", "The component requests an unsupported permission.");
@@ -220,7 +294,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
     }
     const state: Record<string, string | number | boolean> = Object.create(null) as Record<string, string | number | boolean>;
     if (rawComponent.state !== undefined) {
-      if (!isRecord(rawComponent.state) || Object.keys(rawComponent.state).length > 32) fail("SKIN_PLUGIN_STATE_INVALID", "A component may declare up to 32 local state values.");
+      if (!isRecord(rawComponent.state) || Object.keys(rawComponent.state).length > (inputSchemaVersion >= 3 ? 64 : 32)) fail("SKIN_PLUGIN_STATE_INVALID", "A component declares too many local state values.");
       for (const [key, value] of Object.entries(rawComponent.state)) {
         identifier(key, "state.key");
         if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") fail("SKIN_PLUGIN_STATE_INVALID", "Component state values must be scalar.");
@@ -231,13 +305,14 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
     const stateKeys = new Set(Object.keys(state));
     if (!isRecord(rawComponent.actions)) fail("SKIN_PLUGIN_ACTION_INVALID", "A component must declare an action map.");
     const actionEntries = Object.entries(rawComponent.actions);
-    if (actionEntries.length > 24) fail("SKIN_PLUGIN_ACTION_INVALID", "A component declares too many actions.");
+    if (actionEntries.length > (inputSchemaVersion >= 3 ? 64 : 24)) fail("SKIN_PLUGIN_ACTION_INVALID", "A component declares too many actions.");
     const actions: Record<string, SkinPluginActionDefinition> = Object.create(null) as Record<string, SkinPluginActionDefinition>;
     for (const [actionId, rawAction] of actionEntries) {
       identifier(actionId, "action.id");
       if (!isRecord(rawAction)) fail("SKIN_PLUGIN_ACTION_INVALID", "An action must be an object.");
       onlyKeys(rawAction, new Set(["type", "args"]), "Component action");
       if (typeof rawAction.type !== "string" || !ACTIONS.has(rawAction.type)) fail("SKIN_PLUGIN_ACTION_UNKNOWN", "An action type is not supported by the host.");
+      if (inputSchemaVersion < 3 && V3_ACTIONS.has(rawAction.type)) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "This action requires components schema version 3.");
       if (!isRecord(rawAction.args)) fail("SKIN_PLUGIN_ACTION_INVALID", "An action must define an argument object.");
       const requiredPermission = ACTION_PERMISSION[rawAction.type as SkinPluginAction];
       if (requiredPermission && !permissions.includes(requiredPermission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The ${rawAction.type} action requires ${requiredPermission}.`);
@@ -254,17 +329,24 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (rawAction.type === "ui.setState" && (typeof args.key !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/.test(args.key) || !stateKeys.has(args.key) || !("value" in args))) {
         fail("SKIN_PLUGIN_ACTION_INVALID", "ui.setState requires a local state key and value.");
       }
+      if (rawAction.type === "ui.toggleState" && (typeof args.key !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/.test(args.key) || !stateKeys.has(args.key) || typeof state[args.key] !== "boolean")) {
+        fail("SKIN_PLUGIN_ACTION_INVALID", "ui.toggleState requires a declared boolean local state key.");
+      }
       if (rawAction.type === "voice.joinChannel" && typeof args.channelId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.joinChannel requires a channelId binding.");
       if (rawAction.type === "favorites.switch" && typeof args.favoriteId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "favorites.switch requires a favoriteId binding.");
       if (rawAction.type === "quickServers.switch" && typeof args.quickServerId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "quickServers.switch requires a quickServerId binding.");
       if (rawAction.type === "chat.sendMessage" && typeof args.text !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "chat.sendMessage requires a text binding.");
+      if (rawAction.type === "voice.setOutputVolume" && typeof args.volume !== "number" && typeof args.volume !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.setOutputVolume requires a volume value.");
+      if (rawAction.type === "voice.setAway" && typeof args.away !== "boolean") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.setAway requires an away boolean.");
+      if (rawAction.type === "voice.setWhisperActive" && typeof args.active !== "boolean") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.setWhisperActive requires an active boolean.");
+      if (rawAction.type === "voice.joinScreenShare" && typeof args.streamId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.joinScreenShare requires a visible streamId.");
       actions[actionId] = { type: rawAction.type as SkinPluginAction, args };
     }
     let componentNodes = 0;
     const walk = (rawNode: unknown, depth: number, aliases: ReadonlyMap<string, string> = new Map()): SkinPluginNode => {
       componentNodes += 1;
-      if (componentNodes > SKIN_PLUGIN_NODE_LIMIT) fail("SKIN_PLUGIN_COMPLEXITY_LIMIT", "A component contains too many template nodes.");
-      if (depth > SKIN_PLUGIN_TREE_DEPTH_LIMIT || !isRecord(rawNode)) fail("SKIN_PLUGIN_TREE_INVALID", "A component tree is too deep or contains an invalid node.");
+      if (componentNodes > (inputSchemaVersion >= 3 ? SKIN_PLUGIN_NODE_LIMIT : 256)) fail("SKIN_PLUGIN_COMPLEXITY_LIMIT", "A component contains too many template nodes.");
+      if (depth > (inputSchemaVersion >= 3 ? SKIN_PLUGIN_TREE_DEPTH_LIMIT : 16) || !isRecord(rawNode)) fail("SKIN_PLUGIN_TREE_INVALID", "A component tree is too deep or contains an invalid node.");
       onlyKeys(rawNode, new Set(["widget", "tag", "text", "part", "className", "attributes", "asset", "bindValue", "repeat", "when", "events", "children"]), "Component node");
       if (inputSchemaVersion === 1 && rawNode.widget !== undefined) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Host widgets require components schema version 2.");
       const nodeKinds = Number(rawNode.widget !== undefined) + Number(rawNode.tag !== undefined) + Number(rawNode.text !== undefined);
@@ -293,11 +375,12 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         node.className = rawNode.className;
       }
       if (rawNode.attributes !== undefined) {
-        if (!isRecord(rawNode.attributes) || Object.keys(rawNode.attributes).length > 24) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "Component attributes must be a small object.");
+        if (!isRecord(rawNode.attributes) || Object.keys(rawNode.attributes).length > (inputSchemaVersion >= 3 ? 48 : 24)) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "Component attributes must be a small object.");
         const attrs: Record<string, string | number | boolean> = Object.create(null) as Record<string, string | number | boolean>;
         for (const [key, value] of Object.entries(rawNode.attributes)) {
           const lowerKey = key.toLowerCase();
-          if (!ATTRIBUTES.has(lowerKey) || lowerKey.startsWith("on") || key !== lowerKey) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "The component uses an unsupported or executable attribute.");
+          const isAriaOrData = inputSchemaVersion >= 3 && /^(?:aria|data)-[a-z][a-z0-9-]{0,47}$/.test(lowerKey);
+          if ((!ATTRIBUTES.has(lowerKey) && !isAriaOrData) || lowerKey.startsWith("on") || key !== lowerKey) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "The component uses an unsupported or executable attribute.");
           if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "Component attributes must be scalar values.");
           if (typeof value === "string" && ["fill", "stroke"].includes(lowerKey) && /\burl\s*\(|javascript\s*:/i.test(value)) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "SVG paint attributes cannot load external or executable resources.");
           if (typeof value === "string") {
@@ -326,7 +409,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (!isRecord(rawNode.repeat)) fail("SKIN_PLUGIN_REPEAT_INVALID", "A repeat declaration must be an object.");
         onlyKeys(rawNode.repeat, new Set(["path", "as"]), "Repeat declaration");
         const path = boundedText(rawNode.repeat.path, "repeat.path", 120);
-        if (!(path === "session.channels" || path === "session.members" || path === "favorites.items" || path === "servers.quickList" || path === "chat.messages")) fail("SKIN_PLUGIN_REPEAT_INVALID", "A component may repeat only a registered public collection.");
+    if (!(path === "session.channels" || path === "session.members" || path === "favorites.items" || path === "servers.quickList" || path === "chat.messages" || path === "screenShare.streams")) fail("SKIN_PLUGIN_REPEAT_INVALID", "A component may repeat only a registered public collection.");
         const permission = COLLECTION_PERMISSION[path];
         if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `Repeating ${path} requires ${permission}.`);
         const alias = identifier(rawNode.repeat.as, "repeat.as");
@@ -345,12 +428,15 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         node.when = { path, ...(equals === undefined ? {} : { equals }) };
       }
       if (rawNode.events !== undefined) {
-        if (!isRecord(rawNode.events) || Object.keys(rawNode.events).length > 6) fail("SKIN_PLUGIN_EVENT_INVALID", "Component events must be a small object.");
+        if (!isRecord(rawNode.events) || Object.keys(rawNode.events).length > (inputSchemaVersion >= 3 ? 18 : 6)) fail("SKIN_PLUGIN_EVENT_INVALID", "Component events must be a small object.");
         const events: Partial<Record<SkinPluginEvent, string>> = {};
         for (const [event, actionIdValue] of Object.entries(rawNode.events)) {
-          if (!EVENTS.has(event) || typeof actionIdValue !== "string" || !actions[actionIdValue]) fail("SKIN_PLUGIN_EVENT_INVALID", "Each component event must refer to a declared host action.");
+          if (!EVENTS.has(event) || (inputSchemaVersion < 3 && V3_EVENTS.has(event)) || typeof actionIdValue !== "string" || !actions[actionIdValue]) fail("SKIN_PLUGIN_EVENT_INVALID", "Each component event must refer to a declared host action supported by this schema.");
           const action = actions[actionIdValue];
           if (action.type !== "ui.setState" && (event === "input" || event === "change")) fail("SKIN_PLUGIN_EVENT_INVALID", "Host actions cannot run while a form value is being typed or changed.");
+          if (action.type !== "ui.setState" && action.type !== "ui.toggleState" && PASSIVE_EVENTS.has(event)) {
+            fail("SKIN_PLUGIN_EVENT_INVALID", "Voice and host actions require an explicit user activation event.");
+          }
           for (const argument of Object.values(action.args)) {
             if (typeof argument !== "string") continue;
             for (const permission of bindingPermissions(argument, aliases, stateKeys)) {
@@ -362,7 +448,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         node.events = events;
       }
       if (rawNode.children !== undefined) {
-        if (!Array.isArray(rawNode.children) || rawNode.children.length > 100) fail("SKIN_PLUGIN_TREE_INVALID", "A component node contains too many children.");
+        if (!Array.isArray(rawNode.children) || rawNode.children.length > (inputSchemaVersion >= 3 ? 256 : 100)) fail("SKIN_PLUGIN_TREE_INVALID", "A component node contains too many children.");
         if (node.tag && VOID_ELEMENTS.has(node.tag) && rawNode.children.length) fail("SKIN_PLUGIN_TREE_INVALID", "A void element cannot contain child nodes.");
         const childAliases = new Map(aliases);
         if (node.repeat) childAliases.set(node.repeat.as, node.repeat.path);
@@ -395,7 +481,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
     visit(component.root);
     widgetsByPage.set(component.page, pageWidgets);
   }
-  return { schemaVersion: SKIN_PLUGIN_SCHEMA_VERSION, components };
+  return { schemaVersion: inputSchemaVersion, components };
 }
 
 export function parseSkinPluginJson(source: string): SkinPluginDocument {

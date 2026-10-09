@@ -1,6 +1,7 @@
 import { computed, defineComponent, Fragment, h, onUnmounted, reactive, ref, Teleport, watch, type PropType, type VNodeChild } from "vue";
 import {
   SKIN_PLUGIN_PERMISSIONS,
+  SKIN_PLUGIN_REPEAT_LIMIT,
   parseSkinPluginDocument,
   type SkinPluginActionDefinition,
   type SkinPluginComponent,
@@ -16,7 +17,9 @@ type HostAction = (args: Record<string, Scalar>, component: SkinPluginComponent)
 type HostWidget = () => VNodeChild;
 
 const eventProps: Record<string, string> = {
-  click: "onClick", dblclick: "onDblclick", change: "onChange", input: "onInput", submit: "onSubmit", keydown: "onKeydown",
+  click: "onClick", dblclick: "onDblclick", change: "onChange", input: "onInput", submit: "onSubmit", keydown: "onKeydown", keyup: "onKeyup",
+  contextmenu: "onContextmenu", focus: "onFocus", blur: "onBlur", pointerdown: "onPointerdown", pointerup: "onPointerup",
+  pointerenter: "onPointerenter", pointerleave: "onPointerleave", dragstart: "onDragstart", dragover: "onDragover", drop: "onDrop",
 };
 
 export default defineComponent({
@@ -118,6 +121,12 @@ export default defineComponent({
         if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && "value" in args) state[args.key] = args.value;
         return;
       }
+      if (definition.type === "ui.toggleState") {
+        if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && typeof state[args.key] === "boolean") {
+          state[args.key] = !state[args.key];
+        }
+        return;
+      }
       const handler = props.actions[definition.type];
       if (handler) void Promise.resolve(handler(args, component)).catch(() => undefined);
     }
@@ -149,7 +158,8 @@ export default defineComponent({
       if (!skipRepeat && node.repeat) {
         const values = resolvePath(node.repeat.path, context, state);
         if (!Array.isArray(values)) return null;
-        return h(Fragment, null, values.slice(0, 100).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, true)));
+        const repeatLimit = props.document.schemaVersion >= 3 ? SKIN_PLUGIN_REPEAT_LIMIT : 100;
+        return h(Fragment, null, values.slice(0, repeatLimit).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, true)));
       }
       if (node.when) {
         const value = resolvePath(node.when.path, context, state);
@@ -174,7 +184,9 @@ export default defineComponent({
         if (!propName) continue;
         attrs[propName] = (event: Event) => {
           if (!event.isTrusted) return;
-          if (eventName === "keydown" && event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
+          if ((eventName === "keydown" || eventName === "keyup") && event instanceof KeyboardEvent
+            && event.key !== "Enter" && event.key !== " " && event.key !== "Escape") return;
+          if (eventName === "contextmenu" || eventName === "dragover") event.preventDefault();
           if (node.bindValue && eventName === "input" && (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
             state[node.bindValue] = event.target instanceof HTMLInputElement && event.target.type === "checkbox" ? event.target.checked : event.target.value;
           } else if (node.bindValue && eventName === "change" && (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) {

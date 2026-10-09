@@ -1,6 +1,6 @@
 # 更开放的皮肤系统规格
 
-状态：皮肤包 schema v3 已接入公开客户端、浏览器导入和服务端包校验；components.json schema v2 正在提供整页替换和宿主控件插槽，旧组件 schema v1 继续兼容。页面内容由受限声明式树和皮肤 CSS 定义，交互通过白名单动作及 WebSpeak 原生控件完成；不执行皮肤作者的 JavaScript 或 WebAssembly。阶段记录见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)，创作者操作见[皮肤开发规范](./SKIN_DEVELOPMENT.md)。
+状态：皮肤包 schema v3 已接入公开客户端、浏览器导入和服务端包校验；components.json schema v3 支持自定义公开页面结构、整页替换和更丰富的宿主动作，schema v1/v2 继续兼容。界面由受限声明式树和皮肤 CSS 定义，交互映射到经权限控制的 WebSpeak/TeamSpeak 功能；不执行作者 JavaScript 或 WebAssembly。阶段记录见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)，创作者操作见[皮肤开发规范](./SKIN_DEVELOPMENT.md)。
 
 ## 1. 目标与范围
 
@@ -12,13 +12,13 @@
 
 皮肤格式按版本区分：v1 保持视觉皮肤兼容；v2 提供有界布局 JSON；v3 使用 open-skin 清单、受控 CSS 和可选的 components.json。v1/v2 的 CSS 继续拒绝布局类声明，既有用户包不会因升级而获得新权限。v3 才允许 CSS 控制公开页面中的布局、位置、尺寸、顺序、文字排版和显隐。
 
-v3 自定义组件不是脚本插件。components.json schema v1 是既有组件格式；schema v2 增加 `mode: "surface"` 与宿主控件节点。surface 可以替换首页或语音工作区的整页可见内容；作者可把安全节点、公开数据列表和宿主控件组合成自己的应用布局。宿主解析元素白名单、受限属性、数据绑定、重复列表、条件和事件声明，再由 Vue 创建节点。管理员面板和演示页不能被 surface 替换。
+v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。作者可直接用自己的节点和 CSS 构建页面，宿主控件只是可选的可信原生功能块，不是允许自定义界面的固定组件目录。宿主解析元素白名单、受限属性、数据绑定、重复列表、条件和事件声明，再由 Vue 创建节点。管理员面板和演示页不能被 surface 替换。
 
-宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。频道、收藏等自定义列表仍可用现有公开数据绑定和受限动作构建。
+宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
 
 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAssembly、远程脚本、任意 URL、表单导航、浏览器存储访问或网络调用。未知字段、元素、动作、数据路径、控件和权限一律拒绝。
 
-每个组件只能声明 home、voice 或 demo 页面中的一个页面、一个有界的树和精确权限清单。components.json 全文不超过 256 KiB；最多 32 个组件；每组件最多 256 个节点、16 层深度、100 个重复行、32 个本地状态值和 24 个宿主动作。图片仅可通过包内 image 资源引用。
+每个组件只能声明 home、voice 或 demo 页面中的一个页面、一个有界的树和精确权限清单。components.json 全文不超过 256 KiB。schema v1/v2 保留旧上限（32 个组件、每组件 256 个节点、16 层深度、100 个重复行）；schema v3 上限为 128 个组件、每组件 2048 个节点、32 层深度、250 个重复行、64 个本地状态值和 64 个动作。图片仅可通过包内 image 资源引用。文档字节上限仍优先生效，因此实际可用数量取决于包内容。
 
 ## 3. 可读数据和权限
 
@@ -32,6 +32,10 @@ v3 自定义组件不是脚本插件。components.json schema v1 是既有组件
 - chat.channel.read：当前公开文字频道中可见的消息。
 - favorites.read：收藏项名称、类型、是否当前项和随机不透明本地令牌；不提供地址或凭据。
 - servers.quickList.read：统一后的收藏和最近连接名称、当前项、分类与随机不透明本地令牌；不提供地址或凭据。
+- audio.status.read：当前用户自己的麦克风静音和输出静音状态。
+- voice.whisper.status.read：悄悄话开关状态与已配置目标数量。
+- voice.screenShare.status.read：当前用户自己的屏幕共享状态。
+- voice.screenShare.read：当前可见共享的名称、来源、所有者显示名、音频标记和观看人数；不提供流内容。
 
 当前宿主动作如下：
 
@@ -40,10 +44,12 @@ v3 自定义组件不是脚本插件。components.json schema v1 是既有组件
 - quickServers.switch 需要 servers.quickList.switch，只能让宿主按不透明令牌选择本机已有收藏或最近连接并走原连接流程。
 - chat.sendMessage 需要 chat.channel.send，只能发送到当前公开文字频道；不包括私聊。
 - ui.setState 只修改该组件短暂的本地标量状态，不需要会话权限。
+- v3 的 ui.toggleState 可切换该组件声明的布尔状态，不需要会话权限。
+- v3 可在用户明确操作时切换自己的麦克风和扬声器静音、调整本地输出音量、断开当前会话、设置自己的离开状态、启停悄悄话，以及开始/停止或加入/离开可见的屏幕共享；每项都需要对应权限，并继续走 WebSpeak 原有流程。
 
 宿主控件节点只是把 WebSpeak 的原生界面放进皮肤布局，不向皮肤提供控件内部的数据对象。控件仍使用原来的连接、权限和用户事件检查；例如嵌入 `voice.chat-panel` 可以让用户继续使用原生聊天界面，但不会授予组件读取私聊内容的能力。
 
-动作仅能绑定到真实可信用户事件。输入和 change 事件不能调用宿主动作；键盘动作仅响应 Enter 或 Space。宿主再次检查当前频道、令牌及动作参数。皮肤不能控制麦克风、音频设备、屏幕采集、身份密钥或 TeamSpeak 管理命令。
+事件支持 click、dblclick、keydown/up、contextmenu、focus/blur、pointer 和 drag/drop 等受限事件；键盘动作仅响应 Enter、Space 或 Escape。输入和 change 事件不能调用宿主动作；focus/blur、pointerenter/leave、dragstart/over 这类被动事件只能改变组件本地状态，不能触发语音或其他宿主动作。敏感语音动作要求可信的明确用户操作。宿主再次检查当前频道、令牌、共享 ID 及动作参数；系统屏幕采集授权仍由浏览器/操作系统处理。皮肤不能读取原始音频或屏幕流、控制其他用户、读取身份密钥或调用 TeamSpeak 管理命令。
 
 数据授权不是数据上传授权：组件没有任意联网或持久化 API，权限决定保存在本机。渲染进程不会把服务器地址、密码、身份私钥、访问令牌、Cookie、私聊、原始音频或屏幕流交给皮肤。
 
@@ -67,7 +73,7 @@ v3 CSS 和 surface 可排列、替换或遮挡公开 UI，因此可能改变麦�
 
 ## 7. 后续安全工作
 
-- 扩展数据字段或宿主动作时，增加精确 schema、权限和宿主侧运行时验证，不暴露内部 SDK 对象。新增宿主控件也必须登记固定 ID、明确页面和确认只在宿主内处理其私有状态。
+- 扩展数据字段或宿主动作时，增加精确 schema、权限、明确用户事件约束和宿主侧运行时验证，不暴露内部 SDK 对象。新增宿主控件也必须登记固定 ID、明确页面和确认只在宿主内处理其私有状态；自定义声明式 UI 不应被限制为只能拼装这组控件。
 - 对恶意输入、路径别名、拒绝授权、撤销、更新和皮肤切换增加测试；高敏能力必须单独设计。
 - 不把当前声明式包描述为可执行代码沙箱。现有 JavaScript Worker 与 Wasm 原型均未启用；浏览器 Worker 没有硬内存配额，原型也没有完整的页面渲染、控件与动作审查流程。若未来考虑作者代码，应另行开展威胁建模、资源耗尽测试、浏览器隔离评估与独立安全审查。
 - 商城发布、签名、下架、更新和撤销设计与管理员面板重做一起验收，且保持零新增服务费用为默认约束。
