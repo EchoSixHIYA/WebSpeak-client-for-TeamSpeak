@@ -1,6 +1,9 @@
 import {
+  SKIN_PLUGIN_NODE_LIMIT,
+  SKIN_PLUGIN_TREE_DEPTH_LIMIT,
   parseSkinPluginDocument,
   type SkinPluginAction,
+  type SkinPluginComponent,
   type SkinPluginDocument,
   type SkinPluginNode,
 } from "./skin-plugin.js";
@@ -8,6 +11,38 @@ import {
 export const SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES = 16 * 1024;
 
 const LOCAL_UI_ACTIONS = new Set<SkinPluginAction>(["ui.setState", "ui.toggleState"]);
+const GENERATED_COMPONENT_LIMIT = 64;
+const GENERATED_CHILD_LIMIT = 256;
+const GENERATED_ATTRIBUTE_LIMIT = 64;
+const GENERATED_BLOCKED_ELEMENTS = new Set([
+  "base", "embed", "frame", "frameset", "iframe", "link", "meta", "object", "portal", "script", "style", "template",
+]);
+const GENERATED_SAFE_ELEMENTS = new Set([
+  "a", "abbr", "address", "article", "aside", "b", "blockquote", "br", "button", "caption", "circle", "cite", "code", "col",
+  "colgroup", "dd", "del", "details", "dfn", "div", "dl", "dt", "em", "fieldset", "figcaption", "figure", "footer", "g", "h1",
+  "form", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "input", "kbd", "label", "legend", "li", "line", "main", "mark",
+  "nav", "ol", "option", "output", "p", "path", "polygon", "polyline", "pre", "progress", "q", "rect", "s", "section", "select",
+  "small", "span", "stop", "strong", "sub", "summary", "sup", "svg", "table", "tbody", "td", "text", "textarea", "tfoot", "th",
+  "thead", "time", "tr", "u", "ul", "use", "wbr",
+]);
+const GENERATED_VOID_ELEMENTS = new Set([
+  "br", "col", "hr", "img", "input", "line", "path", "polygon", "polyline", "rect", "stop", "use", "wbr",
+]);
+const GENERATED_SAFE_ATTRIBUTES = new Set([
+  "accept", "alt", "aria-label", "aria-labelledby", "aria-describedby", "aria-live", "aria-current", "aria-expanded", "aria-hidden",
+  "aria-pressed", "aria-selected", "autocomplete", "checked", "cite", "class", "colspan", "contenteditable", "controls", "coords",
+  "datetime", "dir", "disabled", "draggable", "fill", "fill-rule", "height", "hidden", "high", "id", "inputmode", "label", "low",
+  "max", "maxlength", "min", "minlength", "multiple", "muted", "name", "open", "optimum", "placeholder", "preload", "readonly",
+  "required", "reversed", "role", "rows", "rowspan", "scope", "selected", "shape", "size", "span", "spellcheck", "start", "step",
+  "stroke", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-width", "tabindex",
+  "href", "title", "transform", "type", "value", "viewbox", "width", "wrap", "x", "x1", "x2", "y", "y1", "y2", "cx", "cy", "d", "r", "rx",
+  "ry", "points", "opacity", "preserveaspectratio", "vector-effect",
+]);
+const GENERATED_BLOCKED_ATTRIBUTES = new Set([
+  "action", "archive", "background", "code", "codebase", "data", "download", "form", "formaction", "formmethod", "formenctype",
+  "formtarget", "is", "manifest", "ping", "poster", "profile", "src", "srcdoc", "srcset", "style", "target", "xlink:href",
+  "autofocus", "autoplay", "command", "commandfor", "http-equiv", "nonce", "slot",
+]);
 
 export class SkinExtensionUiOutputError extends Error {
   constructor(readonly code: string, message: string) {
@@ -25,7 +60,126 @@ function assertLocalUiNode(node: SkinPluginNode): void {
   node.children?.forEach(assertLocalUiNode);
 }
 
-/** Parses Wasm output into the existing safe component tree, with no added host capabilities. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function boundedText(value: unknown, maximum: number, code: string, field: string): string {
+  if (typeof value !== "string" || !value.trim() || value.trim() !== value || value.length > maximum) {
+    fail(code, `${field} must be bounded non-empty text.`);
+  }
+  return value;
+}
+
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], context: string): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key))) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", `${context} has an unsupported field.`);
+}
+
+function generatedNode(input: unknown, depth: number, count: { value: number }): SkinPluginNode {
+  count.value += 1;
+  if (count.value > SKIN_PLUGIN_NODE_LIMIT || depth > SKIN_PLUGIN_TREE_DEPTH_LIMIT || !isRecord(input)) {
+    fail("SKIN_EXTENSION_UI_COMPLEXITY_LIMIT", "The generated UI tree exceeds its node or depth limit.");
+  }
+  onlyKeys(input, ["tag", "text", "part", "className", "attributes", "asset", "children"], "A generated UI node");
+  const hasTag = input.tag !== undefined;
+  const hasText = input.text !== undefined;
+  if (Number(hasTag) + Number(hasText) !== 1) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated node must contain either a tag or text.");
+
+  const node: SkinPluginNode = {};
+  if (hasText) {
+    if (typeof input.text !== "string" || input.text.length > 8_192) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated text exceeds its limit.");
+    node.text = input.text;
+  }
+  if (hasTag) {
+    const tag = boundedText(input.tag, 64, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "node.tag");
+    const customElementName = /^[a-z][a-z0-9]*-[a-z0-9-]+$/.test(tag);
+    if ((!GENERATED_SAFE_ELEMENTS.has(tag) && !customElementName) || GENERATED_BLOCKED_ELEMENTS.has(tag)) {
+      fail("SKIN_EXTENSION_UI_ELEMENT_INVALID", `The generated element '${tag}' is not allowed.`);
+    }
+    node.tag = tag;
+  }
+  if (input.part !== undefined) {
+    const part = boundedText(input.part, 64, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "node.part");
+    if (!/^[a-z][a-z0-9-]*$/.test(part)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated part uses an invalid name.");
+    node.part = part;
+  }
+  if (input.className !== undefined) {
+    if (typeof input.className !== "string" || input.className.length > 512 || /[<>\u0000-\u001f]/.test(input.className)) {
+      fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated class names must be bounded plain text.");
+    }
+    node.className = input.className;
+  }
+  if (input.attributes !== undefined) {
+    if (!isRecord(input.attributes) || Object.keys(input.attributes).length > GENERATED_ATTRIBUTE_LIMIT) {
+      fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", "Generated attributes must be a bounded object.");
+    }
+    const attributes: Record<string, string | number | boolean> = Object.create(null) as Record<string, string | number | boolean>;
+    for (const [key, value] of Object.entries(input.attributes)) {
+      const safeDataOrAria = key.startsWith("data-") || key.startsWith("aria-");
+      if (!/^[a-z][a-z0-9:_-]{0,63}$/.test(key) || key.startsWith("on")
+        || key.startsWith("data-ws-") || GENERATED_BLOCKED_ATTRIBUTES.has(key)
+        || (!GENERATED_SAFE_ATTRIBUTES.has(key) && !safeDataOrAria)) {
+        fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", `The generated attribute '${key}' is not allowed.`);
+      }
+      if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+        fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", "Generated attribute values must be scalar.");
+      }
+      if (typeof value === "string" && value.length > 4_096) fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", "A generated attribute exceeds its size limit.");
+      if (key === "href" && (typeof value !== "string" || !/^#[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(value))) {
+        fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", "Generated links may only target a same-document fragment.");
+      }
+      if (["fill", "stroke", "clip-path", "filter", "mask", "marker-start", "marker-mid", "marker-end"].includes(key)
+        && typeof value === "string" && /url\s*\(|javascript\s*:/i.test(value)) {
+        fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", "SVG attributes cannot load external or executable resources.");
+      }
+      attributes[key] = value;
+    }
+    node.attributes = attributes;
+  }
+  if (input.asset !== undefined) {
+    const asset = boundedText(input.asset, 120, "SKIN_EXTENSION_UI_ASSET_INVALID", "node.asset");
+    if (node.tag !== "img" || !/^assets\/[A-Za-z0-9._/-]+$/.test(asset) || asset.split("/").some((part) => !part || part === "." || part === "..")) {
+      fail("SKIN_EXTENSION_UI_ASSET_INVALID", "Generated image assets must use safe package-relative paths.");
+    }
+    node.asset = asset;
+  }
+  if (input.children !== undefined) {
+    if (!Array.isArray(input.children) || input.children.length > GENERATED_CHILD_LIMIT) {
+      fail("SKIN_EXTENSION_UI_COMPLEXITY_LIMIT", "A generated node has too many children.");
+    }
+    if (node.tag && GENERATED_VOID_ELEMENTS.has(node.tag) && input.children.length > 0) {
+      fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Void generated elements cannot contain children.");
+    }
+    node.children = input.children.map((child) => generatedNode(child, depth + 1, count));
+  }
+  return node;
+}
+
+function parseGeneratedDocument(input: Record<string, unknown>): SkinPluginDocument {
+  onlyKeys(input, ["schemaVersion", "components"], "Generated UI document");
+  if (!Array.isArray(input.components) || input.components.length < 1 || input.components.length > GENERATED_COMPONENT_LIMIT) {
+    fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "The generated document has an unsupported component count.");
+  }
+  const ids = new Set<string>();
+  const components: SkinPluginComponent[] = input.components.map((raw, index) => {
+    if (!isRecord(raw)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", `Generated component ${index} must be an object.`);
+    onlyKeys(raw, ["id", "name", "page", "accessibleName", "root"], "Generated component");
+    const id = boundedText(raw.id, 64, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "component.id");
+    if (!/^[a-z][a-z0-9-]*$/.test(id) || ids.has(id)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated component IDs must be unique lowercase slugs.");
+    ids.add(id);
+    const name = boundedText(raw.name, 80, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "component.name");
+    const accessibleName = boundedText(raw.accessibleName, 120, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "component.accessibleName");
+    if (raw.page !== "home" && raw.page !== "voice") fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated components may target only the public home or voice page.");
+    const root = generatedNode(raw.root, 1, { value: 0 });
+    if (!root.tag) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated component root must be an element.");
+    return { id, name, page: raw.page, accessibleName, permissions: [], actions: Object.create(null) as Record<string, never>, root };
+  });
+  return { schemaVersion: 3, components };
+}
+
+/** Parses bounded Wasm output. Schema 4 supports broad safe HTML/SVG, data/ARIA attributes, and inert custom-element placeholders. */
 export function parseSkinExtensionUiOutput(source: string): SkinPluginDocument {
   if (typeof source !== "string" || !source.length) {
     fail("SKIN_EXTENSION_UI_OUTPUT_INVALID", "Extension UI output must be a non-empty JSON string.");
@@ -37,6 +191,9 @@ export function parseSkinExtensionUiOutput(source: string): SkinPluginDocument {
   let input: unknown;
   try { input = JSON.parse(source); }
   catch { fail("SKIN_EXTENSION_UI_OUTPUT_JSON", "Extension UI output must contain valid JSON."); }
+
+  if (!isRecord(input)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Extension UI output must be an object.");
+  if (input.schemaVersion === 4) return parseGeneratedDocument(input);
 
   let document: SkinPluginDocument;
   try { document = parseSkinPluginDocument(input); }

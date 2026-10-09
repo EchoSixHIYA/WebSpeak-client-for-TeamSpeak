@@ -1,5 +1,6 @@
 import { computed, defineComponent, Fragment, h, onUnmounted, reactive, ref, Teleport, watch, type PropType, type VNodeChild } from "vue";
 import {
+  SKIN_PLUGIN_COMPONENT_LIMIT,
   SKIN_PLUGIN_PERMISSIONS,
   SKIN_PLUGIN_REPEAT_LIMIT,
   parseSkinPluginDocument,
@@ -54,10 +55,10 @@ export default defineComponent({
       if (!props.extensionOutput || document.schemaVersion !== 3) return document;
       try {
         const extensionDocument = parseSkinExtensionUiOutput(props.extensionOutput);
-        return parseSkinPluginDocument({
-          schemaVersion: 3,
-          components: [...document.components, ...extensionDocument.components],
-        });
+        const ids = new Set(document.components.map((component) => component.id));
+        if (document.components.length + extensionDocument.components.length > SKIN_PLUGIN_COMPONENT_LIMIT
+          || extensionDocument.components.some((component) => ids.has(component.id))) return document;
+        return { schemaVersion: 3 as const, components: [...document.components, ...extensionDocument.components] };
       } catch {
         // Dynamic output is optional; an invalid or colliding result leaves the package UI intact.
         return document;
@@ -239,7 +240,11 @@ export default defineComponent({
       }
       if (node.tag === "form" && !node.events?.submit) attrs.onSubmit = (event: Event) => event.preventDefault();
       const children = (node.children ?? []).map((child, index) => renderNode(component, child, context, state, false, `${nodePath}-${index}`));
-      return h(node.tag, attrs, children);
+      // Custom element names are inert host-rendered placeholders. Never instantiate a page-registered
+      // custom element from generated output, since its connectedCallback would run with page privileges.
+      const tag = node.tag.includes("-") ? "div" : node.tag;
+      if (tag !== node.tag) attrs["data-ws-generated-element"] = node.tag;
+      return h(tag, attrs, children);
     }
 
     function accept(): void {
