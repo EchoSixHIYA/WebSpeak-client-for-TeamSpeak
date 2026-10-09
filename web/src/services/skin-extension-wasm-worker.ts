@@ -8,6 +8,7 @@ import {
   SKIN_EXTENSION_WASM_MESSAGE_LIMIT,
   SKIN_EXTENSION_WASM_STATUS_BYTES_LIMIT,
   SKIN_EXTENSION_WASM_STATUS_READ_LIMIT,
+  SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES,
   validateSkinExtensionWasmImportsAndExports,
 } from "./skin-extension-wasm-policy.js";
 
@@ -32,6 +33,8 @@ interface WasmiInterpreterExports extends WebAssembly.Exports {
   last_error_code: () => number;
   last_status_read_count: () => number;
   last_guest_memory_bytes: () => number;
+  last_ui_output_pointer: () => number;
+  last_ui_output_length: () => number;
 }
 
 const scope = self as unknown as {
@@ -111,7 +114,8 @@ async function run(job: RunMessage): Promise<void> {
         : errorCode === 6 ? "SKIN_EXTENSION_WASM_MEMORY_LIMIT"
           : errorCode === 10 ? "SKIN_EXTENSION_WASM_IMPORT_INVALID"
             : errorCode === 11 ? "SKIN_EXTENSION_WASM_PERMISSION_INVALID"
-              : "SKIN_EXTENSION_WASM_INTERPRETER_FAILED";
+              : errorCode === 12 ? "SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID"
+                : "SKIN_EXTENSION_WASM_INTERPRETER_FAILED";
       sendError(code, "The extension was rejected or stopped inside the bounded Wasmi interpreter.");
       return;
     }
@@ -119,6 +123,8 @@ async function run(job: RunMessage): Promise<void> {
     const result = Number(rawResult);
     const statusReadCount = interpreter.last_status_read_count();
     const linearMemoryBytes = interpreter.last_guest_memory_bytes();
+    const uiOutputPointer = interpreter.last_ui_output_pointer();
+    const uiOutputLength = interpreter.last_ui_output_length();
     if (!Number.isSafeInteger(result) || !Number.isSafeInteger(statusReadCount) || statusReadCount < 0
       || statusReadCount > SKIN_EXTENSION_WASM_STATUS_READ_LIMIT || !Number.isSafeInteger(linearMemoryBytes)
       || linearMemoryBytes < 0 || linearMemoryBytes > metadata.memoryMaximumPages * 64 * 1024
@@ -126,11 +132,33 @@ async function run(job: RunMessage): Promise<void> {
       sendError("SKIN_EXTENSION_WASM_RESULT_INVALID", "The interpreter returned a value outside the allowed resource policy.");
       return;
     }
+    if (!Number.isSafeInteger(uiOutputPointer) || uiOutputPointer < 0 || !Number.isSafeInteger(uiOutputLength)
+      || uiOutputLength < 0 || uiOutputLength > SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES
+      || (uiOutputLength > 0 && !metadata.usesUiOutput)
+      || uiOutputPointer > interpreter.memory.buffer.byteLength
+      || uiOutputLength > interpreter.memory.buffer.byteLength - uiOutputPointer) {
+      sendError("SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID", "The interpreter returned UI output outside its bounded memory range.");
+      return;
+    }
+    let uiOutput: string | null = null;
+    if (uiOutputLength > 0) {
+      try {
+        const decodedOutput = new TextDecoder("utf-8", { fatal: true }).decode(
+          new Uint8Array(interpreter.memory.buffer, uiOutputPointer, uiOutputLength),
+        );
+        JSON.parse(decodedOutput);
+        uiOutput = decodedOutput;
+      } catch {
+        sendError("SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID", "The extension returned malformed UTF-8 or JSON UI output.");
+        return;
+      }
+    }
     const message = {
       type: "complete",
       result,
       linearMemoryBytes,
       statusReadCount,
+      uiOutput,
     };
     if (new TextEncoder().encode(JSON.stringify(message)).byteLength > SKIN_EXTENSION_WASM_MESSAGE_LIMIT) {
       sendError("SKIN_EXTENSION_WASM_MESSAGE_SIZE", "The module result exceeds its message limit.");
@@ -160,7 +188,8 @@ async function loadWasmiInterpreter(): Promise<WasmiInterpreterExports> {
   const exports = instance.exports as unknown as WasmiInterpreterExports;
   if (!(exports.memory instanceof WebAssembly.Memory) || typeof exports.alloc !== "function"
     || typeof exports.run !== "function" || typeof exports.last_error_code !== "function"
-    || typeof exports.last_status_read_count !== "function" || typeof exports.last_guest_memory_bytes !== "function") {
+    || typeof exports.last_status_read_count !== "function" || typeof exports.last_guest_memory_bytes !== "function"
+    || typeof exports.last_ui_output_pointer !== "function" || typeof exports.last_ui_output_length !== "function") {
     throw new Error("The bounded Wasmi interpreter exposes an incompatible runtime interface.");
   }
   return exports;

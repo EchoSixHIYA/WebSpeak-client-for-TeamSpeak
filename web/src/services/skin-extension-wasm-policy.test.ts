@@ -20,11 +20,12 @@ import {
   createSkinExtensionWasmPrefixByteImmediateProbe,
   createSkinExtensionWasmStatusProbe,
   createSkinExtensionWasmTooManyFunctionsProbe,
+  createSkinExtensionWasmUiOutputProbe,
 } from "../../test/skin-extension-wasm-fixture.js";
 
 test("Wasm metadata policy accepts only a single run export and one bounded host memory", () => {
   const metadata = validateSkinExtensionWasmImportsAndExports(createSkinExtensionWasmPrefixByteImmediateProbe());
-  assert.deepEqual(metadata, { usesSessionStatus: false, memoryMaximumPages: SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES });
+  assert.deepEqual(metadata, { usesSessionStatus: false, usesUiOutput: false, memoryMaximumPages: SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES });
 });
 
 test("Wasm policy rejects module-defined memory or tables that bypass host limits", () => {
@@ -83,9 +84,15 @@ test("Wasm import parsing reads the bounded permission contract without native c
   });
   assert.deepEqual(validateSkinExtensionWasmImportsAndExports(status, ["session.status.read"]), {
     usesSessionStatus: true,
+    usesUiOutput: false,
     memoryMaximumPages: SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES,
   });
   assert.equal(validateSkinExtensionWasmImportsAndExports(createSkinExtensionWasmCappedRunProbe()).usesSessionStatus, false);
+  assert.deepEqual(validateSkinExtensionWasmImportsAndExports(createSkinExtensionWasmUiOutputProbe()), {
+    usesSessionStatus: false,
+    usesUiOutput: true,
+    memoryMaximumPages: SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES,
+  });
 });
 
 test("Wasm instruction scanning distinguishes extension prefixes from signed integer bytes", () => {
@@ -93,6 +100,7 @@ test("Wasm instruction scanning distinguishes extension prefixes from signed int
   assert.doesNotThrow(() => validateSkinExtensionWasmBytes(bytes));
   assert.deepEqual(validateSkinExtensionWasmImportsAndExports(bytes), {
     usesSessionStatus: false,
+    usesUiOutput: false,
     memoryMaximumPages: SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES,
   });
 });

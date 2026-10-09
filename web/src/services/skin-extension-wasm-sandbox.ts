@@ -13,6 +13,7 @@ import {
   SKIN_EXTENSION_WASM_SOURCE_LIMIT,
   SKIN_EXTENSION_WASM_STARTUP_TIMEOUT_MS,
   SKIN_EXTENSION_WASM_STATUS_READ_LIMIT,
+  SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES,
   validateSkinExtensionWasmBytes,
 } from "./skin-extension-wasm-policy.js";
 
@@ -29,6 +30,7 @@ export interface SkinExtensionWasmSandboxResult {
   result: number | string;
   linearMemoryBytes: number;
   statusReadCount: number;
+  uiOutput: string | null;
   sessionSnapshot?: SkinExtensionSessionStatus;
 }
 
@@ -173,10 +175,13 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
       return;
     }
     if (message.type === "complete") {
-      const expectedKeys = ["type", "result", "linearMemoryBytes", "statusReadCount"];
+      const expectedKeys = ["type", "result", "linearMemoryBytes", "statusReadCount", "uiOutput"];
       if (Object.keys(message).length !== expectedKeys.length
         || Object.keys(message).some((key) => !expectedKeys.includes(key))
         || (typeof message.result !== "number" && typeof message.result !== "string")
+        || (message.uiOutput !== null && typeof message.uiOutput !== "string")
+        || (typeof message.uiOutput === "string"
+          && new TextEncoder().encode(message.uiOutput).byteLength > SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES)
         || !Number.isSafeInteger(message.linearMemoryBytes) || (message.linearMemoryBytes as number) < 0
         || (message.linearMemoryBytes as number) > SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES * 64 * 1024
         || !Number.isSafeInteger(message.statusReadCount) || (message.statusReadCount as number) < 0
@@ -185,7 +190,8 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
         return;
       }
       complete({ result: message.result as number | string, linearMemoryBytes: message.linearMemoryBytes as number,
-        statusReadCount: message.statusReadCount as number, ...(approvedSessionStatus ? { sessionSnapshot: approvedSessionStatus } : {}) });
+        statusReadCount: message.statusReadCount as number, uiOutput: message.uiOutput as string | null,
+        ...(approvedSessionStatus ? { sessionSnapshot: approvedSessionStatus } : {}) });
       return;
     }
     if (message.type === "error" && Object.keys(message).length === 3

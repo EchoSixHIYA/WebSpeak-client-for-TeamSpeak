@@ -19,6 +19,7 @@ import {
   createSkinExtensionWasmInfiniteRunProbe,
   createSkinExtensionWasmStatusMutationProbe,
   createSkinExtensionWasmStatusProbe,
+  createSkinExtensionWasmUiOutputProbe,
   createSkinExtensionWasmGcAllocationProbe,
   createSkinExtensionWasmOversizedFunctionBodyProbe,
   createSkinExtensionWasmOversizedElementVectorProbe,
@@ -243,6 +244,48 @@ await test("the development Wasm prototype bounds linear memory at 64 pages", as
   } finally {
     sandbox.close("test-complete");
     await sandbox.stopped;
+  }
+});
+
+await test("Wasm can return one bounded UTF-8 UI payload to the host", async () => {
+  const { sandbox } = wasmExtension(createSkinExtensionWasmUiOutputProbe());
+  try {
+    await sandbox.ready;
+    const result = await sandbox.result;
+    equal(result.uiOutput, '{"type":"root"}', "the host should receive the exact bounded UI payload");
+    equal(result.result, 7, "the ordinary scalar return value should remain available");
+  } finally {
+    sandbox.close("test-complete");
+    await sandbox.stopped;
+  }
+});
+
+await test("Wasm UI output is rejected when it exceeds the host byte limit", async () => {
+  const { sandbox } = wasmExtension(createSkinExtensionWasmUiOutputProbe("x".repeat(16 * 1024 + 1)));
+  try {
+    await sandbox.ready;
+    await rejects(sandbox.result, "SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID", "oversized UI output must fail closed");
+    await sandbox.stopped;
+  } finally {
+    sandbox.close("test-complete");
+    await sandbox.stopped;
+  }
+});
+
+await test("Wasm UI output rejects malformed JSON and repeated emissions", async () => {
+  for (const bytes of [
+    createSkinExtensionWasmUiOutputProbe("not-json"),
+    createSkinExtensionWasmUiOutputProbe('{"type":"root"}', true),
+  ]) {
+    const { sandbox } = wasmExtension(bytes);
+    try {
+      await sandbox.ready;
+      await rejects(sandbox.result, "SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID", "invalid UI output must fail closed");
+      await sandbox.stopped;
+    } finally {
+      sandbox.close("test-complete");
+      await sandbox.stopped;
+    }
   }
 });
 

@@ -3,9 +3,10 @@ export const SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES = 64;
 export const SKIN_EXTENSION_WASM_PAGE_BYTES = 64 * 1024;
 export const SKIN_EXTENSION_WASM_STARTUP_TIMEOUT_MS = 3_000;
 export const SKIN_EXTENSION_WASM_EXECUTION_LIMIT_MS = 100;
-export const SKIN_EXTENSION_WASM_MESSAGE_LIMIT = 8 * 1024;
+export const SKIN_EXTENSION_WASM_MESSAGE_LIMIT = 32 * 1024;
 export const SKIN_EXTENSION_WASM_STATUS_READ_LIMIT = 10;
 export const SKIN_EXTENSION_WASM_STATUS_BYTES_LIMIT = 512;
+export const SKIN_EXTENSION_WASM_UI_OUTPUT_LIMIT_BYTES = 16 * 1024;
 export const SKIN_EXTENSION_WASM_FUEL_LIMIT = 10_000_000n;
 export const SKIN_EXTENSION_WASM_INTERPRETER_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
 export const SKIN_EXTENSION_WASM_FUNCTION_LIMIT = 128;
@@ -19,7 +20,7 @@ const WASM_HEADER = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00] as const;
 const SCALAR_VALUE_TYPES = new Set([0x7f, 0x7e, 0x7d, 0x7c]);
 const BOUNDED_VECTOR_COUNTS = new Map<number, number>([
   [1, 128], // types
-  [2, 2], // memory and one optional capability import
+  [2, 3], // memory, one optional capability import, and one optional UI output import
   [3, SKIN_EXTENSION_WASM_FUNCTION_LIMIT],
   [6, 128], // globals
   [7, 64], // exports; the runner later requires exactly run
@@ -310,6 +311,7 @@ export function validateSkinExtensionWasmBytes(source: Uint8Array): void {
 
 export interface SkinExtensionWasmModuleMetadata {
   usesSessionStatus: boolean;
+  usesUiOutput: boolean;
   memoryMaximumPages: number;
 }
 
@@ -360,6 +362,7 @@ export function validateSkinExtensionWasmImportsAndExports(
   let memoryMaximumPages = SKIN_EXTENSION_WASM_MEMORY_LIMIT_PAGES;
   let hasMemory = false;
   let usesSessionStatus = false;
+  let usesUiOutput = false;
   let hasExports = false;
 
   while (offset < bytes.byteLength) {
@@ -371,8 +374,8 @@ export function validateSkinExtensionWasmImportsAndExports(
 
     if (sectionId === 2) {
       const count = readU32(bytes, offset, end);
-      if (count.value < 1 || count.value > 2) {
-        throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module must import one host memory and at most one approved capability.");
+      if (count.value < 1 || count.value > 3) {
+        throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module must import one host memory and may import one capability and one UI output function.");
       }
       let cursor = count.next;
       for (let index = 0; index < count.value; index += 1) {
@@ -386,10 +389,13 @@ export function validateSkinExtensionWasmImportsAndExports(
         if (kind === 0) {
           const typeIndex = readU32(bytes, cursor, end);
           cursor = typeIndex.next;
-          if (fieldName.value !== "session_status_read" || usesSessionStatus) {
+          if (fieldName.value === "session_status_read" && !usesSessionStatus) {
+            usesSessionStatus = true;
+          } else if (fieldName.value === "ui_emit_json" && !usesUiOutput) {
+            usesUiOutput = true;
+          } else {
             throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module requested an unsupported or duplicate function import.");
           }
-          usesSessionStatus = true;
         } else if (kind === 2) {
           if (fieldName.value !== "memory" || hasMemory) {
             throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_IMPORT_INVALID", "The module must import exactly one env.memory value.");
@@ -433,5 +439,5 @@ export function validateSkinExtensionWasmImportsAndExports(
   if (usesSessionStatus && !grantedPermissions.includes("session.status.read")) {
     throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_PERMISSION_INVALID", "The module imports session status without an approved session.status.read capability.");
   }
-  return { usesSessionStatus, memoryMaximumPages };
+  return { usesSessionStatus, usesUiOutput, memoryMaximumPages };
 }

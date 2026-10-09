@@ -5,6 +5,7 @@ use wasmi::{
 
 const SOURCE_LIMIT: usize = 256 * 1024;
 const STATUS_LIMIT: usize = 512;
+const UI_OUTPUT_LIMIT: usize = 16 * 1024;
 const MEMORY_LIMIT_BYTES: usize = 64 * 64 * 1024;
 const STATUS_READ_LIMIT: u32 = 10;
 const FUEL_LIMIT: u64 = 10_000_000;
@@ -20,10 +21,13 @@ const ERROR_STATUS_LINK: u32 = 8;
 const ERROR_INSTANTIATION: u32 = 9;
 const ERROR_IMPORT: u32 = 10;
 const ERROR_PERMISSION: u32 = 11;
+const ERROR_UI_OUTPUT: u32 = 12;
 
 static mut LAST_ERROR_CODE: u32 = ERROR_NONE;
 static mut LAST_STATUS_READ_COUNT: u32 = 0;
 static mut LAST_GUEST_MEMORY_BYTES: u32 = 0;
+static mut LAST_UI_OUTPUT: [u8; UI_OUTPUT_LIMIT] = [0; UI_OUTPUT_LIMIT];
+static mut LAST_UI_OUTPUT_LENGTH: u32 = 0;
 static mut LAST_DIAGNOSTIC: [u8; 256] = [0; 256];
 static mut LAST_DIAGNOSTIC_LENGTH: u32 = 0;
 
@@ -31,6 +35,9 @@ struct HostState {
     limits: StoreLimits,
     status: Vec<u8>,
     status_read_count: u32,
+    ui_output: Vec<u8>,
+    ui_output_emitted: bool,
+    ui_output_invalid: bool,
 }
 
 #[unsafe(no_mangle)]
@@ -60,6 +67,7 @@ pub unsafe extern "C" fn run(
     fuel: u64,
 ) -> i64 {
     clear_diagnostic();
+    clear_ui_output();
     set_report(ERROR_NONE, 0, 0);
     if module_pointer == 0
         || module_length == 0
@@ -83,7 +91,8 @@ pub unsafe extern "C" fn run(
     };
 
     match execute(module_bytes, status, status_permission_granted == 1, memory_maximum_pages, fuel) {
-        Ok((result, status_reads, guest_memory_bytes)) => {
+        Ok((result, status_reads, guest_memory_bytes, ui_output)) => {
+            set_ui_output(&ui_output);
             set_report(ERROR_NONE, status_reads, guest_memory_bytes);
             result as i64
         }
@@ -107,6 +116,16 @@ pub extern "C" fn last_status_read_count() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn last_guest_memory_bytes() -> u32 {
     unsafe { LAST_GUEST_MEMORY_BYTES }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn last_ui_output_pointer() -> u32 {
+    core::ptr::addr_of!(LAST_UI_OUTPUT) as usize as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn last_ui_output_length() -> u32 {
+    unsafe { LAST_UI_OUTPUT_LENGTH }
 }
 
 #[unsafe(no_mangle)]
@@ -142,13 +161,26 @@ fn set_report(error: u32, status_reads: u32, guest_memory_bytes: u32) {
     }
 }
 
+fn clear_ui_output() {
+    unsafe { LAST_UI_OUTPUT_LENGTH = 0; }
+}
+
+fn set_ui_output(output: &[u8]) {
+    let length = output.len().min(UI_OUTPUT_LIMIT);
+    unsafe {
+        let destination = core::ptr::addr_of_mut!(LAST_UI_OUTPUT).cast::<u8>();
+        core::ptr::copy_nonoverlapping(output.as_ptr(), destination, length);
+        LAST_UI_OUTPUT_LENGTH = length as u32;
+    }
+}
+
 fn execute(
     module_bytes: &[u8],
     status: Vec<u8>,
     status_permission_granted: bool,
     memory_maximum_pages: u32,
     fuel: u64,
-) -> Result<(i32, u32, u32), (u32, u32, u32)> {
+) -> Result<(i32, u32, u32, Vec<u8>), (u32, u32, u32)> {
     let mut config = Config::default();
     config
         .consume_fuel(true)
@@ -165,6 +197,7 @@ fn execute(
         .map_err(|_| (ERROR_MODULE, 0, 0))?;
     let mut saw_memory = false;
     let mut saw_status = false;
+    let mut saw_ui_output = false;
     for import in module.imports() {
         match (import.module(), import.name(), import.ty()) {
             ("env", "memory", wasmi::ExternType::Memory(memory_type))
@@ -182,6 +215,9 @@ fn execute(
             }
             ("env", "session_status_read", wasmi::ExternType::Func(_)) => {
                 return Err((ERROR_PERMISSION, 0, 0));
+            }
+            ("env", "ui_emit_json", wasmi::ExternType::Func(_)) if !saw_ui_output => {
+                saw_ui_output = true;
             }
             _ => return Err((ERROR_IMPORT, 0, 0)),
         }
@@ -210,7 +246,14 @@ fn execute(
         .tables(0)
         .trap_on_grow_failure(true)
         .build();
-    let mut store = Store::new(&engine, HostState { limits, status, status_read_count: 0 });
+    let mut store = Store::new(&engine, HostState {
+        limits,
+        status,
+        status_read_count: 0,
+        ui_output: Vec::new(),
+        ui_output_emitted: false,
+        ui_output_invalid: false,
+    });
     store.limiter(|state| &mut state.limits);
     store.set_fuel(fuel).map_err(|_| (ERROR_EXECUTION, 0, 0))?;
 
@@ -256,6 +299,36 @@ fn execute(
             .map_err(|_| (ERROR_STATUS_LINK, 0, 0))?;
     }
 
+    let output_memory = memory;
+    linker
+        .func_wrap(
+            "env",
+            "ui_emit_json",
+            move |mut caller: Caller<'_, HostState>, pointer: i32, length: i32| -> i32 {
+                if pointer < 0 || length <= 0 || length as usize > UI_OUTPUT_LIMIT {
+                    caller.data_mut().ui_output_invalid = true;
+                    return -1;
+                }
+                let offset = pointer as usize;
+                let length = length as usize;
+                let memory_bytes = output_memory.data(&caller);
+                if offset > memory_bytes.len() || length > memory_bytes.len() - offset {
+                    caller.data_mut().ui_output_invalid = true;
+                    return -1;
+                }
+                let output = memory_bytes[offset..offset + length].to_vec();
+                if core::str::from_utf8(&output).is_err() || caller.data().ui_output_emitted {
+                    caller.data_mut().ui_output_invalid = true;
+                    return -1;
+                }
+                let state = caller.data_mut();
+                state.ui_output = output;
+                state.ui_output_emitted = true;
+                length as i32
+            },
+        )
+        .map_err(|_| (ERROR_IMPORT, 0, 0))?;
+
     let instance = match linker.instantiate_and_start(&mut store, &module) {
         Ok(instance) => instance,
         Err(error) => {
@@ -270,9 +343,14 @@ fn execute(
         .call(&mut store, ())
         .map_err(|_| (ERROR_EXECUTION, store.data().status_read_count, memory.data(&store).len() as u32))?;
 
+    if store.data().ui_output_invalid {
+        return Err((ERROR_UI_OUTPUT, store.data().status_read_count, memory.data(&store).len() as u32));
+    }
+
     Ok((
         result,
         store.data().status_read_count,
         memory.data(&store).len() as u32,
+        store.data().ui_output.clone(),
     ))
 }

@@ -13,6 +13,21 @@ function unsignedLeb128(value: number): number[] {
   return bytes;
 }
 
+function signedLeb128(value: number): number[] {
+  const bytes: number[] = [];
+  let remaining = value | 0;
+  let more = true;
+  while (more) {
+    let byte = remaining & 0x7f;
+    remaining >>= 7;
+    const signBitSet = (byte & 0x40) !== 0;
+    more = !((remaining === 0 && !signBitSet) || (remaining === -1 && signBitSet));
+    if (more) byte |= 0x80;
+    bytes.push(byte);
+  }
+  return bytes;
+}
+
 function name(value: string): number[] {
   const bytes = Array.from(value, (character) => character.charCodeAt(0));
   return [bytes.length, ...bytes];
@@ -47,6 +62,38 @@ export function createSkinExtensionWasmCappedRunProbe(): Uint8Array {
 /** Reads the permission-gated status snapshot into bounded linear memory and returns its byte length. */
 export function createSkinExtensionWasmStatusProbe(): Uint8Array {
   return singleRunModule([0, 0x41, 0x00, 0x41, 0x80, 0x02, 0x10, 0x00, 0x0b], true);
+}
+
+/** Emits one bounded UTF-8 JSON string through the host-owned UI output bridge. */
+export function createSkinExtensionWasmUiOutputProbe(output = '{"type":"root"}', emitTwice = false): Uint8Array {
+  const outputBytes = Array.from(new TextEncoder().encode(output));
+  const outputPointer = 16;
+  const emitOutput = [
+    0x41, ...signedLeb128(outputPointer),
+    0x41, ...signedLeb128(outputBytes.length),
+    0x10, 0,
+    0x1a,
+  ];
+  const body = [
+    0,
+    ...emitOutput,
+    ...(emitTwice ? emitOutput : []),
+    0x41, 0x07,
+    0x0b,
+  ];
+  return Uint8Array.from([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+    ...section(1, [2, 0x60, 2, 0x7f, 0x7f, 1, 0x7f, 0x60, 0, 1, 0x7f]),
+    ...section(2, [
+      2,
+      ...name("env"), ...name("memory"), 0x02, 0x01, 1, 64,
+      ...name("env"), ...name("ui_emit_json"), 0x00, 0,
+    ]),
+    ...section(3, [1, 1]),
+    ...section(7, [1, ...name("run"), 0, 1]),
+    ...section(10, [1, body.length, ...body]),
+    ...section(11, [1, 0, 0x41, outputPointer, 0x0b, ...unsignedLeb128(outputBytes.length), ...outputBytes]),
+  ]);
 }
 
 /** Tries to alter the copied snapshot before returning; host results must remain host-owned. */
