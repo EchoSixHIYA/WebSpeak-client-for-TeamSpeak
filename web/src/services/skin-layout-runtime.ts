@@ -88,10 +88,10 @@ function setVariable(element: HTMLElement, dataFlag: string, variable: string, v
 }
 
 function clearLayoutAttributes(element: HTMLElement): void {
-  for (const key of ["wsLayoutActive", "wsLayoutHidden", "wsLayoutSelected", "wsLayoutForeground", "wsLayoutBackground", "wsLayoutBorder", "wsLayoutRadius", "wsLayoutWidth", "wsLayoutHeight", "wsLayoutTouchTarget"]) {
+  for (const key of ["wsLayoutActive", "wsLayoutHidden", "wsLayoutSelected", "wsLayoutForeground", "wsLayoutBackground", "wsLayoutBorder", "wsLayoutRadius", "wsLayoutWidth", "wsLayoutHeight", "wsLayoutOrder", "wsLayoutTouchTarget"]) {
     delete element.dataset[key];
   }
-  for (const key of ["--ws-layout-x", "--ws-layout-y", "--ws-layout-scale", "--ws-layout-width", "--ws-layout-height", "--ws-layout-foreground", "--ws-layout-background", "--ws-layout-border", "--ws-layout-radius"]) {
+  for (const key of ["--ws-layout-x", "--ws-layout-y", "--ws-layout-scale", "--ws-layout-order", "--ws-layout-width", "--ws-layout-height", "--ws-layout-foreground", "--ws-layout-background", "--ws-layout-border", "--ws-layout-radius"]) {
     element.style.removeProperty(key);
   }
 }
@@ -147,6 +147,7 @@ function applyRoot(root: HTMLElement): void {
     else element.style.removeProperty("--ws-layout-y");
     if (placement.scale !== undefined) element.style.setProperty("--ws-layout-scale", String(placement.scale));
     else element.style.removeProperty("--ws-layout-scale");
+    setVariable(element, "wsLayoutOrder", "--ws-layout-order", placement.order === undefined ? undefined : String(placement.order));
     setVariable(element, "wsLayoutWidth", "--ws-layout-width", placement.width === undefined ? undefined : placement.width + "px");
     setVariable(element, "wsLayoutHeight", "--ws-layout-height", placement.height === undefined ? undefined : placement.height + "px");
     setVariable(element, "wsLayoutForeground", "--ws-layout-foreground", placement.foreground);

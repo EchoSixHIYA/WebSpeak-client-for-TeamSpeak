@@ -84,9 +84,10 @@ test("version 2 layout overrides can be saved, loaded, and cleared per skin", ()
   withLocalStorage((storage) => {
     saveSkinLayoutOverrides("community.illusia-voice", {
       schemaVersion: 1,
-      pages: { home: { mobile: { "home.header": { x: 8, visible: true } } } },
+      pages: { home: { mobile: { "home.header": { x: 8, visible: true, order: 2 } } } },
     });
     assert.equal(loadSkinLayoutOverrides("community.illusia-voice").pages.home?.mobile?.["home.header"]?.x, 8);
+    assert.equal(loadSkinLayoutOverrides("community.illusia-voice").pages.home?.mobile?.["home.header"]?.order, 2);
     clearSkinLayoutOverrides("community.illusia-voice");
     assert.deepEqual(loadSkinLayoutOverrides("community.illusia-voice"), { schemaVersion: 1, pages: {} });
     assert.equal(JSON.parse(storage.getItem(SKIN_LAYOUT_STORAGE_KEY) ?? "null").schemaVersion, 2);

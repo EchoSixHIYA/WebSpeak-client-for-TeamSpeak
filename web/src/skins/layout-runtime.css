@@ -8,6 +8,10 @@
   scale: var(--ws-layout-scale, 1) !important;
 }
 
+.ws-skin-root [data-ws-layout-order="true"] {
+  order: var(--ws-layout-order) !important;
+}
+
 .ws-skin-root [data-ws-layout-width="true"] {
   width: var(--ws-layout-width) !important;
 }

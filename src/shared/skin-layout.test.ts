@@ -58,7 +58,7 @@ test("valid layouts accept only bounded positions and safe visual tokens", () =>
     pages: {
       home: {
         desktop: {
-          "home.header": { x: -120, y: 40, scale: 1.25, visible: true, foreground: "#aabbcc", radius: 16 },
+          "home.header": { x: -120, y: 40, scale: 1.25, order: -2, visible: true, foreground: "#aabbcc", radius: 16 },
           "control.button": { background: "#010203", border: "#ffffff" },
         },
         mobile: { "home.join-card": { x: 8, scale: 0.9 } },
@@ -68,6 +68,7 @@ test("valid layouts accept only bounded positions and safe visual tokens", () =>
   });
   assert.equal(layout.pages.home?.desktop?.["home.header"]?.x, -120);
   assert.equal(layout.pages.home?.desktop?.["home.header"]?.foreground, "#aabbcc");
+  assert.equal(layout.pages.home?.desktop?.["home.header"]?.order, -2);
   assert.equal(layout.pages.home?.tablet?.["home.join-card"]?.width, 720);
   assert.equal(getSkinLayoutComponents("home").some((component) => component.id === "home.join-card"), true);
   assert.equal(getSkinLayoutComponents("voice").some((component) => component.id === "home.join-card"), false);
@@ -128,9 +129,11 @@ test("layout validation fails closed for unknown pages, components, trusted noti
     { schemaVersion: 1, pages: { admin: { desktop: {} } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.not-registered": { x: 0 } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.security-note": { visible: false } } } } },
+    { schemaVersion: 1, pages: { home: { desktop: { "home.security-note": { order: -1 } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { app: { visible: false } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.header": { position: "fixed" } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.header": { x: 2001 } } } } },
+    { schemaVersion: 1, pages: { home: { desktop: { "home.header": { order: 101 } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.header": { width: 8 } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "voice.connection-status": { visible: false } } } } },
     { schemaVersion: 1, pages: { home: { desktop: { "home.header": { background: "url(https://example.invalid)" } } } } },
@@ -147,7 +150,7 @@ test("registered components carry accessibility, responsive, purpose, and data-s
     assert.ok(["core", "optional", "trusted-chrome"].includes(component.category));
     if (component.editable) {
       assert.deepEqual(component.allowedContainers, ["app"]);
-      assert.deepEqual(component.layoutModes, ["position", "size", "visibility", "appearance"]);
+      assert.deepEqual(component.layoutModes, ["position", "size", "visibility", "appearance", "order"]);
       assert.ok(component.minWidth > 0 && component.maxWidth >= component.minWidth);
       assert.ok(component.minHeight > 0 && component.maxHeight >= component.minHeight);
       assert.ok(component.minScale > 0 && component.maxScale >= component.minScale);

@@ -78,3 +78,33 @@ test("registered interactive controls retain their minimum hit target without a 
   assert.equal(trustedControl.dataset.wsLayoutTouchTarget, undefined, "trusted host UI must remain outside the editable layout runtime");
   assert.equal(unknown.dataset.wsLayoutTouchTarget, undefined, "unregistered markup must not inherit layout control styles");
 });
+
+test("a local order override is applied only to the registered element", () => {
+  const root = new FakeElement();
+  root.dataset.wsPage = "home";
+  root.dataset.wsSkin = "test.skin";
+  const ordered = append(root, new FakeElement());
+  ordered.dataset.wsPart = "home.header";
+  const unrelated = append(root, new FakeElement());
+  unrelated.dataset.wsPart = "home.content";
+  const collection = JSON.stringify({
+    schemaVersion: 2,
+    skins: {
+      "test.skin": {
+        schemaVersion: 1,
+        pages: { home: { desktop: { "home.header": { order: -7 } } } },
+      },
+    },
+    recoveries: {},
+  });
+  setGlobal("localStorage", { getItem: () => collection, setItem: () => undefined });
+  setGlobal("document", { querySelectorAll: () => [root] });
+  setGlobal("window", { matchMedia: () => ({ matches: false }) });
+
+  runtime.refreshSkinLayout();
+
+  assert.equal(ordered.dataset.wsLayoutOrder, "true");
+  assert.equal(ordered.style.values.get("--ws-layout-order"), "-7");
+  assert.equal(unrelated.dataset.wsLayoutOrder, undefined);
+  assert.equal(unrelated.style.values.has("--ws-layout-order"), false);
+});

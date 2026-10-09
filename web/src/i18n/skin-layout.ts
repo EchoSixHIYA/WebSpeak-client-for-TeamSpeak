@@ -12,6 +12,8 @@ type SkinLayoutLabels = {
   size: string;
   width: string;
   height: string;
+  order: string;
+  orderHint: string;
   foreground: string;
   background: string;
   border: string;
@@ -55,6 +57,8 @@ export const skinLayoutLabels: Record<Language, SkinLayoutLabels> = {
     size: "缩放",
     width: "宽度",
     height: "高度",
+    order: "排列顺序",
+    orderHint: "仅在父容器使用 Flex 或 Grid 时影响同级顺序；键盘焦点顺序保持不变。",
     foreground: "文字颜色",
     background: "背景颜色",
     border: "边框颜色",
@@ -96,6 +100,8 @@ export const skinLayoutLabels: Record<Language, SkinLayoutLabels> = {
     size: "Scale",
     width: "Width",
     height: "Height",
+    order: "Display order",
+    orderHint: "Affects sibling order only inside a flex or grid parent. Keyboard focus order stays unchanged.",
     foreground: "Text color",
     background: "Background",
     border: "Border color",
@@ -137,6 +143,8 @@ export const skinLayoutLabels: Record<Language, SkinLayoutLabels> = {
     size: "Skalierung",
     width: "Breite",
     height: "Höhe",
+    order: "Anzeigereihenfolge",
+    orderHint: "Wirkt nur auf Geschwister in einem Flex- oder Grid-Container. Die Tastaturreihenfolge bleibt unverändert.",
     foreground: "Textfarbe",
     background: "Hintergrund",
     border: "Rahmenfarbe",
@@ -178,6 +186,8 @@ export const skinLayoutLabels: Record<Language, SkinLayoutLabels> = {
     size: "Масштаб",
     width: "Ширина",
     height: "Высота",
+    order: "Порядок отображения",
+    orderHint: "Меняет порядок соседей только внутри flex- или grid-контейнера. Порядок клавиатурного фокуса не меняется.",
     foreground: "Цвет текста",
     background: "Фон",
     border: "Цвет границы",
@@ -219,6 +229,8 @@ export const skinLayoutLabels: Record<Language, SkinLayoutLabels> = {
     size: "拡大縮小",
     width: "幅",
     height: "高さ",
+    order: "表示順序",
+    orderHint: "Flex または Grid の親要素内の兄弟要素にのみ適用されます。キーボードのフォーカス順は変わりません。",
     foreground: "文字色",
     background: "背景色",
     border: "枠線の色",

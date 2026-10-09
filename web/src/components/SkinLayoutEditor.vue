@@ -81,6 +81,10 @@
           <label><span>{{ editor.labels.value.height }}</span><output>{{ Math.round(editor.selectedHeight.value) }} px</output></label>
           <input type="range" :min="editor.selectedSizeBounds.value.minHeight" :max="editor.selectedSizeBounds.value.maxHeight" step="4" :value="editor.selectedHeight.value" @input="editor.setHeight(Number(($event.target as HTMLInputElement).value))" />
         </div>
+        <div class="skin-layout-range" :title="editor.labels.value.orderHint">
+          <label><span>{{ editor.labels.value.order }}</span><output>{{ editor.selectedOrder.value }}</output></label>
+          <input type="range" min="-100" max="100" step="1" :value="editor.selectedOrder.value" @input="editor.setOrder(Number(($event.target as HTMLInputElement).value))" />
+        </div>
 
         <div class="skin-layout-colors">
           <label><span>{{ editor.labels.value.foreground }}</span><input type="color" :value="editor.selectedForeground.value" @input="editor.setForeground(($event.target as HTMLInputElement).value)" /></label>

@@ -6,6 +6,7 @@ export interface SkinLayoutPlacement {
   x?: number;
   y?: number;
   scale?: number;
+  order?: number;
   width?: number;
   height?: number;
   foreground?: string;
@@ -28,7 +29,7 @@ export interface SkinLayoutComponent {
   purpose: "host-shell" | "host-action" | "session-content" | "identity-content" | "page-content" | "decoration" | "trusted-status";
   category: "core" | "optional" | "trusted-chrome";
   allowedContainers: readonly string[];
-  layoutModes: readonly ("position" | "size" | "visibility" | "appearance")[];
+  layoutModes: readonly ("position" | "size" | "visibility" | "appearance" | "order")[];
   dataSensitivity: "none" | "public" | "session" | "identity";
   keyboardBehavior: "host-native";
   focusOrder: "host-dom";
@@ -341,7 +342,7 @@ function pageOfPart(id: string): SkinLayoutPage | "common" | null {
   return null;
 }
 
-const LAYOUT_MODES = ["position", "size", "visibility", "appearance"] as const;
+const LAYOUT_MODES = ["position", "size", "visibility", "appearance", "order"] as const;
 const STYLE_TOKENS = ["foreground", "background", "border", "radius"] as const;
 const COMPONENT_NAME_PARTS: Record<string, string> = {
   action: "Action", actions: "Actions", activity: "Activity", add: "Add", app: "Application", artwork: "Artwork",
@@ -485,7 +486,7 @@ export function getSkinLayoutComponentId(part: string | undefined, controlKind?:
 }
 
 const ALLOWED_PLACEMENT_FIELDS = new Set([
-  "visible", "x", "y", "scale", "width", "height", "foreground", "background", "border", "radius",
+  "visible", "x", "y", "scale", "order", "width", "height", "foreground", "background", "border", "radius",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -544,6 +545,7 @@ export function validateSkinLayout(value: unknown): SkinLayoutDocument {
         if (component.layoutModes.includes("position")) { supportedFields.add("x"); supportedFields.add("y"); }
         if (component.layoutModes.includes("size")) { supportedFields.add("scale"); supportedFields.add("width"); supportedFields.add("height"); }
         if (component.layoutModes.includes("appearance")) component.allowedStyleTokens.forEach((token) => supportedFields.add(token));
+        if (component.layoutModes.includes("order")) supportedFields.add("order");
         assertOnlyKeys(rawPlacement, supportedFields, "Skin component placement");
         const placement: SkinLayoutPlacement = {};
         if (rawPlacement.visible !== undefined) {
@@ -553,12 +555,14 @@ export function validateSkinLayout(value: unknown): SkinLayoutDocument {
         const x = readNumber(rawPlacement.x, "x", -2000, 2000);
         const y = readNumber(rawPlacement.y, "y", -2000, 2000);
         const scale = readNumber(rawPlacement.scale, "scale", component.minScale, component.maxScale);
+        const order = readNumber(rawPlacement.order, "order", -100, 100);
         const width = readNumber(rawPlacement.width, "width", component.minWidth, component.maxWidth);
         const height = readNumber(rawPlacement.height, "height", component.minHeight, component.maxHeight);
         const radius = readNumber(rawPlacement.radius, "radius", 0, 64);
         if (x !== undefined) placement.x = x;
         if (y !== undefined) placement.y = y;
         if (scale !== undefined) placement.scale = scale;
+        if (order !== undefined) placement.order = order;
         if (width !== undefined) placement.width = width;
         if (height !== undefined) placement.height = height;
         if (radius !== undefined) placement.radius = radius;

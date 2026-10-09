@@ -109,6 +109,7 @@ export function useSkinLayoutEditor() {
   const selectedHeight = computed(() => selectedPlacement.value.height ?? 160);
   const selectedX = computed(() => selectedPlacement.value.x ?? 0);
   const selectedY = computed(() => selectedPlacement.value.y ?? 0);
+  const selectedOrder = computed(() => selectedPlacement.value.order ?? 0);
   const selectedForeground = computed(() => selectedPlacement.value.foreground ?? "#ffffff");
   const selectedBackground = computed(() => selectedPlacement.value.background ?? "#ffffff");
   const selectedBorder = computed(() => selectedPlacement.value.border ?? "#ffffff");
@@ -344,6 +345,7 @@ export function useSkinLayoutEditor() {
   function setVisible(value: boolean): void { updateSelected("visible", value); }
   function setX(value: number): void { updateSelected("x", clampSkinLayoutOffset(value, offsetBounds("x") ?? { minimum: -2000, maximum: 2000 })); }
   function setY(value: number): void { updateSelected("y", clampSkinLayoutOffset(value, offsetBounds("y") ?? { minimum: -2000, maximum: 2000 })); }
+  function setOrder(value: number): void { updateSelected("order", Math.max(-100, Math.min(100, Math.round(value)))); }
   function setScale(value: number): void { updateSelected("scale", Math.max(selectedSizeBounds.value.minScale, Math.min(selectedSizeBounds.value.maxScale, value))); }
   function setWidth(value: number): void { updateSelected("width", Math.max(selectedSizeBounds.value.minWidth, Math.min(selectedSizeBounds.value.maxWidth, Math.round(value)))); }
   function setHeight(value: number): void { updateSelected("height", Math.max(selectedSizeBounds.value.minHeight, Math.min(selectedSizeBounds.value.maxHeight, Math.round(value)))); }
@@ -631,6 +633,7 @@ export function useSkinLayoutEditor() {
     focusPreviewTargets,
     selectedX,
     selectedY,
+    selectedOrder,
     selectedForeground,
     selectedBackground,
     selectedBorder,
@@ -650,6 +653,7 @@ export function useSkinLayoutEditor() {
     setVisible,
     setX,
     setY,
+    setOrder,
     setScale,
     setWidth,
     setHeight,
