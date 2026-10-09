@@ -87,12 +87,17 @@ test("a local order override is applied only to the registered element", () => {
   ordered.dataset.wsPart = "home.header";
   const unrelated = append(root, new FakeElement());
   unrelated.dataset.wsPart = "home.content";
+  const pluginRoot = append(root, new FakeElement());
+  pluginRoot.dataset.wsPart = "skin.home.runtime_plugin_root_voice-toolbar";
   const collection = JSON.stringify({
     schemaVersion: 2,
     skins: {
       "test.skin": {
         schemaVersion: 1,
-        pages: { home: { desktop: { "home.header": { order: -7 } } } },
+        pages: { home: { desktop: {
+          "home.header": { order: -7 },
+          "skin.home.runtime_plugin_root_voice-toolbar": { order: 3 },
+        } } },
       },
     },
     recoveries: {},
@@ -107,4 +112,6 @@ test("a local order override is applied only to the registered element", () => {
   assert.equal(ordered.style.values.get("--ws-layout-order"), "-7");
   assert.equal(unrelated.dataset.wsLayoutOrder, undefined);
   assert.equal(unrelated.style.values.has("--ws-layout-order"), false);
+  assert.equal(pluginRoot.dataset.wsLayoutOrder, "true");
+  assert.equal(pluginRoot.style.values.get("--ws-layout-order"), "3");
 });

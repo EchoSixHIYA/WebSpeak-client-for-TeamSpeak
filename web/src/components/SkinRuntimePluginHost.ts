@@ -333,7 +333,12 @@ export default defineComponent({
       for (const plugin of currentPlugins) {
         const generatedOutput = suppressedSurfaces.value.has(plugin.id) ? null : outputs.value[plugin.id] ?? null;
         const pluginAssets = outputAssets(plugin);
-        nodes.push(h(SkinPluginOutlet, {
+        nodes.push(h("div", {
+          key: `${props.skinId}:${plugin.id}:layout-root:${props.page}`,
+          class: "ws-runtime-plugin-root",
+          "data-ws-runtime-plugin-root": plugin.id,
+          "data-ws-part": `skin.${props.page}.runtime_plugin_root_${plugin.id}`,
+        }, [h(SkinPluginOutlet, {
           key: `${props.skinId}:${plugin.id}:${props.page}`,
           skinId: props.skinId,
           skinVersion: props.skinVersion,
@@ -349,7 +354,7 @@ export default defineComponent({
           onExtensionEvent: (event: unknown) => dispatch(plugin.id, event),
           onSurfaceChange: (active: boolean) => surfaceChanged(plugin.id, active),
           onRestoreSkin: () => emit("restore-skin"),
-        }));
+        })]));
       }
 
       const controls: VNodeChild[] = [];

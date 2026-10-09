@@ -81,6 +81,7 @@ test("skin-authored component roots and nodes become independently editable layo
     "skin.voice.toolbar.node-root",
     "skin.voice.toolbar.part-chat-list",
     "skin.voice.toolbar.control-node-root-0",
+    "skin.voice.runtime_plugin_root_voice-toolbar",
     "skin.voice.runtime_plugin_voice-surface__voice-ui",
     "skin.voice.runtime_plugin_voice-surface__voice-ui.node-root",
     "skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list",
@@ -100,12 +101,14 @@ test("skin-authored component roots and nodes become independently editable layo
       "skin.voice.toolbar.node-root": { width: 720 },
       "skin.voice.toolbar.part-chat-list": { visible: false },
       "skin.voice.toolbar.control-node-root-0": { scale: 1, width: 60, height: 48 },
+      "skin.voice.runtime_plugin_root_voice-toolbar": { order: 2 },
       "skin.voice.runtime_plugin_voice-surface__voice-ui": { width: 800 },
       "skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list": { visible: false },
       "skin.voice.runtime_plugin_voice-surface__voice-ui.control-part-join": { width: 60, height: 48 },
     } } },
   });
   assert.equal(layout.pages.voice?.desktop?.["skin.voice.toolbar.part-chat-list"]?.visible, false);
+  assert.equal(layout.pages.voice?.desktop?.["skin.voice.runtime_plugin_root_voice-toolbar"]?.order, 2);
   assert.equal(layout.pages.voice?.desktop?.["skin.voice.runtime_plugin_voice-surface__voice-ui"]?.width, 800);
   assert.equal(layout.pages.voice?.desktop?.["skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list"]?.visible, false);
   assert.equal(getSkinLayoutComponent("skin.voice.runtime_plugin_voice-surface__voice-ui.control-part-join")?.minTouchTarget, 44);

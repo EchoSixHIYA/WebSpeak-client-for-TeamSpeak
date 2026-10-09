@@ -434,12 +434,12 @@ export const SKIN_LAYOUT_COMPONENTS: readonly SkinLayoutComponent[] = [
 const componentById = new Map(SKIN_LAYOUT_COMPONENTS.map((component) => [component.id, component]));
 
 function dynamicSkinPartPage(id: string): SkinLayoutPage | undefined {
-  const match = /^skin\.(home|voice|demo)\.((?:[a-z][a-z0-9-]{0,63}|runtime_plugin_[a-z][a-z0-9-]{0,63}__[a-z][a-z0-9-]{0,63}))(?:\.(control-)?(node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63}))?$/.exec(id);
+  const match = /^skin\.(home|voice|demo)\.((?:[a-z][a-z0-9-]{0,63}|runtime_plugin_root_[a-z][a-z0-9-]{0,63}|runtime_plugin_[a-z][a-z0-9-]{0,63}__[a-z][a-z0-9-]{0,63}))(?:\.(control-)?(node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63}))?$/.exec(id);
   return match?.[1] as SkinLayoutPage | undefined;
 }
 
 function isDynamicSkinControl(id: string): boolean {
-  return /^skin\.(?:home|voice|demo)\.(?:[a-z][a-z0-9-]{0,63}|runtime_plugin_[a-z][a-z0-9-]{0,63}__[a-z][a-z0-9-]{0,63})\.control-(?:node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63})$/.test(id);
+  return /^skin\.(?:home|voice|demo)\.(?:[a-z][a-z0-9-]{0,63}|runtime_plugin_root_[a-z][a-z0-9-]{0,63}|runtime_plugin_[a-z][a-z0-9-]{0,63}__[a-z][a-z0-9-]{0,63})\.control-(?:node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63})$/.test(id);
 }
 
 const dynamicSkinPartCache = new Map<string, SkinLayoutComponent>();
