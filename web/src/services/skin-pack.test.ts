@@ -154,6 +154,10 @@ test("the ILLUSIA visual-only example imports without replacing WebSpeak's base 
   assert.match(skin.css, /language\.option/);
   assert.match(skin.css, /data-ws-skin-id="community\.illusia-voice"/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.rail"/);
+  assert.match(skin.css, /data-ws-part="home\.server-history\.item"/);
+  assert.match(skin.css, /data-ws-part="home\.server-history\.favorite-toggle"\]\[data-ws-state="saved"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.favorite-toggle"\]\[data-ws-state="saved"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.strip\.favorite-toggle"\]\[data-ws-state="saved"\]/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.strip\.server"\]\[data-ws-state="current"\]/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog"\]\s*\{[^}]*background:\s*linear-gradient/s);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog\.input"\]:focus-visible\s*\{[^}]*box-shadow:/s);

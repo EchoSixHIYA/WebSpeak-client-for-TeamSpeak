@@ -80,36 +80,38 @@
       ></div
     >
     <div
-      v-if="accessMode === 'open' && (favoriteServers.length || recentServers.length)"
+      v-if="accessMode === 'open' && quickServers.length"
       class="local-servers"
       data-ws-part="home.server-history"
     >
       <div
-        v-if="favoriteServers.length"
         class="local-server-group"
         data-ws-part="home.server-history.group"
-        data-ws-state="favorite"
-        ><span>{{ t("favoriteServers") }}</span
+        ><span>{{ t("quickServers") }}</span
+        ><div
+          v-for="server in quickServers"
+          :key="server.id"
+          class="local-server-item"
+          data-ws-part="home.server-history.item"
+          :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
         ><button
-          v-for="favorite in favoriteServers"
-          :key="favorite.id"
           type="button"
-          @click="emit('selectServer', favorite.address, favorite.nickname)"
-          >{{ favorite.label }}</button
+          class="local-server-select"
+          data-ws-part="home.server-history.select"
+          :title="server.label + '\n' + server.address"
+          :aria-label="t('switchToServer', { server: server.label })"
+          @click="emit('selectServer', server.address, server.nickname, server.lastChannelHint?.name)"
+          >{{ server.label }}</button
+          ><button
+            type="button"
+            :class="['local-server-favorite', { active: server.isFavorite }]"
+            data-ws-part="home.server-history.favorite-toggle"
+            :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+            :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+            :aria-pressed="server.isFavorite"
+            @click.stop="emit('toggleQuickFavorite', server)"
+          ><Icon name="star" :size="13" /></button
         ></div
-      >
-      <div
-        v-if="recentServers.length"
-        class="local-server-group"
-        data-ws-part="home.server-history.group"
-        data-ws-state="recent"
-        ><span>{{ t("recentServers") }}</span
-        ><button
-          v-for="recent in recentServers"
-          :key="recent.id"
-          type="button"
-          @click="emit('selectServer', recent.address, recent.nickname)"
-          >{{ recent.address }}</button
         ></div
       >
     </div>
@@ -245,7 +247,7 @@
 
 <script setup lang="ts">
 import Icon from "../Icon.vue";
-import type { FavoriteServer, RecentServer } from "../../services/local-persistence.js";
+import type { QuickServer } from "../../services/quick-servers.js";
 
 const serverHost = defineModel<string>("serverHost", { required: true });
 const serverPort = defineModel<string>("serverPort", { required: true });
@@ -260,8 +262,7 @@ defineProps<{
   accessMode: "fixed" | "open";
   openTargetPrefillBlocked: boolean;
   accelerationRelays: ReadonlyArray<{ id: string; name: string }>;
-  favoriteServers: readonly FavoriteServer[];
-  recentServers: readonly RecentServer[];
+  quickServers: readonly QuickServer[];
   isFavorite: boolean;
   identityExportBusy: boolean;
   hasIdentity: boolean;
@@ -276,6 +277,7 @@ const emit = defineEmits<{
   importIdentity: [];
   exportIdentity: [];
   toggleFavorite: [];
-  selectServer: [address: string, nickname?: string];
+  toggleQuickFavorite: [server: QuickServer];
+  selectServer: [address: string, nickname?: string, channel?: string];
 }>();
 </script>

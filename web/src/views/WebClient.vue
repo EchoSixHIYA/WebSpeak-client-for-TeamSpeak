@@ -196,8 +196,7 @@
             :access-mode="accessMode"
             :open-target-prefill-blocked="openTargetPrefillBlocked"
             :acceleration-relays="accelerationRelays"
-            :favorite-servers="favoriteServers"
-            :recent-servers="recentServers"
+            :quick-servers="quickServers"
             :is-favorite="isFavorite"
             :identity-export-busy="identityExportBusy"
             :has-identity="Boolean(identityMaterial)"
@@ -210,6 +209,7 @@
             @disconnect="doDisconnect"
             @select-server="selectLocalServer"
             @toggle-favorite="toggleFavorite"
+            @toggle-quick-favorite="toggleQuickFavorite"
             @import-identity="openIdentityImport"
             @export-identity="exportIdentity"
           />
@@ -310,38 +310,42 @@
         v-if="accessMode === 'open'"
         class="favorite-server-rail"
         data-ws-part="voice.favorite-servers.rail"
-        :aria-label="t('favoriteServers')"
+        :aria-label="t('quickServers')"
       >
         <div class="favorite-server-rail-list" data-ws-part="voice.favorite-servers.rail.list">
           <div
-            v-for="favorite in favoriteServers"
-            :key="favorite.id"
+            v-for="server in quickServers"
+            :key="server.id"
             class="favorite-server-rail-item"
             data-ws-part="voice.favorite-servers.rail.item"
+            :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
           >
             <button
               type="button"
-              :class="['favorite-server-button', { active: isFavoriteTarget(favorite) }]"
+              :class="['favorite-server-button', { active: isQuickServerTarget(server) }]"
               data-ws-part="voice.favorite-servers.server"
-              :data-ws-state="isFavoriteTarget(favorite) ? 'current' : 'idle'"
-              :title="favorite.label + '\n' + favorite.address"
-              :aria-label="t('switchToFavorite', { server: favorite.label })"
-              :aria-pressed="isFavoriteTarget(favorite)"
+              :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
+              :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
+              :title="server.label + '\n' + server.address"
+              :aria-label="t('switchToServer', { server: server.label })"
+              :aria-pressed="isQuickServerTarget(server)"
               :disabled="voiceState.connecting"
-              @click.stop="connectFavoriteServer(favorite)"
+              @click.stop="connectQuickServer(server)"
             >
-              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(favorite.label)">{{ avatarInitial(favorite.label) }}</span>
-              <span class="favorite-server-tooltip" data-ws-part="voice.favorite-servers.tooltip"><strong>{{ favorite.label }}</strong><small>{{ favorite.address }}</small></span>
+              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)">{{ avatarInitial(server.label) }}</span>
+              <span class="favorite-server-tooltip" data-ws-part="voice.favorite-servers.tooltip"><strong>{{ server.label }}</strong><small>{{ server.address }}</small></span>
             </button>
             <button
               type="button"
-              class="favorite-server-remove"
-              data-ws-part="voice.favorite-servers.remove"
-              :aria-label="t('removeFavoriteForServer', { server: favorite.label })"
-              :title="t('removeFavorite')"
-              @click.stop="removeFavoriteFromRail(favorite)"
+              :class="['favorite-server-toggle', { active: server.isFavorite }]"
+              data-ws-part="voice.favorite-servers.favorite-toggle"
+              :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+              :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+              :title="server.isFavorite ? t('removeFavorite') : t('saveFavorite')"
+              :aria-pressed="server.isFavorite"
+              @click.stop="toggleQuickFavorite(server)"
             >
-              <Icon name="close" :size="12" />
+              <Icon name="star" :size="11" />
             </button>
           </div>
         </div>
@@ -359,20 +363,36 @@
         v-if="accessMode === 'open'"
         class="favorite-server-strip"
         data-ws-part="voice.favorite-servers.strip"
-        :aria-label="t('favoriteServers')"
+        :aria-label="t('quickServers')"
       >
-        <button
-          v-for="favorite in favoriteServers"
-          :key="favorite.id"
+        <div
+          v-for="server in quickServers"
+          :key="server.id"
+          class="favorite-server-strip-item"
+          data-ws-part="voice.favorite-servers.strip.item"
+          :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
+        ><button
           type="button"
-          :class="['favorite-server-strip-button', { active: isFavoriteTarget(favorite) }]"
+          :class="['favorite-server-strip-button', { active: isQuickServerTarget(server) }]"
           data-ws-part="voice.favorite-servers.strip.server"
-          :data-ws-state="isFavoriteTarget(favorite) ? 'current' : 'idle'"
-          :aria-label="t('switchToFavorite', { server: favorite.label })"
-          :aria-pressed="isFavoriteTarget(favorite)"
+          :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
+          :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
+          :aria-label="t('switchToServer', { server: server.label })"
+          :aria-pressed="isQuickServerTarget(server)"
           :disabled="voiceState.connecting"
-          @click="connectFavoriteServer(favorite)"
-        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(favorite.label)">{{ avatarInitial(favorite.label) }}</span><span>{{ favorite.label }}</span></button>
+          @click="connectQuickServer(server)"
+        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)">{{ avatarInitial(server.label) }}</span><span>{{ server.label }}</span></button
+          ><button
+            type="button"
+            :class="['favorite-server-strip-toggle', { active: server.isFavorite }]"
+            data-ws-part="voice.favorite-servers.strip.favorite-toggle"
+            :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+            :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+            :title="server.isFavorite ? t('removeFavorite') : t('saveFavorite')"
+            :aria-pressed="server.isFavorite"
+            @click.stop="toggleQuickFavorite(server)"
+          ><Icon name="star" :size="11" /></button
+        ></div>
         <button
           type="button"
           class="favorite-server-strip-add"
@@ -927,6 +947,7 @@ import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfi
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
+import type { QuickServer } from "../services/quick-servers.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
@@ -1073,15 +1094,14 @@ const {
   readFile: readIdentityFile, submit: importIdentity, exportIdentity,
 } = useWebClientIdentity({ identityMaterial, rememberIdentity, t, showToast });
 const {
-  favoriteServers,
-  recentServers,
+  quickServers,
   isFavorite,
   loadSavedServers,
   recordCurrentServer,
   selectLocalServer,
   saveFavoriteServer,
-  removeFavoriteServer,
   toggleFavorite,
+  toggleQuickServerFavorite,
   clearServerHistory,
 } = useWebClientServerHistory({ serverHost, serverPort, nickname, channel, rememberIdentity, identityMaterial, t, showToast });
 const {
@@ -1332,21 +1352,21 @@ const showVoiceShell = computed(() => Boolean(
   voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
   || favoriteSwitchPending.value || favoriteSwitchFailed.value,
 ));
-const favoriteSwitchLabel = computed(() => favoriteServers.value.find((favorite) =>
-  favorite.id === currentServerTarget().toLocaleLowerCase(),
+const favoriteSwitchLabel = computed(() => quickServers.value.find((server) =>
+  server.id === currentServerTarget().toLocaleLowerCase(),
 )?.label ?? currentServerTarget());
 
-function isFavoriteTarget(favorite: FavoriteServer): boolean {
-  return favorite.id === currentServerTarget().toLocaleLowerCase();
+function isQuickServerTarget(server: QuickServer): boolean {
+  return server.id === currentServerTarget().toLocaleLowerCase();
 }
 
-function connectFavoriteServer(favorite: FavoriteServer): void {
-  if (accessMode.value !== "open" || voiceState.connecting || (voiceState.connected && isFavoriteTarget(favorite))) return;
-  const target = splitTeamSpeakTarget(favorite.address);
+function connectQuickServer(server: QuickServer): void {
+  if (accessMode.value !== "open" || voiceState.connecting || (voiceState.connected && isQuickServerTarget(server))) return;
+  const target = splitTeamSpeakTarget(server.address);
   serverHost.value = target.address;
   serverPort.value = target.port || DEFAULT_TEAM_SPEAK_PORT;
-  nickname.value = favorite.nickname?.trim() || nickname.value.trim();
-  channel.value = favorite.lastChannelHint?.name ?? "";
+  nickname.value = server.nickname?.trim() || nickname.value.trim();
+  channel.value = server.lastChannelHint?.name ?? "";
   serverPassword.value = "";
   accelerationRelayId.value = "";
   inviteToken.value = "";
@@ -1384,8 +1404,8 @@ function leaveVoiceWorkspace(): void {
   doDisconnect();
 }
 
-function removeFavoriteFromRail(favorite: FavoriteServer): void {
-  void removeFavoriteServer(favorite.id).then(() => showToast(t("removedFavoriteToast")));
+function toggleQuickFavorite(server: QuickServer): void {
+  void toggleQuickServerFavorite(server);
 }
 
 async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<void> {

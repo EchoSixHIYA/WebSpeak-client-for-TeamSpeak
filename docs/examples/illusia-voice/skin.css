@@ -891,6 +891,38 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, .94), 0 0 0 4px rgba(71, 201, 212, .72);
 }
 
+/* Home quick servers use the same light glass language as the voice switcher. */
+[data-ws-part="home.server-history.group"] {
+  color: var(--skin-illusia-muted);
+}
+
+[data-ws-part="home.server-history.item"] {
+  color: var(--skin-illusia-ink);
+  border-color: rgba(104, 183, 198, .42);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .94), rgba(220, 245, 249, .84));
+  box-shadow: 0 3px 10px rgba(37, 122, 143, .08), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+[data-ws-part="home.server-history.select"] {
+  color: var(--skin-illusia-ink);
+}
+
+[data-ws-part="home.server-history.select"]:hover {
+  color: var(--skin-illusia-teal);
+  background: rgba(71, 201, 212, .12);
+}
+
+[data-ws-part="home.server-history.favorite-toggle"] {
+  color: var(--skin-illusia-muted);
+  border-color: rgba(104, 183, 198, .32);
+}
+
+[data-ws-part="home.server-history.favorite-toggle"][data-ws-state="saved"] {
+  color: #b47a09;
+  background: rgba(255, 245, 205, .62);
+}
+
 /* Favorite-server navigation shares the voice room's light glass appearance. */
 [data-ws-part="voice.favorite-servers.rail"],
 [data-ws-part="voice.favorite-servers.strip"] {
@@ -940,9 +972,18 @@
   box-shadow: 0 10px 26px rgba(25, 94, 115, .2), inset 0 1px 0 #fff;
 }
 
-[data-ws-part="voice.favorite-servers.remove"] {
+[data-ws-part="voice.favorite-servers.favorite-toggle"],
+[data-ws-part="voice.favorite-servers.strip.favorite-toggle"] {
+  color: var(--skin-illusia-muted);
   border-color: rgba(255, 255, 255, .96);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(221, 246, 249, .94));
   box-shadow: 0 2px 7px rgba(26, 82, 94, .22);
+}
+
+[data-ws-part="voice.favorite-servers.favorite-toggle"][data-ws-state="saved"],
+[data-ws-part="voice.favorite-servers.strip.favorite-toggle"][data-ws-state="saved"] {
+  color: #a87405;
+  background: linear-gradient(145deg, rgba(255, 245, 205, .98), rgba(255, 255, 255, .96));
 }
 
 [data-ws-part="voice.favorite-servers.switch-status"] {

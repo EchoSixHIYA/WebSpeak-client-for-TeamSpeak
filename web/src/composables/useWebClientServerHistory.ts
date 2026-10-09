@@ -8,6 +8,7 @@ import {
   type FavoriteServer,
   type RecentServer,
 } from "../services/local-persistence.js";
+import { mergeQuickServers, type QuickServer } from "../services/quick-servers.js";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 type Translator = (key: string, variables?: Record<string, string | number>) => string;
@@ -35,6 +36,7 @@ export function useWebClientServerHistory({
 }: UseWebClientServerHistoryOptions) {
   const favoriteServers = ref<FavoriteServer[]>([]);
   const recentServers = ref<RecentServer[]>([]);
+  const quickServers = computed(() => mergeQuickServers(favoriteServers.value, recentServers.value));
   const currentTarget = computed(() => combineTeamSpeakTarget(serverHost.value, serverPort.value));
   const isFavorite = computed(() => favoriteServers.value.some((favorite) => favorite.id === serverKey(currentTarget.value)));
 
@@ -58,11 +60,12 @@ export function useWebClientServerHistory({
     void recordRecentServer(recent).then(() => listRecentServers().then((items) => { recentServers.value = items; }));
   }
 
-  function selectLocalServer(address: string, savedNickname?: string): void {
+  function selectLocalServer(address: string, savedNickname?: string, savedChannel?: string): void {
     const target = splitTeamSpeakTarget(address);
     serverHost.value = target.address;
     serverPort.value = target.port;
     if (savedNickname && !nickname.value.trim()) nickname.value = savedNickname;
+    if (savedChannel) channel.value = savedChannel;
   }
 
   async function saveFavoriteServer(
@@ -106,6 +109,21 @@ export function useWebClientServerHistory({
     showToast(t("savedFavoriteToast"));
   }
 
+  async function toggleQuickServerFavorite(server: QuickServer): Promise<void> {
+    if (server.isFavorite) {
+      await removeFavoriteServer(server.id);
+      showToast(t("removedFavoriteToast"));
+      return;
+    }
+    await saveFavoriteServer(
+      server.address,
+      server.label,
+      server.nickname ?? "",
+      server.lastChannelHint?.name ?? "",
+    );
+    showToast(t("savedFavoriteToast"));
+  }
+
   function clearServerHistory(): void {
     favoriteServers.value = [];
     recentServers.value = [];
@@ -114,6 +132,7 @@ export function useWebClientServerHistory({
   return {
     favoriteServers,
     recentServers,
+    quickServers,
     isFavorite,
     loadSavedServers,
     recordCurrentServer,
@@ -121,6 +140,7 @@ export function useWebClientServerHistory({
     saveFavoriteServer,
     removeFavoriteServer,
     toggleFavorite,
+    toggleQuickServerFavorite,
     clearServerHistory,
   };
 }
