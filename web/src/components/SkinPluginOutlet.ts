@@ -2,6 +2,7 @@ import { computed, defineComponent, Fragment, h, onUnmounted, reactive, ref, Tel
 import {
   SKIN_PLUGIN_COMPONENT_LIMIT,
   SKIN_PLUGIN_PERMISSIONS,
+  SKIN_PLUGIN_RENDER_NODE_LIMIT,
   SKIN_PLUGIN_REPEAT_LIMIT,
   parseSkinPluginDocument,
   type SkinPluginActionDefinition,
@@ -187,7 +188,9 @@ export default defineComponent({
       return `skin.${component.page}.${component.id}.${interactive ? "control-" : ""}${part}`;
     }
 
-    function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, skipRepeat = false, nodePath = "node-root"): VNodeChild {
+    function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, budget: { remaining: number }, skipRepeat = false, nodePath = "node-root"): VNodeChild {
+      if (budget.remaining <= 0) return null;
+      budget.remaining -= 1;
       if (node.widget) {
         if (node.when) {
           const value = resolvePath(node.when.path, context, state);
@@ -215,7 +218,7 @@ export default defineComponent({
         const values = resolvePath(node.repeat.path, context, state);
         if (!Array.isArray(values)) return null;
         const repeatLimit = props.document.schemaVersion >= 3 ? SKIN_PLUGIN_REPEAT_LIMIT : 100;
-        return h(Fragment, null, values.slice(0, repeatLimit).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, true, nodePath)));
+        return h(Fragment, null, values.slice(0, repeatLimit).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, budget, true, nodePath)));
       }
       if (node.when) {
         const value = resolvePath(node.when.path, context, state);
@@ -264,7 +267,7 @@ export default defineComponent({
         };
       }
       if (node.tag === "form" && !node.events?.submit) attrs.onSubmit = (event: Event) => event.preventDefault();
-      const children = (node.children ?? []).map((child, index) => renderNode(component, child, context, state, false, `${nodePath}-${index}`));
+      const children = (node.children ?? []).map((child, index) => renderNode(component, child, context, state, budget, false, `${nodePath}-${index}`));
       // Custom element names are inert host-rendered placeholders. Never instantiate a page-registered
       // custom element from generated output, since its connectedCallback would run with page privileges.
       const tag = node.tag.includes("-") ? "div" : node.tag;
@@ -308,7 +311,7 @@ export default defineComponent({
         "data-ws-part": `skin.${component.page}.${component.id}`,
         ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,
-      }, [renderNode(component, component.root, props.data, localState(component))]));
+      }, [renderNode(component, component.root, props.data, localState(component), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
       const hasPermissions = matchingComponents.value.some((component) => component.permissions.length > 0);
       const showConsent = pendingApproval.value.length > 0 || manageOpen.value;
       const accessToggle = hasPermissions ? h(Teleport, { to: "body" }, [h("button", {

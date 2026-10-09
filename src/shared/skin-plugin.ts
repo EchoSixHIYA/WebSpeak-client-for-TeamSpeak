@@ -9,6 +9,7 @@ export const SKIN_PLUGIN_COMPONENT_LIMIT = 128;
 export const SKIN_PLUGIN_NODE_LIMIT = 2048;
 export const SKIN_PLUGIN_TREE_DEPTH_LIMIT = 32;
 export const SKIN_PLUGIN_REPEAT_LIMIT = 250;
+export const SKIN_PLUGIN_RENDER_NODE_LIMIT = 8192;
 
 export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.surface.replace": Object.freeze({ policyVersion: 1, description: "Replace the built-in public page with a custom skin surface; the host recovery controls remain available." }),
@@ -411,9 +412,14 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (!isRecord(rawNode.repeat)) fail("SKIN_PLUGIN_REPEAT_INVALID", "A repeat declaration must be an object.");
         onlyKeys(rawNode.repeat, new Set(["path", "as"]), "Repeat declaration");
         const path = boundedText(rawNode.repeat.path, "repeat.path", 120);
-    if (!(path === "session.channels" || path === "session.members" || path === "favorites.items" || path === "servers.quickList" || path === "chat.messages" || path === "screenShare.streams")) fail("SKIN_PLUGIN_REPEAT_INVALID", "A component may repeat only a registered public collection.");
-        const permission = COLLECTION_PERMISSION[path];
-        if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `Repeating ${path} requires ${permission}.`);
+        const nestedChannelMembers = path.split(".").length === 2
+          && path.endsWith(".members")
+          && aliases.get(path.slice(0, path.lastIndexOf("."))) === "session.channels";
+        if (!(path === "session.channels" || path === "session.members" || path === "favorites.items" || path === "servers.quickList" || path === "chat.messages" || path === "screenShare.streams" || nestedChannelMembers)) {
+          fail("SKIN_PLUGIN_REPEAT_INVALID", "A component may repeat only a registered public collection or the members of a repeated channel.");
+        }
+        const permission = nestedChannelMembers ? "session.members.read" : COLLECTION_PERMISSION[path];
+        if (!permission || !permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `Repeating ${path} requires ${permission ?? "a registered collection permission"}.`);
         const alias = identifier(rawNode.repeat.as, "repeat.as");
         if (aliases.has(alias)) fail("SKIN_PLUGIN_REPEAT_INVALID", "Repeat aliases cannot shadow an existing alias.");
         node.repeat = { path, as: alias };
@@ -453,7 +459,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (!Array.isArray(rawNode.children) || rawNode.children.length > (inputSchemaVersion >= 3 ? 256 : 100)) fail("SKIN_PLUGIN_TREE_INVALID", "A component node contains too many children.");
         if (node.tag && VOID_ELEMENTS.has(node.tag) && rawNode.children.length) fail("SKIN_PLUGIN_TREE_INVALID", "A void element cannot contain child nodes.");
         const childAliases = new Map(aliases);
-        if (node.repeat) childAliases.set(node.repeat.as, node.repeat.path);
+        if (node.repeat) childAliases.set(node.repeat.as, node.repeat.path.endsWith(".members") ? "session.members" : node.repeat.path);
         node.children = rawNode.children.map((child) => walk(child, depth + 1, childAliases));
       }
       return node;

@@ -3,6 +3,7 @@ import test from "node:test";
 import { createRenderer, createSSRApp, nextTick } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { approveSkinPluginComponents } from "./skin-plugin-approval.js";
 import {
   parseSkinExtensionUiOutput,
   SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES,
@@ -290,6 +291,70 @@ test("SkinPluginOutlet renders generated custom elements as inert host nodes", a
   }));
   assert.match(html, /<div[^>]*data-ws-generated-element="kook-server-rail"/);
   assert.match(html, /Server/);
+});
+
+test("SkinPluginOutlet renders bounded members nested under their channel", async () => {
+  const document = {
+    schemaVersion: 3,
+    components: [{
+      id: "channel-members",
+      name: "Channel members",
+      page: "voice",
+      accessibleName: "Voice channels and members",
+      permissions: ["session.channels.read", "session.members.read"],
+      actions: {},
+      root: {
+        tag: "nav",
+        repeat: { path: "session.channels", as: "channel" },
+        children: [{
+          tag: "section",
+          children: [
+            { tag: "h2", children: [{ text: "{{channel.name}}" }] },
+            {
+              tag: "ul",
+              children: [{
+                tag: "li",
+                repeat: { path: "channel.members", as: "member" },
+                children: [{ text: "{{member.name}}" }],
+              }],
+            },
+          ],
+        }],
+      },
+    }],
+  } as unknown as SkinPluginDocument;
+  const storage = new Map<string, string>();
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value); },
+    },
+  });
+  try {
+    approveSkinPluginComponents("community.test", "1.0.0", document.components);
+    const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+      skinId: "community.test",
+      skinVersion: "1.0.0",
+      document,
+      page: "voice",
+      data: { session: { channels: Array.from({ length: 100 }, (_, channelIndex) => ({
+        id: `room-${channelIndex}`,
+        name: channelIndex === 0 ? "Room One" : `Room ${channelIndex}`,
+        members: Array.from({ length: 100 }, (_, memberIndex) => ({ id: `user-${channelIndex}-${memberIndex}`, name: `Member-${channelIndex}-${memberIndex}` })),
+      })) } },
+      assets: {},
+      actions: {},
+    }));
+    assert.match(html, /Room One/);
+    const renderedMembers = html.match(/Member-\d+-\d+/g) ?? [];
+    assert.ok(renderedMembers.length > 0);
+    assert.ok(renderedMembers.length < 10_000, "nested repeats must stop at the component render-node limit");
+  } finally {
+    if (previousStorage) Object.defineProperty(globalThis, "localStorage", previousStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
 });
 
 test("skin-authored DOM nodes expose independent layout parts and retain touch bounds for controls", async () => {

@@ -409,7 +409,10 @@ test("the distributable KAAK v3 package validates end to end", async () => {
   assert.equal(skin.schemaVersion, 3);
   assert.deepEqual(skin.pluginData?.components.map((component) => component.id), ["kaak-channel-sidebar", "kaak-members-sidebar"]);
   assert.equal(skin.pluginData?.components[0].root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
+  assert.ok(skin.pluginData?.components[0].permissions.includes("session.members.read"));
+  assert.equal(skin.pluginData?.components[0].root.children?.[1].children?.[0].children?.[1].children?.[0].repeat?.path, "channel.members");
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-row"'));
+  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-members"'));
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-members-sidebar.member-row-content"'));
 });
 

@@ -1468,6 +1468,14 @@ const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickS
 const skinPluginFavorites = computed(() => skinPluginQuickList.value
   .filter((server) => server.favorite)
   .map(({ favorite: _favorite, ...server }) => server));
+const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => item.members.map((member) => ({
+  id: String(member.id),
+  name: member.nickname,
+  channelId: item.id,
+  status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
+  speaking: speakingIds.has(member.id),
+  self: member.id === voiceState.tsClientId,
+}))));
 
 const skinPluginContext = computed(() => ({
   session: {
@@ -1478,22 +1486,19 @@ const skinPluginContext = computed(() => ({
       channelName: currentChannelName.value,
       userName: nickname.value,
     },
-    channels: channelTree.value.map((item) => ({
-      id: item.id,
-      name: item.name,
-      parentId: item.parentID,
-      depth: item.depth,
-      memberCount: item.members.length,
-      current: item.id === currentChannel.value?.id,
-    })),
-    members: memberChannels.value.flatMap((item) => item.members.map((member) => ({
-      id: String(member.id),
-      name: member.nickname,
-      channelId: item.id,
-      status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
-      speaking: speakingIds.has(member.id),
-      self: member.id === voiceState.tsClientId,
-    }))),
+    channels: channelTree.value.map((item) => {
+      const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
+      return {
+        id: item.id,
+        name: item.name,
+        parentId: item.parentID,
+        depth: item.depth,
+        memberCount: item.members.length,
+        current: item.id === currentChannel.value?.id,
+        members,
+      };
+    }),
+    members: skinPluginMembers.value,
   },
   favorites: { items: skinPluginFavorites.value },
   servers: { quickList: skinPluginQuickList.value },

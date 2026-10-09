@@ -8,6 +8,7 @@
       "accessibleName": "频道列表 / Channel list",
       "permissions": [
         "session.channels.read",
+        "session.members.read",
         "session.channel.join"
       ],
       "actions": {
@@ -73,6 +74,38 @@
                         "part": "channel-count",
                         "className": "kaak-channel-count",
                         "children": [{ "text": "{{channel.memberCount}}" }]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "ul",
+                    "part": "channel-members",
+                    "className": "kaak-channel-members",
+                    "attributes": { "aria-label": "频道成员 / Channel members" },
+                    "children": [
+                      {
+                        "tag": "li",
+                        "part": "channel-member",
+                        "className": "kaak-channel-member",
+                        "repeat": { "path": "channel.members", "as": "member" },
+                        "children": [
+                          {
+                            "tag": "span",
+                            "part": "channel-member-presence",
+                            "className": "kaak-channel-member-presence",
+                            "attributes": {
+                              "aria-hidden": true,
+                              "data-speaking": "{{member.speaking}}",
+                              "data-self": "{{member.self}}"
+                            }
+                          },
+                          {
+                            "tag": "span",
+                            "part": "channel-member-name",
+                            "className": "kaak-channel-member-name",
+                            "children": [{ "text": "{{member.name}}" }]
+                          }
+                        ]
                       }
                     ]
                   }

@@ -139,10 +139,13 @@ test("KAAK v3 example splits validated channel and member data by component", as
   const memberSidebar = parsed.components.find((component) => component.id === "kaak-members-sidebar");
   assert.ok(channelSidebar);
   assert.ok(memberSidebar);
-  assert.deepEqual(channelSidebar.permissions, ["session.channels.read", "session.channel.join"]);
+  assert.deepEqual(channelSidebar.permissions, ["session.channels.read", "session.members.read", "session.channel.join"]);
   assert.equal(channelSidebar.actions["join-channel"].type, "voice.joinChannel");
   assert.equal(channelSidebar.root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
   assert.equal(channelSidebar.root.children?.[1].children?.[0].repeat?.path, "session.channels");
+  const nestedMembers = channelSidebar.root.children?.[1].children?.[0].children?.[1].children?.[0];
+  assert.equal(nestedMembers?.repeat?.path, "channel.members");
+  assert.equal(nestedMembers?.children?.[1].children?.[0].text, "{{member.name}}");
   assert.deepEqual(memberSidebar.permissions, ["session.members.read"]);
   assert.equal(memberSidebar.root.children?.[2].children?.[0].repeat?.path, "session.members");
 });
@@ -186,6 +189,32 @@ test("skin plugin restricts repeated fields to the selected collection", () => {
   document.components[0].root.repeat = { path: "session.channels", as: "channel" };
   document.components[0].root.children = [{ text: "{{channel.author}}" }];
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_BINDING_INVALID");
+});
+
+test("skin plugins can repeat channel members only under a channel alias and with member permission", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].permissions.push("session.members.read");
+  document.components[0].root.children = [{
+    tag: "ul",
+    children: [{
+      tag: "li",
+      repeat: { path: "channel.members", as: "member" },
+      children: [{ text: "{{channel.name}} — {{member.name}}" }],
+    }],
+  }];
+  const parsed = parseSkinPluginDocument(document);
+  const nestedMember = parsed.components[0].root.children?.[0].children?.[0];
+  assert.deepEqual(nestedMember?.repeat, { path: "channel.members", as: "member" });
+
+  const missingPermission = structuredClone(document);
+  missingPermission.components[0].permissions = ["session.channels.read", "session.channel.join"];
+  errorCode(() => parseSkinPluginDocument(missingPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const outsideChannel = structuredClone(document);
+  outsideChannel.components[0].root.repeat = undefined;
+  outsideChannel.components[0].root.children = [{ tag: "ul", repeat: { path: "channel.members", as: "member" } }];
+  errorCode(() => parseSkinPluginDocument(outsideChannel), "SKIN_PLUGIN_REPEAT_INVALID");
 });
 
 test("skin plugin never dispatches host actions from typing or selection changes", () => {

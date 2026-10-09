@@ -938,6 +938,10 @@
   gap: 3px;
 }
 
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-item"] {
+  min-width: 0;
+}
+
 [data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-row"] {
   display: flex;
   align-items: center;
@@ -977,6 +981,50 @@
 [data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-count"] {
   color: var(--skin-kaak-muted);
   font-size: 10px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-members"] {
+  display: grid;
+  gap: 1px;
+  margin: 1px 0 5px;
+  padding: 0 0 0 34px;
+  list-style: none;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-member"] {
+  display: flex;
+  min-width: 0;
+  min-height: 24px;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 5px;
+  color: var(--skin-kaak-muted);
+  border-radius: 5px;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-member-presence"] {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #727579;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-member-presence"][data-speaking="true"] {
+  background: var(--skin-kaak-green);
+  box-shadow: 0 0 0 2px rgba(124, 201, 138, .15);
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-member-name"] {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-ws-page="voice"] [data-ws-plugin-part="kaak-channel-sidebar.channel-member-presence"][data-self="true"] + [data-ws-plugin-part="kaak-channel-sidebar.channel-member-name"] {
+  color: var(--skin-kaak-accent);
 }
 
 [data-ws-page="voice"] [data-ws-plugin-part="kaak-members-sidebar.online-label"] {
