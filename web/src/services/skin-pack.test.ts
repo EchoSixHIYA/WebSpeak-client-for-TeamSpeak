@@ -368,8 +368,9 @@ test("the distributable KAAK v3 package validates end to end", async () => {
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
   assert.equal(skin.schemaVersion, 3);
-  assert.equal(skin.pluginData?.components[0].id, "kaak-room-sidebar");
-  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-room-sidebar.channel-row"'));
+  assert.deepEqual(skin.pluginData?.components.map((component) => component.id), ["kaak-channel-sidebar", "kaak-members-sidebar"]);
+  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-row"'));
+  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-members-sidebar.member-row-content"'));
 });
 
 test("the full voice surface example packages home, voice, and host-owned controls", async () => {

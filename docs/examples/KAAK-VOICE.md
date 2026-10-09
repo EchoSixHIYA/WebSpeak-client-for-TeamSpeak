@@ -1,16 +1,16 @@
 # KAAK voice skin
 
-KAAK is a schema v3 open-skin package for WebSpeak's public connection page and voice workspace. It keeps TeamSpeak connection, channel, member, chat, favorite-server, audio, and screen-sharing behavior in the host. On desktop, its declarative channel/member sidebar replaces the host's channel tree; on narrow screens, WebSpeak's native responsive channel/member UI remains in use.
+KAAK is a schema v3 open-skin package for WebSpeak's public connection page and voice workspace. It keeps TeamSpeak connection, channel, member, chat, favorite-server, audio, and screen-sharing behavior in the host. The desktop voice layout places the favorite-server rail, a declarative channel list, the active workspace, a member column, and the audio dock in separate regions. Narrow screens return to WebSpeak's responsive channel and member controls.
 
-The design target is the voice-client portion of KOOK, as requested by the project owner. This skin does not include discovery, advertising, companion/party, event, store, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
+The design target is the voice-client portion of KOOK, as requested by the project owner. This skin does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
 
 ## Reference access note
 
-The owner authorized inspection of two specified voice rooms. The current browser bridge exposes the KOOK tab in its inventory but times out when reading its page, and direct page access is unavailable. Therefore this revision is a v3 architecture and styling migration based on the existing KAAK draft and the owner's voice-client scope; it is not a verified pixel-for-pixel reproduction of either live room. No room contents or member details are asserted here.
+The owner authorized inspection of the first two voice rooms in the KOOK server. Both rooms were entered and viewed; the microphone remained off. The reference confirmed a narrow server rail, grouped channel list with inline voice participants, a central channel/chat workspace, a right-side member column, and a compact voice-control dock near the lower left. This is a layout and styling reference, not a claim of pixel-for-pixel reproduction. Server/room identifiers, member names, and chat contents were not recorded.
 
 ## Components and permissions
 
-The voice sidebar is defined in [components.json](./kaak-voice/components.json). It reads the public channel tree and visible member names/speaking state. A real user double-click or Enter/Space key action can ask the host to join a listed channel; the host rechecks that the channel is visible and applies the existing TeamSpeak password and permission flow. Permission approval is local to this skin version and can be revoked from the host access control.
+The channel list and member column are defined as separate components in [components.json](./kaak-voice/components.json). They read only the visible TeamSpeak channel tree and visible member names/speaking state. A user-activated channel control asks the host to join a listed channel; the host rechecks visibility and applies the existing TeamSpeak password and permission flow. Permission approval is local to this skin version and can be revoked from the host access control.
 
 The favorite-server rail and main audio/chat controls remain WebSpeak components. The plugin does not receive server addresses, passwords, identity keys, microphone controls, raw audio, private messages, or arbitrary network/storage APIs. The /demo page uses synthetic data and does not connect to TeamSpeak.
 

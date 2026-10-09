@@ -132,14 +132,18 @@ test("host widget references stay allowlisted and cannot be used on the demo pag
   errorCode(() => parseSkinPluginDocument(demoWidget), "SKIN_PLUGIN_WIDGET_INVALID");
 });
 
-test("KAAK v3 example uses only validated public session data and an explicit join action", async () => {
+test("KAAK v3 example splits validated channel and member data by component", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
-  const sidebar = parsed.components[0];
-  assert.equal(sidebar.id, "kaak-room-sidebar");
-  assert.deepEqual(sidebar.permissions, ["session.channels.read", "session.members.read", "session.channel.join"]);
-  assert.equal(sidebar.actions["join-channel"].type, "voice.joinChannel");
-  assert.equal(sidebar.root.children?.[1].children?.[0].repeat?.path, "session.channels");
+  const channelSidebar = parsed.components.find((component) => component.id === "kaak-channel-sidebar");
+  const memberSidebar = parsed.components.find((component) => component.id === "kaak-members-sidebar");
+  assert.ok(channelSidebar);
+  assert.ok(memberSidebar);
+  assert.deepEqual(channelSidebar.permissions, ["session.channels.read", "session.channel.join"]);
+  assert.equal(channelSidebar.actions["join-channel"].type, "voice.joinChannel");
+  assert.equal(channelSidebar.root.children?.[1].children?.[0].repeat?.path, "session.channels");
+  assert.deepEqual(memberSidebar.permissions, ["session.members.read"]);
+  assert.equal(memberSidebar.root.children?.[2].children?.[0].repeat?.path, "session.members");
 });
 
 test("skin plugin binds form controls only to declared local state", () => {

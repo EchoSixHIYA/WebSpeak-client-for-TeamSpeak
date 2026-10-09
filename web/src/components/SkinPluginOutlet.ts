@@ -9,6 +9,7 @@ import {
   type SkinPluginHostWidget,
   type SkinPluginNode,
 } from "../../../src/shared/skin-plugin.js";
+import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
 
 type Scalar = string | number | boolean;
@@ -28,6 +29,7 @@ export default defineComponent({
     skinId: { type: String, required: true },
     skinVersion: { type: String, required: true },
     document: { type: Object as PropType<SkinPluginDocument>, required: true },
+    extensionOutput: { type: String, default: null },
     page: { type: String as PropType<"home" | "voice" | "demo">, required: true },
     data: { type: Object as PropType<SafeContext>, required: true },
     assets: { type: Object as PropType<Record<string, Blob>>, required: true },
@@ -46,8 +48,20 @@ export default defineComponent({
     const stateByComponent = reactive<Record<string, Record<string, Scalar>>>({});
     const objectUrls = new Map<string, string>();
     const validatedDocument = computed(() => {
-      try { return parseSkinPluginDocument(props.document); }
+      let document: SkinPluginDocument;
+      try { document = parseSkinPluginDocument(props.document); }
       catch { return { schemaVersion: 2 as const, components: [] }; }
+      if (!props.extensionOutput || document.schemaVersion !== 3) return document;
+      try {
+        const extensionDocument = parseSkinExtensionUiOutput(props.extensionOutput);
+        return parseSkinPluginDocument({
+          schemaVersion: 3,
+          components: [...document.components, ...extensionDocument.components],
+        });
+      } catch {
+        // Dynamic output is optional; an invalid or colliding result leaves the package UI intact.
+        return document;
+      }
     });
     const matchingComponents = computed(() => validatedDocument.value.components.filter((component) => component.page === props.page));
     const pendingApproval = computed(() => {
@@ -66,7 +80,7 @@ export default defineComponent({
     const renderedComponents = computed(() => activeComponents.value.filter((component) =>
       component.mode !== "surface" || component !== surfaceCandidate.value || !surfaceSuppressed.value));
 
-    watch(() => [props.skinId, props.skinVersion, props.document, props.page], () => {
+    watch(() => [props.skinId, props.skinVersion, props.document, props.extensionOutput, props.page], () => {
       denied.value = false;
       surfaceSuppressed.value = false;
       refresh.value += 1;
