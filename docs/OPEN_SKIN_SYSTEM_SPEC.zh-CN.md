@@ -14,7 +14,7 @@
 
 皮肤格式按版本区分：v1 保持视觉皮肤兼容；v2 提供有界布局 JSON；v3 使用 open-skin 清单、受控 CSS 和声明式 components.json；v4 在 open-skin 包中增加必需的 plugins.json 和插件专属 JS/CSS/素材路径。客户端与服务端共用 v4 插件描述校验器，并检查引用文件、UTF-8 和大小；当前不执行或加载这些代码。v1/v2 的 CSS 继续拒绝布局类声明，旧包不会因升级而获得新权限；v3/v4 才允许 CSS 控制公开页面中的布局、位置、尺寸、顺序、文字排版和显隐。
 
-v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。宿主仍解析固定元素/属性白名单、固定数据集合、简单绑定与有限动作，再由 Vue 创建节点。作者不必使用固定宿主控件目录，但 v3 仍不足以表达任意自定义 UI 逻辑和完整插件生命周期。管理员面板和演示页不能被 surface 替换。
+v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。宿主仍解析固定元素/属性白名单、固定数据集合、简单绑定与有限动作，再由 Vue 创建节点。每个自定义组件根和每个有 DOM 的节点都会作为独立本地布局项，可移动、调整尺寸、改变外观或隐藏。节点指定 `part` 后使用该标识；未指定时使用树路径，树结构调整后旧的本地覆盖可能要重新设置。可操作节点保留至少 44 px 的触控目标。作者不必使用固定宿主控件目录，但 v3 仍不足以表达任意自定义 UI 逻辑和完整插件生命周期。管理员面板和演示页不能被 surface 替换。
 
 宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
 

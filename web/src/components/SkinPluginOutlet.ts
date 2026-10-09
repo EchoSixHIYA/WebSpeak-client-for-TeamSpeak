@@ -153,7 +153,16 @@ export default defineComponent({
       return url;
     }
 
-    function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, skipRepeat = false): VNodeChild {
+    function layoutPart(component: SkinPluginComponent, node: SkinPluginNode, nodePath: string): string {
+      const interactive = ["a", "button", "input", "select", "summary", "textarea"].includes(node.tag ?? "")
+        || node.attributes?.role === "button"
+        || ["click", "dblclick", "contextmenu", "keydown", "keyup", "pointerdown", "pointerup", "drop"]
+          .some((eventName) => Boolean(node.events?.[eventName as keyof typeof node.events]));
+      const part = node.part ? `part-${node.part}` : nodePath;
+      return `skin.${component.page}.${component.id}.${interactive ? "control-" : ""}${part}`;
+    }
+
+    function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, skipRepeat = false, nodePath = "node-root"): VNodeChild {
       if (node.widget) {
         if (node.when) {
           const value = resolvePath(node.when.path, context, state);
@@ -165,15 +174,23 @@ export default defineComponent({
           class: ["ws-plugin-host-widget", node.className],
           "data-ws-plugin-widget": node.widget,
           "data-ws-plugin-part": node.part ? `${component.id}.${node.part}` : component.id,
+          "data-ws-part": layoutPart(component, node, nodePath),
           "aria-label": component.accessibleName,
         }, [widget()]);
       }
-      if (!node.tag) return interpolate(node.text ?? "", context, state);
+      if (!node.tag) {
+        const text = interpolate(node.text ?? "", context, state);
+        return node.part ? h("span", {
+          class: "ws-plugin-node",
+          "data-ws-plugin-part": `${component.id}.${node.part}`,
+          "data-ws-part": layoutPart(component, node, nodePath),
+        }, text) : text;
+      }
       if (!skipRepeat && node.repeat) {
         const values = resolvePath(node.repeat.path, context, state);
         if (!Array.isArray(values)) return null;
         const repeatLimit = props.document.schemaVersion >= 3 ? SKIN_PLUGIN_REPEAT_LIMIT : 100;
-        return h(Fragment, null, values.slice(0, repeatLimit).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, true)));
+        return h(Fragment, null, values.slice(0, repeatLimit).map((value) => renderNode(component, node, { ...context, [node.repeat!.as]: value }, state, true, nodePath)));
       }
       if (node.when) {
         const value = resolvePath(node.when.path, context, state);
@@ -191,6 +208,7 @@ export default defineComponent({
         attrs.class = ["ws-plugin-node", node.className, attrs.class].filter(Boolean).join(" ");
       } else attrs.class = "ws-plugin-node";
       attrs["data-ws-plugin-part"] = node.part ? `${component.id}.${node.part}` : component.id;
+      attrs["data-ws-part"] = layoutPart(component, node, nodePath);
       if (node.bindValue) attrs.value = state[node.bindValue];
 
       for (const [eventName, actionId] of Object.entries(node.events ?? {})) {
@@ -220,7 +238,7 @@ export default defineComponent({
         };
       }
       if (node.tag === "form" && !node.events?.submit) attrs.onSubmit = (event: Event) => event.preventDefault();
-      const children = (node.children ?? []).map((child) => renderNode(component, child, context, state));
+      const children = (node.children ?? []).map((child, index) => renderNode(component, child, context, state, false, `${nodePath}-${index}`));
       return h(node.tag, attrs, children);
     }
 
@@ -257,6 +275,7 @@ export default defineComponent({
         "data-ws-plugin-component": component.id,
         "data-ws-plugin-name": component.name,
         "data-ws-plugin-part": component.id,
+        "data-ws-part": `skin.${component.page}.${component.id}`,
         ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,
       }, [renderNode(component, component.root, props.data, localState(component))]));

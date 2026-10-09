@@ -432,12 +432,42 @@ export const SKIN_LAYOUT_COMPONENTS: readonly SkinLayoutComponent[] = [
 
 const componentById = new Map(SKIN_LAYOUT_COMPONENTS.map((component) => [component.id, component]));
 
-export function getSkinLayoutComponents(page: SkinLayoutPage): SkinLayoutComponent[] {
-  return SKIN_LAYOUT_COMPONENTS.filter((component) => component.page === "common" || component.page === page);
+function dynamicSkinPartPage(id: string): SkinLayoutPage | undefined {
+  const match = /^skin\.(home|voice|demo)\.([a-z][a-z0-9-]{0,63})(?:\.(control-)?(node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63}))?$/.exec(id);
+  return match?.[1] as SkinLayoutPage | undefined;
+}
+
+function isDynamicSkinControl(id: string): boolean {
+  return /^skin\.(?:home|voice|demo)\.[a-z][a-z0-9-]{0,63}\.control-(?:node-root(?:-\d+){0,32}|part-[a-z][a-z0-9-]{0,63})$/.test(id);
+}
+
+const dynamicSkinPartCache = new Map<string, SkinLayoutComponent>();
+
+function dynamicSkinLayoutComponent(id: string, page: SkinLayoutPage): SkinLayoutComponent {
+  let component = dynamicSkinPartCache.get(id);
+  if (!component) {
+    component = describeComponent(id, page, isDynamicSkinControl(id) ? "button" : undefined);
+    if (dynamicSkinPartCache.size >= 4096) dynamicSkinPartCache.clear();
+    dynamicSkinPartCache.set(id, component);
+  }
+  return component;
+}
+
+/** Dynamic IDs are generated only for declared skin component roots and nodes. */
+export function getSkinLayoutComponents(page: SkinLayoutPage, dynamicParts: readonly string[] = []): SkinLayoutComponent[] {
+  const components = SKIN_LAYOUT_COMPONENTS.filter((component) => component.page === "common" || component.page === page);
+  const seen = new Set(components.map((component) => component.id));
+  for (const id of dynamicParts) {
+    if (seen.has(id) || dynamicSkinPartPage(id) !== page) continue;
+    seen.add(id);
+    components.push(dynamicSkinLayoutComponent(id, page));
+  }
+  return components;
 }
 
 export function getSkinLayoutComponent(id: string, page?: SkinLayoutPage): SkinLayoutComponent | undefined {
-  const component = componentById.get(id);
+  const component = componentById.get(id)
+    ?? (dynamicSkinPartPage(id) ? dynamicSkinLayoutComponent(id, dynamicSkinPartPage(id)!) : undefined);
   if (!component || (page && component.page !== "common" && component.page !== page)) return undefined;
   return component;
 }

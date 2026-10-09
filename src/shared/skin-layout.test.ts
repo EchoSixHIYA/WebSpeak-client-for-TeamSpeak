@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import {
   getSkinLayoutComponents,
+  getSkinLayoutComponent,
   parseSkinLayoutJson,
   SKIN_LAYOUT_COMPONENTS,
   validateSkinLayout,
@@ -70,6 +71,42 @@ test("valid layouts accept only bounded positions and safe visual tokens", () =>
   assert.equal(layout.pages.home?.tablet?.["home.join-card"]?.width, 720);
   assert.equal(getSkinLayoutComponents("home").some((component) => component.id === "home.join-card"), true);
   assert.equal(getSkinLayoutComponents("voice").some((component) => component.id === "home.join-card"), false);
+});
+
+test("skin-authored component roots and nodes become independently editable layout parts", () => {
+  const dynamicIds = [
+    "skin.voice.toolbar",
+    "skin.voice.toolbar.node-root",
+    "skin.voice.toolbar.part-chat-list",
+    "skin.voice.toolbar.control-node-root-0",
+  ];
+  const components = getSkinLayoutComponents("voice", dynamicIds);
+  assert.deepEqual(components.filter((component) => dynamicIds.includes(component.id)).map((component) => component.id), dynamicIds);
+  assert.ok(dynamicIds.every((id) => getSkinLayoutComponent(id, "voice")?.editable));
+  assert.equal(getSkinLayoutComponent("skin.home.toolbar", "voice"), undefined);
+  assert.equal(getSkinLayoutComponent("skin.voice.toolbar.node-root-onclick", "voice"), undefined);
+
+  const layout = validateSkinLayout({
+    schemaVersion: 1,
+    pages: { voice: { desktop: {
+      "skin.voice.toolbar": { x: 18, y: 12, visible: true },
+      "skin.voice.toolbar.node-root": { width: 720 },
+      "skin.voice.toolbar.part-chat-list": { visible: false },
+      "skin.voice.toolbar.control-node-root-0": { scale: 1, width: 60, height: 48 },
+    } } },
+  });
+  assert.equal(layout.pages.voice?.desktop?.["skin.voice.toolbar.part-chat-list"]?.visible, false);
+  assert.equal(getSkinLayoutComponent("skin.voice.toolbar.control-node-root-0")?.minTouchTarget, 44);
+  assert.ok(getSkinLayoutComponent("skin.voice.toolbar.control-node-root-0")!.minScale >= 1);
+
+  assert.throws(() => validateSkinLayout({
+    schemaVersion: 1,
+    pages: { voice: { desktop: { "skin.home.toolbar": { x: 0 } } } },
+  }));
+  assert.throws(() => validateSkinLayout({
+    schemaVersion: 1,
+    pages: { voice: { desktop: { "skin.voice.toolbar.control-node-root-0": { scale: 0.8 } } } },
+  }));
 });
 
 test("layout validation fails closed for unknown pages, components, trusted notices, fields, and values", () => {

@@ -60,6 +60,11 @@ function componentIdForElement(element: HTMLElement): string | null {
   return getSkinLayoutComponentId(element.dataset.wsPart, element.dataset.wsControlKind);
 }
 
+function dynamicPartsInRoot(root: HTMLElement): string[] {
+  return [...root.querySelectorAll<HTMLElement>("[data-ws-part^='skin.']")]
+    .map((element) => element.dataset.wsPart ?? "");
+}
+
 export function useSkinLayoutEditor() {
   const isOpen = ref(false);
   const isEditing = ref(false);
@@ -86,8 +91,8 @@ export function useSkinLayoutEditor() {
   const available = computed(() => Boolean(context.value));
   const components = computed(() => {
     revision.value;
-    const page = context.value?.page;
-    return page ? getSkinLayoutComponents(page).filter((component) => component.editable) : [];
+    const active = context.value;
+    return active ? getSkinLayoutComponents(active.page, dynamicPartsInRoot(active.root)).filter((component) => component.editable) : [];
   });
   const filteredComponents = computed(() => {
     const search = filter.value.trim().toLowerCase();
@@ -281,7 +286,7 @@ export function useSkinLayoutEditor() {
     historyIndex = history.length ? 0 : -1;
     lastHistoryChangeAt = 0;
     updateHistoryControls();
-    const first = next ? getSkinLayoutComponents(next.page).find((component) => component.editable)?.id ?? "" : "";
+    const first = next ? getSkinLayoutComponents(next.page, dynamicPartsInRoot(next.root)).find((component) => component.editable)?.id ?? "" : "";
     if (!next || !getSkinLayoutComponent(selectedComponentId.value, next.page)?.editable) selectedComponentId.value = first;
     reviseLayout();
     setSkinLayoutEditorState(isEditing.value, selectedComponentId.value || null);
@@ -555,16 +560,22 @@ export function useSkinLayoutEditor() {
   onMounted(() => {
     initializeSkinLayoutRuntime();
     syncContext();
-    observer = new MutationObserver(() => {
+    observer = new MutationObserver((records) => {
       syncContext();
-      if (focusPreviewEnabled.value) revision.value += 1;
+      const includesDynamicPart = (node: Node) => node instanceof Element
+        && (node.matches("[data-ws-part^='skin.']") || Boolean(node.querySelector("[data-ws-part^='skin.']")));
+      const dynamicPartsChanged = records.some((record) =>
+        (record.type === "attributes" && record.attributeName === "data-ws-part"
+          && record.target instanceof Element && record.target.matches("[data-ws-part^='skin.']"))
+        || (record.type === "childList" && [...record.addedNodes, ...record.removedNodes].some(includesDynamicPart)));
+      if (dynamicPartsChanged || focusPreviewEnabled.value) revision.value += 1;
     });
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ["data-ws-page", "data-ws-skin", "lang", "tabindex", "disabled", "href", "aria-label", "aria-labelledby", "title", "placeholder", "hidden", "inert", "aria-hidden", "class", "style"],
+      attributeFilter: ["data-ws-page", "data-ws-skin", "data-ws-part", "lang", "tabindex", "disabled", "href", "aria-label", "aria-labelledby", "title", "placeholder", "hidden", "inert", "aria-hidden", "class", "style"],
     });
     document.addEventListener("pointerdown", startDrag, true);
     document.addEventListener("pointermove", moveDrag, true);
