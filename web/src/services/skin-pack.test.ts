@@ -369,6 +369,7 @@ test("the distributable KAAK v3 package validates end to end", async () => {
   assert.equal(skin.id, "community.kaak-voice");
   assert.equal(skin.schemaVersion, 3);
   assert.deepEqual(skin.pluginData?.components.map((component) => component.id), ["kaak-channel-sidebar", "kaak-members-sidebar"]);
+  assert.equal(skin.pluginData?.components[0].root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-row"'));
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-members-sidebar.member-row-content"'));
 });

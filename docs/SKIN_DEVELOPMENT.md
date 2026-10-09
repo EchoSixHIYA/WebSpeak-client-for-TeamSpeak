@@ -1,6 +1,8 @@
 # WebSpeak 皮肤开发规范
 
-本文说明仍受支持的 v1 视觉皮肤、v2 声明式布局皮肤和 v3 开放皮肤。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。自定义界面不依赖固定宿主控件目录；交互通过逐项授权的宿主动作实现。界面由宿主安全渲染，不执行作者代码。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明仍受支持的 v1 视觉皮肤、v2 声明式布局皮肤和 v3 开放皮肤。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。自定义界面不依赖固定宿主控件目录；交互通过逐项授权的宿主动作实现。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+
+当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 插件运行时是目标阶段，尚未实现或获安全批准；它必须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v3 的示例包或 Wasm 输出原型描述成已完成的全量插件系统。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -108,7 +110,7 @@ v1 和 v2 都只支持公开页面。`/admin/**` 不加载布局、用户覆盖�
 
 v3 清单的 packageType 固定为 open-skin，entry 指向 CSS，components 指向 components.json；不含 v2 的 layout 或 permissions 字段。组件文件可以省略。仅 v3 开放公开页面的 CSS 排版能力，v1/v2 仍按旧 CSS 规则校验。客户端导入和服务端登记使用同一共享组件 schema 与权限白名单。
 
-components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。schema v1 维持旧兼容；schema v2 引入 `mode: "widget"`（默认）或 `mode: "surface"`，并提供可选宿主控件节点；schema v3 保持这些能力，扩大声明式 UI 的节点/状态/动作边界，并增加用户操作事件和语音功能动作。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。
+components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。schema v1 维持旧兼容；schema v2 引入 `mode: "widget"`（默认）或 `mode: "surface"`，并提供可选宿主控件节点；schema v3 保持这些能力，扩大声明式 UI 的节点/状态/动作边界，并增加用户操作事件和语音功能动作。v3 仍使用固定元素/属性、公开数据集合和宿主动作白名单，不是任意 HTML 或任意脚本。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。v4 完整插件协议见[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md#21-完整插件目标协议v4尚未实现)，当前不可作为已支持包格式使用。
 
 普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。schema v2 另允许固定宿主控件节点，例如：
 

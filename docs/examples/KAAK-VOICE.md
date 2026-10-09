@@ -10,7 +10,7 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 ## Components and permissions
 
-The channel list and member column are defined as separate components in [components.json](./kaak-voice/components.json). They read only the visible TeamSpeak channel tree and visible member names/speaking state. A user-activated channel control asks the host to join a listed channel; the host rechecks visibility and applies the existing TeamSpeak password and permission flow. Permission approval is local to this skin version and can be revoked from the host access control.
+The channel list and member column are defined as separate components in [components.json](./kaak-voice/components.json). They read only the visible TeamSpeak channel tree and visible member names/speaking state. Double-clicking a channel asks the host to join it; the host rechecks visibility and applies the existing TeamSpeak password and permission flow. This behavior belongs only to this KAAK component and does not alter the TeamSpeak protocol or other skins. Permission approval is local to this skin version and can be revoked from the host access control.
 
 The favorite-server rail and main audio/chat controls remain WebSpeak components. The plugin does not receive server addresses, passwords, identity keys, microphone controls, raw audio, private messages, or arbitrary network/storage APIs. The /demo page uses synthetic data and does not connect to TeamSpeak.
 

@@ -52,7 +52,7 @@
                       "aria-label": "加入 / Join {{channel.name}}"
                     },
                     "events": {
-                      "click": "join-channel"
+                      "dblclick": "join-channel"
                     },
                     "children": [
                       {

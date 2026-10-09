@@ -141,6 +141,7 @@ test("KAAK v3 example splits validated channel and member data by component", as
   assert.ok(memberSidebar);
   assert.deepEqual(channelSidebar.permissions, ["session.channels.read", "session.channel.join"]);
   assert.equal(channelSidebar.actions["join-channel"].type, "voice.joinChannel");
+  assert.equal(channelSidebar.root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
   assert.equal(channelSidebar.root.children?.[1].children?.[0].repeat?.path, "session.channels");
   assert.deepEqual(memberSidebar.permissions, ["session.members.read"]);
   assert.equal(memberSidebar.root.children?.[2].children?.[0].repeat?.path, "session.members");
