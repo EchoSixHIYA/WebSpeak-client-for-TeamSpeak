@@ -34,6 +34,7 @@
       :assets="activeSkin.assets"
       :page="showVoiceShell ? 'voice' : 'home'"
       :context="skinPluginContext"
+      :actions="skinPluginActions"
       :read-session-status="readSkinRuntimeSessionStatus"
       @surface-change="skinRuntimePluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"

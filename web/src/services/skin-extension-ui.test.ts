@@ -5,6 +5,7 @@ import { renderToString } from "@vue/server-renderer";
 import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import { approveSkinPluginComponents } from "./skin-plugin-approval.js";
 import {
+  parseSkinExtensionUiActionRequest,
   parseSkinExtensionUiOutput,
   SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES,
   SkinExtensionUiOutputError,
@@ -105,6 +106,35 @@ test("generated UI schema 5 carries bounded state and named callbacks for a trus
   assert.equal(component.runtimeCallbacks, true);
   assert.deepEqual({ ...component.state }, { expanded: false, selected: "home" });
   assert.equal(component.root.children?.[0].events?.click, "select-server");
+});
+
+test("generated UI schema 6 validates one host action against plugin permissions", () => {
+  const source = JSON.stringify({
+    schemaVersion: 6,
+    components: [{
+      id: "voice-channels",
+      name: "Voice channels",
+      page: "voice",
+      accessibleName: "Voice channels",
+      state: {},
+      root: { tag: "button", events: { dblclick: "join" }, children: [{ text: "Join" }] },
+    }],
+    request: { type: "voice.joinChannel", args: { channelId: "channel-1" } },
+  });
+  const document = parseSkinExtensionUiOutput(source);
+  assert.equal(document.components[0].runtimeCallbacks, true);
+  const action = parseSkinExtensionUiActionRequest(source, ["session.channel.join"]);
+  assert.deepEqual(action && { type: action.type, args: { ...action.args } }, {
+    type: "voice.joinChannel",
+    args: { channelId: "channel-1" },
+  });
+  assert.throws(() => parseSkinExtensionUiActionRequest(source, []), (error: unknown) =>
+    error instanceof SkinExtensionUiOutputError && error.code === "SKIN_EXTENSION_UI_ACTION_INVALID");
+  expectOutputError(JSON.stringify({
+    schemaVersion: 6,
+    components: [{ id: "voice-channels", name: "Voice channels", page: "voice", accessibleName: "Voice channels", root: { tag: "main" } }],
+    request: { type: "voice.joinChannel", args: { channelId: "channel-1", address: "private.example" } },
+  }), "SKIN_EXTENSION_UI_ACTION_INVALID");
 });
 
 test("generated UI callbacks reject unsupported events, malformed IDs, and password inputs", () => {

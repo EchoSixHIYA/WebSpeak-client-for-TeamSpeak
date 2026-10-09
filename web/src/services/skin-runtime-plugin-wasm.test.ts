@@ -48,7 +48,7 @@ test("Wasm plugin startup rechecks the exact digest approval before creating a W
   }), (error: unknown) => error instanceof SkinRuntimePluginWasmError && error.code === "SKIN_EXTENSION_WASM_APPROVAL_INVALID");
 });
 
-test("Wasm prototype refuses write permissions that have no host action bridge", async () => {
+test("Wasm prototype accepts a host-mediated channel join permission", async () => {
   const writePlugin = parseSkinRuntimePluginDocument({
     schemaVersion: 1,
     plugins: [{ ...plugin, permissions: ["session.channel.join"] }],
@@ -56,16 +56,41 @@ test("Wasm prototype refuses write permissions that have no host action bridge",
   const files = { [writePlugin.entry]: new Blob([createSkinExtensionWasmPrefixByteImmediateProbe()]) };
   const digest = await computeSkinRuntimePluginDigest(writePlugin, files);
   const approval = createSkinRuntimePluginApproval("community.sample", "2.0.0", writePlugin, digest);
-  await assert.rejects(createSkinRuntimePluginWasmSandboxPrototype({
-    skinId: "community.sample",
-    skinVersion: "2.0.0",
-    plugin: writePlugin,
-    approval,
-    files,
-    readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
-    prototypeOnly: true,
-  }), (error: unknown) => error instanceof SkinRuntimePluginWasmError
-    && error.code === "SKIN_EXTENSION_WASM_PERMISSION_UNSUPPORTED");
+  const previousWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  class FakeWorker {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    postMessage(): void {
+      queueMicrotask(() => {
+        this.onmessage?.({ data: { type: "running" } } as MessageEvent<unknown>);
+        this.onmessage?.({ data: {
+          type: "complete", result: 1, linearMemoryBytes: 65_536, statusReadCount: 0, uiInputReadCount: 0, uiOutput: null,
+        } } as MessageEvent<unknown>);
+      });
+    }
+    terminate(): void { /* The test worker has no external resources. */ }
+  }
+  Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
+  try {
+    const handle = await createSkinRuntimePluginWasmSandboxPrototype({
+      skinId: "community.sample",
+      skinVersion: "2.0.0",
+      plugin: writePlugin,
+      approval,
+      files,
+      readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
+      prototypeOnly: true,
+    });
+    assert.equal((await handle.result).uiOutput, null);
+  } finally {
+    if (previousWorker) Object.defineProperty(globalThis, "Worker", previousWorker);
+    else Reflect.deleteProperty(globalThis, "Worker");
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
 });
 
 test("approved read permissions project only their public fields into each Wasm job", async () => {

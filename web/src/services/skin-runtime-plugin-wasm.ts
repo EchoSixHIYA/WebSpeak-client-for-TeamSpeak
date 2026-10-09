@@ -10,6 +10,7 @@ import {
   type SkinRuntimePluginApproval,
 } from "../../../src/shared/skin-runtime-plugin-approval.js";
 import { parseSkinRuntimePluginDocument, type SkinRuntimePlugin } from "../../../src/shared/skin-runtime-plugins.js";
+import { SKIN_PLUGIN_ACTION_PERMISSIONS } from "../../../src/shared/skin-plugin.js";
 import { projectSkinRuntimePluginContext, SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import {
@@ -37,7 +38,7 @@ export interface SkinRuntimePluginWasmOptions {
   prototypeOnly: true;
 }
 
-const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, "ui.surface.replace"]);
+const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, ...SKIN_PLUGIN_ACTION_PERMISSIONS, "ui.surface.replace"]);
 
 /** Starts a Wasm entry only after rechecking the exact package digest and local approval. */
 export async function createSkinRuntimePluginWasmSandboxPrototype(

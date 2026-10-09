@@ -183,6 +183,9 @@ const ACTION_PERMISSION: Record<SkinPluginAction, SkinPluginPermission | null> =
   "voice.joinScreenShare": "voice.screenShare.control",
   "voice.leaveScreenShare": "voice.screenShare.control",
 };
+export const SKIN_PLUGIN_ACTION_PERMISSIONS: readonly SkinPluginPermission[] = Object.freeze([...new Set(
+  Object.values(ACTION_PERMISSION).filter((permission): permission is SkinPluginPermission => permission !== null),
+)]);
 const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
   "session.channels": "session.channels.read",
   "session.members": "session.members.read",
@@ -497,6 +500,31 @@ export function parseSkinPluginJson(source: string): SkinPluginDocument {
   let input: unknown;
   try { input = JSON.parse(source); } catch { fail("SKIN_PLUGIN_DOCUMENT_INVALID", "components.json must contain valid JSON."); }
   return parseSkinPluginDocument(input);
+}
+
+/** Parse a single runtime action using the same schema and permission rules as declarative skin actions. */
+export function parseSkinPluginRuntimeAction(
+  input: unknown,
+  permissions: readonly SkinPluginPermission[],
+): SkinPluginActionDefinition {
+  if (!isRecord(input)) fail("SKIN_PLUGIN_ACTION_INVALID", "A runtime action request must be an object.");
+  const parsed = parseSkinPluginDocument({
+    schemaVersion: 3,
+    components: [{
+      id: "runtime-action",
+      name: "Runtime action",
+      page: "voice",
+      accessibleName: "Runtime action",
+      permissions: [...permissions],
+      actions: { request: input },
+      root: { tag: "main", children: [{ text: "Runtime action" }] },
+    }],
+  });
+  const action = parsed.components[0].actions.request;
+  if (!action || action.type === "ui.setState" || action.type === "ui.toggleState") {
+    fail("SKIN_PLUGIN_ACTION_INVALID", "A runtime action request must name a host capability.");
+  }
+  return action;
 }
 
 export function listSkinPluginAssetPaths(document: SkinPluginDocument): string[] {

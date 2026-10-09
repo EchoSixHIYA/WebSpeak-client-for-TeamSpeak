@@ -1,11 +1,15 @@
 import {
+  SKIN_PLUGIN_PERMISSIONS,
+  parseSkinPluginRuntimeAction,
   SKIN_PLUGIN_NODE_LIMIT,
   SKIN_PLUGIN_TREE_DEPTH_LIMIT,
   parseSkinPluginDocument,
   type SkinPluginAction,
+  type SkinPluginActionDefinition,
   type SkinPluginComponent,
   type SkinPluginDocument,
   type SkinPluginNode,
+  type SkinPluginPermission,
 } from "./skin-plugin.js";
 import { parseSkinExtensionUiInput, SKIN_EXTENSION_UI_EVENT_NAMES } from "./skin-extension-ui-input.js";
 
@@ -176,8 +180,8 @@ function generatedNode(input: unknown, depth: number, count: { value: number }, 
   return node;
 }
 
-function parseGeneratedDocument(input: Record<string, unknown>, allowEvents: boolean): SkinPluginDocument {
-  onlyKeys(input, ["schemaVersion", "components"], "Generated UI document");
+function parseGeneratedDocument(input: Record<string, unknown>, allowEvents: boolean, allowRequest = false): SkinPluginDocument {
+  onlyKeys(input, ["schemaVersion", "components", ...(allowRequest ? ["request"] : [])], "Generated UI document");
   if (!Array.isArray(input.components) || input.components.length < 1 || input.components.length > GENERATED_COMPONENT_LIMIT) {
     fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "The generated document has an unsupported component count.");
   }
@@ -205,22 +209,44 @@ function parseGeneratedDocument(input: Record<string, unknown>, allowEvents: boo
   return { schemaVersion: 3, components };
 }
 
-/** Parses bounded Wasm output. Schema 5 adds trusted UI event callbacks and local scalar state. */
-export function parseSkinExtensionUiOutput(source: string): SkinPluginDocument {
+function parseOutputInput(source: string): Record<string, unknown> {
   if (typeof source !== "string" || !source.length) {
     fail("SKIN_EXTENSION_UI_OUTPUT_INVALID", "Extension UI output must be a non-empty JSON string.");
   }
   if (new TextEncoder().encode(source).byteLength > SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES) {
     fail("SKIN_EXTENSION_UI_OUTPUT_SIZE", "Extension UI output exceeds the 16 KiB UTF-8 limit.");
   }
-
   let input: unknown;
   try { input = JSON.parse(source); }
   catch { fail("SKIN_EXTENSION_UI_OUTPUT_JSON", "Extension UI output must contain valid JSON."); }
-
   if (!isRecord(input)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Extension UI output must be an object.");
+  return input;
+}
+
+/** Parse a single host action effect from schema 6 output and require its permission in the plugin manifest. */
+export function parseSkinExtensionUiActionRequest(
+  source: string,
+  permissions: readonly SkinPluginPermission[],
+): SkinPluginActionDefinition | null {
+  const input = parseOutputInput(source);
+  if (input.schemaVersion !== 6 || input.request === undefined) return null;
+  try { return parseSkinPluginRuntimeAction(input.request, permissions); }
+  catch { fail("SKIN_EXTENSION_UI_ACTION_INVALID", "The requested host action is malformed or lacks an approved plugin permission."); }
+}
+
+/** Parses bounded Wasm output. Schema 5 adds trusted callbacks; schema 6 adds one permission-checked host action effect. */
+export function parseSkinExtensionUiOutput(source: string): SkinPluginDocument {
+  const input = parseOutputInput(source);
   if (input.schemaVersion === 4) return parseGeneratedDocument(input, false);
   if (input.schemaVersion === 5) return parseGeneratedDocument(input, true);
+  if (input.schemaVersion === 6) {
+    const document = parseGeneratedDocument(input, true, true);
+    if (input.request !== undefined) {
+      try { parseSkinPluginRuntimeAction(input.request, Object.keys(SKIN_PLUGIN_PERMISSIONS) as SkinPluginPermission[]); }
+      catch { fail("SKIN_EXTENSION_UI_ACTION_INVALID", "The generated host action request is malformed."); }
+    }
+    return document;
+  }
 
   let document: SkinPluginDocument;
   try { document = parseSkinPluginDocument(input); }
