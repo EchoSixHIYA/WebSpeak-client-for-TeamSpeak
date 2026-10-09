@@ -1,6 +1,8 @@
 # WebSpeak 皮肤开发规范
 
-本文说明如何制作、校验并发布 WebSpeak `.wskin` 皮肤包。皮肤可为公开页面逐个部件定制二次元美术表现：背景、素材、配色、轮廓、圆角、阴影、头像装饰、按钮质感、滚动条颜色和播放器外观都可以自定义；但组件的位置、尺寸、排列、文字排版空间及交互结构由 WebSpeak 固定提供，皮肤不得重排或覆盖。
+本文说明仍受支持的 v1 视觉皮肤包，以及已实现的 v2 声明式布局皮肤。v1 继续保持固定组件布局；v2 可调整公开组件的位置、尺寸、显隐和外观，但不执行作者代码。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+
+`.wskin` 包可为公开页面定制艺术表现。v1 保持 WebSpeak 的固定布局；v2 另外携带受校验的布局 JSON，并可由用户在浏览器本地继续调整。两种格式均不允许皮肤替换宿主组件或改变 TeamSpeak 行为。
 
 页面结构、必要控件和所有基础翻译均由 WebSpeak 提供。皮肤包不必携带文案；如果只包含样式与美术素材，所有界面文字仍由 WebSpeak 按当前语言显示。`content.json` 仅用于可选覆盖，缺少的语言或字段回退到 WebSpeak 的基础内容。皮肤不注入 HTML 或 JavaScript，也不改变语音、权限、连接、拖动和屏幕共享行为。**管理后台 `/admin/**` 不属于皮肤范围，始终使用 WebSpeak 自己的固定样式。**
 
@@ -32,11 +34,11 @@ assets/brand.woff2            # 可选：自带字体
 ```json
 {
   "schemaVersion": 1,
-  "id": "community.illusia-voice",
-  "name": "ILLUSIA风",
-  "version": "1.0.28",
-  "author": "WebSpeak Project",
-  "license": "All rights reserved",
+  "id": "community.example-skin",
+  "name": "Example skin",
+  "version": "1.0.0",
+  "author": "Example author",
+  "license": "CC-BY-4.0",
   "description": "A visual-only art skin using the WebSpeak interface translations.",
   "entry": "skin.css",
   "preview": "assets/background-composite.webp",
@@ -56,6 +58,50 @@ assets/brand.woff2            # 可选：自带字体
 | `description` | 可选，最多 400 个字符。 |
 
 清单不得重复声明同一个文件为 CSS、内容或预览入口。
+
+### schemaVersion 2：声明式布局皮肤
+
+v2 为 v1 增加一个必需布局文件。清单和布局 JSON 会在导入端及服务端分别验证；未知清单字段、权限、组件、布局字段及越界数值都会导致包被拒绝。v2 不支持 HTML、JavaScript、WebAssembly、远程资源或扩展插件代码。皮肤 CSS 仍使用当前解析器规则，不能控制几何布局和交互区域。
+
+```json
+{
+  "schemaVersion": 2,
+  "packageType": "layout-skin",
+  "id": "community.example-layout",
+  "name": "Example layout",
+  "version": "1.0.0",
+  "author": "Example author",
+  "license": "CC-BY-4.0",
+  "entry": "skin.css",
+  "layout": "layout.json",
+  "permissions": [],
+  "minAppVersion": "0.2.7"
+}
+```
+
+布局只引用 WebSpeak 登记的稳定组件 ID。当前支持 `home`、`voice`、`demo` 页面及 `desktop`、`tablet`、`mobile` 三种设备配置。组件位置使用有界的水平/垂直偏移，尺寸使用缩放、宽、高，外观字段只接受六位十六进制颜色和受限圆角；`visible` 控制显示状态。`home.security-note`、身份安全提示、连接状态与屏幕共享错误属于可信宿主 UI，不允许布局隐藏或改写。
+
+示例 `layout.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "pages": {
+    "home": {
+      "desktop": {
+        "home.header": { "x": 12, "y": 8, "scale": 1.05 },
+        "home.features": { "visible": false }
+      },
+      "tablet": { "home.join-card": { "width": 680 } },
+      "mobile": { "home.header": { "x": 0, "y": 4 } }
+    }
+  }
+}
+```
+
+作者包中的布局是初始默认值。用户编辑内容单独存放在本地浏览器，覆盖作者默认值；支持撤销/重做、单个组件重置、整套布局恢复、导入和导出。更换设备宽度会选择对应设备配置，不会删除其他设备的值。恢复入口由宿主在皮肤根节点之外绘制，即使用户隐藏了页面组件，也能再次打开编辑器并恢复默认值。
+
+v1 和 v2 都只支持公开页面。`/admin/**` 不加载布局、用户覆盖和皮肤组件编辑器。布局包没有数据/API 权限；后续插件必须另行设计独立沙箱与授权协议，不能通过增加 v2 清单字段取得能力。
 
 ## 首页内容和文案
 
@@ -185,11 +231,11 @@ assets/brand.woff2            # 可选：自带字体
 
 ### 固定布局与交互边界
 
-皮肤校验器会拒绝改变布局、定位、尺寸、文字流向/换行或交互命中区域的 CSS 声明，包括 `display`、`position`、`inset`、`z-index`、宽高、内外边距、网格/弹性布局、间距、溢出裁切、变换、指针事件、字号、行高、字距、大小写转换和换行方式等。也不能通过 `all` 重置组件或用伪元素生成/替换文字。动画可以用于颜色、阴影、滤镜等装饰效果，但关键帧同样不能动画化布局属性。
+以下规则针对 `skin.css`：校验器会拒绝改变布局、定位、尺寸、文字流向/换行或交互命中区域的 CSS 声明，包括 `display`、`position`、`inset`、`z-index`、宽高、内外边距、网格/弹性布局、间距、溢出裁切、变换、指针事件、字号、行高、字距、大小写转换和换行方式等。也不能通过 `all` 重置组件或用伪元素生成/替换文字。动画可以用于颜色、阴影、滤镜等装饰效果，但关键帧同样不能动画化布局属性。v2 的位置和尺寸只从经过 schema 校验的 `layout.json` 生效，不会放宽 CSS 规则。
 
-因此，皮肤可以把成员头像绘制成角色徽章、给屏幕播放器加主题边框和背景、换首页美术素材，但不能移动播放器、压缩文字、扩大/缩小成员卡片、把锚定浮层改成模态弹窗，或挪动按钮的点击区域。用 `background-position` / `background-size` 只调整图片在既有区域中的裁切，不改变组件盒子。轮廓或内阴影可作为不参与排版的描边。
+因此，皮肤 CSS 可以把成员头像绘制成角色徽章、给屏幕播放器加主题边框和背景、换首页美术素材；v1 不能移动播放器或改变成员卡片尺寸。v2 布局可移动和缩放宿主注册组件，但 CSS 仍不能把锚定浮层改成模态弹窗或挪动按钮点击区域。用 `background-position` / `background-size` 只调整图片在既有区域中的裁切，不改变组件盒子。轮廓或内阴影可作为不参与排版的描边。
 
-外观可以因窄屏而更换图片裁切或装饰，但 `@media` 规则也受同一限制，不能用来重排组件。上线前仍需预览桌面与窄屏、所有五种语言、日夜基础主题、键盘焦点、减少动效偏好，并确认浮层和必要控件保持在原位、文字未被裁切。
+v1 外观可以因窄屏而更换图片裁切或装饰，但 `@media` 规则也受同一限制，不能用来重排组件。v2 应在布局数据中分别设置桌面、平板和手机配置。上线前仍需预览各设备尺寸、所有五种语言、键盘焦点、减少动效偏好，并确认必要控件可用、文字未被裁切。
 
 ## 安全边界和限制
 
@@ -246,9 +292,10 @@ CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删�
    ```powershell
    Compress-Archive -Path .\docs\examples\illusia-voice\* -DestinationPath .\illusia-voice.zip -Force
    Rename-Item .\illusia-voice.zip illusia-voice.wskin
+   Copy-Item .\illusia-voice.wskin .\web\public\skins\illusia-voice.wskin -Force
    ```
 
-5. 在管理员后台 `/admin/skins` 上传。用访客浏览器分别检查连接首页、进入语音页和 `/demo`；测试自定义图片、所有交互控件、语音/静音状态、成员列表、聊天、屏幕共享播放器和设置，确认组件位置、尺寸、排列与未启用皮肤时一致。
+5. 在管理员后台 `/admin/skins` 上传。用访客浏览器分别检查连接首页、进入语音页和 `/demo`；测试自定义图片、所有交互控件、语音/静音状态、成员列表、聊天、屏幕共享播放器和设置。v1 检查固定布局无回归；v2 还要检查作者默认布局与用户本地覆盖。
 6. 检查至少一个窄屏尺寸和桌面尺寸，并检查焦点可见、对比度、动效偏好；确认没有第三方素材授权问题。
 
 当前自动化回归涵盖 ZIP/清单验证、资源路径、CSS 隔离与拒绝规则、文案结构和服务端皮肤目录读写。视觉排版、内容遮挡和浏览器间表现仍须人工预览。

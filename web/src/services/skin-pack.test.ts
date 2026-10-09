@@ -127,12 +127,18 @@ test("skin content supports localized interface message overrides and includes t
   assert.ok(skin.assets["assets/preview.png"]);
 });
 
-test("the ILLUSIA visual-only example imports without replacing WebSpeak's base translations", async () => {
-  const bytes = await readFile(new URL("../../../docs/examples/illusia-voice.wskin", import.meta.url));
-  const skin = await importSkinPack(new File([bytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
+test("the ILLUSIA v2 example and bundled package import without replacing WebSpeak's base translations", async () => {
+  const exampleBytes = await readFile(new URL("../../../docs/examples/illusia-voice.wskin", import.meta.url));
+  const bundledBytes = await readFile(new URL("../../public/skins/illusia-voice.wskin", import.meta.url));
+  assert.deepEqual(bundledBytes, exampleBytes);
+  const skin = await importSkinPack(new File([exampleBytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "1.0.28");
+  assert.equal(skin.version, "1.0.29");
+  assert.equal(skin.schemaVersion, 2);
+  assert.equal(skin.packageType, "layout-skin");
+  assert.deepEqual(skin.permissions, []);
+  assert.deepEqual(skin.layoutData, { schemaVersion: 1, pages: {} });
   assert.equal(skin.minAppVersion, "0.2.7-preview");
   assert.equal(skin.contentData, undefined);
   assert.equal(skin.previewBlob?.type, "image/webp");
@@ -249,4 +255,53 @@ function makeSkin(css: string, content?: unknown): File {
   if (content) packageFiles["content.json"] = strToU8(JSON.stringify(content));
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin.wskin", { type: "application/octet-stream" });
+}
+
+test("schema version 2 skin packages load only validated declarative layouts with no permissions", async () => {
+  const layout = {
+    schemaVersion: 1,
+    pages: {
+      home: { desktop: { "home.header": { x: 48, y: -12, scale: 1.1, background: "#123456" } } },
+    },
+  };
+  const skin = await importSkinPack(makeSkinV2(layout));
+  assert.equal(skin.schemaVersion, 2);
+  assert.equal(skin.packageType, "layout-skin");
+  assert.deepEqual(skin.permissions, []);
+  assert.equal(skin.layoutData?.pages.home?.desktop?.["home.header"]?.x, 48);
+  assert.equal(skin.layoutData?.pages.home?.desktop?.["home.header"]?.background, "#123456");
+
+  await assert.rejects(
+    importSkinPack(makeSkinV2(layout, { permissions: ["network.fetch"] })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PERMISSION_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2(layout, { capabilities: ["network.fetch"] })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_MANIFEST_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2({ schemaVersion: 1, pages: { home: { desktop: { "home.unknown": { x: 4 } } } } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_LAYOUT_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2({ schemaVersion: 1, pages: { home: { desktop: { "home.security-note": { visible: false } } } } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_LAYOUT_INVALID",
+  );
+});
+
+function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = {}): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({
+      ...manifest,
+      schemaVersion: 2,
+      packageType: "layout-skin",
+      layout: "layout.json",
+      permissions: [],
+      ...manifestChanges,
+    })),
+    "skin.css": strToU8('[data-ws-part="home.header"] { color: #123456; }'),
+    "layout.json": strToU8(JSON.stringify(layout)),
+  };
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v2.wskin", { type: "application/octet-stream" });
 }

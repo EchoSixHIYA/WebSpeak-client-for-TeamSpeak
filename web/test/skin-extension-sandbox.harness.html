@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Skin extension sandbox security harness</title>
+    <style>
+      body { max-width: 800px; margin: 32px auto; padding: 0 20px; color: #152536; font: 15px/1.5 system-ui, sans-serif; }
+      li { margin: 8px 0; }
+      .pass { color: #087443; }
+      .fail { color: #b42318; }
+      #sandbox-host { position: fixed; left: -10000px; top: 0; width: 320px; height: 200px; }
+    </style>
+  </head>
+  <body>
+    <h1>Skin extension sandbox prototype</h1>
+    <p>Development-only browser checks. Start <code>node web/test/skin-extension-network-probe-server.mjs</code> for the network-egress probe. This page is not a production route and does not connect to TeamSpeak.</p>
+    <ol id="results"></ol>
+    <div id="sandbox-host" aria-hidden="true"></div>
+    <script type="module" src="./skin-extension-sandbox.harness.ts"></script>
+  </body>
+</html>

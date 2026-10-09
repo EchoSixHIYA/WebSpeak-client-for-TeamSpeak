@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { SkinRegistry, SkinRegistryError } from "./skin-registry.js";
 
-const manifest = {
+    const manifest = {
   schemaVersion: 1,
   id: "sample-skin",
   name: "Sample skin",
@@ -85,6 +85,53 @@ test("custom skins can be enabled, disabled, and selected as the instance defaul
   await registry.setDefaultSkin("sample-skin");
   assert.equal(await registry.remove("sample-skin"), true);
   assert.equal(await registry.getDefaultSkinId(), "builtin.light");
+});
+
+test("server accepts validated declarative v2 layouts and rejects permissions or unregistered components", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-v2-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const manifestV2 = {
+    ...manifest,
+    schemaVersion: 2,
+    packageType: "layout-skin",
+    permissions: [],
+    layout: "layout.json",
+    content: undefined,
+    preview: undefined,
+  };
+  const layout = {
+    schemaVersion: 1,
+    pages: { home: { desktop: { "home.header": { x: 24, visible: true, background: "#123456" } } } },
+  };
+  const archive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV2))],
+    ["skin.css", Buffer.from('[data-ws-part="home.header"] { color: teal; }')],
+    ["layout.json", Buffer.from(JSON.stringify(layout))],
+  ]);
+  const saved = await registry.save(archive, "sample-skin");
+  assert.equal(saved.id, "sample-skin");
+  assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+
+  const permissionsArchive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifestV2, permissions: ["network.fetch"] }))],
+    ["skin.css", Buffer.from("")],
+    ["layout.json", Buffer.from(JSON.stringify(layout))],
+  ]);
+  await assert.rejects(registry.save(permissionsArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_PERMISSION_INVALID");
+  const unknownManifestField = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifestV2, capabilities: ["network.fetch"] }))],
+    ["skin.css", Buffer.from('[data-ws-part="home.header"] { color: teal; }')],
+    ["layout.json", Buffer.from(JSON.stringify({ schemaVersion: 1, pages: {} }))],
+  ]);
+  await assert.rejects(registry.save(unknownManifestField, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_MANIFEST_INVALID");
+
+  const unknownComponentArchive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV2))],
+    ["skin.css", Buffer.from(".voice-card { color: teal; }")],
+    ["layout.json", Buffer.from(JSON.stringify({ schemaVersion: 1, pages: { home: { desktop: { "home.unknown": { x: 1 } } } } }))],
+  ]);
+  await assert.rejects(registry.save(unknownComponentArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_LAYOUT_INVALID");
 });
 
 test("skin registry rejects path traversal and mismatched local ZIP headers", async (context) => {

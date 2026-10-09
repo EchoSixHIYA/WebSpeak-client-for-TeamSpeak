@@ -212,6 +212,23 @@ test("reset prevents outstanding choices from restoring cleared state", async ()
   assert.deepEqual(writes, []);
 });
 
+test("a failed skin choice falls back, exposes recovery, and remembers the built-in selection", async () => {
+  handler = async url => url === "/api/skins"
+    ? json({ skins: [{ ...skin("sample.a"), author: "test", license: "MIT" }] })
+    : { ok: false, status: 503 };
+  await catalog.listPublicSkins();
+  const view = page();
+
+  await view.select("sample.a");
+  assert.equal(view.activeSkinId.value, "builtin.light");
+  assert.deepEqual(view.skinLoadError.value, { skinId: "sample.a" });
+
+  await view.switchToBuiltInAfterLoadError();
+  assert.equal(view.skinLoadError.value, null);
+  assert.equal(storage.get("webspeak:skin-choice"), "builtin.light");
+  assert.equal(runtime.getStoredSkinId(), "builtin.light");
+});
+
 test("an already aborted caller cannot cancel the next page's activation", async () => {
   const read = deferred(); globalThis.skinStorage.get = () => read.promise;
   const current = runtime.activateSkin("sample.b");

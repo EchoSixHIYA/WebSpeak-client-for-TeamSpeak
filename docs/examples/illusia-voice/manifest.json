@@ -1,12 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "packageType": "layout-skin",
   "id": "community.illusia-voice",
   "name": "ILLUSIA风",
-  "version": "1.0.28",
+  "version": "1.0.29",
   "author": "WebSpeak Project",
   "license": "All rights reserved",
   "description": "A bright original-character art skin for the home, voice room, and demo pages.",
   "entry": "skin.css",
+  "layout": "layout.json",
+  "permissions": [],
   "preview": "assets/background-composite.webp",
   "minAppVersion": "0.2.7-preview"
 }

@@ -65,9 +65,9 @@ export function applyTheme(theme: ThemeMode, options: { preserveCustomSkins?: bo
   style.textContent = activeSkin.css;
 }
 
-export function saveTheme(theme: ThemeMode): void {
+export function saveTheme(theme: ThemeMode, options: { preserveCustomSkins?: boolean } = {}): void {
   if (typeof localStorage !== "undefined") localStorage.setItem(THEME_KEY, theme);
-  applyTheme(theme);
+  applyTheme(theme, options);
 }
 
 export function isDarkTheme(theme: ThemeMode): boolean {
