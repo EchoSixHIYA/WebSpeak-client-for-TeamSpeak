@@ -233,6 +233,29 @@ await test("a data worker inherits network CSP and can be terminated while its o
   }
 });
 
+await test("opaque-origin sandbox still permits its own URL navigation", async () => {
+  await fetch("http://127.0.0.1:5176/reset");
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.srcdoc = `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-frameprobe'; connect-src 'none'; form-action 'none'; frame-src 'none'; base-uri 'none'; navigate-to 'none'">
+    <script nonce="frameprobe">setTimeout(() => location.replace('http://127.0.0.1:5176/probe?source=frame-navigation'), 0);</script>`;
+  document.body.append(frame);
+  try {
+    let hits = 0;
+    const deadline = performance.now() + 2_000;
+    while (performance.now() < deadline && hits === 0) {
+      const result = await fetch("http://127.0.0.1:5176/count").then((response) => response.json()) as { hits?: unknown };
+      if (typeof result.hits === "number") hits = result.hits;
+      if (hits === 0) await new Promise((resolve) => window.setTimeout(resolve, 25));
+    }
+    assert(hits === 1, "The sandboxed document did not navigate to the loopback-only probe; review whether browser navigation policy changed.");
+    assert(frame.isConnected, "The probe navigation must remain scoped to the nested test browsing context.");
+  } finally {
+    frame.remove();
+  }
+});
+
 await test("the development Wasm prototype bounds linear memory at 64 pages", async () => {
   const { sandbox } = wasmExtension(createSkinExtensionWasmCappedRunProbe());
   try {

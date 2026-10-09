@@ -172,9 +172,9 @@ v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客�
 
 `plugins.json` 顶层 `schemaVersion` 当前为 `1`，并包含 1–64 个插件。每个插件声明 `id`、`name`、`version`、`apiVersion: 1`、`page`（`home` 或 `voice`）、`mode`（`widget` 或 `surface`）、必需的 `entry`、可选的 `style`、素材路径数组 `assets` 和 `permissions`。入口及样式必须位于 `plugins/<id>/`；素材必须位于该插件自己的 `assets/` 子目录，只能是本地图片或 woff2 字体。插件不能共享文件；同一公开页面最多有一个 `surface`，且必须申请 `ui.surface.replace`。其余权限只能从 `src/shared/skin-plugin.ts` 的现有权限表中选择。
 
-`plugins.json` 不超过 256 KiB；每个入口 JS 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。沙箱 iframe、可信事件捕获、MessageChannel 能力桥、逐插件授权、撤销和生命周期隔离仍未完成；不得通过增加识别格式而提前开启脚本执行。
+`plugins.json` 不超过 256 KiB；每个入口 JS 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。v4 的 JS/CSS 仍只校验、缓存，不执行。不要将有 DOM 的 iframe 当作网络沙箱：sandbox 不阻止 iframe 自己导航，`navigate-to` 也不能作为跨浏览器安全保证；获批数据可能被编码到导航 URL。现有无 DOM Worker 原型虽阻断常规网络 API，但没有硬内存限额，也不得生产启用。完整运行时需要同时保留自定义 UI/交互能力，并通过有资源边界的执行环境和可信宿主渲染/权限桥解决，不可退回固定原生控件目录。
 
-当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过其 iframe 去调整其他插件或宿主恢复控件。
+当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过自身宿主节点去调整其他插件或宿主恢复控件。
 
 ## 首页内容和文案
 
