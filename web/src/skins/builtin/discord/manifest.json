@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.discord",
+  "name": "Discord",
+  "version": "1.0.0",
+  "author": "WebSpeak",
+  "license": "AGPL-3.0-only",
+  "description": "Discord 1:1 authentic dark theme with classic layout, typography, and color palette.",
+  "entry": "skin.css",
+  "minAppVersion": "0.2.5"
+}

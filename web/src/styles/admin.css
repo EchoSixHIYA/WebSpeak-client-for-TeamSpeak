@@ -3459,6 +3459,16 @@
   background: rgba(225,255,249,.1);
 }
 
+:deep(.skin-preview--discord) {
+  color: #fff;
+  background: linear-gradient(145deg,#5865f2 0%,#404eed 50%,#313338 100%);
+}
+
+:deep(.skin-preview--discord>span) {
+  border-color: rgba(255,255,255,.28);
+  background: rgba(255,255,255,.12);
+}
+
 :deep(.skin-preview small) {
   position: absolute;
   right: 9px;

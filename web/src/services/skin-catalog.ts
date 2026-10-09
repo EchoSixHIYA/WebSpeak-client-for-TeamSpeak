@@ -4,6 +4,7 @@ export type { SkinCatalogEntry } from "../../../src/shared/skin-catalog.js";
 
 export const BUILTIN_ILLUSIA_SKIN_ID = "community.illusia-voice";
 export const BUILTIN_KAAK_SKIN_ID = "community.kaak-voice";
+export const BUILTIN_DISCORD_SKIN_ID = "builtin.discord";
 
 export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
@@ -29,6 +30,18 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
     installedAt: 0,
     builtIn: true,
     previewKind: "night",
+  },
+  {
+    id: BUILTIN_DISCORD_SKIN_ID,
+    name: "Discord",
+    version: "1.0.0",
+    author: "WebSpeak",
+    license: "AGPL-3.0-only",
+    description: "Discord 1:1 authentic dark theme with classic layout, typography, and color palette.",
+    minAppVersion: "0.2.6",
+    installedAt: 0,
+    builtIn: true,
+    previewKind: "discord",
   },
   {
     id: BUILTIN_ILLUSIA_SKIN_ID,

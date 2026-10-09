@@ -85,7 +85,7 @@
             :alt="skinName(skin)"
           /><span v-else
             ><Icon
-              :name="skin.previewKind === 'night' ? 'moon' : 'sun'"
+              :name="skin.previewKind === 'discord' ? 'discord' : skin.previewKind === 'night' ? 'moon' : 'sun'"
               :size="28" /></span
           ><small>v{{ skin.version }}</small
           ><b

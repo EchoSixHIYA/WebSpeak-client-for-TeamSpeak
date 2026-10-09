@@ -50,11 +50,12 @@ test("skin catalog always includes protected built-ins and exposes only enabled 
     assert.deepEqual(skins.map((skin) => skin.id), [
       "builtin.light",
       "builtin.dark",
+      "builtin.discord",
       "community.illusia-voice",
       "community.kaak-voice",
       "sample-skin",
     ]);
-    assert.deepEqual(BUILTIN_SKIN_CATALOG.map((skin) => skin.id), skins.slice(0, 4).map((skin) => skin.id));
+    assert.deepEqual(BUILTIN_SKIN_CATALOG.map((skin) => skin.id), skins.slice(0, 5).map((skin) => skin.id));
     assert.equal(getPublicDefaultSkinId(), "sample-skin");
     assert.equal(isPublicSkinEnabled("sample-skin"), true);
     assert.equal(isPublicSkinEnabled("disabled-skin"), false);
@@ -74,7 +75,7 @@ test("invalid or disabled instance defaults safely fall back to the protected da
 
   try {
     const skins = await listPublicSkins();
-    assert.equal(skins.length, 4);
+    assert.equal(skins.length, 5);
     assert.equal(getPublicDefaultSkinId(), "builtin.light");
   } finally {
     globalThis.fetch = originalFetch;

@@ -62,7 +62,7 @@ const connection = object({
 const skin = object({
   id: text, name: text, version: text, author: text, license: text, minAppVersion: text, installedAt: number,
   description: optional(text), previewUrl: optional(text), previewMimeType: optional(text),
-  builtIn: optional(boolean), enabled: optional(boolean), previewKind: optional(choice("day", "night", "illusia")),
+  builtIn: optional(boolean), enabled: optional(boolean), previewKind: optional(choice("day", "night", "illusia", "discord")),
 });
 const sessionStatus = object({ authenticated: boolean, mustChangePassword: optional(boolean), csrfToken: optional(text) });
 
