@@ -109,6 +109,7 @@ export interface InstalledSkin extends SkinManifest {
   pluginData?: SkinPluginDocument;
   runtimePlugins?: SkinRuntimePluginDocument;
   runtimePluginFiles?: Record<string, Blob>;
+  runtimePluginStyles?: Record<string, string>;
   previewBlob?: Blob;
   warnings: string[];
   installedAt: number;
@@ -177,6 +178,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
   }
 
   const runtimePluginFiles: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
+  const assets: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
   const runtimePluginPaths = runtimePlugins ? listSkinRuntimePluginFilePaths(runtimePlugins) : [];
   const runtimePluginPathSet = new Set(runtimePluginPaths.map((path) => path.toLowerCase()));
   const manifestPathSet = ["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins, manifest.preview]
@@ -213,10 +215,10 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
       if (mimeType.startsWith("font/") && bytes.byteLength > MAX_FONT_BYTES) throw new SkinPackError("Plugin fonts must be smaller than 4 MiB.", "SKIN_FONT_SIZE");
       if (mimeType.startsWith("image/") && bytes.byteLength > MAX_IMAGE_BYTES) throw new SkinPackError("Plugin images must be smaller than 16 MiB.", "SKIN_IMAGE_SIZE");
       runtimePluginFiles[pluginPath] = new Blob([bytes], { type: mimeType });
+      assets[pluginPath] = runtimePluginFiles[pluginPath];
     }
   }
 
-  const assets: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
   for (const [path, bytes] of files) {
     if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins].includes(path)
       || runtimePluginPathSet.has(path.toLowerCase())) continue;
@@ -225,6 +227,20 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     if (mimeType.startsWith("font/") && bytes.byteLength > MAX_FONT_BYTES) throw new SkinPackError("Fonts must be smaller than 4 MiB.", "SKIN_FONT_SIZE");
     if (mimeType.startsWith("image/") && bytes.byteLength > MAX_IMAGE_BYTES) throw new SkinPackError("Each image must be smaller than 16 MiB.", "SKIN_IMAGE_SIZE");
     assets[path] = new Blob([bytes], { type: mimeType });
+  }
+
+  const runtimePluginStyles: Record<string, string> = Object.create(null) as Record<string, string>;
+  const runtimePluginWarnings: string[] = [];
+  for (const plugin of runtimePlugins?.plugins ?? []) {
+    if (!plugin.style) continue;
+    const style = runtimePluginFiles[plugin.style];
+    if (!style) throw new SkinPackError(`A declared plugin style is missing: ${plugin.style}`, "SKIN_RUNTIME_PLUGIN_FILE_MISSING");
+    const pluginAssetPrefix = `plugins/${plugin.id}/assets/`;
+    const pluginAssets = Object.fromEntries(Object.entries(assets).filter(([path]) =>
+      path.startsWith("assets/") || path.startsWith(pluginAssetPrefix)));
+    const compiledStyle = compileSkinCss(await style.text(), manifest.id, pluginAssets, manifest.schemaVersion, plugin.id);
+    runtimePluginStyles[plugin.id] = compiledStyle.css;
+    runtimePluginWarnings.push(...compiledStyle.warnings);
   }
 
   let contentData: SkinContent | undefined;
@@ -264,7 +280,24 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
   }
 
   const compiled = compileSkinCss(decoder.decode(cssBytes), manifest.id, assets, manifest.schemaVersion);
-  return { ...manifest, css: compiled.css, assets, contentData, layoutData, pluginData, runtimePlugins, runtimePluginFiles, previewBlob, warnings: compiled.warnings, installedAt: Date.now() };
+  const hasConflictingSurface = (pluginData?.components ?? []).some((component) => component.mode === "surface"
+    && runtimePlugins?.plugins.some((plugin) => plugin.mode === "surface" && plugin.page === component.page));
+  if (hasConflictingSurface) throw new SkinPackError("A page cannot declare both a v3 and v4 surface.", "SKIN_PLUGIN_SURFACE_DUPLICATE");
+
+  return {
+    ...manifest,
+    css: compiled.css,
+    assets,
+    contentData,
+    layoutData,
+    pluginData,
+    runtimePlugins,
+    runtimePluginFiles,
+    runtimePluginStyles,
+    previewBlob,
+    warnings: [...compiled.warnings, ...runtimePluginWarnings],
+    installedAt: Date.now(),
+  };
 }
 
 export function resolveSkinCssAssets(css: string, assets: Record<string, Blob>): { css: string; objectUrls: string[] } {
@@ -527,15 +560,18 @@ function parseContent(bytes: Uint8Array): SkinContent {
   return { defaultLocale: root.defaultLocale, locales };
 }
 
-function compileSkinCss(source: string, id: string, assets: Record<string, Blob>, schemaVersion: SkinManifest["schemaVersion"]): { css: string; warnings: string[] } {
+function compileSkinCss(source: string, id: string, assets: Record<string, Blob>, schemaVersion: SkinManifest["schemaVersion"], pluginId?: string): { css: string; warnings: string[] } {
   const size = new TextEncoder().encode(source).byteLength;
   if (!size || size > MAX_CSS_BYTES) throw new SkinPackError("The CSS entry must be between 1 byte and 512 KiB.", "SKIN_CSS_SIZE");
   let root: postcss.Root;
   try { root = postcss.parse(source, { from: undefined }); }
   catch (error) { throw new SkinPackError(`The CSS file could not be parsed: ${(error as Error).message}`, "SKIN_CSS_INVALID"); }
 
-  const scope = `.ws-skin-root[data-ws-skin="${id}"]`;
-  const namespace = `ws-${id.replace(/[^a-z0-9_-]/gi, "-")}`;
+  const skinScope = `.ws-skin-root[data-ws-skin="${id}"]`;
+  const scope = pluginId
+    ? `${skinScope} .ws-plugin-component[data-ws-runtime-plugin="${pluginId}"]`
+    : skinScope;
+  const namespace = `ws-${id.replace(/[^a-z0-9_-]/gi, "-")}${pluginId ? `-${pluginId}` : ""}`;
   const scopeNodes = selectorParser().astSync(scope).first!.nodes.map((node) => node.clone());
   const warnings = new Set<string>();
   const keyframeNames = new Map<string, string>();
@@ -575,7 +611,7 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
   root.walkRules((rule: Rule) => {
     if (hasKeyframesAncestor(rule)) return;
     if (rule.parent?.type === "rule") throw rule.error("Nested style rules are not supported; use flat selectors.");
-    if (!selectorUsesPublicHook(rule.selector, schemaVersion >= 3)) throw rule.error("Skin selectors must use :root, [data-ws-page], [data-ws-part], or [data-ws-plugin-part] so they stay attached to WebSpeak's stable visual interface.");
+    if (!pluginId && !selectorUsesPublicHook(rule.selector, schemaVersion >= 3)) throw rule.error("Skin selectors must use :root, [data-ws-page], [data-ws-part], or [data-ws-plugin-part] so they stay attached to WebSpeak's stable visual interface.");
     if (targetsOnlyOptionalVisualParts(rule.selector)) hideableRules.add(rule);
     try {
       rule.selector = selectorParser((selectors) => {
@@ -629,8 +665,11 @@ function compileSkinCss(source: string, id: string, assets: Record<string, Blob>
     const canHideTarget = owningRule
       ? hideableRules.has(owningRule) || Boolean(keyframesRule && optionalOnlyKeyframes.has(keyframesRule.params.trim()))
       : false;
-    if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)) {
-      throw declaration.error("Custom skin variables must use the --skin- prefix so they cannot replace WebSpeak's structural tokens.");
+    if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)
+      && !(pluginId && property.startsWith(`--plugin-${pluginId}-`))) {
+      throw declaration.error(pluginId
+        ? `Custom plugin variables must use --plugin-${pluginId}- or --skin- prefixes.`
+        : "Custom skin variables must use the --skin- prefix so they cannot replace WebSpeak's structural tokens.");
     }
     if (schemaVersion < 3 && isLayoutAffectingProperty(property)) {
       throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");

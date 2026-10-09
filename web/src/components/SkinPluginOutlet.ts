@@ -7,6 +7,7 @@ import {
   parseSkinPluginDocument,
   type SkinPluginActionDefinition,
   type SkinPluginComponent,
+  type SkinPluginComponentMode,
   type SkinPluginDocument,
   type SkinPluginHostWidget,
   type SkinPluginNode,
@@ -32,7 +33,10 @@ export default defineComponent({
     skinId: { type: String, required: true },
     skinVersion: { type: String, required: true },
     document: { type: Object as PropType<SkinPluginDocument>, required: true },
-    extensionOutput: { type: String, default: null },
+    extensionOutput: { type: String as PropType<string | null>, default: null },
+    extensionMode: { type: String as PropType<SkinPluginComponentMode | undefined>, default: undefined },
+    componentNamespace: { type: String, default: "" },
+    manageSurfaceRecovery: { type: Boolean, default: true },
     page: { type: String as PropType<"home" | "voice" | "demo">, required: true },
     data: { type: Object as PropType<SafeContext>, required: true },
     assets: { type: Object as PropType<Record<string, Blob>>, required: true },
@@ -57,7 +61,10 @@ export default defineComponent({
       catch { return { schemaVersion: 2 as const, components: [] }; }
       if (!props.extensionOutput || document.schemaVersion !== 3) return document;
       try {
-        const extensionDocument = parseSkinExtensionUiOutput(props.extensionOutput);
+        const parsedExtensionDocument = parseSkinExtensionUiOutput(props.extensionOutput);
+        const extensionDocument = props.extensionMode
+          ? { ...parsedExtensionDocument, components: parsedExtensionDocument.components.map((component) => ({ ...component, mode: props.extensionMode })) }
+          : parsedExtensionDocument;
         const ids = new Set(document.components.map((component) => component.id));
         if (document.components.length + extensionDocument.components.length > SKIN_PLUGIN_COMPONENT_LIMIT
           || extensionDocument.components.some((component) => ids.has(component.id))) return document;
@@ -84,7 +91,7 @@ export default defineComponent({
     const renderedComponents = computed(() => activeComponents.value.filter((component) =>
       component.mode !== "surface" || component !== surfaceCandidate.value || !surfaceSuppressed.value));
 
-    watch(() => [props.skinId, props.skinVersion, props.document, props.extensionOutput, props.page], () => {
+    watch(() => [props.skinId, props.skinVersion, props.document, props.extensionOutput, props.extensionMode, props.componentNamespace, props.page], () => {
       denied.value = false;
       surfaceSuppressed.value = false;
       refresh.value += 1;
@@ -185,7 +192,8 @@ export default defineComponent({
         || ["click", "dblclick", "contextmenu", "keydown", "keyup", "pointerdown", "pointerup", "drop"]
           .some((eventName) => Boolean(node.events?.[eventName as keyof typeof node.events]));
       const part = node.part ? `part-${node.part}` : nodePath;
-      return `skin.${component.page}.${component.id}.${interactive ? "control-" : ""}${part}`;
+      const componentPath = props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id;
+      return `skin.${component.page}.${componentPath}.${interactive ? "control-" : ""}${part}`;
     }
 
     function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, budget: { remaining: number }, skipRepeat = false, nodePath = "node-root"): VNodeChild {
@@ -235,7 +243,8 @@ export default defineComponent({
       if (node.className || attrs.class) {
         attrs.class = ["ws-plugin-node", node.className, attrs.class].filter(Boolean).join(" ");
       } else attrs.class = "ws-plugin-node";
-      attrs["data-ws-plugin-part"] = node.part ? `${component.id}.${node.part}` : component.id;
+      const componentPath = props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id;
+      attrs["data-ws-plugin-part"] = node.part ? `${componentPath}.${node.part}` : componentPath;
       attrs["data-ws-part"] = layoutPart(component, node, nodePath);
       if (node.bindValue) attrs.value = state[node.bindValue];
 
@@ -305,10 +314,11 @@ export default defineComponent({
       const nodes: VNodeChild[] = renderedComponents.value.map((component) => h("div", {
         key: `${props.skinId}:${component.id}`,
         class: ["ws-plugin-component", component.mode === "surface" && "ws-plugin-surface"],
-        "data-ws-plugin-component": component.id,
+        "data-ws-plugin-component": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
         "data-ws-plugin-name": component.name,
-        "data-ws-plugin-part": component.id,
-        "data-ws-part": `skin.${component.page}.${component.id}`,
+        "data-ws-plugin-part": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
+        "data-ws-part": `skin.${component.page}.${props.componentNamespace ? `${props.componentNamespace}.` : ""}${component.id}`,
+        ...(props.componentNamespace ? { "data-ws-runtime-plugin": props.componentNamespace } : {}),
         ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,
       }, [renderNode(component, component.root, props.data, localState(component), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
@@ -320,13 +330,13 @@ export default defineComponent({
         "aria-label": "管理皮肤组件权限 / Manage skin component access",
         onClick: openAccessManager,
       }, "权限 / Access")]) : null;
-      const surfaceRecovery = activeSurface.value ? h(Teleport, { to: "body" }, [h("button", {
+      const surfaceRecovery = activeSurface.value && props.manageSurfaceRecovery ? h(Teleport, { to: "body" }, [h("button", {
         type: "button",
         class: "ws-plugin-surface-recovery",
         "aria-label": "返回 WebSpeak 标准界面 / Return to the built-in interface",
         onClick: () => { surfaceSuppressed.value = true; },
       }, "标准界面 / Built-in UI")]) : null;
-      const skinRecovery = activeSurface.value ? h(Teleport, { to: "body" }, [h("button", {
+      const skinRecovery = activeSurface.value && props.manageSurfaceRecovery ? h(Teleport, { to: "body" }, [h("button", {
         type: "button",
         class: "ws-plugin-surface-reset",
         "aria-label": "恢复内置皮肤 / Restore the built-in skin",

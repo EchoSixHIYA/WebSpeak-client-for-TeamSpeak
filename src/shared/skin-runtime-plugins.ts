@@ -136,6 +136,9 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
     if (raw.mode === "surface" && !permissions.includes("ui.surface.replace")) {
       invalid("SKIN_RUNTIME_PLUGIN_PERMISSION_MISSING", "A surface plugin requires ui.surface.replace.");
     }
+    if (raw.mode !== "surface" && permissions.includes("ui.surface.replace")) {
+      invalid("SKIN_RUNTIME_PLUGIN_PERMISSION_INVALID", "Only a surface plugin may request ui.surface.replace.");
+    }
 
     for (const path of [entry, ...(style ? [style] : []), ...assets]) {
       const normalized = path.toLowerCase();

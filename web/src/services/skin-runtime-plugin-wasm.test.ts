@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "./skin-runtime-plugin-session.test.js";
 import {
   computeSkinRuntimePluginDigest,
   createSkinRuntimePluginApproval,

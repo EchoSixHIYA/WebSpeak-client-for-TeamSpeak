@@ -50,6 +50,10 @@ test("v4 plugin descriptors recognize Wasm entries and reject a runtime/file mis
     () => parseSkinRuntimePluginDocument(document([{ ...plugin, runtime: "native" }]) as never),
     (error: unknown) => error instanceof SkinRuntimePluginValidationError && error.code === "SKIN_RUNTIME_PLUGIN_RUNTIME_INVALID",
   );
+  assert.throws(
+    () => parseSkinRuntimePluginDocument(document([{ ...plugin, permissions: ["ui.surface.replace"] }]) as never),
+    (error: unknown) => error instanceof SkinRuntimePluginValidationError && error.code === "SKIN_RUNTIME_PLUGIN_PERMISSION_INVALID",
+  );
 });
 
 test("surface replacement is an explicit page-scoped plugin capability", () => {

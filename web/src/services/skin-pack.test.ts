@@ -385,7 +385,9 @@ test("schema version 4 validates and caches isolated plugin package files withou
   assert.equal(await skin.runtimePluginFiles?.[entry].text(), "export const render = () => document.createElement('button');");
   assert.equal(await skin.runtimePluginFiles?.[style].text(), ".toolbar { color: teal; }");
   assert.equal(skin.runtimePluginFiles?.[icon].type, "image/png");
-  assert.equal(skin.assets[icon], undefined, "plugin assets stay in the isolated plugin file set");
+  assert.equal(skin.assets[icon]?.type, "image/png", "declared plugin media is available only by its package path for scoped CSS and host remapping");
+  assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /data-ws-runtime-plugin="voice-toolbar".*?\.toolbar/s);
+  assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /color: teal/);
   assert.match(skin.css, /position: fixed/);
 
   await assert.rejects(
@@ -399,6 +401,49 @@ test("schema version 4 validates and caches isolated plugin package files withou
   await assert.rejects(
     importSkinPack(makeSkinV4(undefined, { entryBytes: new Uint8Array(256 * 1024 + 1) })),
     (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE",
+  );
+});
+
+test("a v4 surface cannot compete with a v3 surface on the same public page", async () => {
+  const components = {
+    schemaVersion: 2,
+    components: [{
+      id: "voice-v3-surface",
+      name: "Voice v3 surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Voice workspace",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: { tag: "main", children: [{ tag: "p", children: [{ text: "replacement UI" }] }] },
+    }],
+  };
+  const plugins = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-v4-surface",
+      name: "Voice v4 surface",
+      version: "1.0.0",
+      apiVersion: 1,
+      runtime: "wasm",
+      page: "voice",
+      mode: "surface",
+      entry: "plugins/voice-v4-surface/index.wasm",
+      assets: [],
+      permissions: ["ui.surface.replace"],
+    }],
+  };
+  const files = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", components: "components.json", plugins: "plugins.json" })),
+    "skin.css": strToU8('[data-ws-part="app"] { color: teal; }'),
+    "components.json": strToU8(JSON.stringify(components)),
+    "plugins.json": strToU8(JSON.stringify(plugins)),
+    "plugins/voice-v4-surface/index.wasm": createSkinExtensionWasmPrefixByteImmediateProbe(),
+  };
+  const archive = zipSync(files);
+  await assert.rejects(
+    importSkinPack(new File([archive.slice().buffer as ArrayBuffer], "competing-surfaces.wskin")),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_SURFACE_DUPLICATE",
   );
 });
 

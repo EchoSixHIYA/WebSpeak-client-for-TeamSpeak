@@ -24,9 +24,22 @@
       @surface-change="skinPluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"
     />
+    <SkinRuntimePluginHost
+      v-if="activeSkin?.runtimePlugins"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :plugins="activeSkin.runtimePlugins"
+      :files="activeSkin.runtimePluginFiles ?? {}"
+      :styles="activeSkin.runtimePluginStyles ?? {}"
+      :assets="activeSkin.assets"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :read-session-status="readSkinRuntimeSessionStatus"
+      @surface-change="skinRuntimePluginSurfaceActive = $event"
+      @restore-skin="switchToBuiltIn"
+    />
     <!-- Connection / welcome screen -->
     <section
-      v-if="!showVoiceShell && !skinPluginSurfaceActive"
+      v-if="!showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       class="join-page"
       data-ws-part="home"
     >
@@ -301,7 +314,7 @@
 
     <!-- Connected application shell -->
     <div
-      v-else-if="showVoiceShell && !skinPluginSurfaceActive"
+      v-else-if="showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       :class="['app-shell', `mobile-view-${mobileSection}`]"
       :data-performance-open="performancePanelOpen ? 'true' : 'false'"
       :data-favorite-rail="accessMode === 'open' ? 'true' : 'false'"
@@ -930,6 +943,7 @@ import { observeMobileViewport } from "../services/mobile-viewport.js";
 import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
+import SkinRuntimePluginHost from "../components/SkinRuntimePluginHost.js";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
@@ -1097,7 +1111,11 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 const language = ref<Language>(getInitialLanguage());
 const activeSkin = shallowRef<InstalledSkin | null>(null);
 const skinPluginSurfaceActive = ref(false);
-watch(activeSkin, () => { skinPluginSurfaceActive.value = false; }, { flush: "sync" });
+const skinRuntimePluginSurfaceActive = ref(false);
+watch(activeSkin, () => {
+  skinPluginSurfaceActive.value = false;
+  skinRuntimePluginSurfaceActive.value = false;
+}, { flush: "sync" });
 const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value, language.value));
 const { t: translate, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
 function t(key: string, variables: Record<string, string | number> = {}) {
@@ -1541,6 +1559,12 @@ const skinPluginContext = computed(() => ({
     })),
   },
 }));
+
+const readSkinRuntimeSessionStatus = (_signal: AbortSignal) => ({
+  connected: voiceState.connected,
+  channelName: voiceState.connected ? currentChannelName.value : null,
+  memberCount: skinPluginMembers.value.length,
+});
 
 const skinPluginActions = {
   "voice.joinChannel": (args: Record<string, string | number | boolean>) => {

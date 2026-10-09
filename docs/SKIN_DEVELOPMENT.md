@@ -1,10 +1,10 @@
 # WebSpeak 皮肤开发规范
 
-本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及正在接入的 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 已加入插件清单、文件校验和本地缓存；客户端会预检 Wasm 固定 ABI，并有一个仅供开发验证的 Wasm 授权运行适配器。作者 JS 不执行，Wasm 适配器也没有接入生产 UI 生命周期或完整权限桥。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 有插件清单、文件校验和本地缓存；开发构建中的 Wasm 原型已接入 WebClient 授权与 UI 生命周期，生产构建仍关闭。作者 JS 不执行；频道/成员/聊天数据桥和 TeamSpeak 动作桥尚未实现。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
 KOOK 语音界面参考仅覆盖用户授权的语音频道，语音区结构记录在[参考文档](./KOOK_VOICE_REFERENCE.zh-CN.md)；发现、陪玩、活动、广告、商城和管理后台不属于复刻范围。
 
-当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 完整运行时尚未实现或获安全批准；JS/CSS 只校验、缓存，Wasm 入口增加固定 ABI 预检，开发适配器仅在本地摘要授权匹配时开放一次性有界任务，目前只支持 `session.status.read`。它还没有接入生产 UI 生命周期、频道/成员数据桥或 TeamSpeak 动作桥。完整运行时仍须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v4 包格式、v3 示例包或 Wasm 输出原型描述成已完成的全量插件系统。
+当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。开发构建的 v4 Wasm 原型已接入 WebClient 的本地摘要授权、页面生命周期、动态 UI 渲染与插件 CSS；目前只支持 `session.status.read` 和 `ui.surface.replace`，生产构建明确关闭。普通 JavaScript 仍只校验、缓存，不执行。当前没有频道/成员/聊天数据投影或 TeamSpeak 动作桥，也没有 widget 的排序、显隐和本地几何设置。完整目标仍要求作者能自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v4 原型或 v3 示例包描述成已完成的全量插件系统。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -117,7 +117,7 @@ v1 和 v2 都只支持公开页面。`/admin/**` 不加载布局、用户覆盖�
 
 v3 清单的 packageType 固定为 open-skin，entry 指向 CSS，components 指向 components.json；不含 v2 的 layout 或 permissions 字段。组件文件可以省略。仅 v3 开放公开页面的 CSS 排版能力，v1/v2 仍按旧 CSS 规则校验。客户端导入和服务端登记使用同一共享组件 schema 与权限白名单。
 
-components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。schema v1 维持旧兼容；schema v2 引入 `mode: "widget"`（默认）或 `mode: "surface"`，并提供可选宿主控件节点；schema v3 保持这些能力，扩大声明式 UI 的节点/状态/动作边界，并增加用户操作事件和语音功能动作。v3 仍使用固定元素/属性、公开数据集合和宿主动作白名单，不是任意 HTML 或任意脚本。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。所有皮肤组件根节点及其中的每个可见元素都以动态布局项加入本地布局编辑器，可独立移动、缩放、改尺寸、改外观或隐藏。按钮、输入框及显式用户操作节点保留 44 px 最小触控区域。为让用户覆盖在树结构调整后仍能指向同一元素，请给重要节点设置稳定的 `part` 名称；未设置时按组件树位置生成标识。v4 完整插件协议见[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md#21-完整插件目标协议v4尚未实现)，当前不可作为已支持包格式使用。
+components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。schema v1 维持旧兼容；schema v2 引入 `mode: "widget"`（默认）或 `mode: "surface"`，并提供可选宿主控件节点；schema v3 保持这些能力，扩大声明式 UI 的节点/状态/动作边界，并增加用户操作事件和语音功能动作。v3 仍使用固定元素/属性、公开数据集合和宿主动作白名单，不是任意 HTML 或任意脚本。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。所有皮肤组件根节点及其中的每个可见元素都以动态布局项加入本地布局编辑器，可独立移动、缩放、改尺寸、改外观或隐藏。按钮、输入框及显式用户操作节点保留 44 px 最小触控区域。为让用户覆盖在树结构调整后仍能指向同一元素，请给重要节点设置稳定的 `part` 名称；未设置时按组件树位置生成标识。v4 包和开发态插件原型见[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)；生产运行时仍关闭。
 
 普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。重复列表可使用注册的公开集合；频道重复项仅能再重复其 `channel.members`，并且需要额外批准 `session.members.read`。宿主每个组件的实际渲染节点最多 8192 个，防止嵌套集合放大界面。schema v2 另允许固定宿主控件节点，例如：
 
@@ -150,15 +150,15 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 示例包见 [KAAK voice 示例](./examples/KAAK-VOICE.md)，其 components.json 展示了公开频道列表和在线成员侧栏；[Open Voice Surface](./examples/OPEN-VOICE-SURFACE.md) 展示了完整首页和语音工作区 surface，是格式验证脚手架。KAAK 的语音视觉参考来自用户授权进入的前两个语音房间；只记录布局，不保留服务器/房间标识、成员名或聊天内容。当前数据权限和宿主动作以[开放皮肤规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)中的清单为准。组件按本地用户授权后才渲染；权限对每个皮肤版本、页面和组件分别保存，可在宿主权限入口撤销。页面替换时，宿主会额外显示“返回标准界面”和“恢复内置皮肤”入口；拒绝授权或离开 surface 后，普通页面可立即恢复。
 
-组件树有硬上限：components.json 256 KiB。schema v1/v2 上限为 32 个组件、每组件 256 个模板节点、16 层深度和 100 条重复记录；schema v3 上限为 128 个组件、每组件 2048 个模板节点、32 层深度和 250 条重复记录，并允许 64 个本地标量状态与 64 个动作。Wasmi 原型动态 UI 输出的 schema v4 有 16 KiB 总输出上限、最多 64 个组件、每个节点最多 64 个属性和 256 个子节点，并沿用每组件节点/深度限制；它可使用更广的安全 HTML/SVG 结构、ARIA/data 属性和包内图片。动态输出 schema v5 再增加本地标量状态及事件名到作者处理器 ID 的映射。宿主只通过 `isTrusted` 用户事件发出剥离 DOM/Event 对象后的 `extension-event`，Wasm 侧只能经 `env.ui_input_read` 一次读取最多 8 KiB 的 JSON。输入字段限长；生成界面中的 password/file/hidden 类型输入会拒绝。自定义元素名称映射为惰性 `div`，外部 URL、脚本/框架、事件属性和导航目标会拒绝。开发态 UI 循环原型可把事件作为下一次独立 Wasm 调用的输入，最多串行排队 8 项并验证回调/状态归属；它尚未接入实际 WebClient 授权生命周期，也没有 TeamSpeak 数据投影或宿主动作桥。生产开关仍关闭，不能当作完整插件运行时。
+组件树有硬上限：components.json 256 KiB。schema v1/v2 上限为 32 个组件、每组件 256 个模板节点、16 层深度和 100 条重复记录；schema v3 上限为 128 个组件、每组件 2048 个模板节点、32 层深度和 250 条重复记录，并允许 64 个本地标量状态与 64 个动作。Wasmi 原型动态 UI 输出的 schema v4 有 16 KiB 总输出上限、最多 64 个组件、每个节点最多 64 个属性和 256 个子节点，并沿用每组件节点/深度限制；它可使用更广的安全 HTML/SVG 结构、ARIA/data 属性和包内图片。动态输出 schema v5 再增加本地标量状态及事件名到作者处理器 ID 的映射。宿主只通过 `isTrusted` 用户事件发出剥离 DOM/Event 对象后的 `extension-event`，Wasm 侧只能经 `env.ui_input_read` 一次读取最多 8 KiB 的 JSON。输入字段限长；生成界面中的 password/file/hidden 类型输入会拒绝。自定义元素名称映射为惰性 `div`，外部 URL、脚本/框架、事件属性和导航目标会拒绝。开发构建中的 UI 循环已经接入 WebClient 授权生命周期，可把可信事件作为下一次独立 Wasm 调用输入，最多串行排队 8 项并验证回调/状态归属；当前仍没有 TeamSpeak 数据投影或宿主动作桥。生产构建关闭运行时，不能当作完整插件系统。
 
 图片资源只能从包内引用，CSS 不能读取外部 URL、脚本或浏览器存储。宿主动作需显式权限，并只能绑定可信的用户事件；输入或 change 事件不能触发宿主动作。focus/blur、hover 和 drag-start/over 等被动事件只可改动组件本地状态，不能触发语音操作。
 
 注意：v3 CSS 和 surface 可以隐藏或遮挡普通语音控件。权限和返回标准界面提示由宿主在皮肤根之外绘制；其他界面控件仍受皮肤排版影响。测试时务必确保麦克风、设置、退出语音、屏幕共享操作和移动端导航仍有可达路径。组件演示页 /demo 使用合成数据，加入频道和聊天动作只更新演示状态；它不支持宿主控件或整页替换。
 
-### schemaVersion 4：插件包描述（运行时尚未启用）
+### schemaVersion 4：插件包描述与开发态运行时原型
 
-v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。客户端还会对 Wasm 入口执行固定导入/导出 ABI 预检。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。当前持久化函数尚未连接用户确认界面或运行生命周期。JS、CSS 和 Wasm 文件默认只校验、缓存；另有开发态 Wasm 原型适配器，会在启动前复核摘要绑定的本地授权，但只支持 `session.status.read`，且没有接入 WebClient 生命周期或能力桥。生产运行时仍未启用，因此 v4 目前不能作为可运行插件发布。
+v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。客户端还会对 Wasm 入口执行固定导入/导出 ABI 预检。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。开发构建的 WebClient 已有本地授权对话框和 Wasm 运行生命周期；目前支持安全 UI 输出、可信 UI 事件回调、插件专属 CSS，以及 `session.status.read` / `ui.surface.replace`。JavaScript 仍只校验、缓存，不执行；生产构建的 Wasm 运行时保持关闭，因此 v4 仍是开发原型而非可发布的生产插件系统。
 
 ```json
 {
@@ -177,9 +177,9 @@ v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客�
 
 `plugins.json` 顶层 `schemaVersion` 当前为 `1`，并包含 1–64 个插件。每个插件声明 `id`、`name`、`version`、`apiVersion: 1`、`page`（`home` 或 `voice`）、`mode`（`widget` 或 `surface`）、必需的 `entry`、可选的 `runtime`、可选的 `style`、素材路径数组 `assets` 和 `permissions`。入口扩展名 `.js` 默认对应 `javascript`，`.wasm` 默认对应 `wasm`；显式 `runtime` 必须与入口扩展名一致。入口及样式必须位于 `plugins/<id>/`；素材必须位于该插件自己的 `assets/` 子目录，只能是本地图片或 woff2 字体。插件不能共享文件；同一公开页面最多有一个 `surface`，且必须申请 `ui.surface.replace`。其余权限只能从 `src/shared/skin-plugin.ts` 的现有权限表中选择。
 
-`plugins.json` 不超过 256 KiB；每个入口 JS 或 Wasm 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。客户端导入会拒绝不符合固定内存、导入、导出和 Wasm 模块结构限制的入口。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。v4 的 JS/CSS/Wasm 默认仍只校验、缓存，不执行。Wasm 开发原型只在用户显式授权、摘要匹配时通过有界解释器启动一次性任务，当前唯一可用的数据权限为 `session.status.read`；尚无频道/成员数据投影、宿主动作桥或页面生命周期集成。不要将有 DOM 的 iframe 当作网络沙箱：sandbox 不阻止 iframe 自己导航，`navigate-to` 也不能作为跨浏览器安全保证；获批数据可能被编码到导航 URL。完整运行时需要同时保留自定义 UI/交互能力，并通过有资源边界的执行环境和可信宿主渲染/权限桥解决，不可退回固定原生控件目录。
+`plugins.json` 不超过 256 KiB；每个入口 JS 或 Wasm 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。客户端导入会拒绝不符合固定内存、导入、导出和 Wasm 模块结构限制的入口。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。v4 JavaScript 仍只校验、缓存，不执行。开发构建的 Wasm 原型仅在用户显式授权、摘要匹配时通过有界解释器启动一次性任务；目前接入权限为 `session.status.read` 和 `ui.surface.replace`，但尚无频道/成员/聊天数据投影或宿主动作桥。页面生命周期、输出渲染和插件 CSS 已接入开发 WebClient；生产构建保持关闭。不要将有 DOM 的 iframe 当作网络沙箱：sandbox 不阻止 iframe 自己导航，`navigate-to` 也不能作为跨浏览器安全保证；获批数据可能被编码到导航 URL。完整运行时需要同时保留自定义 UI/交互能力，并通过有资源边界的执行环境和可信宿主渲染/权限桥解决，不可退回固定原生控件目录。
 
-当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过自身宿主节点去调整其他插件或宿主恢复控件。
+当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过自身宿主节点去调整其他插件或宿主恢复控件。开发态 v4 host 已按 descriptor 管理当前页 widget/surface、授权、输出、事件循环、样式和清理，但还没有持久化的多插件布局界面。
 
 ## 首页内容和文案
 

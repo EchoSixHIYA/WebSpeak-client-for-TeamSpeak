@@ -33,7 +33,7 @@ export interface SkinRuntimePluginWasmOptions {
   prototypeOnly: true;
 }
 
-const WASM_PROTOTYPE_PERMISSIONS = new Set(["session.status.read"]);
+const WASM_PROTOTYPE_PERMISSIONS = new Set(["session.status.read", "ui.surface.replace"]);
 
 /** Starts a Wasm entry only after rechecking the exact package digest and local approval. */
 export async function createSkinRuntimePluginWasmSandboxPrototype(
@@ -66,7 +66,7 @@ export async function createSkinRuntimePluginWasmSandboxPrototype(
     name: plugin.name,
     version: plugin.version,
     apiVersion: plugin.apiVersion,
-    permissions: [...plugin.permissions],
+    permissions: plugin.permissions.filter((permission) => permission === "session.status.read"),
   });
 
   // This legacy approval object is created only after the v4 digest-bound host approval above.
