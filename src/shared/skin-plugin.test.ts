@@ -41,8 +41,95 @@ function errorCode(run: () => unknown, expected: string): void {
 
 test("skin plugin accepts a bounded channel list with a double-click host action", () => {
   const parsed = parseSkinPluginDocument(validDocument());
+  assert.equal(parsed.schemaVersion, 2, "legacy documents normalize to the current component schema");
+  assert.equal(parsed.components[0].mode, "widget");
   assert.equal(parsed.components[0].root.repeat?.path, "session.channels");
   assert.equal(parsed.components[0].root.children?.[0].events?.dblclick, "join");
+});
+
+test("component schema v2 can replace a public page and compose trusted host widgets", () => {
+  const document = validDocument();
+  document.schemaVersion = 2;
+  document.components[0].mode = "surface";
+  document.components[0].permissions = ["ui.surface.replace"];
+  document.components[0].actions = {};
+  document.components[0].root = {
+    tag: "main",
+    className: "custom-voice-shell",
+    children: [
+      { widget: "voice.channel-panel", part: "channels" },
+      { widget: "voice.chat-panel" },
+    ],
+  };
+
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].mode, "surface");
+  assert.deepEqual(parsed.components[0].root.children?.map((node) => node.widget), ["voice.channel-panel", "voice.chat-panel"]);
+  assert.throws(() => parseSkinPluginDocument({ ...document, schemaVersion: 1 }), { code: "SKIN_PLUGIN_SCHEMA_UNSUPPORTED" });
+});
+
+test("page surfaces and stateful host widgets cannot be duplicated", () => {
+  const document = validDocument();
+  document.schemaVersion = 2;
+  document.components[0].mode = "surface";
+  document.components[0].permissions.push("ui.surface.replace");
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.chat-panel" }] };
+  document.components.push({
+    ...document.components[0],
+    id: "second-surface",
+    mode: "widget",
+    root: { tag: "section", children: [{ widget: "voice.chat-panel" }] },
+  });
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_WIDGET_DUPLICATE");
+
+  document.components[1].mode = "surface";
+  document.components[1].root.children = [{ widget: "voice.member-cards" }];
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_SURFACE_DUPLICATE");
+});
+
+test("replacing a built-in public page requires an explicit user approval capability", () => {
+  const document = validDocument();
+  document.schemaVersion = 2;
+  document.components[0].mode = "surface";
+  document.components[0].permissions = [];
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ tag: "h1", children: [{ text: "Custom client" }] }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["ui.surface.replace"];
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].permissions, ["ui.surface.replace"]);
+});
+
+test("custom surfaces can safely render and switch unified favorite and recent server entries", () => {
+  const document = validDocument();
+  document.components[0].permissions = ["servers.quickList.read", "servers.quickList.switch"];
+  document.components[0].actions = {
+    switch: { type: "quickServers.switch", args: { quickServerId: "{{server.id}}" } },
+  };
+  document.components[0].root = {
+    tag: "nav",
+    repeat: { path: "servers.quickList", as: "server" },
+    children: [{ tag: "button", events: { dblclick: "switch" }, children: [{ text: "{{server.label}}" }] }],
+  };
+  const parsed = parseSkinPluginDocument(document).components[0];
+  assert.equal(parsed.root.repeat?.path, "servers.quickList");
+  assert.equal(parsed.actions.switch.type, "quickServers.switch");
+
+  document.components[0].permissions = ["servers.quickList.read"];
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+});
+
+test("host widget references stay allowlisted and cannot be used on the demo page", () => {
+  const unknownWidget = validDocument();
+  unknownWidget.schemaVersion = 2;
+  unknownWidget.components[0].root = { tag: "main", children: [{ widget: "filesystem.read" as never }] };
+  errorCode(() => parseSkinPluginDocument(unknownWidget), "SKIN_PLUGIN_WIDGET_INVALID");
+
+  const demoWidget = validDocument();
+  demoWidget.schemaVersion = 2;
+  demoWidget.components[0].page = "demo";
+  demoWidget.components[0].root = { tag: "main", children: [{ widget: "voice.chat-panel" }] };
+  errorCode(() => parseSkinPluginDocument(demoWidget), "SKIN_PLUGIN_WIDGET_INVALID");
 });
 
 test("KAAK v3 example uses only validated public session data and an explicit join action", async () => {

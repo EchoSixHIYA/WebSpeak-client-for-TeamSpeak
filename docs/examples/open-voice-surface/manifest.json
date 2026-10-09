@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "packageType": "open-skin",
+  "id": "community.open-voice-surface",
+  "name": "Open Voice Surface",
+  "version": "1.0.0",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "A complete, script-free public voice client surface scaffold.",
+  "entry": "skin.css",
+  "components": "components.json",
+  "minAppVersion": "0.2.7-preview"
+}

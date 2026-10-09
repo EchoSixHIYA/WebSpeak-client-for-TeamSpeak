@@ -1,6 +1,6 @@
 # WebSpeak 皮肤开发规范
 
-本文说明仍受支持的 v1 视觉皮肤、v2 声明式布局皮肤和 v3 开放皮肤。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI 并携带受限声明式组件，但不执行作者代码。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明仍受支持的 v1 视觉皮肤、v2 声明式布局皮肤和 v3 开放皮肤。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、添加受限组件，或用 components.json schema v2 替换首页/语音工作区的整页可见界面。界面由宿主安全渲染，仍不执行作者代码。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -25,7 +25,7 @@ content.json                  # 可选：首页内容与多语言界面文案
 assets/preview.jpg            # 可选：管理后台显示的预览图，也可在 CSS 中使用
 assets/background.webp        # 可选：页面艺术素材
 assets/brand.woff2            # 可选：自带字体
-components.json               # v3 可选：声明式扩展组件
+components.json               # v3 可选：声明式组件或完整页面 surface
 ```
 
 所有资源路径使用 `/`，区分大小写，并相对于包根目录。CSS 的 `url()` 使用同样的包根相对路径，例如 `url("assets/background.webp")`。不得使用机器本地路径、站点绝对路径或远程 URL。
@@ -104,17 +104,46 @@ v2 为 v1 增加一个必需布局文件。清单和布局 JSON 会在导入端�
 
 v1 和 v2 都只支持公开页面。`/admin/**` 不加载布局、用户覆盖和皮肤组件编辑器。布局包没有数据/API 权限；后续插件必须另行设计独立沙箱与授权协议，不能通过增加 v2 清单字段取得能力。
 
-### schemaVersion 3：开放皮肤和声明式组件
+### schemaVersion 3：开放皮肤和完整声明式页面
 
 v3 清单的 packageType 固定为 open-skin，entry 指向 CSS，components 指向 components.json；不含 v2 的 layout 或 permissions 字段。组件文件可以省略。仅 v3 开放公开页面的 CSS 排版能力，v1/v2 仍按旧 CSS 规则校验。客户端导入和服务端登记使用同一共享组件 schema 与权限白名单。
 
-components.json 顶层为 schemaVersion 1 和 components 数组。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 只接受 home、voice、demo。root 使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。
+components.json 顶层接受 schemaVersion 1 或 2 和 components 数组。schema v1 维持原有兼容；schema v2 的组件可声明 `mode: "widget"`（默认）或 `mode: "surface"`。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。
 
-示例包见 [KAAK voice 示例](./examples/KAAK-VOICE.md)，其 components.json 展示了公开频道列表和双击加入频道。当前数据权限和宿主动作以[开放皮肤规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)中的清单为准。组件按本地用户授权后才渲染；权限对每个皮肤版本、页面和组件分别保存，可在宿主浮动的权限入口撤销。用户拒绝时组件保持关闭。
+普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。schema v2 另允许固定宿主控件节点，例如：
+
+```json
+{
+  "schemaVersion": 2,
+  "components": [{
+    "id": "example-voice-surface",
+    "name": "Example voice surface",
+    "page": "voice",
+    "mode": "surface",
+    "accessibleName": "Example voice workspace",
+    "permissions": ["ui.surface.replace"],
+    "actions": {},
+    "root": {
+      "tag": "main",
+      "children": [
+        { "widget": "voice.channel-panel" },
+        { "widget": "voice.member-cards" },
+        { "widget": "voice.chat-panel" },
+        { "widget": "voice.audio-controls" },
+        { "widget": "voice.disconnect-control" }
+      ]
+    }
+  }]
+}
+```
+
+当前宿主控件 ID：`home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls`、`voice.disconnect-control`。未知控件和同页重复控件会被拒绝；每个控件的状态和业务动作仍由 WebSpeak 内部处理。只显示收藏时可用 `favorites.items` 和 `favorites.switch`；若要将收藏与最近连接放在同一自定义栏，可用 `servers.quickList` 数据与 `quickServers.switch` 动作。服务器目标始终使用本机生成的不透明令牌，不把地址、密码或身份材料交给组件。频道行也可把 `voice.joinChannel` 绑定到双击事件，切房继续走 TeamSpeak 原有权限和密码流程。
+
+示例包见 [KAAK voice 示例](./examples/KAAK-VOICE.md)，其 components.json 展示了公开频道列表和双击加入频道；[Open Voice Surface](./examples/OPEN-VOICE-SURFACE.md) 展示了完整首页和语音工作区 surface。后者是格式验证脚手架，不声称已经逐像素复刻 KOOK。当前数据权限和宿主动作以[开放皮肤规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)中的清单为准。组件按本地用户授权后才渲染；权限对每个皮肤版本、页面和组件分别保存，可在宿主权限入口撤销。页面替换时，宿主会额外显示“返回标准界面”和“恢复内置皮肤”入口；拒绝授权或离开 surface 后，普通页面可立即恢复。
 
 组件树有硬上限：components.json 256 KiB，最多 32 个组件，每组件最多 256 个模板节点、16 层深度、100 条重复记录、32 个本地标量状态和 24 个动作。图片资源只能从包内引用，CSS 不能读取外部 URL、脚本或浏览器存储。宿主动作需显式权限，并只能绑定可信的用户事件；输入或 change 事件不能连接、切房或发消息。
 
-注意：v3 CSS 可以隐藏或遮挡语音控件。权限和恢复提示由宿主在皮肤根之外绘制，但其他界面控件仍受皮肤排版影响。测试时务必确保麦克风、设置、退出语音、屏幕共享操作和移动端导航仍有可达路径。组件演示页 /demo 使用合成数据，加入频道和聊天动作只更新演示状态。
+注意：v3 CSS 和 surface 可以隐藏或遮挡普通语音控件。权限和返回标准界面提示由宿主在皮肤根之外绘制；其他界面控件仍受皮肤排版影响。测试时务必确保麦克风、设置、退出语音、屏幕共享操作和移动端导航仍有可达路径。组件演示页 /demo 使用合成数据，加入频道和聊天动作只更新演示状态；它不支持宿主控件或整页替换。
 
 ## 首页内容和文案
 
@@ -312,3 +341,11 @@ CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删�
 6. 检查至少一个窄屏尺寸和桌面尺寸，并检查焦点可见、对比度、动效偏好；确认没有第三方素材授权问题。
 
 当前自动化回归涵盖 ZIP/清单验证、资源路径、CSS 隔离与拒绝规则、文案结构和服务端皮肤目录读写。视觉排版、内容遮挡和浏览器间表现仍须人工预览。
+
+## 本轮实现问题记录
+
+- 整页替换必须是用户明确批准的能力；仅安装皮肤不能隐藏普通首页或语音页。schema v2 surface 应声明 `ui.surface.replace`，并验证拒绝授权和撤销后普通界面会恢复。
+- surface 上的“恢复内置皮肤”操作必须调用无条件的内置皮肤切换路径；用于“皮肤加载失败”提示的回退函数会在正常情况下直接返回。
+- 自定义服务器栏需要用 `servers.quickList` 同时显示收藏与最近连接；只能把标签、类型、当前标记和随机令牌交给组件，切换时再由宿主解析本地目标。
+- 最近连接和默认收藏名可能直接是服务器地址；组件上下文会在投影阶段将这种标签改为通用名称，不能改为暴露原始地址。
+- 外部 KOOK 页面目前无法通过当前 IAB/Edge 桥接读取；本轮没有采集房间视觉或操作状态。皮肤指南要求将该项保留为未验收，不能根据搜索摘要宣称完成视觉克隆。

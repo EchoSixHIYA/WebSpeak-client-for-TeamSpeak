@@ -1,11 +1,11 @@
 ---
 name: webspeak-skin-development
-description: Create, refine, package, and verify WebSpeak v1 visual, v2 layout, and v3 open skins while preserving host-owned behavior and access boundaries.
+description: Create, refine, package, and verify WebSpeak v1 visual, v2 layout, and v3 open skins, including declarative full-page surfaces that compose host-owned voice controls.
 ---
 
 # WebSpeak skin development
 
-Use this skill when editing or authoring a WebSpeak `.wskin` package, a built-in skin, or skin-facing UI hooks. v1/v2 packages are visual/layout data; v3 may rearrange public UI and add bounded declarative components. WebSpeak owns host behavior and the administrator console is outside the skin scope.
+Use this skill when editing or authoring a WebSpeak `.wskin` package, a built-in skin, or skin-facing UI hooks. v1/v2 packages are visual/layout data; v3 may rearrange public UI, add bounded declarative components, or replace the visible home/voice page with a validated surface. WebSpeak owns host behavior and the administrator console is outside the skin scope.
 
 ## Before editing
 
@@ -17,17 +17,24 @@ Use this skill when editing or authoring a WebSpeak `.wskin` package, a built-in
 
 - Keep WebSpeak's translations and semantic content as the baseline. Add `content.json` only when a text override is an explicit part of the request; never use it to implement visual artwork.
 - Follow the schema-specific CSS rules: v1/v2 reject layout changes; v3 allows layout, placement, size, typography, and visibility changes within the skin root. Keep CSS package-local, scoped to public hooks, and free of external resources or executable values.
-- v3 can obscure normal page controls. Preserve usable microphone, disconnect, device-settings, screen-share and recovery paths at desktop and mobile sizes. Skin CSS cannot reach host permission and recovery chrome rendered outside the skin root. Keep `/admin/**` unskinned.
-- v3 component trees are declarative JSON rendered by the host. Never add script, Wasm, HTML strings, direct network/storage, or private host objects. Request only the component-level permissions needed; keep labels and favorite identifiers opaque and never bind server addresses or credentials.
+- v3 can replace or obscure normal page controls. A surface must request `ui.surface.replace` and stays disabled until the user approves it. Arrange host widgets for the functions it needs; available IDs are registered in `src/shared/skin-plugin.ts`. Each stateful host widget may appear once per page. Preserve usable microphone, disconnect, device-settings, screen-share and recovery paths at desktop and mobile sizes. Verify both the return-to-built-in-UI and restore-built-in-skin buttons. The host recovery and permission UI render outside the skin root. Keep `/admin/**` unskinned.
+- components.json schema v1 is legacy; schema v2 adds `mode: "surface"` and allowlisted host-widget nodes. Component trees are declarative JSON rendered by the host. Never add script, Wasm, HTML strings, direct network/storage, or private host objects. Request only the component-level permissions needed; surfaces require `ui.surface.replace`. Keep server-list labels and opaque identifiers separate from addresses and credentials. Use `servers.quickList` plus `quickServers.switch` when a custom UI should show favorites and recent servers together. Host widgets execute in WebSpeak and do not grant author code access to their private state.
 - Use the host's reserved artwork hooks for layered character art and the headphone scene. Prefer transparent assets and `background-size: contain` where the reference requires the full character or chibi to remain visible; arrange the artwork around the fixed hook rather than changing its geometry.
 - Build visual depth with separate background, surface, and foreground artwork already exposed by the hooks. Avoid duplicate static decorations when an animated replacement exists. For motion, keep waveforms/sonar smooth and restrained, honor reduced-motion preferences, and retain readable focus, error, mute, and speaking states.
 - Keep skin-specific CSS variables under `--skin-*`. Use only package-local assets and confirm their redistribution rights.
 
 ## Verify and package
 
-1. Compare the implementation with its visual reference at desktop and narrow widths. Check the homepage, voice workspace, empty chat, member list, screen-share player, selectors, and `/demo`; verify no crop, overflow, text collision, or control overlap.
+1. Compare the implementation with its accessible visual reference at desktop and narrow widths. Check the homepage, voice workspace, empty chat, member list, screen-share player, selectors, and `/demo`; verify no crop, overflow, text collision, or control overlap. Do not claim visual verification when the reference page could not be read.
 2. Check all five interface languages, day/night modes, keyboard focus, and reduced-motion behavior. Confirm the admin console is unchanged.
-3. Run the relevant skin-package tests and application build after a related batch of changes. Fix validation failures rather than weakening the v1/v2 boundaries or v3 permission checks.
+3. Run the relevant skin-package tests and application build after a related batch of changes. Fix validation failures rather than weakening v1/v2 boundaries, v3 permission checks, surface limits, or the host-widget allowlist.
 4. Package the contents of the skin directory so `manifest.json` is at the archive root, then import it through `/admin/skins` and retest the installed `.wskin` in a visitor session.
 
 The shipped default day, default night, and ILLUSIA skins are protected built-ins. Do not change their IDs or introduce upload/update flows that can disable, replace, or remove them. A permission request is not a grant; verify the deny and revoke paths. Do not claim a skin was visually verified against an external reference unless that page was actually accessible.
+
+## Integration findings
+
+- A full-page surface is a separate user-approved capability (`ui.surface.replace`); package installation alone must leave the built-in page visible.
+- The “restore built-in skin” control must use an unconditional selection function, not the skin-load-error-only recovery handler.
+- Custom quick-server layouts should use the unified favorites/recent collection and opaque host tokens. Labels that match the underlying address are redacted before projection; never expose target addresses or credentials to skin data bindings.
+- Record external-reference access failures and leave visual checks incomplete; do not replace the authorized page with search snippets or unrelated screenshots.

@@ -5,6 +5,7 @@ import {
   type SkinPluginActionDefinition,
   type SkinPluginComponent,
   type SkinPluginDocument,
+  type SkinPluginHostWidget,
   type SkinPluginNode,
 } from "../../../src/shared/skin-plugin.js";
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
@@ -12,6 +13,7 @@ import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPlugi
 type Scalar = string | number | boolean;
 type SafeContext = Record<string, unknown>;
 type HostAction = (args: Record<string, Scalar>, component: SkinPluginComponent) => void | Promise<void>;
+type HostWidget = () => VNodeChild;
 
 const eventProps: Record<string, string> = {
   click: "onClick", dblclick: "onDblclick", change: "onChange", input: "onInput", submit: "onSubmit", keydown: "onKeydown",
@@ -27,16 +29,22 @@ export default defineComponent({
     data: { type: Object as PropType<SafeContext>, required: true },
     assets: { type: Object as PropType<Record<string, Blob>>, required: true },
     actions: { type: Object as PropType<Record<string, HostAction>>, required: true },
+    widgets: { type: Object as PropType<Partial<Record<SkinPluginHostWidget, HostWidget>>>, default: () => ({}) },
   },
-  setup(props) {
+  emits: {
+    "surface-change": (_active: boolean) => typeof _active === "boolean",
+    "restore-skin": () => true,
+  },
+  setup(props, { emit }) {
     const denied = ref(false);
+    const surfaceSuppressed = ref(false);
     const manageOpen = ref(false);
     const refresh = ref(0);
     const stateByComponent = reactive<Record<string, Record<string, Scalar>>>({});
     const objectUrls = new Map<string, string>();
     const validatedDocument = computed(() => {
       try { return parseSkinPluginDocument(props.document); }
-      catch { return { schemaVersion: 1 as const, components: [] }; }
+      catch { return { schemaVersion: 2 as const, components: [] }; }
     });
     const matchingComponents = computed(() => validatedDocument.value.components.filter((component) => component.page === props.page));
     const pendingApproval = computed(() => {
@@ -50,8 +58,17 @@ export default defineComponent({
       refresh.value;
       return matchingComponents.value.filter((component) => isSkinPluginComponentApproved(props.skinId, props.skinVersion, component));
     });
+    const surfaceCandidate = computed(() => activeComponents.value.find((component) => component.mode === "surface") ?? null);
+    const activeSurface = computed(() => surfaceSuppressed.value ? null : surfaceCandidate.value);
+    const renderedComponents = computed(() => activeComponents.value.filter((component) =>
+      component.mode !== "surface" || component !== surfaceCandidate.value || !surfaceSuppressed.value));
 
-    watch(() => [props.skinId, props.skinVersion, props.document, props.page], () => { denied.value = false; refresh.value += 1; }, { immediate: true });
+    watch(() => [props.skinId, props.skinVersion, props.document, props.page], () => {
+      denied.value = false;
+      surfaceSuppressed.value = false;
+      refresh.value += 1;
+    }, { immediate: true });
+    watch(activeSurface, (surface) => emit("surface-change", Boolean(surface)), { immediate: true, flush: "sync" });
 
     function localState(component: SkinPluginComponent): Record<string, Scalar> {
       const key = `${props.skinId}/${component.id}`;
@@ -114,6 +131,20 @@ export default defineComponent({
     }
 
     function renderNode(component: SkinPluginComponent, node: SkinPluginNode, context: SafeContext, state: Record<string, Scalar>, skipRepeat = false): VNodeChild {
+      if (node.widget) {
+        if (node.when) {
+          const value = resolvePath(node.when.path, context, state);
+          if (node.when.equals !== undefined ? value !== node.when.equals : !value) return null;
+        }
+        const widget = props.widgets[node.widget];
+        if (!widget) return null;
+        return h("div", {
+          class: ["ws-plugin-host-widget", node.className],
+          "data-ws-plugin-widget": node.widget,
+          "data-ws-plugin-part": node.part ? `${component.id}.${node.part}` : component.id,
+          "aria-label": component.accessibleName,
+        }, [widget()]);
+      }
       if (!node.tag) return interpolate(node.text ?? "", context, state);
       if (!skipRepeat && node.repeat) {
         const values = resolvePath(node.repeat.path, context, state);
@@ -194,12 +225,13 @@ export default defineComponent({
     onUnmounted(() => { objectUrls.forEach((url) => URL.revokeObjectURL(url)); objectUrls.clear(); });
 
     return () => {
-      const nodes: VNodeChild[] = activeComponents.value.map((component) => h("div", {
+      const nodes: VNodeChild[] = renderedComponents.value.map((component) => h("div", {
         key: `${props.skinId}:${component.id}`,
-        class: "ws-plugin-component",
+        class: ["ws-plugin-component", component.mode === "surface" && "ws-plugin-surface"],
         "data-ws-plugin-component": component.id,
         "data-ws-plugin-name": component.name,
         "data-ws-plugin-part": component.id,
+        ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,
       }, [renderNode(component, component.root, props.data, localState(component))]));
       const hasPermissions = matchingComponents.value.some((component) => component.permissions.length > 0);
@@ -210,7 +242,23 @@ export default defineComponent({
         "aria-label": "管理皮肤组件权限 / Manage skin component access",
         onClick: openAccessManager,
       }, "权限 / Access")]) : null;
-      if (!showConsent) return h(Fragment, null, [...nodes, ...(accessToggle ? [accessToggle] : [])]);
+      const surfaceRecovery = activeSurface.value ? h(Teleport, { to: "body" }, [h("button", {
+        type: "button",
+        class: "ws-plugin-surface-recovery",
+        "aria-label": "返回 WebSpeak 标准界面 / Return to the built-in interface",
+        onClick: () => { surfaceSuppressed.value = true; },
+      }, "标准界面 / Built-in UI")]) : null;
+      const skinRecovery = activeSurface.value ? h(Teleport, { to: "body" }, [h("button", {
+        type: "button",
+        class: "ws-plugin-surface-reset",
+        "aria-label": "恢复内置皮肤 / Restore the built-in skin",
+        onClick: () => emit("restore-skin"),
+      }, "恢复内置皮肤 / Reset skin")]) : null;
+      const recoveryControls = [
+        ...(surfaceRecovery ? [surfaceRecovery] : []),
+        ...(skinRecovery ? [skinRecovery] : []),
+      ];
+      if (!showConsent) return h(Fragment, null, [...nodes, ...(accessToggle ? [accessToggle] : []), ...recoveryControls]);
 
       const requested = accessComponents.value;
       const hasMissing = pendingApproval.value.length > 0;
@@ -222,7 +270,7 @@ export default defineComponent({
             h("strong", null, component.name),
             h("ul", null, component.permissions.map((permission) => h("li", { key: permission }, permissionLabel(permission)))),
           ])),
-          h("p", { class: "ws-plugin-consent-note" }, "组件不能运行脚本、访问浏览器存储、读取连接地址/密码或控制麦克风。/ Components cannot run code, access storage or credentials, or control the microphone."),
+          h("p", { class: "ws-plugin-consent-note" }, "页面可以替换公开客户端外观；内置控件仍由 WebSpeak 处理。皮肤不能运行脚本、访问网络或存储，也不能读取连接地址、密码和身份材料。/ A surface can replace the public client UI while built-in controls remain host-owned. Skins cannot run code, access network or storage, or read connection targets, passwords, or identity material."),
           h("div", { class: "ws-plugin-consent-actions" }, [
             ...(hasMissing ? [h("button", { type: "button", class: "secondary", onClick: closeOrDisable }, "暂不启用 / Keep disabled")]
               : [h("button", { type: "button", class: "secondary", onClick: revokeAll }, "撤销全部授权 / Revoke all access")]),
@@ -230,7 +278,7 @@ export default defineComponent({
           ]),
         ]),
       ])]);
-      return h(Fragment, null, [...nodes, ...(accessToggle ? [accessToggle] : []), consent]);
+      return h(Fragment, null, [...nodes, ...(accessToggle ? [accessToggle] : []), ...recoveryControls, consent]);
     };
   },
 });

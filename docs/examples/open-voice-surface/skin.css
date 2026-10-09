@@ -1,0 +1,294 @@
+:root {
+  color-scheme: dark;
+  --skin-voice-bg: #111318;
+  --skin-voice-panel: #191c24;
+  --skin-voice-raised: #222631;
+  --skin-voice-text: #f0f1f5;
+  --skin-voice-muted: #969baa;
+  --skin-voice-accent: #8e7bff;
+  --skin-voice-live: #62d5a7;
+}
+
+[data-ws-plugin-part="open-voice-home"] {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  gap: 32px;
+  padding: clamp(18px, 5vw, 56px);
+  color: var(--skin-voice-text);
+  background: radial-gradient(ellipse at 50% 42%, #25253c 0, var(--skin-voice-bg) 66%);
+}
+
+[data-ws-plugin-part="open-voice-home.home-header"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 1080px);
+}
+
+[data-ws-plugin-part="open-voice-home.brand-mark"],
+[data-ws-plugin-part="open-voice-workspace.brand-mark"] {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  color: white;
+  background: var(--skin-voice-accent);
+  font-weight: 800;
+}
+
+[data-ws-plugin-part="open-voice-home.brand-name"] {
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+[data-ws-plugin-part="open-voice-home.connection-card"] {
+  align-self: center;
+  width: min(100%, 520px);
+  padding: clamp(22px, 5vw, 42px);
+  border: 1px solid #ffffff17;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--skin-voice-panel) 94%, transparent);
+  box-shadow: 0 28px 90px #0008;
+}
+
+[data-ws-plugin-part="open-voice-home.eyebrow"],
+[data-ws-plugin-part="open-voice-workspace.section-title"] {
+  color: var(--skin-voice-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+[data-ws-plugin-part="open-voice-home.title"] {
+  margin: 10px 0;
+  font-size: clamp(27px, 5vw, 40px);
+  letter-spacing: -.04em;
+}
+
+[data-ws-plugin-part="open-voice-home.description"],
+[data-ws-plugin-part="open-voice-home.home-footer"] {
+  color: var(--skin-voice-muted);
+  line-height: 1.6;
+}
+
+[data-ws-plugin-part="open-voice-workspace"] {
+  display: grid;
+  grid-template-columns: 72px 228px minmax(320px, 1fr) 252px;
+  grid-template-rows: 62px minmax(0, 1fr);
+  width: 100%;
+  min-height: 100vh;
+  color: var(--skin-voice-text);
+  background: var(--skin-voice-bg);
+}
+
+[data-ws-plugin-part="open-voice-workspace.workspace-header"] {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-bottom: 1px solid #ffffff12;
+  background: #171920;
+}
+
+[data-ws-plugin-part="open-voice-workspace.server-title"] { margin-right: auto; }
+
+[data-ws-plugin-part="open-voice-workspace.quick-rail"] {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 14px 8px;
+  background: #171920;
+}
+
+[data-ws-plugin-part="open-voice-workspace.quick-server"] {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 52px;
+  min-height: 58px;
+  padding: 5px;
+  border: 0;
+  border-radius: 16px;
+  color: var(--skin-voice-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+[data-ws-plugin-part="open-voice-workspace.quick-server"][aria-current="true"] {
+  color: white;
+  background: var(--skin-voice-accent);
+}
+
+[data-ws-plugin-part="open-voice-workspace.server-monogram"] {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #ffffff18;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+[data-ws-plugin-part="open-voice-workspace.server-kind"] { font-size: 8px; }
+
+[data-ws-plugin-part="open-voice-workspace.channels"],
+[data-ws-plugin-part="open-voice-workspace.members-and-controls"] {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 12px;
+  background: var(--skin-voice-panel);
+}
+
+[data-ws-plugin-part="open-voice-workspace.channels"] { grid-column: 2; grid-row: 2; }
+[data-ws-plugin-part="open-voice-workspace.members-and-controls"] { grid-column: 4; grid-row: 2; }
+
+[data-ws-plugin-part="open-voice-workspace.channel-row"] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--skin-voice-muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-ws-plugin-part="open-voice-workspace.channel-row"][aria-current="true"] {
+  color: var(--skin-voice-text);
+  background: var(--skin-voice-raised);
+}
+
+[data-ws-plugin-part="open-voice-workspace.channel-name"] { flex: 1; }
+[data-ws-plugin-part="open-voice-workspace.channel-count"] { font-size: 11px; }
+
+[data-ws-plugin-part="open-voice-workspace.conversation"] {
+  grid-column: 3;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px;
+  gap: 12px;
+}
+
+[data-ws-plugin-part="open-voice-workspace.conversation-heading"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  border-bottom: 1px solid #ffffff12;
+}
+
+[data-ws-plugin-part="open-voice-workspace.channel-title"] { margin-right: auto; }
+[data-ws-plugin-part="open-voice-workspace.connection-state"] { color: var(--skin-voice-live); font-size: 12px; }
+
+[data-ws-plugin-part="open-voice-workspace.member-list"] {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+[data-ws-plugin-part="open-voice-workspace.member-row"] {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  color: var(--skin-voice-text);
+  font-size: 12px;
+}
+
+[data-ws-plugin-part="open-voice-workspace.member-avatar"] {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: white;
+  background: var(--skin-voice-raised);
+  font-weight: 700;
+}
+
+[data-ws-plugin-part="open-voice-workspace.speaking-indicator"] { color: var(--skin-voice-live); font-size: 10px; }
+
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.chat"],
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.audio-controls"],
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.connection-controls"],
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.disconnect-control"],
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.whisper-controls"],
+[data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.screen-player"] {
+  border-radius: 12px;
+  color: var(--skin-voice-text);
+  background-color: var(--skin-voice-panel);
+}
+
+[data-ws-plugin-part="open-voice-workspace"] button:focus-visible {
+  outline: 2px solid var(--skin-voice-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 800px) {
+  [data-ws-plugin-part="open-voice-workspace"] {
+    grid-template-columns: 58px minmax(0, 1fr);
+    grid-template-rows: 56px minmax(320px, 1fr) auto;
+    min-height: 100dvh;
+  }
+
+  [data-ws-plugin-part="open-voice-workspace.workspace-header"] { padding: 0 10px; }
+  [data-ws-plugin-part="open-voice-workspace.quick-rail"] { grid-column: 1; grid-row: 2; }
+  [data-ws-plugin-part="open-voice-workspace.channels"] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px;
+  }
+  [data-ws-plugin-part="open-voice-workspace.section-title"] { display: none; }
+  [data-ws-plugin-part="open-voice-workspace.channel-row"] { width: max-content; min-width: 130px; margin: 0; }
+  [data-ws-plugin-part="open-voice-workspace.conversation"] {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 10px;
+  }
+  [data-ws-plugin-part="open-voice-workspace.members-and-controls"] {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+  }
+  [data-ws-plugin-part="open-voice-workspace.member-list"] { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ws-plugin-part="open-voice-workspace"] *,
+  [data-ws-plugin-part="open-voice-home"] * {
+    scroll-behavior: auto;
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+    transition-duration: .01ms;
+  }
+}

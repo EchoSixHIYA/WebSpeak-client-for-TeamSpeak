@@ -331,6 +331,37 @@ test("schema version 3 supports arbitrary public layouts and validated declarati
   await assert.rejects(importSkinPack(makeSkinV3(missingAsset, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_ASSET_INVALID");
 });
 
+test("schema version 3 accepts a schema v2 full-page surface with host widgets", async () => {
+  const components = {
+    schemaVersion: 2,
+    components: [{
+      id: "custom-voice-surface",
+      name: "Custom voice surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Custom voice workspace",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: {
+        tag: "main",
+        className: "custom-workspace",
+        children: [
+          { widget: "voice.channel-panel" },
+          { widget: "voice.member-cards" },
+          { widget: "voice.chat-panel" },
+          { widget: "voice.audio-controls" },
+        ],
+      },
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV3(components, '[data-ws-part="app"] { --skin-surface: #123456; }'));
+  assert.equal(skin.pluginData?.schemaVersion, 2);
+  assert.equal(skin.pluginData?.components[0].mode, "surface");
+  assert.deepEqual(skin.pluginData?.components[0].root.children?.map((node) => node.widget), [
+    "voice.channel-panel", "voice.member-cards", "voice.chat-panel", "voice.audio-controls",
+  ]);
+});
+
 test("the distributable KAAK v3 package validates end to end", async () => {
   const archive = await readFile(new URL("../../../docs/examples/kaak-voice.wskin", import.meta.url));
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
@@ -339,6 +370,24 @@ test("the distributable KAAK v3 package validates end to end", async () => {
   assert.equal(skin.schemaVersion, 3);
   assert.equal(skin.pluginData?.components[0].id, "kaak-room-sidebar");
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-room-sidebar.channel-row"'));
+});
+
+test("the full voice surface example packages home, voice, and host-owned controls", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/open-voice-surface.wskin", import.meta.url));
+  const file = new File([archive], "open-voice-surface.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.open-voice-surface");
+  assert.equal(skin.pluginData?.schemaVersion, 2);
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.page, component.mode]), [
+    ["home", "surface"], ["voice", "surface"],
+  ]);
+  const voiceSurface = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voiceSurface?.permissions.includes("ui.surface.replace"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.read"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voiceSurface?.permissions.includes("session.channels.read"));
+  assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  assert.ok(skin.css.includes("@media (max-width: 800px)"));
 });
 
 function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = {}): File {

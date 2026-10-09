@@ -20,10 +20,13 @@
       :data="skinPluginContext"
       :assets="activeSkin.assets"
       :actions="skinPluginActions"
+      :widgets="skinPluginWidgets"
+      @surface-change="skinPluginSurfaceActive = $event"
+      @restore-skin="switchToBuiltIn"
     />
     <!-- Connection / welcome screen -->
     <section
-      v-if="!showVoiceShell"
+      v-if="!showVoiceShell && !skinPluginSurfaceActive"
       class="join-page"
       data-ws-part="home"
     >
@@ -236,18 +239,6 @@
         </div>
       </main>
 
-      <IdentityImportDialog
-        v-if="identityImportOpen"
-        v-model="identityImportText"
-        :busy="identityImportBusy"
-        :reading="identityFileReading"
-        :error="identityImportError"
-        :t="t"
-        @close="closeIdentityImport"
-        @submit="importIdentity"
-        @file="readIdentityFile"
-      />
-
       <footer
         class="join-footer"
         data-ws-part="home.footer"
@@ -310,7 +301,7 @@
 
     <!-- Connected application shell -->
     <div
-      v-else
+      v-else-if="showVoiceShell && !skinPluginSurfaceActive"
       :class="['app-shell', `mobile-view-${mobileSection}`]"
       :data-performance-open="performancePanelOpen ? 'true' : 'false'"
       :data-favorite-rail="accessMode === 'open' ? 'true' : 'false'"
@@ -539,13 +530,6 @@
           </span>
           <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
         </div>
-
-        <ScreenShareSettingsDialog
-          v-if="screenShareSettingsOpen"
-          :model="screenShareControls"
-          :t="t"
-          @close="screenShareSettingsOpen = false"
-        />
 
         <div
           v-if="voiceState.reconnecting || voiceState.reconnectFailed"
@@ -853,6 +837,25 @@
       </nav>
     </div>
 
+    <IdentityImportDialog
+      v-if="identityImportOpen"
+      v-model="identityImportText"
+      :busy="identityImportBusy"
+      :reading="identityFileReading"
+      :error="identityImportError"
+      :t="t"
+      @close="closeIdentityImport"
+      @submit="importIdentity"
+      @file="readIdentityFile"
+    />
+
+    <ScreenShareSettingsDialog
+      v-if="screenShareSettingsOpen"
+      :model="screenShareControls"
+      :t="t"
+      @close="screenShareSettingsOpen = false"
+    />
+
     <MemberActionsMenu
       :model="memberControls"
       :is-mobile-viewport="isMobileViewport"
@@ -924,7 +927,7 @@
 
 <script setup lang="ts">
 import { observeMobileViewport } from "../services/mobile-viewport.js";
-import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
@@ -968,6 +971,7 @@ import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
+import { createSkinPluginQuickServerProjection } from "../services/skin-plugin-context.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
@@ -1092,6 +1096,8 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const language = ref<Language>(getInitialLanguage());
 const activeSkin = shallowRef<InstalledSkin | null>(null);
+const skinPluginSurfaceActive = ref(false);
+watch(activeSkin, () => { skinPluginSurfaceActive.value = false; }, { flush: "sync" });
 const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value, language.value));
 const { t: translate, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
 function t(key: string, variables: Record<string, string | number> = {}) {
@@ -1136,7 +1142,7 @@ const themeMode = ref<ThemeMode>(getStoredTheme());
 applyTheme(themeMode.value);
 const publicSkin = usePublicSkin({ activeSkin, themeMode, appVersion: () => appVersion.value });
 const { activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins,
-  select: onSkinChange, initialize: initializeSkin, switchToBuiltInAfterLoadError } = publicSkin;
+  select: onSkinChange, initialize: initializeSkin, switchToBuiltIn, switchToBuiltInAfterLoadError } = publicSkin;
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
@@ -1457,23 +1463,11 @@ async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<vo
 
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
-const opaqueFavoriteTokenById = new Map<string, string>();
-const skinPluginFavoriteTargets = new Map<string, QuickServer>();
-const skinPluginFavorites = computed(() => {
-  const targets = quickServers.value.filter((server) => server.isFavorite);
-  const activeIds = new Set(targets.map((server) => server.id));
-  for (const id of opaqueFavoriteTokenById.keys()) if (!activeIds.has(id)) opaqueFavoriteTokenById.delete(id);
-  skinPluginFavoriteTargets.clear();
-  return targets.map((server) => {
-    let token = opaqueFavoriteTokenById.get(server.id);
-    if (!token) {
-      token = globalThis.crypto?.randomUUID?.() ?? `favorite-${Math.random().toString(36).slice(2)}`;
-      opaqueFavoriteTokenById.set(server.id, token);
-    }
-    skinPluginFavoriteTargets.set(token, server);
-    return { id: token, label: server.label, current: isQuickServerTarget(server), kind: "favorite" };
-  });
-});
+const skinPluginQuickServers = createSkinPluginQuickServerProjection();
+const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickServers.value, isQuickServerTarget));
+const skinPluginFavorites = computed(() => skinPluginQuickList.value
+  .filter((server) => server.favorite)
+  .map(({ favorite: _favorite, ...server }) => server));
 
 const skinPluginContext = computed(() => ({
   session: {
@@ -1502,6 +1496,7 @@ const skinPluginContext = computed(() => ({
     }))),
   },
   favorites: { items: skinPluginFavorites.value },
+  servers: { quickList: skinPluginQuickList.value },
   chat: {
     messages: chat.visibleMessages.value.filter((message) => message.scope === "channel").map((message) => ({
       id: message.id,
@@ -1522,8 +1517,13 @@ const skinPluginActions = {
   },
   "favorites.switch": (args: Record<string, string | number | boolean>) => {
     if (accessMode.value !== "open" || typeof args.favoriteId !== "string") return;
-    const target = skinPluginFavoriteTargets.get(args.favoriteId);
-    if (target?.isFavorite) connectQuickServer(target);
+    const target = skinPluginQuickServers.resolve(args.favoriteId);
+    if (target?.isFavorite && quickServers.value.some((server) => server.id === target.id && server.isFavorite)) connectQuickServer(target);
+  },
+  "quickServers.switch": (args: Record<string, string | number | boolean>) => {
+    if (accessMode.value !== "open" || typeof args.quickServerId !== "string") return;
+    const target = skinPluginQuickServers.resolve(args.quickServerId);
+    if (target && quickServers.value.some((server) => server.id === target.id)) connectQuickServer(target);
   },
   "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
     if (!voiceState.connected || typeof args.text !== "string" || !currentChannel.value?.id) return;
@@ -1531,6 +1531,160 @@ const skinPluginActions = {
     if (!text || text.length > 1000 || text.includes("\u0000")) return;
     void sendTextMessage(text, currentChannel.value.id);
   },
+};
+
+const skinPluginWidgets = {
+  "home.connection-form": () => h(JoinForm, {
+    autofocusNickname: !isMobileViewport.value,
+    serverHost: serverHost.value,
+    "onUpdate:serverHost": (value: string) => { serverHost.value = value; },
+    serverPort: serverPort.value,
+    "onUpdate:serverPort": (value: string) => { serverPort.value = value; },
+    serverPassword: serverPassword.value,
+    "onUpdate:serverPassword": (value: string) => { serverPassword.value = value; },
+    nickname: nickname.value,
+    "onUpdate:nickname": (value: string) => { nickname.value = value; },
+    channel: channel.value,
+    "onUpdate:channel": (value: string) => { channel.value = value; },
+    rememberIdentity: rememberIdentity.value,
+    "onUpdate:rememberIdentity": (value: boolean) => { rememberIdentity.value = value; },
+    accelerationRelayId: accelerationRelayId.value,
+    "onUpdate:accelerationRelayId": (value: string) => { accelerationRelayId.value = value; },
+    accessMode: accessMode.value,
+    openTargetPrefillBlocked: openTargetPrefillBlocked.value,
+    accelerationRelays: accelerationRelays.value,
+    quickServers: quickServers.value,
+    isFavorite: isFavorite.value,
+    identityExportBusy: identityExportBusy.value,
+    hasIdentity: Boolean(identityMaterial.value),
+    connecting: voiceState.connecting,
+    joinDisabled: !canJoin.value || serverConfigLoading.value || !identityReady.value || voiceState.connecting,
+    t,
+    onConnect: doConnect,
+    onDisconnect: doDisconnect,
+    onSelectServer: selectLocalServer,
+    onToggleFavorite: toggleFavorite,
+    onToggleQuickFavorite: toggleQuickFavorite,
+    onImportIdentity: openIdentityImport,
+    onExportIdentity: exportIdentity,
+  }),
+  "app.skin-switcher": () => h(SkinSwitcher, {
+    modelValue: activeSkinId.value,
+    "onUpdate:modelValue": (value: string) => { activeSkinId.value = value; },
+    class: "skin-switcher",
+    menuLabel: t("skinSelector"),
+    options: skinOptions.value,
+    onChange: onSkinChange,
+  }),
+  "app.language-switcher": () => h(LanguageSwitcher, {
+    modelValue: language.value,
+    "onUpdate:modelValue": (value: Language) => { language.value = value; },
+    menuLabel: t("languageMenu"),
+    onChange: persistLanguage,
+  }),
+  "voice.channel-panel": () => h(ChannelMemberPanel, {
+    query: memberQuery.value,
+    "onUpdate:query": (value: string) => { memberQuery.value = value; },
+    model: memberControls,
+    filteredMemberChannels: filteredMemberChannels.value,
+    currentChannelId: currentChannel.value?.id,
+    mobileVisible: true,
+    isMobileViewport: isMobileViewport.value,
+    volumes,
+    avatarStyle,
+    avatarInitial,
+    rangeStyle,
+    t,
+    onSelectChannel: selectChannel,
+    onVolumeInput: onVolInput,
+  }),
+  "voice.member-cards": () => h(VoiceMemberCards, {
+    currentMembers: currentMembers.value,
+    isMobileViewport: isMobileViewport.value,
+    sharing: memberSharingState,
+    controls: screenShareControls,
+    isSpeaking,
+    avatarStyle,
+    avatarInitial,
+    t,
+    onMemberActions: openMemberActions,
+    onStopShare: stopScreenShare,
+  }),
+  "voice.chat-panel": () => h(ChatPanel, {
+    model: chat,
+    t,
+    currentChannelName: currentChannelName.value,
+    mobileHidden: false,
+    serverEvents,
+    avatarStyle,
+    avatarInitial,
+    messageAvatar,
+    formatTime,
+  }),
+  "voice.audio-controls": () => isMobileViewport.value
+    ? h("div", { class: "mobile-voice-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
+      h("button", {
+        type: "button",
+        class: ["mobile-voice-toggle", microphoneMuted.value && "muted"],
+        "aria-label": t("microphone"),
+        "aria-pressed": !microphoneMuted.value,
+        onClick: toggleMicrophone,
+      }, [h(Icon, { name: microphoneMuted.value ? "mic-off" : "mic", size: 20 }), h("span", null, t("microphone"))]),
+      h("button", {
+        type: "button",
+        class: ["mobile-voice-toggle", outputMuted.value && "muted"],
+        "aria-label": t("speaker"),
+        "aria-pressed": !outputMuted.value,
+        onClick: toggleOutputMute,
+      }, [h(Icon, { name: outputMuted.value ? "volume-off" : "volume", size: 20 }), h("span", null, t("speaker"))]),
+    ])
+    : h(AudioDock, {
+      model: audioDockState,
+      controls: audioControls,
+      t,
+      rangeStyle,
+      onSettings: () => { settingsOpen.value = true; },
+      onOutputMute: toggleOutputMute,
+    }),
+  "voice.screen-share-player": () => screenShareViewing.value ? h(ScreenSharePlayer, {
+    model: screenShareControls,
+    screenShareRemoteStream: screenShareRemoteStream.value,
+    screenShareRemoteVolume: screenShareRemoteVolume.value,
+    screenShareError: screenShareError.value,
+    leaveScreenShare,
+    avatarInitial,
+    t,
+  }) : null,
+  "voice.whisper-controls": () => whisperTargetIds.size ? h(WhisperControls, {
+    targets: whisperTargets.value,
+    active: whisperActive.value,
+    enabled: !isMobileViewport.value || mobileSection.value === "voice",
+    controls: audioControls,
+    t,
+    onClear: clearWhisperTargets,
+  }) : null,
+  "voice.performance-panel": () => h(VoicePerformancePanel, {
+    model: performance,
+    screenShareWebRtcStats,
+    t,
+  }),
+  "voice.connection-controls": () => h("div", { class: "ws-plugin-connection-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
+    h("button", { type: "button", "aria-label": t("copyInvite"), title: t("copyInvite"), onClick: doShare }, [h(Icon, { name: "share", size: 18 })]),
+    ...(accessMode.value === "open" ? [h("button", {
+      type: "button",
+      "aria-label": t(isFavorite.value ? "removeFavorite" : "saveFavorite"),
+      "aria-pressed": isFavorite.value,
+      title: t(isFavorite.value ? "removeFavorite" : "saveFavorite"),
+      onClick: toggleFavorite,
+    }, [h(Icon, { name: "star", size: 18 })])] : []),
+    h("button", { type: "button", "aria-label": t("exit"), title: t("exit"), onClick: leaveVoiceWorkspace }, [h(Icon, { name: "door", size: 18 }), h("span", null, t("exit"))]),
+  ]),
+  "voice.disconnect-control": () => h("button", {
+    type: "button",
+    class: "ws-plugin-disconnect-control",
+    "aria-label": t("exit"),
+    onClick: leaveVoiceWorkspace,
+  }, [h(Icon, { name: "door", size: 18 }), h("span", null, t("exit"))]),
 };
 
 watch(() => pokeNotifications.length, (length, previousLength) => {

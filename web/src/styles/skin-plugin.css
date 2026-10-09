@@ -15,7 +15,7 @@
   position: fixed;
   right: 12px;
   bottom: 12px;
-  z-index: 2147483000;
+  z-index: 2147483647;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid #8197ac;
@@ -27,6 +27,37 @@
   cursor: pointer;
 }
 .ws-plugin-access-toggle:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
+
+.ws-plugin-surface {
+  display: block;
+  width: 100%;
+  min-height: var(--ws-viewport-height, 100vh);
+}
+
+.ws-plugin-host-widget {
+  min-width: 0;
+  min-height: 0;
+}
+
+.ws-plugin-surface-recovery,
+.ws-plugin-surface-reset {
+  position: fixed;
+  left: 12px;
+  z-index: 2147483647;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #8197ac;
+  border-radius: 999px;
+  color: #f7fbff;
+  background: #182331ef;
+  box-shadow: 0 4px 18px #0006;
+  font: 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+.ws-plugin-surface-recovery { bottom: 12px; }
+.ws-plugin-surface-reset { bottom: 54px; }
+.ws-plugin-surface-recovery:focus-visible,
+.ws-plugin-surface-reset:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
 
 .ws-plugin-consent {
   width: min(640px, 100%);

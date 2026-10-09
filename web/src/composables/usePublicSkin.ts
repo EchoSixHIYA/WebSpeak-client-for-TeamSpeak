@@ -115,6 +115,9 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     if (!skinLoadError.value) return;
     await select(fallbackId());
   }
+  async function switchToBuiltIn(): Promise<void> {
+    await select(fallbackId());
+  }
 
-  return { activeSkin, activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins, initialize, select, cancel, reset, switchToBuiltInAfterLoadError };
+  return { activeSkin, activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins, initialize, select, cancel, reset, switchToBuiltIn, switchToBuiltInAfterLoadError };
 }
