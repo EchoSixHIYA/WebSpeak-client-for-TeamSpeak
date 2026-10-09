@@ -74,11 +74,17 @@ test("valid layouts accept only bounded positions and safe visual tokens", () =>
 });
 
 test("skin-authored component roots and nodes become independently editable layout parts", () => {
+  const maxRuntimeNodeId = `skin.voice.runtime_plugin_${"p".repeat(64)}__${"c".repeat(64)}.control-node-root-0`;
   const dynamicIds = [
     "skin.voice.toolbar",
     "skin.voice.toolbar.node-root",
     "skin.voice.toolbar.part-chat-list",
     "skin.voice.toolbar.control-node-root-0",
+    "skin.voice.runtime_plugin_voice-surface__voice-ui",
+    "skin.voice.runtime_plugin_voice-surface__voice-ui.node-root",
+    "skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list",
+    "skin.voice.runtime_plugin_voice-surface__voice-ui.control-part-join",
+    maxRuntimeNodeId,
   ];
   const components = getSkinLayoutComponents("voice", dynamicIds);
   assert.deepEqual(components.filter((component) => dynamicIds.includes(component.id)).map((component) => component.id), dynamicIds);
@@ -93,9 +99,16 @@ test("skin-authored component roots and nodes become independently editable layo
       "skin.voice.toolbar.node-root": { width: 720 },
       "skin.voice.toolbar.part-chat-list": { visible: false },
       "skin.voice.toolbar.control-node-root-0": { scale: 1, width: 60, height: 48 },
+      "skin.voice.runtime_plugin_voice-surface__voice-ui": { width: 800 },
+      "skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list": { visible: false },
+      "skin.voice.runtime_plugin_voice-surface__voice-ui.control-part-join": { width: 60, height: 48 },
     } } },
   });
   assert.equal(layout.pages.voice?.desktop?.["skin.voice.toolbar.part-chat-list"]?.visible, false);
+  assert.equal(layout.pages.voice?.desktop?.["skin.voice.runtime_plugin_voice-surface__voice-ui"]?.width, 800);
+  assert.equal(layout.pages.voice?.desktop?.["skin.voice.runtime_plugin_voice-surface__voice-ui.part-chat-list"]?.visible, false);
+  assert.equal(getSkinLayoutComponent("skin.voice.runtime_plugin_voice-surface__voice-ui.control-part-join")?.minTouchTarget, 44);
+  assert.equal(getSkinLayoutComponent(maxRuntimeNodeId)?.minTouchTarget, 44);
   assert.equal(getSkinLayoutComponent("skin.voice.toolbar.control-node-root-0")?.minTouchTarget, 44);
   assert.ok(getSkinLayoutComponent("skin.voice.toolbar.control-node-root-0")!.minScale >= 1);
 

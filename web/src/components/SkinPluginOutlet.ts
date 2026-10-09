@@ -186,13 +186,17 @@ export default defineComponent({
       return url;
     }
 
+    function layoutComponentPath(component: SkinPluginComponent): string {
+      return props.componentNamespace ? `runtime_plugin_${props.componentNamespace}__${component.id}` : component.id;
+    }
+
     function layoutPart(component: SkinPluginComponent, node: SkinPluginNode, nodePath: string): string {
       const interactive = ["a", "button", "input", "select", "summary", "textarea"].includes(node.tag ?? "")
         || node.attributes?.role === "button"
         || ["click", "dblclick", "contextmenu", "keydown", "keyup", "pointerdown", "pointerup", "drop"]
           .some((eventName) => Boolean(node.events?.[eventName as keyof typeof node.events]));
       const part = node.part ? `part-${node.part}` : nodePath;
-      const componentPath = props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id;
+      const componentPath = layoutComponentPath(component);
       return `skin.${component.page}.${componentPath}.${interactive ? "control-" : ""}${part}`;
     }
 
@@ -317,7 +321,7 @@ export default defineComponent({
         "data-ws-plugin-component": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
         "data-ws-plugin-name": component.name,
         "data-ws-plugin-part": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
-        "data-ws-part": `skin.${component.page}.${props.componentNamespace ? `${props.componentNamespace}.` : ""}${component.id}`,
+        "data-ws-part": `skin.${component.page}.${layoutComponentPath(component)}`,
         ...(props.componentNamespace ? { "data-ws-runtime-plugin": props.componentNamespace } : {}),
         ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,

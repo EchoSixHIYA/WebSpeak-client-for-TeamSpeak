@@ -60,6 +60,26 @@ test("legacy local layouts migrate matching entries and keep incompatible entrie
   });
 });
 
+test("migration recovery preserves full runtime plugin layout identifiers", () => {
+  withLocalStorage(() => {
+    const componentId = `skin.voice.runtime_plugin_${"p".repeat(64)}__${"c".repeat(64)}.control-node-root-0`;
+    const legacy = JSON.stringify({
+      schemaVersion: 1,
+      skins: {
+        "community.illusia-voice": {
+          schemaVersion: 1,
+          pages: { voice: { desktop: { [componentId]: { width: 9000 } } } },
+        },
+      },
+    });
+    localStorage.setItem(LEGACY_SKIN_LAYOUT_STORAGE_KEY, legacy);
+
+    loadSkinLayoutOverrides("community.illusia-voice");
+    const recovery = getSkinLayoutMigrationRecovery("community.illusia-voice");
+    assert.equal(recovery?.items[0]?.componentId, componentId);
+  });
+});
+
 test("version 2 layout overrides can be saved, loaded, and cleared per skin", () => {
   withLocalStorage((storage) => {
     saveSkinLayoutOverrides("community.illusia-voice", {

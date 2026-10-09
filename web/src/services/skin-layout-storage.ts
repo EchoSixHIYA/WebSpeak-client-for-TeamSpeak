@@ -84,7 +84,7 @@ function parseCollection(source: string | null): SkinLayoutCollection {
       items: recovery.items.filter(isRecord).map((item) => ({
         page: typeof item.page === "string" ? item.page.slice(0, 80) : "",
         profile: typeof item.profile === "string" ? item.profile.slice(0, 20) : "",
-        componentId: typeof item.componentId === "string" ? item.componentId.slice(0, 120) : "",
+        componentId: typeof item.componentId === "string" ? item.componentId.slice(0, 320) : "",
         placement: item.placement,
       })),
       omittedCount: Math.max(0, recovery.omittedCount),
@@ -98,7 +98,7 @@ function recoverLegacyLayout(layout: unknown): { layout: SkinLayoutDocument; ite
   const items: SkinLayoutMigrationRecovery["items"] = [];
   const pages: SkinLayoutDocument["pages"] = {};
   const remember = (page: string, profile: string, componentId: string, placement: unknown) => {
-    if (items.length < 1024) items.push({ page: page.slice(0, 80), profile: profile.slice(0, 20), componentId: componentId.slice(0, 120), placement });
+    if (items.length < 1024) items.push({ page: page.slice(0, 80), profile: profile.slice(0, 20), componentId: componentId.slice(0, 320), placement });
   };
   if (!isRecord(layout) || layout.schemaVersion !== 1 || !isRecord(layout.pages)) {
     remember("", "", "__document__", layout);

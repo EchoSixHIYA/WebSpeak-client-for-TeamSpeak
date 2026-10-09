@@ -296,6 +296,33 @@ test("SkinPluginOutlet renders validated dynamic output and preserves package UI
   assert.match(collisionHtml, /Package UI/);
 });
 
+test("runtime plugin component layout parts keep plugin and component identities in the layout registry format", async () => {
+  const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.test",
+    skinVersion: "1.0.0",
+    document: {
+      schemaVersion: 3,
+      components: [{
+        id: "base-ui",
+        name: "Base UI",
+        page: "voice",
+        accessibleName: "Base UI",
+        permissions: [],
+        actions: {},
+        root: { tag: "main", children: [{ text: "Base UI" }] },
+      }],
+    },
+    extensionOutput: generatedOutput("voice-ui", { tag: "button", part: "join", children: [{ text: "Join" }] }),
+    componentNamespace: "voice-surface",
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+  }));
+  assert.match(html, /data-ws-part="skin\.voice\.runtime_plugin_voice-surface__voice-ui"/);
+  assert.match(html, /data-ws-part="skin\.voice\.runtime_plugin_voice-surface__voice-ui\.control-part-join"/);
+});
+
 test("SkinPluginOutlet renders generated custom elements as inert host nodes", async () => {
   const document: SkinPluginDocument = {
     schemaVersion: 3,
