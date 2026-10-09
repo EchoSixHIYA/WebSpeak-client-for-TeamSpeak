@@ -106,11 +106,11 @@ test("skin registry rejects path traversal and mismatched local ZIP headers", as
   assert.deepEqual(await registry.list(), []);
 });
 
-test("the three bundled skins cannot be replaced or removed through the registry", async (context) => {
+test("the bundled skins cannot be replaced or removed through the registry", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-builtins-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   const registry = new SkinRegistry(directory);
-  for (const id of ["builtin.light", "builtin.dark", "community.illusia-voice"]) {
+  for (const id of ["builtin.light", "builtin.dark", "builtin.discord", "community.illusia-voice"]) {
     await assert.rejects(registry.save(Buffer.alloc(22), id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
     await assert.rejects(registry.remove(id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
     await assert.rejects(registry.setEnabled(id, false), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");

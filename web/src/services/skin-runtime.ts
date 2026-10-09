@@ -8,6 +8,7 @@ import { createSkinOperation, type SkinLoadOptions } from "./skin-operation.js";
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
 export const BUILTIN_DARK_SKIN = "builtin.dark";
+export const BUILTIN_DISCORD_SKIN = "builtin.discord";
 const CUSTOM_STYLE_ID = "webspeak-active-custom-skin";
 const CUSTOM_BASE_STYLE_ID = "webspeak-active-custom-skin-base";
 
@@ -50,9 +51,9 @@ export async function activateSkin(id: string, expectedVersion?: string, appVers
 async function prepareAndActivate(id: string, expectedVersion: string | undefined, appVersion: string,
   operation: ReturnType<typeof createSkinOperation>): Promise<InstalledSkin | null> {
   operation.check();
-  if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN) {
+  if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN || id === BUILTIN_DISCORD_SKIN) {
     removeCustomSkinStyle();
-    applyTheme(id === BUILTIN_DARK_SKIN ? "dark" : "light");
+    applyTheme(id === BUILTIN_DISCORD_SKIN ? "discord" : (id === BUILTIN_DARK_SKIN ? "dark" : "light"));
     markCoreControls();
     storeSkinId(id);
     return null;

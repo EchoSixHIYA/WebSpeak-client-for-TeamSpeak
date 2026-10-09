@@ -45,7 +45,7 @@ export interface RecentServer {
 export interface LocalPreferences {
   schemaVersion: 1;
   locale?: "auto" | "zh-CN" | "en";
-  theme?: "system" | "light" | "dark";
+  theme?: "system" | "light" | "dark" | "discord";
   skinId?: string;
   microphoneMuted?: boolean;
   noiseSuppressionEnabled?: boolean;

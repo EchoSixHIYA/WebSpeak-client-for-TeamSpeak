@@ -11,6 +11,6 @@ export interface SkinCatalogEntry {
   installedAt: number;
   builtIn?: boolean;
   enabled?: boolean;
-  previewKind?: "day" | "night" | "illusia";
+  previewKind?: "day" | "night" | "illusia" | "discord";
 }
 

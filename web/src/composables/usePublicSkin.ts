@@ -1,7 +1,7 @@
 import { onScopeDispose, ref, shallowRef, type Ref } from "vue";
 import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 import { BUILTIN_SKIN_CATALOG, getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
-import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, clearCustomSkinStyle, getStoredSkinId } from "../services/skin-runtime.js";
+import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, BUILTIN_DISCORD_SKIN, clearCustomSkinStyle, getStoredSkinId } from "../services/skin-runtime.js";
 import { createSkinOperation } from "../services/skin-operation.js";
 import { getStoredTheme, isDarkTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import type { InstalledSkin } from "../services/skin-pack.js";
@@ -13,7 +13,7 @@ interface PublicSkinOptions {
   timeoutMs?: number;
 }
 const readChoice = () => { try { return localStorage.getItem("webspeak:skin-choice"); } catch { return null; } };
-const builtin = (id: string) => id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN;
+const builtin = (id: string) => id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN || id === BUILTIN_DISCORD_SKIN;
 const fallbackId = () => isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
 
 /** One page owns initialization, choices and their late responses, including persistence. */
@@ -42,7 +42,7 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     activeSkin.value = skin;
     activeSkinId.value = skin?.id ?? (builtin(id) ? id : fallbackId());
     const mode = activeSkinId.value === BUILTIN_LIGHT_SKIN ? "light"
-      : activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : isDarkTheme(getStoredTheme()) ? "dark" : "light";
+      : activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : activeSkinId.value === BUILTIN_DISCORD_SKIN ? "discord" : isDarkTheme(getStoredTheme()) ? "dark" : "light";
     if (options.themeMode && updateTheme) {
       options.themeMode.value = mode;
       saveTheme(mode);

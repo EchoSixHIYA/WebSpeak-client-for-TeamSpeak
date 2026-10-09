@@ -53,8 +53,8 @@ const { activeSkin, activeSkinId, skinReady, installedSkins, catalogSkins,
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
-    label: skin.id === BUILTIN_LIGHT_SKIN ? copy.value.skinDay : skin.id === BUILTIN_DARK_SKIN ? copy.value.skinNight : skin.id === BUILTIN_ILLUSIA_SKIN_ID ? illusiaSkinLabels[language.value] : skin.name,
-    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : "compass",
+    label: skin.id === BUILTIN_LIGHT_SKIN ? copy.value.skinDay : skin.id === BUILTIN_DARK_SKIN ? copy.value.skinNight : skin.id === "builtin.discord" ? "Discord" : skin.id === BUILTIN_ILLUSIA_SKIN_ID ? illusiaSkinLabels[language.value] : skin.name,
+    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : skin.id === "builtin.discord" ? "discord" : "compass",
   })),
   ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id) && isPublicSkinEnabled(skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
 ]);

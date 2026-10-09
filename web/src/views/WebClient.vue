@@ -6,6 +6,7 @@
       `language-${language}`,
       { 'skin-initializing': !skinReady, 'keyboard-open': mobileViewport.keyboardOpen },
     ]"
+    :data-ws-skin="activeSkinId"
     :style="{ '--ws-viewport-height': `${mobileViewport.height}px`, '--ws-viewport-top': `${mobileViewport.top}px` }"
     data-ws-part="app"
     :data-ws-page="showVoiceShell ? 'voice' : 'home'"
@@ -1125,8 +1126,8 @@ const { activeSkinId, skinReady, installedSkins, catalogSkins, select: onSkinCha
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
-    label: skin.id === BUILTIN_LIGHT_SKIN ? t("skinDay") : skin.id === BUILTIN_DARK_SKIN ? t("skinNight") : skin.id === "community.illusia-voice" ? t("skinIllusia") : skin.name,
-    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : "compass",
+    label: skin.id === BUILTIN_LIGHT_SKIN ? t("skinDay") : skin.id === BUILTIN_DARK_SKIN ? t("skinNight") : skin.id === "builtin.discord" ? "Discord" : skin.id === "community.illusia-voice" ? t("skinIllusia") : skin.name,
+    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : skin.id === "builtin.discord" ? "discord" : "compass",
   })),
   ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id) && isPublicSkinEnabled(skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
 ]);
