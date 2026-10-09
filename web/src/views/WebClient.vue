@@ -7,6 +7,7 @@
       { 'skin-initializing': !skinReady, 'keyboard-open': mobileViewport.keyboardOpen },
     ]"
     :style="{ '--ws-viewport-height': `${mobileViewport.height}px`, '--ws-viewport-top': `${mobileViewport.top}px` }"
+    :lang="language"
     data-ws-part="app"
     :data-ws-page="showVoiceShell ? 'voice' : 'home'"
   >
@@ -908,12 +909,14 @@
       {{ toast }}</div
     >
   </div>
+  <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
 </template>
 
 <script setup lang="ts">
 import { observeMobileViewport } from "../services/mobile-viewport.js";
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
@@ -1121,7 +1124,8 @@ const {
 const themeMode = ref<ThemeMode>(getStoredTheme());
 applyTheme(themeMode.value);
 const publicSkin = usePublicSkin({ activeSkin, themeMode, appVersion: () => appVersion.value });
-const { activeSkinId, skinReady, installedSkins, catalogSkins, select: onSkinChange, initialize: initializeSkin } = publicSkin;
+const { activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins,
+  select: onSkinChange, initialize: initializeSkin, switchToBuiltInAfterLoadError } = publicSkin;
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,

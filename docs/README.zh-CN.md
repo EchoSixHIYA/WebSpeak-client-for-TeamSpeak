@@ -4,6 +4,8 @@
 
 WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户无需安装桌面客户端即可从浏览器加入频道，管理员可以在控制台管理目标服务器、访问方式和运行状态。
 
+当前皮肤包的实现规则见[皮肤开发规范](./SKIN_DEVELOPMENT.md)。声明式布局已实现；扩展插件权限沙箱仍为默认关闭的开发原型，阶段状态和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+
 ## 在线 Demo
 
 地址：<https://webspeak.example.invalid>

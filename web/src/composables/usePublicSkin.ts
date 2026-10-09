@@ -22,6 +22,7 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
   const stored = getStoredSkinId();
   const activeSkinId = ref(stored ?? fallbackId());
   const skinReady = ref(Boolean(stored && builtin(stored)));
+  const skinLoadError = shallowRef<{ skinId: string } | null>(null);
   const installedSkins = ref<InstalledSkin[]>([]);
   const catalogSkins = ref<SkinCatalogEntry[]>([...BUILTIN_SKIN_CATALOG]);
   let current: ReturnType<typeof createSkinOperation> | undefined;
@@ -34,34 +35,38 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
   }
   onScopeDispose(() => { disposed = true; cancel(); });
 
-  async function apply(id: string, operation: ReturnType<typeof createSkinOperation>, persist = true, updateTheme = false) {
+  async function apply(id: string, operation: ReturnType<typeof createSkinOperation>, persist = true, updateTheme = false, clearLoadError = true) {
     operation.check();
     const entry = catalogSkins.value.find(skin => skin.id === id);
     const skin = await operation.wait(activateSkin(id, entry?.version, options.appVersion?.(), { signal: operation.signal }));
     if (!owns(operation)) return;
+    if (!builtin(id) && !skin) throw new Error("The selected skin could not be activated.");
     activeSkin.value = skin;
     activeSkinId.value = skin?.id ?? (builtin(id) ? id : fallbackId());
+    if (clearLoadError) skinLoadError.value = null;
     const mode = activeSkinId.value === BUILTIN_LIGHT_SKIN ? "light"
       : activeSkinId.value === BUILTIN_DARK_SKIN ? "dark" : isDarkTheme(getStoredTheme()) ? "dark" : "light";
     if (options.themeMode && updateTheme) {
       options.themeMode.value = mode;
-      saveTheme(mode);
+      saveTheme(mode, { preserveCustomSkins: !builtin(activeSkinId.value) });
     }
     if (persist) void saveLocalPreferences({ schemaVersion: 1, skinId: activeSkinId.value,
       ...(options.themeMode && updateTheme ? { theme: mode } : {}) }, operation.signal).catch(() => undefined);
   }
-  async function recover(error: unknown, operation: ReturnType<typeof createSkinOperation>) {
+  async function recover(error: unknown, operation: ReturnType<typeof createSkinOperation>, failedSkinId: string) {
     if (!owns(operation) || (error as { name?: string })?.name === "AbortError") return;
+    if (!builtin(failedSkinId)) skinLoadError.value = { skinId: failedSkinId };
     // Retire every stage of the old operation before installing a fallback.
     operation.cancel();
     const fallback = begin();
-    try { await apply(fallbackId(), fallback, false); }
+    try { await apply(fallbackId(), fallback, false, false, false); }
     catch { /* A newer selection or page can retire the fallback as well. */ }
     finally { if (owns(fallback)) skinReady.value = true; fallback.finish(); }
   }
   async function initialize() {
     if (disposed) return;
     const operation = begin();
+    let requestedSkinId = fallbackId();
     try {
       const [preferences, installed, available] = await operation.wait(Promise.all([
         loadLocalPreferences(), listInstalledSkins(), listPublicSkins({ signal: operation.signal }),
@@ -74,8 +79,9 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
       }
       // Only an explicit user choice overrides the instance default.
       const choice = readChoice();
-      await apply(choice && isPublicSkinEnabled(choice) ? choice : getPublicDefaultSkinId(), operation);
-    } catch (error) { await recover(error, operation); }
+      requestedSkinId = choice && isPublicSkinEnabled(choice) ? choice : getPublicDefaultSkinId();
+      await apply(requestedSkinId, operation);
+    } catch (error) { await recover(error, operation, requestedSkinId); }
     finally { if (owns(operation)) skinReady.value = true; operation.finish(); }
   }
   async function select(id: string) {
@@ -84,12 +90,13 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     try {
       try { localStorage.setItem("webspeak:skin-choice", id); } catch { /* Optional storage. */ }
       await apply(id, operation, true, true);
-    } catch (error) { await recover(error, operation); }
+    } catch (error) { await recover(error, operation, id); }
     finally { if (owns(operation)) skinReady.value = true; operation.finish(); }
   }
   async function reset() {
     if (disposed) return;
     const operation = begin();
+    skinLoadError.value = null;
     clearCustomSkinStyle();
     activeSkin.value = null;
     installedSkins.value = [];
@@ -104,5 +111,10 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     catch { /* Reset remains usable even if refreshing the optional catalog fails. */ }
     finally { operation.finish(); }
   }
-  return { activeSkin, activeSkinId, skinReady, installedSkins, catalogSkins, initialize, select, cancel, reset };
+  async function switchToBuiltInAfterLoadError(): Promise<void> {
+    if (!skinLoadError.value) return;
+    await select(fallbackId());
+  }
+
+  return { activeSkin, activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins, initialize, select, cancel, reset, switchToBuiltInAfterLoadError };
 }

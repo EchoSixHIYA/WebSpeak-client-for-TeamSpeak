@@ -2,6 +2,7 @@ import postcss, { type AtRule, type Declaration, type Node, type Rule } from "po
 import selectorParser from "postcss-selector-parser";
 import valueParser from "postcss-value-parser";
 import { unzipSync } from "fflate";
+import { parseSkinLayoutJson, type SkinLayoutDocument } from "../../../src/shared/skin-layout.js";
 
 const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_EXPANDED_BYTES = 50 * 1024 * 1024;
@@ -51,7 +52,8 @@ const ZIP_EOCD = 0x06054b50;
 const ZIP_CENTRAL_FILE = 0x02014b50;
 
 export interface SkinManifest {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  packageType?: "layout-skin";
   id: string;
   name: string;
   version: string;
@@ -59,6 +61,8 @@ export interface SkinManifest {
   license: string;
   description?: string;
   entry: string;
+  layout?: string;
+  permissions?: [];
   content?: string;
   minAppVersion: string;
   preview?: string;
@@ -89,6 +93,7 @@ export interface InstalledSkin extends SkinManifest {
   css: string;
   assets: Record<string, Blob>;
   contentData?: SkinContent;
+  layoutData?: SkinLayoutDocument;
   previewBlob?: Blob;
   warnings: string[];
   installedAt: number;
@@ -148,7 +153,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
 
   const assets: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
   for (const [path, bytes] of files) {
-    if (["manifest.json", manifest.entry, manifest.content].includes(path)) continue;
+    if (["manifest.json", manifest.entry, manifest.layout, manifest.content].includes(path)) continue;
     const mimeType = assetMimeType(path);
     if (!mimeType) throw new SkinPackError(`Unsupported package file: ${path}`, "SKIN_FILE_UNSUPPORTED");
     if (mimeType.startsWith("font/") && bytes.byteLength > MAX_FONT_BYTES) throw new SkinPackError("Fonts must be smaller than 4 MiB.", "SKIN_FONT_SIZE");
@@ -163,6 +168,14 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     contentData = parseContent(contentBytes);
   }
 
+  let layoutData: SkinLayoutDocument | undefined;
+  if (manifest.layout) {
+    const layoutBytes = files.get(manifest.layout);
+    if (!layoutBytes) throw new SkinPackError("layout.json is missing from the package.", "SKIN_LAYOUT_MISSING");
+    try { layoutData = parseSkinLayoutJson(decoder.decode(layoutBytes)); }
+    catch (error) { throw new SkinPackError("layout.json is invalid: " + (error instanceof Error ? error.message : "unknown layout error"), "SKIN_LAYOUT_INVALID"); }
+  }
+
   let previewBlob: Blob | undefined;
   if (manifest.preview) {
     const previewBytes = files.get(manifest.preview);
@@ -174,7 +187,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
   }
 
   const compiled = compileSkinCss(decoder.decode(cssBytes), manifest.id, assets);
-  return { ...manifest, css: compiled.css, assets, contentData, previewBlob, warnings: compiled.warnings, installedAt: Date.now() };
+  return { ...manifest, css: compiled.css, assets, contentData, layoutData, previewBlob, warnings: compiled.warnings, installedAt: Date.now() };
 }
 
 export function resolveSkinCssAssets(css: string, assets: Record<string, Blob>): { css: string; objectUrls: string[] } {
@@ -319,30 +332,44 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   catch { throw new SkinPackError("manifest.json must contain valid UTF-8 JSON.", "SKIN_MANIFEST_INVALID"); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SkinPackError("manifest.json must be an object.", "SKIN_MANIFEST_INVALID");
   const raw = value as Record<string, unknown>;
+  const schemaVersion = raw.schemaVersion;
+  if (schemaVersion !== 1 && schemaVersion !== 2) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
+  if (schemaVersion === 2) {
+    const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
+    const unknown = Object.keys(raw).find((key) => !fields.has(key));
+    if (unknown) throw new SkinPackError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
+  }
   const stringField = (key: string, max: number, required = true): string | undefined => {
     const field = raw[key];
     if (field == null && !required) return undefined;
     if (typeof field !== "string" || !field.trim() || field.length > max) throw new SkinPackError(`manifest.json has an invalid ${key} field.`, "SKIN_MANIFEST_INVALID");
     return field.trim();
   };
-  if (raw.schemaVersion !== 1) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
+  if (schemaVersion === 2 && (raw.packageType !== "layout-skin" || !Array.isArray(raw.permissions) || raw.permissions.length !== 0)) {
+    throw new SkinPackError("Layout skin packages must declare the layout-skin type and no executable permissions.", "SKIN_PERMISSION_INVALID");
+  }
+  if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined)) {
+    throw new SkinPackError("Version 1 skin packages cannot declare layout or plugin fields.", "SKIN_SCHEMA_VERSION");
+  }
   const id = stringField("id", 80)!;
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(id) || id.startsWith("builtin.")) throw new SkinPackError("Skin IDs must be unique lowercase IDs and cannot use the reserved builtin. prefix.", "SKIN_ID_INVALID");
   const entry = stringField("entry", 120)!;
+  const layout = schemaVersion === 2 ? stringField("layout", 120)! : undefined;
   const content = stringField("content", 120, false);
   const preview = stringField("preview", 120, false);
-  for (const path of [entry, content, preview].filter((item): item is string => Boolean(item))) {
+  for (const path of [entry, layout, content, preview].filter((item): item is string => Boolean(item))) {
     if (path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === "..")) throw new SkinPackError(`manifest.json has an unsafe path: ${path}`, "SKIN_PATH_INVALID");
   }
   const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
   const version = stringField("version", 32)!;
   const minAppVersion = stringField("minAppVersion", 32)!;
   if (!semver.test(version) || !semver.test(minAppVersion)) throw new SkinPackError("Skin and minimum app versions must use semantic version format.", "SKIN_MANIFEST_INVALID");
-  if (!entry.toLowerCase().endsWith(".css") || (content && !content.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The entry must be CSS, content must be JSON, and preview must be a supported image.", "SKIN_MANIFEST_INVALID");
-  const declaredFiles = ["manifest.json", entry, ...(content ? [content] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
+  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The CSS entry, layout, content, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
+  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
   if (new Set(declaredFiles).size !== declaredFiles.length) throw new SkinPackError("Manifest files must use separate package paths.", "SKIN_MANIFEST_INVALID");
   return {
-    schemaVersion: 1,
+    schemaVersion,
+    ...(schemaVersion === 2 ? { packageType: "layout-skin" as const, permissions: [] as [] } : {}),
     id,
     name: stringField("name", 80)!,
     version,
@@ -350,6 +377,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
     license: stringField("license", 80)!,
     description: stringField("description", 400, false),
     entry,
+    layout,
     content,
     minAppVersion,
     preview,

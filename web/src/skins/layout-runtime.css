@@ -1,0 +1,44 @@
+.ws-skin-root[data-ws-layout-hidden="true"],
+.ws-skin-root [data-ws-layout-hidden="true"] {
+  display: none !important;
+}
+
+.ws-skin-root [data-ws-layout-active="true"] {
+  translate: var(--ws-layout-x, 0px) var(--ws-layout-y, 0px) !important;
+  scale: var(--ws-layout-scale, 1) !important;
+}
+
+.ws-skin-root [data-ws-layout-width="true"] {
+  width: var(--ws-layout-width) !important;
+}
+
+.ws-skin-root [data-ws-layout-height="true"] {
+  height: var(--ws-layout-height) !important;
+}
+
+.ws-skin-root [data-ws-layout-touch-target="44"] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+.ws-skin-root [data-ws-layout-foreground="true"] {
+  color: var(--ws-layout-foreground) !important;
+}
+
+.ws-skin-root [data-ws-layout-background="true"] {
+  background-color: var(--ws-layout-background) !important;
+}
+
+.ws-skin-root [data-ws-layout-border="true"] {
+  border-color: var(--ws-layout-border) !important;
+}
+
+.ws-skin-root [data-ws-layout-radius="true"] {
+  border-radius: var(--ws-layout-radius) !important;
+}
+
+.ws-skin-root[data-ws-layout-editing="true"] [data-ws-layout-selected="true"] {
+  outline: 2px solid #4f46e5 !important;
+  outline-offset: 2px !important;
+  cursor: move !important;
+}
