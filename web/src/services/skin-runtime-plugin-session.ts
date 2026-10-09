@@ -44,6 +44,7 @@ export function createSkinRuntimePluginSession(options: SkinRuntimePluginSession
     get running() { return loop.running; },
     start: () => loop.start(),
     dispatch: (input: unknown) => loop.dispatch(input),
+    refresh: () => loop.refresh(),
     close: (reason?: string) => loop.close(reason),
   };
 }

@@ -39,6 +39,23 @@ test("Wasm UI input preserves bounded local state and safe event data", () => {
   assert.deepEqual(parsed.event, { componentId: "server-rail", handlerId: "select-server", eventName: "click" });
 });
 
+test("Wasm UI input sanitizes host-projected public data before it enters the guest", () => {
+  const parsed = parseSkinExtensionUiInput({
+    schemaVersion: 1,
+    state: {},
+    event: null,
+    data: {
+      session: {
+        channels: [{ id: "lobby", name: "Lobby", address: "private.example:9987", members: [{ name: "not a projected field" }] }],
+      },
+      private: { token: "must not cross the guest boundary" },
+    },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.data)), {
+    session: { channels: [{ id: "lobby", name: "Lobby" }] },
+  });
+});
+
 test("Wasm UI input rejects unsupported fields, oversized text, and mismatched event values", () => {
   assert.throws(() => parseSkinExtensionUiInput({ schemaVersion: 1, state: {}, event: null, trusted: true }), {
     code: "SKIN_EXTENSION_UI_INPUT_INVALID",

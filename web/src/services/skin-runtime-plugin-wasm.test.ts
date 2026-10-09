@@ -48,24 +48,85 @@ test("Wasm plugin startup rechecks the exact digest approval before creating a W
   }), (error: unknown) => error instanceof SkinRuntimePluginWasmError && error.code === "SKIN_EXTENSION_WASM_APPROVAL_INVALID");
 });
 
-test("Wasm prototype refuses v4 capabilities it does not implement", async () => {
-  const channelPlugin = parseSkinRuntimePluginDocument({
+test("Wasm prototype refuses write permissions that have no host action bridge", async () => {
+  const writePlugin = parseSkinRuntimePluginDocument({
     schemaVersion: 1,
-    plugins: [{ ...plugin, permissions: ["session.channels.read"] }],
+    plugins: [{ ...plugin, permissions: ["session.channel.join"] }],
   }).plugins[0];
-  const files = { [channelPlugin.entry]: new Blob([createSkinExtensionWasmPrefixByteImmediateProbe()]) };
-  const digest = await computeSkinRuntimePluginDigest(channelPlugin, files);
-  const approval = createSkinRuntimePluginApproval("community.sample", "2.0.0", channelPlugin, digest);
+  const files = { [writePlugin.entry]: new Blob([createSkinExtensionWasmPrefixByteImmediateProbe()]) };
+  const digest = await computeSkinRuntimePluginDigest(writePlugin, files);
+  const approval = createSkinRuntimePluginApproval("community.sample", "2.0.0", writePlugin, digest);
   await assert.rejects(createSkinRuntimePluginWasmSandboxPrototype({
     skinId: "community.sample",
     skinVersion: "2.0.0",
-    plugin: channelPlugin,
+    plugin: writePlugin,
     approval,
     files,
     readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
     prototypeOnly: true,
   }), (error: unknown) => error instanceof SkinRuntimePluginWasmError
     && error.code === "SKIN_EXTENSION_WASM_PERMISSION_UNSUPPORTED");
+});
+
+test("approved read permissions project only their public fields into each Wasm job", async () => {
+  const readPlugin = parseSkinRuntimePluginDocument({
+    schemaVersion: 1,
+    plugins: [{ ...plugin, permissions: ["session.channels.read"] }],
+  }).plugins[0];
+  const files = { [readPlugin.entry]: new Blob([createSkinExtensionWasmPrefixByteImmediateProbe()]) };
+  const digest = await computeSkinRuntimePluginDigest(readPlugin, files);
+  const approval = createSkinRuntimePluginApproval("community.sample", "2.0.0", readPlugin, digest);
+  const previousWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  let inputJson = "";
+  class FakeWorker {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    postMessage(message: unknown): void {
+      if (message && typeof message === "object" && "input" in message && typeof message.input === "string") inputJson = message.input;
+      queueMicrotask(() => {
+        this.onmessage?.({ data: { type: "running" } } as MessageEvent<unknown>);
+        this.onmessage?.({ data: {
+          type: "complete", result: 1, linearMemoryBytes: 65_536, statusReadCount: 0, uiInputReadCount: 0, uiOutput: null,
+        } } as MessageEvent<unknown>);
+      });
+    }
+    terminate(): void { /* The test worker has no external resources. */ }
+  }
+  Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
+  try {
+    const handle = await createSkinRuntimePluginWasmSandboxPrototype({
+      skinId: "community.sample",
+      skinVersion: "2.0.0",
+      plugin: readPlugin,
+      approval,
+      files,
+      context: {
+        session: {
+          status: { connected: true, serverLabel: "private.example:9987" },
+          channels: [{ id: "lobby", name: "Lobby", depth: 0, memberCount: 1, current: true, address: "voice.internal.example:9987" }],
+        },
+        favorites: { items: [{ id: "favorite-1", label: "Saved", address: "another-private.example:9987" }] },
+      },
+      readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
+      prototypeOnly: true,
+    });
+    await handle.result;
+    const parsedInput = JSON.parse(inputJson) as { data: unknown };
+    assert.deepEqual(JSON.parse(JSON.stringify(parsedInput.data)), {
+      session: { channels: [{ id: "lobby", name: "Lobby", depth: 0, memberCount: 1, current: true }] },
+    });
+    assert.equal(inputJson.includes("private.example"), false);
+    assert.equal(inputJson.includes("voice.internal.example"), false);
+    assert.equal(inputJson.includes("favorite-1"), false);
+  } finally {
+    if (previousWorker) Object.defineProperty(globalThis, "Worker", previousWorker);
+    else Reflect.deleteProperty(globalThis, "Worker");
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
 });
 
 test("approved Wasm entries run as disposable workers with bounded interpreter output", async () => {

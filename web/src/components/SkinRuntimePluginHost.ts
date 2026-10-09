@@ -4,6 +4,7 @@ import { computeSkinRuntimePluginDigest, createSkinRuntimePluginApproval, isSkin
 import type { SkinRuntimePlugin, SkinRuntimePluginDocument, SkinRuntimePluginPage } from "../../../src/shared/skin-runtime-plugins.js";
 import { parseSkinExtensionUiInput, type SkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import SkinPluginOutlet from "./SkinPluginOutlet.js";
 import { approveSkinRuntimePlugin, getSkinRuntimePluginApproval, revokeSkinRuntimePluginApprovals } from "../services/skin-runtime-plugin-approval.js";
 import { createSkinRuntimePluginSession } from "../services/skin-runtime-plugin-session.js";
@@ -12,7 +13,7 @@ import type { SkinExtensionWasmSandboxHandle } from "../services/skin-extension-
 import { resolveSkinCssAssets } from "../services/skin-pack.js";
 
 const EMPTY_DOCUMENT: SkinPluginDocument = { schemaVersion: 3, components: [] };
-const SUPPORTED_PERMISSIONS = new Set(["session.status.read", "ui.surface.replace"]);
+const SUPPORTED_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, "ui.surface.replace"]);
 
 type Session = ReturnType<typeof createSkinRuntimePluginSession>;
 type RunHandle = { result: Promise<{ uiOutput: string | null }>; close(reason?: string): void };
@@ -37,6 +38,7 @@ function createRun(
   plugin: SkinRuntimePlugin,
   approval: SkinRuntimePluginApproval,
   files: Readonly<Record<string, Blob>>,
+  context: unknown,
   readSessionStatus: (signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>,
   input: SkinExtensionUiInput,
 ): RunHandle {
@@ -50,6 +52,7 @@ function createRun(
       approval,
       files,
       uiInput: input,
+      context,
       readSessionStatus,
       prototypeOnly: true,
     });
@@ -81,6 +84,7 @@ export default defineComponent({
     styles: { type: Object as PropType<Record<string, string>>, default: () => ({}) },
     assets: { type: Object as PropType<Record<string, Blob>>, default: () => ({}) },
     page: { type: String as PropType<SkinRuntimePluginPage>, required: true },
+    context: { type: Object as PropType<Record<string, unknown>>, default: () => ({}) },
     readSessionStatus: { type: Function as PropType<(signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>>, required: true },
   },
   emits: {
@@ -101,6 +105,7 @@ export default defineComponent({
     const suppressedSurfaces = ref(new Set<string>());
     let digestRun = 0;
     let disposed = false;
+    let contextRefreshTimer: number | undefined;
 
     const pagePlugins = computed(() => props.plugins?.plugins.filter((plugin) => plugin.page === props.page) ?? []);
     const approved = (plugin: SkinRuntimePlugin): SkinRuntimePluginApproval | null => {
@@ -140,6 +145,10 @@ export default defineComponent({
     }
 
     function stopAll(reason: string): void {
+      if (contextRefreshTimer !== undefined) {
+        window.clearTimeout(contextRefreshTimer);
+        contextRefreshTimer = undefined;
+      }
       for (const pluginId of [...sessions.keys()]) stopPlugin(pluginId, reason);
       for (const pluginId of [...stylesByPlugin.keys()]) removeStyle(pluginId);
       outputs.value = {};
@@ -186,7 +195,7 @@ export default defineComponent({
       if (sessions.has(plugin.id) || !isSupported(plugin)) return;
       const session = createSkinRuntimePluginSession({
         plugin,
-        createRun: (input) => createRun(props.skinId, props.skinVersion, plugin, grant, props.files, props.readSessionStatus, input),
+        createRun: (input) => createRun(props.skinId, props.skinVersion, plugin, grant, props.files, props.context, props.readSessionStatus, input),
         onOutput: () => {
           installStyle(plugin);
           outputs.value = { ...outputs.value, [plugin.id]: session.output };
@@ -286,6 +295,14 @@ export default defineComponent({
     }, { immediate: true });
 
     watch(() => [props.page, digests.value, revision.value], reconcile, { deep: true });
+    watch(() => props.context, () => {
+      if (disposed) return;
+      if (contextRefreshTimer !== undefined) window.clearTimeout(contextRefreshTimer);
+      contextRefreshTimer = window.setTimeout(() => {
+        contextRefreshTimer = undefined;
+        for (const session of sessions.values()) void session.refresh();
+      }, 100);
+    }, { deep: true });
     watch(activeSurface, publishSurfaceState, { flush: "sync" });
     onUnmounted(() => {
       disposed = true;
@@ -366,7 +383,7 @@ export default defineComponent({
               ]),
             ]);
           }),
-          h("p", { class: "ws-plugin-consent-note" }, "当前开发原型仅支持 Wasm、session.status.read 和 ui.surface.replace；授权绑定到此皮肤版本、插件清单和所有插件文件的 SHA-256。/ This development prototype supports Wasm, session.status.read, and ui.surface.replace only. Approval is bound to this skin version, descriptor, and every plugin file by SHA-256."),
+          h("p", { class: "ws-plugin-consent-note" }, "当前开发原型支持 Wasm、安全的公开数据读取与 ui.surface.replace；TeamSpeak 写操作仍未接入此运行时。数据字段只按清单中的读取权限投影，授权绑定到此皮肤版本、插件清单和所有插件文件的 SHA-256。/ This development prototype supports Wasm, safe public data reads, and ui.surface.replace; TeamSpeak write actions are not connected to this runtime. Data is projected by the read permissions in the descriptor, and approval is bound to this skin version, descriptor, and every plugin file by SHA-256."),
           h("div", { class: "ws-plugin-consent-actions" }, showApproval
             ? [
               h("button", { type: "button", class: "secondary", onClick: keepDisabled }, "暂不启用 / Keep disabled"),

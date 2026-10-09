@@ -1,5 +1,10 @@
+import {
+  projectSkinRuntimePluginContext,
+  SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS,
+} from "./skin-runtime-plugin-context.js";
+
 export const SKIN_EXTENSION_UI_INPUT_SCHEMA_VERSION = 1 as const;
-export const SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES = 8 * 1024;
+export const SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES = 64 * 1024;
 export const SKIN_EXTENSION_UI_STATE_KEY_LIMIT = 64;
 export const SKIN_EXTENSION_UI_EVENT_NAMES = Object.freeze([
   "click", "dblclick", "change", "input", "submit", "keydown", "keyup", "contextmenu", "focus", "blur",
@@ -22,6 +27,8 @@ export interface SkinExtensionUiInput {
   schemaVersion: typeof SKIN_EXTENSION_UI_INPUT_SCHEMA_VERSION;
   state: Record<string, SkinExtensionUiScalar>;
   event: SkinExtensionUiEventInput | null;
+  /** Host-projected public application data; permissions are enforced before this is populated. */
+  data?: Record<string, unknown>;
 }
 
 export class SkinExtensionUiInputError extends Error {
@@ -94,27 +101,29 @@ function cleanEvent(value: unknown): SkinExtensionUiEventInput | null {
   return event;
 }
 
-/** Validates bounded local UI state and a single event before it enters the Wasm guest. */
+/** Validates bounded local UI state, one safe event, and a host-projected data snapshot. */
 export function parseSkinExtensionUiInput(input: unknown): SkinExtensionUiInput {
   let value = input;
   if (typeof input === "string") {
     if (new TextEncoder().encode(input).byteLength > SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES) {
-      return fail("UI input exceeds its 8 KiB limit.");
+      return fail("UI input exceeds its 64 KiB limit.");
     }
     try { value = JSON.parse(input); }
     catch { return fail("UI input must be valid JSON."); }
   }
-  if (!isRecord(value) || Object.keys(value).some((key) => !["schemaVersion", "state", "event"].includes(key))
+  if (!isRecord(value) || Object.keys(value).some((key) => !["schemaVersion", "state", "event", "data"].includes(key))
     || value.schemaVersion !== SKIN_EXTENSION_UI_INPUT_SCHEMA_VERSION) {
     return fail("UI input uses an unsupported schema or contains unsupported fields.");
   }
+  if (value.data !== undefined && !isRecord(value.data)) return fail("UI data must be a bounded object.");
   const parsed = {
     schemaVersion: SKIN_EXTENSION_UI_INPUT_SCHEMA_VERSION,
     state: cleanState(value.state),
     event: cleanEvent(value.event),
+    ...(value.data === undefined ? {} : { data: projectSkinRuntimePluginContext(SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, value.data) }),
   } satisfies SkinExtensionUiInput;
   if (new TextEncoder().encode(JSON.stringify(parsed)).byteLength > SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES) {
-    return fail("UI input exceeds its 8 KiB limit.");
+    return fail("UI input exceeds its 64 KiB limit.");
   }
   return parsed;
 }

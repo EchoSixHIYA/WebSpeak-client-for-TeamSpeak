@@ -10,6 +10,8 @@ import {
   type SkinRuntimePluginApproval,
 } from "../../../src/shared/skin-runtime-plugin-approval.js";
 import { parseSkinRuntimePluginDocument, type SkinRuntimePlugin } from "../../../src/shared/skin-runtime-plugins.js";
+import { projectSkinRuntimePluginContext, SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
+import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import {
   createSkinExtensionWasmSandboxPrototype,
   type SkinExtensionWasmSandboxHandle,
@@ -29,11 +31,13 @@ export interface SkinRuntimePluginWasmOptions {
   approval: unknown;
   files: Readonly<Record<string, Blob>>;
   uiInput?: unknown;
+  /** Trusted WebClient snapshot; it is projected using the plugin's declared read permissions. */
+  context?: unknown;
   readSessionStatus: (signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>;
   prototypeOnly: true;
 }
 
-const WASM_PROTOTYPE_PERMISSIONS = new Set(["session.status.read", "ui.surface.replace"]);
+const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, "ui.surface.replace"]);
 
 /** Starts a Wasm entry only after rechecking the exact package digest and local approval. */
 export async function createSkinRuntimePluginWasmSandboxPrototype(
@@ -59,6 +63,11 @@ export async function createSkinRuntimePluginWasmSandboxPrototype(
   const entry = options.files[plugin.entry];
   if (!(entry instanceof Blob)) throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_ENTRY_INVALID", "The approved Wasm entry is unavailable.");
   const wasmBytes = new Uint8Array(await entry.arrayBuffer());
+  const baseInput = parseSkinExtensionUiInput(options.uiInput ?? { schemaVersion: 1, state: {}, event: null });
+  const uiInput = parseSkinExtensionUiInput({
+    ...baseInput,
+    data: projectSkinRuntimePluginContext(plugin.permissions, options.context),
+  });
   const manifest = parseSkinExtensionManifest({
     schemaVersion: 1,
     packageType: "extension",
@@ -74,7 +83,7 @@ export async function createSkinRuntimePluginWasmSandboxPrototype(
     manifest,
     approval: createSkinExtensionApproval(manifest),
     wasmBytes,
-    uiInput: options.uiInput,
+    uiInput,
     readSessionStatus: options.readSessionStatus,
     prototypeOnly: true,
   });

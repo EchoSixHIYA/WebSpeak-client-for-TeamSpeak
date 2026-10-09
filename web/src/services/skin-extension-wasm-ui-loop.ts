@@ -56,8 +56,9 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
   let running = false;
   let output: string | null = null;
   let document: SkinPluginDocument | null = null;
+  let lastState: Record<string, string | number | boolean> = Object.create(null) as Record<string, string | number | boolean>;
   let activeRun: SkinExtensionWasmUiLoopRunHandle | null = null;
-  const queue: Array<{ input: SkinExtensionUiInput; resolve: (ran: boolean) => void }> = [];
+  const queue: Array<{ input: SkinExtensionUiInput; kind: "event" | "refresh"; resolve: Array<(ran: boolean) => void> }> = [];
 
   function report(error: unknown): void {
     try { options.onError?.(error instanceof Error ? error : new Error("The bounded Wasm UI callback failed.")); }
@@ -71,6 +72,7 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
       activeRun = run;
       const result = await run.result;
       if (closed || activeRun !== run) return false;
+      lastState = { ...input.state };
       if (result.uiOutput !== null) {
         const nextDocument = parseSkinExtensionUiOutput(result.uiOutput);
         output = result.uiOutput;
@@ -92,11 +94,15 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
     try {
       while (queue.length && !closed) {
         const pending = queue.shift()!;
-        if (!acceptsEvent(document, pending.input)) {
-          pending.resolve(false);
+        const accepted = pending.kind === "refresh"
+          ? pending.input.event === null
+          : acceptsEvent(document, pending.input);
+        if (!accepted) {
+          pending.resolve.forEach((resolve) => resolve(false));
           continue;
         }
-        pending.resolve(await execute(pending.input));
+        const ran = await execute(pending.input);
+        pending.resolve.forEach((resolve) => resolve(ran));
       }
     } finally {
       running = false;
@@ -106,7 +112,7 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
 
   return {
     get output() { return output; },
-    get pendingEventCount() { return queue.length; },
+    get pendingEventCount() { return queue.filter((item) => item.kind === "event").length; },
     get running() { return running || activeRun !== null; },
     get closed() { return closed; },
     async start(): Promise<boolean> {
@@ -121,14 +127,27 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
       try { input = parseSkinExtensionUiInput(inputValue); }
       catch { return Promise.resolve(false); }
       if (!acceptsEvent(document, input) || queue.length >= SKIN_EXTENSION_WASM_UI_EVENT_QUEUE_LIMIT) return Promise.resolve(false);
-      const result = new Promise<boolean>((resolve) => queue.push({ input, resolve }));
+      const result = new Promise<boolean>((resolve) => queue.push({ input, kind: "event", resolve: [resolve] }));
+      void drain();
+      return result;
+    },
+    refresh(): Promise<boolean> {
+      if (!started || closed) return Promise.resolve(false);
+      const input = parseSkinExtensionUiInput({ schemaVersion: 1, state: { ...lastState }, event: null });
+      const queued = queue.find((item) => item.kind === "refresh");
+      if (queued) {
+        queued.input = input;
+        return new Promise<boolean>((resolve) => queued.resolve.push(resolve));
+      }
+      if (queue.length >= SKIN_EXTENSION_WASM_UI_EVENT_QUEUE_LIMIT) return Promise.resolve(false);
+      const result = new Promise<boolean>((resolve) => queue.push({ input, kind: "refresh", resolve: [resolve] }));
       void drain();
       return result;
     },
     close(reason = "closed"): void {
       if (closed) return;
       closed = true;
-      queue.splice(0).forEach((pending) => pending.resolve(false));
+      queue.splice(0).forEach((pending) => pending.resolve.forEach((resolve) => resolve(false)));
       activeRun?.close(reason);
       activeRun = null;
     },

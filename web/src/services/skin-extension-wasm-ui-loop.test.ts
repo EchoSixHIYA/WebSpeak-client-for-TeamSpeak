@@ -57,6 +57,25 @@ test("Wasm UI callback reruns receive only declared component state and replace 
   loop.close();
 });
 
+test("runtime data refresh reruns the guest without fabricating a user event", async () => {
+  const jobs: SkinExtensionUiInput[] = [];
+  const loop = createSkinExtensionWasmUiLoopPrototype({
+    createRun(input) {
+      jobs.push(input);
+      const count = input.event ? Number(input.state.count) + 1 : Number(input.state.count ?? 0);
+      return { result: Promise.resolve({ uiOutput: uiOutput(count) }), close: () => undefined };
+    },
+  });
+
+  assert.equal(await loop.start(), true);
+  assert.equal(await loop.dispatch(clickInput(3)), true);
+  assert.equal(await loop.refresh(), true);
+  assert.equal(jobs.length, 3);
+  assert.equal(jobs[2].event, null);
+  assert.deepEqual({ ...jobs[2].state }, { count: 3 });
+  loop.close();
+});
+
 test("Wasm UI callback queue is bounded and close cancels active and waiting work", async () => {
   let rejectActive!: (error: Error) => void;
   let held = false;
