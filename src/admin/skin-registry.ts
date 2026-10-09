@@ -257,6 +257,8 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
     if (lowerPath.endsWith(".js")) {
       if (data.byteLength > SKIN_RUNTIME_PLUGIN_SOURCE_LIMIT_BYTES) throw new SkinRegistryError("Plugin entry files must be smaller than 256 KiB.", "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE");
       decodeUtf8(data, "Plugin entry files must contain valid UTF-8.");
+    } else if (lowerPath.endsWith(".wasm")) {
+      if (data.byteLength > SKIN_RUNTIME_PLUGIN_SOURCE_LIMIT_BYTES) throw new SkinRegistryError("Wasm plugin entry files must be smaller than 256 KiB.", "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE");
     } else if (lowerPath.endsWith(".css")) {
       if (data.byteLength > SKIN_RUNTIME_PLUGIN_STYLE_LIMIT_BYTES) throw new SkinRegistryError("Plugin style files must be smaller than 512 KiB.", "SKIN_RUNTIME_PLUGIN_STYLE_SIZE");
       decodeUtf8(data, "Plugin style files must contain valid UTF-8.");

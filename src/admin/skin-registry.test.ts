@@ -229,6 +229,32 @@ test("server validates v4 plugin manifests and package files without executing a
   assert.equal(saved.id, "sample-skin");
   assert.deepEqual(await registry.readArchive("sample-skin"), archive);
 
+  const wasmPlugins = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "bounded-widget",
+      name: "Bounded widget",
+      version: "1.0.0",
+      apiVersion: 1,
+      runtime: "wasm",
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/bounded-widget/index.wasm",
+      assets: [],
+      permissions: [],
+    }],
+  };
+  const wasmManifest = { ...manifestV4, id: "wasm-skin" };
+  const wasmArchive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(wasmManifest))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { position: fixed; }')],
+    ["plugins.json", Buffer.from(JSON.stringify(wasmPlugins))],
+    ["plugins/bounded-widget/index.wasm", Buffer.from([0, 97, 115, 109, 1, 0, 0, 0])],
+  ]);
+  const wasmSaved = await registry.save(wasmArchive, "wasm-skin");
+  assert.equal(wasmSaved.id, "wasm-skin");
+  assert.deepEqual(await registry.readArchive("wasm-skin"), wasmArchive);
+
   const missingEntry = createZip([
     ["manifest.json", Buffer.from(JSON.stringify(manifestV4))],
     ["skin.css", Buffer.from("[data-ws-part=app] { color: teal; }")],

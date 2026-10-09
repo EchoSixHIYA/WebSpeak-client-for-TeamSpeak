@@ -1,10 +1,10 @@
 # WebSpeak 皮肤开发规范
 
-本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及正在接入的 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 已加入插件清单、插件文件校验和本地缓存，但作者代码尚未执行。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及正在接入的 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 已加入插件清单、文件校验和本地缓存；客户端会预检 Wasm 固定 ABI，并有一个仅供开发验证的 Wasm 授权运行适配器。作者 JS 不执行，Wasm 适配器也没有接入生产 UI 生命周期或完整权限桥。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
 KOOK 语音界面参考仅覆盖用户授权的语音频道，语音区结构记录在[参考文档](./KOOK_VOICE_REFERENCE.zh-CN.md)；发现、陪玩、活动、广告、商城和管理后台不属于复刻范围。
 
-当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 插件运行时尚未实现或获安全批准；当前实现只校验并缓存清单、JS/CSS 和包内素材，不执行作者代码。完整运行时仍须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v4 包格式、v3 示例包或 Wasm 输出原型描述成已完成的全量插件系统。
+当前 v3 仍限制 HTML 标签、属性、可绑定数据集合和宿主动作，不能称为“完全自定义”或“万物皆插件”。v4 完整运行时尚未实现或获安全批准；JS/CSS 只校验、缓存，Wasm 入口增加固定 ABI 预检，开发适配器仅在本地摘要授权匹配时开放一次性有界任务，目前只支持 `session.status.read`。它还没有接入生产 UI 生命周期、频道/成员数据桥或 TeamSpeak 动作桥。完整运行时仍须支持作者自定义 DOM/CSS/本地逻辑，同时保持 TeamSpeak 功能经宿主能力桥接、皮肤后台之外可恢复。不要把 v4 包格式、v3 示例包或 Wasm 输出原型描述成已完成的全量插件系统。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -32,6 +32,7 @@ assets/brand.woff2            # 可选：自带字体
 components.json               # v3 可选：声明式组件或完整页面 surface
 plugins.json                  # v4 必需：插件入口、页面、模式、权限与包内文件
 plugins/<plugin-id>/index.js  # v4 插件代码，目前只校验和缓存
+plugins/<plugin-id>/index.wasm # v4 有界 Wasm 原型入口，目前仅开发态可运行
 plugins/<plugin-id>/style.css # v4 可选：插件样式，目前只校验和缓存
 plugins/<plugin-id>/assets/   # v4 插件专属的本地图片或字体素材
 ```
@@ -157,7 +158,7 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 ### schemaVersion 4：插件包描述（运行时尚未启用）
 
-v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。当前持久化函数尚未连接用户确认界面或运行生命周期。JS、CSS 和素材均不会被 WebSpeak 运行时加载或执行，因此 v4 目前不能作为可运行插件发布。
+v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。客户端还会对 Wasm 入口执行固定导入/导出 ABI 预检。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。当前持久化函数尚未连接用户确认界面或运行生命周期。JS、CSS 和 Wasm 文件默认只校验、缓存；另有开发态 Wasm 原型适配器，会在启动前复核摘要绑定的本地授权，但只支持 `session.status.read`，且没有接入 WebClient 生命周期或能力桥。生产运行时仍未启用，因此 v4 目前不能作为可运行插件发布。
 
 ```json
 {
@@ -174,9 +175,9 @@ v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客�
 }
 ```
 
-`plugins.json` 顶层 `schemaVersion` 当前为 `1`，并包含 1–64 个插件。每个插件声明 `id`、`name`、`version`、`apiVersion: 1`、`page`（`home` 或 `voice`）、`mode`（`widget` 或 `surface`）、必需的 `entry`、可选的 `style`、素材路径数组 `assets` 和 `permissions`。入口及样式必须位于 `plugins/<id>/`；素材必须位于该插件自己的 `assets/` 子目录，只能是本地图片或 woff2 字体。插件不能共享文件；同一公开页面最多有一个 `surface`，且必须申请 `ui.surface.replace`。其余权限只能从 `src/shared/skin-plugin.ts` 的现有权限表中选择。
+`plugins.json` 顶层 `schemaVersion` 当前为 `1`，并包含 1–64 个插件。每个插件声明 `id`、`name`、`version`、`apiVersion: 1`、`page`（`home` 或 `voice`）、`mode`（`widget` 或 `surface`）、必需的 `entry`、可选的 `runtime`、可选的 `style`、素材路径数组 `assets` 和 `permissions`。入口扩展名 `.js` 默认对应 `javascript`，`.wasm` 默认对应 `wasm`；显式 `runtime` 必须与入口扩展名一致。入口及样式必须位于 `plugins/<id>/`；素材必须位于该插件自己的 `assets/` 子目录，只能是本地图片或 woff2 字体。插件不能共享文件；同一公开页面最多有一个 `surface`，且必须申请 `ui.surface.replace`。其余权限只能从 `src/shared/skin-plugin.ts` 的现有权限表中选择。
 
-`plugins.json` 不超过 256 KiB；每个入口 JS 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。v4 的 JS/CSS 仍只校验、缓存，不执行。不要将有 DOM 的 iframe 当作网络沙箱：sandbox 不阻止 iframe 自己导航，`navigate-to` 也不能作为跨浏览器安全保证；获批数据可能被编码到导航 URL。现有无 DOM Worker 原型虽阻断常规网络 API，但没有硬内存限额，也不得生产启用。完整运行时需要同时保留自定义 UI/交互能力，并通过有资源边界的执行环境和可信宿主渲染/权限桥解决，不可退回固定原生控件目录。
+`plugins.json` 不超过 256 KiB；每个入口 JS 或 Wasm 不超过 256 KiB，每个样式 CSS 不超过 512 KiB；每个插件最多声明 32 个素材。客户端导入会拒绝不符合固定内存、导入、导出和 Wasm 模块结构限制的入口。皮肤包整体仍受通用 ZIP 文件数、展开大小、图像和字体限额约束。v1–v3 不接受插件代码。v4 的 JS/CSS/Wasm 默认仍只校验、缓存，不执行。Wasm 开发原型只在用户显式授权、摘要匹配时通过有界解释器启动一次性任务，当前唯一可用的数据权限为 `session.status.read`；尚无频道/成员数据投影、宿主动作桥或页面生命周期集成。不要将有 DOM 的 iframe 当作网络沙箱：sandbox 不阻止 iframe 自己导航，`navigate-to` 也不能作为跨浏览器安全保证；获批数据可能被编码到导航 URL。完整运行时需要同时保留自定义 UI/交互能力，并通过有资源边界的执行环境和可信宿主渲染/权限桥解决，不可退回固定原生控件目录。
 
 当前描述还没有 widget 挂载点、排序、显隐或实例布局字段，完整运行时阶段需要明确这些由皮肤作者还是本地用户管理；不能让一个插件越过自身宿主节点去调整其他插件或宿主恢复控件。
 

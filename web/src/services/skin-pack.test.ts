@@ -5,6 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
 import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 
 const manifest = {
   schemaVersion: 1,
@@ -416,6 +417,39 @@ test("the distributable KAAK v3 package validates end to end", async () => {
   assert.ok(skin.css.includes('data-ws-plugin-part="kaak-members-sidebar.member-row-content"'));
 });
 
+test("v4 skin packages validate Wasm entry ABI and cache it as application/wasm", async () => {
+  const wasmPlugin = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      runtime: "wasm",
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.wasm",
+      style: "plugins/voice-toolbar/style.css",
+      assets: ["plugins/voice-toolbar/assets/icon.png"],
+      permissions: [],
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV4(wasmPlugin, {
+    entryPath: "plugins/voice-toolbar/index.wasm",
+    entryBytes: createSkinExtensionWasmPrefixByteImmediateProbe(),
+  }));
+  assert.equal(skin.runtimePlugins?.plugins[0].runtime, "wasm");
+  assert.equal(skin.runtimePluginFiles?.["plugins/voice-toolbar/index.wasm"]?.type, "application/wasm");
+
+  await assert.rejects(
+    importSkinPack(makeSkinV4(wasmPlugin, {
+      entryPath: "plugins/voice-toolbar/index.wasm",
+      entryBytes: new Uint8Array([0, 1, 2, 3]),
+    })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_WASM_INVALID",
+  );
+});
+
 test("the full voice surface example packages home, voice, and host-owned controls", async () => {
   const archive = await readFile(new URL("../../../docs/examples/open-voice-surface.wskin", import.meta.url));
   const file = new File([archive], "open-voice-surface.wskin", { type: "application/octet-stream" });
@@ -478,7 +512,7 @@ function makeSkinV4(
       permissions: ["session.channels.read"],
     }],
   },
-  options: { includeEntry?: boolean; entryBytes?: Uint8Array; extra?: Record<string, Uint8Array> } = {},
+  options: { includeEntry?: boolean; entryBytes?: Uint8Array; entryPath?: string; extra?: Record<string, Uint8Array> } = {},
 ): File {
   const packageFiles: Record<string, Uint8Array> = {
     "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", plugins: "plugins.json" })),
@@ -488,7 +522,8 @@ function makeSkinV4(
     "plugins/voice-toolbar/assets/icon.png": new Uint8Array([1, 2, 3, 4]),
     ...options.extra,
   };
-  if (options.includeEntry !== false) packageFiles["plugins/voice-toolbar/index.js"] = options.entryBytes ?? strToU8("export const render = () => document.createElement('button');");
+  const entryPath = options.entryPath ?? "plugins/voice-toolbar/index.js";
+  if (options.includeEntry !== false) packageFiles[entryPath] = options.entryBytes ?? strToU8("export const render = () => document.createElement('button');");
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin-v4.wskin", { type: "application/octet-stream" });
 }

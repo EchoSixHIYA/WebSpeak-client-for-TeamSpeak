@@ -9,12 +9,14 @@ export const SKIN_RUNTIME_PLUGIN_STYLE_LIMIT_BYTES = 512 * 1024;
 
 export type SkinRuntimePluginPage = "home" | "voice";
 export type SkinRuntimePluginMode = "widget" | "surface";
+export type SkinRuntimePluginRuntime = "javascript" | "wasm";
 
 export interface SkinRuntimePlugin {
   id: string;
   name: string;
   version: string;
   apiVersion: 1;
+  runtime: SkinRuntimePluginRuntime;
   page: SkinRuntimePluginPage;
   mode: SkinRuntimePluginMode;
   entry: string;
@@ -63,11 +65,11 @@ function text(value: unknown, field: string, maximum: number): string {
   return value;
 }
 
-function packageFile(value: unknown, field: string, pluginId: string, suffix: ".js" | ".css"): string {
+function packageFile(value: unknown, field: string, pluginId: string, suffixes: readonly (".js" | ".css" | ".wasm")[]): string {
   const result = text(value, field, 160);
   if (result.includes("\\") || result.startsWith("/") || result.split("/").some((part) => !part || part === "." || part === "..")
-    || !result.startsWith(`plugins/${pluginId}/`) || !result.toLowerCase().endsWith(suffix)) {
-    invalid("SKIN_RUNTIME_PLUGIN_PATH_INVALID", `${field} must be a safe ${suffix} file inside its plugin directory.`);
+    || !result.startsWith(`plugins/${pluginId}/`) || !suffixes.some((suffix) => result.toLowerCase().endsWith(suffix))) {
+    invalid("SKIN_RUNTIME_PLUGIN_PATH_INVALID", `${field} must be a safe plugin file inside its plugin directory.`);
   }
   return result;
 }
@@ -86,7 +88,7 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
   const plugins: SkinRuntimePlugin[] = [];
   for (const raw of input.plugins) {
     if (!isRecord(raw)) invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "A plugin definition must be an object.");
-    onlyKeys(raw, ["id", "name", "version", "apiVersion", "page", "mode", "entry", "style", "assets", "permissions"], "Plugin definition");
+    onlyKeys(raw, ["id", "name", "version", "apiVersion", "runtime", "page", "mode", "entry", "style", "assets", "permissions"], "Plugin definition");
 
     const id = text(raw.id, "plugin.id", 64);
     if (!PLUGIN_ID.test(id) || ids.has(id)) invalid("SKIN_RUNTIME_PLUGIN_ID_INVALID", "Plugin IDs must be unique lowercase slugs.");
@@ -98,8 +100,12 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
     if (raw.page !== "home" && raw.page !== "voice") invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "Plugins may target only the public home or voice page.");
     if (raw.mode !== "widget" && raw.mode !== "surface") invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "Plugin mode must be widget or surface.");
 
-    const entry = packageFile(raw.entry, "plugin.entry", id, ".js");
-    const style = raw.style === undefined ? undefined : packageFile(raw.style, "plugin.style", id, ".css");
+    const runtime = raw.runtime === undefined
+      ? (typeof raw.entry === "string" && raw.entry.toLowerCase().endsWith(".wasm") ? "wasm" : "javascript")
+      : raw.runtime;
+    if (runtime !== "javascript" && runtime !== "wasm") invalid("SKIN_RUNTIME_PLUGIN_RUNTIME_INVALID", "A plugin runtime must be javascript or wasm.");
+    const entry = packageFile(raw.entry, "plugin.entry", id, [runtime === "wasm" ? ".wasm" : ".js"]);
+    const style = raw.style === undefined ? undefined : packageFile(raw.style, "plugin.style", id, [".css"]);
     if (!Array.isArray(raw.assets) || raw.assets.length > SKIN_RUNTIME_PLUGIN_ASSET_LIMIT) {
       invalid("SKIN_RUNTIME_PLUGIN_ASSET_INVALID", "A plugin must declare a bounded asset list.");
     }
@@ -141,6 +147,7 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
       name,
       version,
       apiVersion: 1,
+      runtime,
       page: raw.page,
       mode: raw.mode,
       entry,

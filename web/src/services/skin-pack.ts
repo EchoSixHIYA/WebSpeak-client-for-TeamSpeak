@@ -4,6 +4,7 @@ import valueParser from "postcss-value-parser";
 import { unzipSync } from "fflate";
 import { parseSkinLayoutJson, type SkinLayoutDocument } from "../../../src/shared/skin-layout.js";
 import { listSkinPluginAssetPaths, parseSkinPluginJson, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { validateSkinExtensionWasmBytes, validateSkinExtensionWasmImportsAndExports } from "./skin-extension-wasm-policy.js";
 import {
   listSkinRuntimePluginFilePaths,
   parseSkinRuntimePluginJson,
@@ -191,6 +192,17 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
       if (bytes.byteLength > SKIN_RUNTIME_PLUGIN_SOURCE_LIMIT_BYTES) throw new SkinPackError("Plugin entry files must be smaller than 256 KiB.", "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE");
       try { decoder.decode(bytes); } catch { throw new SkinPackError("Plugin entry files must contain valid UTF-8.", "SKIN_RUNTIME_PLUGIN_ENCODING_INVALID"); }
       runtimePluginFiles[pluginPath] = new Blob([bytes], { type: "text/javascript" });
+    } else if (lowerPath.endsWith(".wasm")) {
+      if (bytes.byteLength > SKIN_RUNTIME_PLUGIN_SOURCE_LIMIT_BYTES) throw new SkinPackError("Wasm plugin entry files must be smaller than 256 KiB.", "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE");
+      const plugin = runtimePlugins?.plugins.find((candidate) => candidate.entry === pluginPath);
+      if (!plugin || plugin.runtime !== "wasm") throw new SkinPackError("A Wasm entry must be declared as a Wasm plugin runtime.", "SKIN_RUNTIME_PLUGIN_WASM_INVALID");
+      try {
+        validateSkinExtensionWasmBytes(bytes);
+        validateSkinExtensionWasmImportsAndExports(bytes, plugin.permissions);
+      } catch (error) {
+        throw new SkinPackError(`The Wasm plugin entry is invalid: ${error instanceof Error ? error.message : "unknown validation error"}`, "SKIN_RUNTIME_PLUGIN_WASM_INVALID");
+      }
+      runtimePluginFiles[pluginPath] = new Blob([bytes], { type: "application/wasm" });
     } else if (lowerPath.endsWith(".css")) {
       if (bytes.byteLength > SKIN_RUNTIME_PLUGIN_STYLE_LIMIT_BYTES) throw new SkinPackError("Plugin style files must be smaller than 512 KiB.", "SKIN_RUNTIME_PLUGIN_STYLE_SIZE");
       try { decoder.decode(bytes); } catch { throw new SkinPackError("Plugin style files must contain valid UTF-8.", "SKIN_RUNTIME_PLUGIN_ENCODING_INVALID"); }

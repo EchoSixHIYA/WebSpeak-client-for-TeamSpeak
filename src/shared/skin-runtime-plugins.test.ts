@@ -33,8 +33,23 @@ test("v4 plugin descriptors accept bounded local files and freeze their parsed d
     "plugins/voice-toolbar/assets/icon.png",
   ]);
   assert.equal(parsed.plugins[0].permissions[0], "session.channels.read");
+  assert.equal(parsed.plugins[0].runtime, "javascript");
   assert.ok(Object.isFrozen(parsed) && Object.isFrozen(parsed.plugins) && Object.isFrozen(parsed.plugins[0]));
   assert.ok(Object.isFrozen(parsed.plugins[0].assets) && Object.isFrozen(parsed.plugins[0].permissions));
+});
+
+test("v4 plugin descriptors recognize Wasm entries and reject a runtime/file mismatch", () => {
+  const wasm = parseSkinRuntimePluginDocument(document([{ ...plugin, runtime: "wasm", entry: "plugins/voice-toolbar/index.wasm" }]) as never);
+  assert.equal(wasm.plugins[0].runtime, "wasm");
+  assert.equal(wasm.plugins[0].entry, "plugins/voice-toolbar/index.wasm");
+  assert.throws(
+    () => parseSkinRuntimePluginDocument(document([{ ...plugin, runtime: "wasm" }]) as never),
+    (error: unknown) => error instanceof SkinRuntimePluginValidationError && error.code === "SKIN_RUNTIME_PLUGIN_PATH_INVALID",
+  );
+  assert.throws(
+    () => parseSkinRuntimePluginDocument(document([{ ...plugin, runtime: "native" }]) as never),
+    (error: unknown) => error instanceof SkinRuntimePluginValidationError && error.code === "SKIN_RUNTIME_PLUGIN_RUNTIME_INVALID",
+  );
 });
 
 test("surface replacement is an explicit page-scoped plugin capability", () => {

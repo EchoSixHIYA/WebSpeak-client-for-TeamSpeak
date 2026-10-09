@@ -79,6 +79,7 @@ export async function computeSkinRuntimePluginDigest(
     name: plugin.name,
     version: plugin.version,
     apiVersion: plugin.apiVersion,
+    runtime: plugin.runtime,
     page: plugin.page,
     mode: plugin.mode,
     entry: plugin.entry,
