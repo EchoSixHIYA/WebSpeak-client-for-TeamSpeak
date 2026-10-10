@@ -217,16 +217,18 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.quick-server"] {
+  position: relative;
   display: grid;
   place-items: center;
   width: 50px;
   min-height: 50px;
   padding: 1px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 14px;
   color: var(--skin-kaak-muted);
   background: transparent;
   cursor: pointer;
+  transition: background-color .18s ease;
 }
 
 [data-ws-plugin-part="kaak-workspace.quick-server"]:hover,
@@ -237,7 +239,25 @@
 
 [data-ws-plugin-part="kaak-workspace.quick-server"][aria-current="true"] {
   color: var(--skin-kaak-text);
-  box-shadow: inset 3px 0 var(--skin-kaak-accent);
+}
+
+[data-ws-plugin-part="kaak-workspace.quick-server"][aria-current="true"]::before {
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  width: 3px;
+  height: 22px;
+  border-radius: 0 3px 3px 0;
+  background: var(--skin-kaak-accent);
+  content: "";
+  transform: translateY(-50%);
+  transform-origin: center;
+  animation: kaak-server-active-arrive .2s cubic-bezier(.2, .75, .25, 1) both;
+}
+
+@keyframes kaak-server-active-arrive {
+  from { opacity: 0; transform: translateY(-50%) scaleY(.55); }
+  to { opacity: 1; transform: translateY(-50%) scaleY(1); }
 }
 
 [data-ws-plugin-part="kaak-workspace.server-monogram"] {
@@ -247,17 +267,24 @@
   height: 42px;
   overflow: hidden;
   border: 1px solid #ffffff12;
-  border-radius: 50%;
+  border-radius: 13px;
   color: var(--skin-kaak-text);
   background: linear-gradient(145deg, #383a40, #222429);
   font-size: 15px;
   font-weight: 800;
   text-align: center;
+  transition: border-radius .18s ease, transform .18s ease, border-color .18s ease;
 }
 
 [data-ws-plugin-part="kaak-workspace.quick-server"][aria-current="true"] [data-ws-plugin-part="kaak-workspace.server-monogram"] {
   border-color: var(--skin-kaak-accent);
+  border-radius: 12px;
   background: color-mix(in srgb, var(--skin-kaak-accent) 18%, #222429);
+}
+
+[data-ws-plugin-part="kaak-workspace.quick-server"]:hover [data-ws-plugin-part="kaak-workspace.server-monogram"] {
+  border-radius: 11px;
+  transform: scale(1.04);
 }
 
 [data-ws-plugin-part="kaak-workspace.server-kind"] {
