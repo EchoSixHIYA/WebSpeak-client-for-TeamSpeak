@@ -1,8 +1,8 @@
 # KAAK voice skin
 
-KAAK is a schema v3 open-skin package for WebSpeak's public connection page and voice workspace. It keeps TeamSpeak connection, channel, member, chat, favorite-server, audio, and screen-sharing behavior in the host. The desktop voice layout places the favorite-server rail, a declarative channel list with members nested under each channel, the active chat workspace, a member column, and the audio dock in separate regions. Narrow screens return to WebSpeak's responsive channel and member controls.
+KAAK is a schema v3 open-skin package with full connection and voice-workspace surfaces. Its voice page uses a narrow server rail, grouped TeamSpeak channels with inline voice participants, a central text chat, an online-member column, and a lower-left voice dock. Channel selection is single-click; joining is double-click. The narrow layout keeps the host's mobile controls available.
 
-The design target is the voice-client portion of KOOK, as requested by the project owner. This skin does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
+The design target is the voice-client portion of KOOK, as requested by the project owner. It does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
 
 ## Reference access note
 
@@ -10,9 +10,9 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 ## Components and permissions
 
-The channel list and member column are defined as separate components in [components.json](./kaak-voice/components.json). The channel component reads the visible TeamSpeak channel tree and, with a separate `session.members.read` grant, renders visible member names and speaking state beneath each channel. Double-clicking a channel asks the host to join it; the host rechecks visibility and applies the existing TeamSpeak password and permission flow. This behavior belongs only to this KAAK component and does not alter the TeamSpeak protocol or other skins. Permission approval is local to this skin version and can be revoked from the host access control.
+The connection page and voice workspace are full-page declarative surfaces in [components.json](./kaak-voice/components.json). The voice surface requests only the capabilities it uses: visible server shortcuts, channel and member data, channel joining, channel chat, voice status, microphone/output controls, whisper controls, disconnect, and screen sharing. The host renders trusted connection, language, skin, audio, and screen-share controls. It rechecks permissions and connection state when each action runs; approval is local to this skin version and can be revoked from the host access control.
 
-The favorite-server rail and main audio/chat controls remain WebSpeak components. The plugin does not receive server addresses, passwords, identity keys, microphone controls, raw audio, private messages, or arbitrary network/storage APIs. The /demo page uses synthetic data and does not connect to TeamSpeak.
+The skin does not receive server addresses, passwords, identity keys, raw audio, private messages, or arbitrary network/storage APIs. Its markup is data-only; it contains no executable JavaScript or Wasm. The `/demo` page uses synthetic data and does not connect to TeamSpeak.
 
 ## Files
 
@@ -21,4 +21,4 @@ The favorite-server rail and main audio/chat controls remain WebSpeak components
 - Distributable archive: [kaak-voice.wskin](./kaak-voice.wskin)
 - Shared format and safety rules: [SKIN_DEVELOPMENT.md](../SKIN_DEVELOPMENT.md)
 
-The package is a ZIP archive with manifest.json at its root. Rebuild the archive from the contents of kaak-voice after any source change, then import the .wskin in a visitor browser and verify the consent, approval, denial, revoke, desktop, and narrow-screen paths.
+KAAK is included in the public skin selector and its `.wskin` archive is also available as a standalone package. After changing the source, run `npm run skin:kaak:build` to rebuild both copies, then run the package tests and verify the connection page, approval, denial, revoke, desktop, and narrow-screen paths in the local browser. The connected voice surface can be verified when a TeamSpeak session is available.

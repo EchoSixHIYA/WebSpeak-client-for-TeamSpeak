@@ -2,108 +2,276 @@
   "schemaVersion": 3,
   "components": [
     {
-      "id": "kaak-channel-sidebar",
-      "name": "KAAK 频道列表 / channel list",
-      "page": "voice",
-      "accessibleName": "频道列表 / Channel list",
+      "id": "kaak-home",
+      "name": "KAAK connection home",
+      "page": "home",
+      "mode": "surface",
+      "accessibleName": "KAAK 连接页 / Connection page",
       "permissions": [
+        "ui.surface.replace"
+      ],
+      "actions": {},
+      "root": {
+        "tag": "main",
+        "part": "home",
+        "children": [
+          {
+            "tag": "header",
+            "part": "home-header",
+            "children": [
+              {
+                "tag": "span",
+                "part": "brand-mark",
+                "children": [
+                  {
+                    "text": "K"
+                  }
+                ]
+              },
+              {
+                "tag": "span",
+                "part": "brand-name",
+                "children": [
+                  {
+                    "text": "KAAK"
+                  }
+                ]
+              },
+              {
+                "widget": "app.language-switcher",
+                "part": "language"
+              },
+              {
+                "widget": "app.skin-switcher",
+                "part": "skin"
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "connection-card",
+            "children": [
+              {
+                "tag": "p",
+                "part": "eyebrow",
+                "children": [
+                  {
+                    "text": "VOICE CLIENT / 语音客户端"
+                  }
+                ]
+              },
+              {
+                "tag": "h1",
+                "part": "title",
+                "children": [
+                  {
+                    "text": "连接你的语音社区"
+                  }
+                ]
+              },
+              {
+                "tag": "p",
+                "part": "description",
+                "children": [
+                  {
+                    "text": "选择 TeamSpeak 服务器，快速回到你的语音频道。"
+                  }
+                ]
+              },
+              {
+                "widget": "home.connection-form",
+                "part": "connection-form"
+              }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "home-footer",
+            "children": [
+              {
+                "text": "连接和身份信息由 WebSpeak 管理。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "kaak-workspace",
+      "name": "KAAK voice workspace",
+      "page": "voice",
+      "mode": "surface",
+      "accessibleName": "KAAK 语音工作区 / Voice workspace",
+      "permissions": [
+        "ui.surface.replace",
+        "session.status.read",
         "session.channels.read",
         "session.members.read",
-        "session.channel.join"
+        "session.channel.join",
+        "servers.quickList.read",
+        "servers.quickList.switch",
+        "chat.channel.read",
+        "chat.channel.send",
+        "audio.status.read",
+        "audio.microphone.control",
+        "audio.output.control",
+        "voice.whisper.status.read",
+        "voice.whisper.control",
+        "voice.disconnect",
+        "voice.screenShare.read",
+        "voice.screenShare.control"
       ],
       "actions": {
+        "switch-server": {
+          "type": "quickServers.switch",
+          "args": {
+            "quickServerId": "{{server.id}}"
+          }
+        },
+        "select-channel": {
+          "type": "ui.setState",
+          "args": {
+            "key": "selectedchannel",
+            "value": "{{channel.id}}"
+          }
+        },
         "join-channel": {
           "type": "voice.joinChannel",
           "args": {
             "channelId": "{{channel.id}}"
           }
+        },
+        "send-message": {
+          "type": "chat.sendMessage",
+          "args": {
+            "text": "{{state.message}}"
+          }
+        },
+        "disconnect": {
+          "type": "voice.disconnect",
+          "args": {}
+        },
+        "whisper-on": {
+          "type": "voice.setWhisperActive",
+          "args": {
+            "active": true
+          }
+        },
+        "whisper-off": {
+          "type": "voice.setWhisperActive",
+          "args": {
+            "active": false
+          }
         }
       },
+      "state": {
+        "selectedchannel": "",
+        "message": ""
+      },
       "root": {
-        "tag": "aside",
-        "part": "channel-panel",
-        "className": "kaak-channel-sidebar",
+        "tag": "main",
+        "part": "workspace",
         "children": [
           {
             "tag": "header",
-            "part": "heading",
-            "className": "kaak-sidebar-heading",
+            "part": "topbar",
             "children": [
-              { "tag": "small", "part": "eyebrow", "children": [{ "text": "VOICE SERVER / 语音服务器" }] },
-              { "tag": "h2", "part": "channel-title", "children": [{ "text": "频道" }] }
+              {
+                "tag": "span",
+                "part": "brand-mark",
+                "children": [
+                  {
+                    "text": "K"
+                  }
+                ]
+              },
+              {
+                "tag": "span",
+                "part": "brand-name",
+                "children": [
+                  {
+                    "text": "KAAK"
+                  }
+                ]
+              },
+              {
+                "tag": "span",
+                "part": "server-title",
+                "children": [
+                  {
+                    "text": "{{session.status.serverLabel}}"
+                  }
+                ]
+              },
+              {
+                "widget": "app.language-switcher",
+                "part": "language"
+              },
+              {
+                "widget": "app.skin-switcher",
+                "part": "skin"
+              }
             ]
           },
           {
             "tag": "nav",
-            "part": "channels",
-            "attributes": { "aria-label": "语音频道 / Voice channels" },
+            "part": "server-rail",
+            "attributes": {
+              "aria-label": "收藏与历史服务器 / Favorites and history"
+            },
             "children": [
               {
                 "tag": "div",
-                "part": "channel-item",
-                "repeat": { "path": "session.channels", "as": "channel" },
+                "part": "quick-server-item",
+                "repeat": {
+                  "path": "servers.quickList",
+                  "as": "server"
+                },
                 "children": [
                   {
                     "tag": "button",
-                    "part": "channel-row",
-                    "className": "kaak-channel-row",
+                    "part": "quick-server",
                     "attributes": {
                       "type": "button",
-                      "aria-pressed": "{{channel.current}}",
-                      "aria-label": "加入 / Join {{channel.name}}"
+                      "aria-current": "{{server.current}}",
+                      "aria-label": "切换到 {{server.label}}"
                     },
                     "events": {
-                      "dblclick": "join-channel"
+                      "click": "switch-server"
                     },
                     "children": [
                       {
                         "tag": "span",
-                        "part": "channel-glyph",
-                        "className": "kaak-channel-glyph",
-                        "attributes": { "aria-hidden": true },
-                        "children": [{ "text": "♬" }]
+                        "part": "server-monogram",
+                        "children": [
+                          {
+                            "text": "{{server.label}}"
+                          }
+                        ]
                       },
                       {
                         "tag": "span",
-                        "part": "channel-name",
-                        "className": "kaak-channel-name",
-                        "children": [{ "text": "{{channel.name}}" }]
-                      },
-                      {
-                        "tag": "small",
-                        "part": "channel-count",
-                        "className": "kaak-channel-count",
-                        "children": [{ "text": "{{channel.memberCount}}" }]
-                      }
-                    ]
-                  },
-                  {
-                    "tag": "ul",
-                    "part": "channel-members",
-                    "className": "kaak-channel-members",
-                    "attributes": { "aria-label": "频道成员 / Channel members" },
-                    "children": [
-                      {
-                        "tag": "li",
-                        "part": "channel-member",
-                        "className": "kaak-channel-member",
-                        "repeat": { "path": "channel.members", "as": "member" },
+                        "part": "server-kind",
+                        "when": {
+                          "path": "server.favorite",
+                          "equals": true
+                        },
                         "children": [
                           {
-                            "tag": "span",
-                            "part": "channel-member-presence",
-                            "className": "kaak-channel-member-presence",
-                            "attributes": {
-                              "aria-hidden": true,
-                              "data-speaking": "{{member.speaking}}",
-                              "data-self": "{{member.self}}"
-                            }
-                          },
+                            "text": "收藏"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "server-kind",
+                        "when": {
+                          "path": "server.kind",
+                          "equals": "recent"
+                        },
+                        "children": [
                           {
-                            "tag": "span",
-                            "part": "channel-member-name",
-                            "className": "kaak-channel-member-name",
-                            "children": [{ "text": "{{member.name}}" }]
+                            "text": "最近"
                           }
                         ]
                       }
@@ -112,65 +280,631 @@
                 ]
               }
             ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "kaak-members-sidebar",
-      "name": "KAAK 在线成员 / online members",
-      "page": "voice",
-      "accessibleName": "在线成员 / Online members",
-      "permissions": ["session.members.read"],
-      "actions": {},
-      "root": {
-        "tag": "aside",
-        "part": "member-panel",
-        "className": "kaak-members-sidebar",
-        "children": [
+          },
           {
-            "tag": "header",
-            "part": "heading",
-            "className": "kaak-sidebar-heading",
+            "tag": "aside",
+            "part": "channel-panel",
+            "attributes": {
+              "aria-label": "服务器频道 / Server channels"
+            },
             "children": [
-              { "tag": "small", "part": "eyebrow", "children": [{ "text": "VOICE / MEMBERS" }] },
-              { "tag": "h2", "part": "member-title", "children": [{ "text": "成员" }] }
+              {
+                "tag": "header",
+                "part": "server-summary",
+                "children": [
+                  {
+                    "tag": "strong",
+                    "part": "server-name",
+                    "children": [
+                      {
+                        "text": "{{session.status.serverLabel}}"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "small",
+                    "part": "server-subtitle",
+                    "children": [
+                      {
+                        "text": "VOICE CHANNELS / 语音频道"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "nav",
+                "part": "channel-list",
+                "attributes": {
+                  "aria-label": "频道 / Channels"
+                },
+                "children": [
+                  {
+                    "tag": "h2",
+                    "part": "section-label",
+                    "children": [
+                      {
+                        "text": "频道 / CHANNELS"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "div",
+                    "part": "channel-item",
+                    "repeat": {
+                      "path": "session.channels",
+                      "as": "channel"
+                    },
+                    "children": [
+                      {
+                        "tag": "button",
+                        "part": "channel-row",
+                        "attributes": {
+                          "type": "button",
+                          "aria-current": "{{channel.current}}",
+                          "aria-label": "双击加入 {{channel.name}}",
+                          "data-depth": "{{channel.depth}}"
+                        },
+                        "events": {
+                          "click": "select-channel",
+                          "dblclick": "join-channel"
+                        },
+                        "children": [
+                          {
+                            "tag": "span",
+                            "part": "channel-glyph",
+                            "children": [
+                              {
+                                "text": "◉"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "channel-name",
+                            "children": [
+                              {
+                                "text": "{{channel.name}}"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "small",
+                            "part": "channel-count",
+                            "children": [
+                              {
+                                "text": "{{channel.memberCount}}"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "selected-channel-indicator",
+                            "when": {
+                              "path": "state.selectedchannel",
+                              "equals": "{{channel.id}}"
+                            },
+                            "attributes": {
+                              "aria-label": "当前频道"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "ul",
+                        "part": "channel-voice-members",
+                        "when": {
+                          "path": "channel.current",
+                          "equals": true
+                        },
+                        "attributes": {
+                          "aria-label": "此频道中的语音成员 / Voice members in this channel"
+                        },
+                        "children": [
+                          {
+                            "tag": "li",
+                            "part": "channel-voice-member",
+                            "repeat": {
+                              "path": "channel.members",
+                              "as": "voicemember"
+                            },
+                            "children": [
+                              {
+                                "tag": "span",
+                                "part": "channel-member-avatar",
+                                "children": [
+                                  {
+                                    "text": "{{voicemember.name}}"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-name",
+                                "children": [
+                                  {
+                                    "text": "{{voicemember.name}}"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-muted",
+                                "when": {
+                                  "path": "voicemember.status",
+                                  "equals": "muted"
+                                },
+                                "attributes": {
+                                  "aria-label": "麦克风已静音"
+                                },
+                                "children": [
+                                  {
+                                    "text": "已静音"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-away",
+                                "when": {
+                                  "path": "voicemember.status",
+                                  "equals": "away"
+                                },
+                                "attributes": {
+                                  "aria-label": "离开"
+                                },
+                                "children": [
+                                  {
+                                    "text": "离开中"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-state",
+                                "when": {
+                                  "path": "voicemember.self",
+                                  "equals": true
+                                },
+                                "children": [
+                                  {
+                                    "text": "你"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-state",
+                                "when": {
+                                  "path": "voicemember.speaking",
+                                  "equals": true
+                                },
+                                "attributes": {
+                                  "aria-label": "正在讲话"
+                                },
+                                "children": [
+                                  {
+                                    "text": "●"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
             ]
           },
           {
-            "tag": "p",
-            "part": "online-label",
-            "className": "kaak-online-label",
-            "children": [{ "text": "当前在线 / Online" }]
-          },
-          {
-            "tag": "ul",
-            "part": "member-list",
-            "className": "kaak-member-list",
+            "tag": "section",
+            "part": "conversation",
+            "attributes": {
+              "aria-label": "当前频道聊天 / Channel chat"
+            },
             "children": [
               {
-                "tag": "li",
-                "part": "member-row",
-                "className": "kaak-member-row",
-                "repeat": { "path": "session.members", "as": "member" },
+                "tag": "header",
+                "part": "conversation-heading",
+                "children": [
+                  {
+                    "tag": "span",
+                    "part": "conversation-glyph",
+                    "children": [
+                      {
+                        "text": "◉"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "h1",
+                    "part": "channel-title",
+                    "children": [
+                      {
+                        "text": "{{session.status.channelName}}"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "connection-state",
+                    "when": {
+                      "path": "session.status.connected",
+                      "equals": true
+                    },
+                    "children": [
+                      {
+                        "text": "已连接"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "chat",
                 "children": [
                   {
                     "tag": "div",
-                    "part": "member-row-content",
-                    "className": "kaak-member-row-content",
-                    "attributes": { "data-speaking": "{{member.speaking}}", "data-self": "{{member.self}}" },
+                    "part": "chat-message-list",
+                    "attributes": {
+                      "aria-label": "当前频道消息 / Channel messages",
+                      "role": "log",
+                      "aria-live": "polite"
+                    },
                     "children": [
-                      { "tag": "span", "part": "presence", "className": "kaak-member-presence", "attributes": { "aria-hidden": true } },
-                      { "tag": "span", "part": "member-name", "className": "kaak-member-name", "children": [{ "text": "{{member.name}}" }] },
                       {
-                        "tag": "small",
-                        "part": "speaking-indicator",
-                        "className": "kaak-speaking-indicator",
-                        "when": { "path": "member.speaking", "equals": true },
-                        "attributes": { "aria-label": "正在说话 / Speaking" },
-                        "children": [{ "text": "说话中" }]
+                        "tag": "p",
+                        "part": "chat-empty",
+                        "when": {
+                          "path": "chat.messages",
+                          "empty": true
+                        },
+                        "children": [
+                          {
+                            "text": "还没有消息，向频道打个招呼吧。"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "article",
+                        "part": "chat-message",
+                        "repeat": {
+                          "path": "chat.messages",
+                          "as": "message"
+                        },
+                        "children": [
+                          {
+                            "tag": "header",
+                            "part": "chat-message-heading",
+                            "children": [
+                              {
+                                "tag": "strong",
+                                "part": "chat-message-author",
+                                "children": [
+                                  {
+                                    "text": "{{message.author}}"
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "time",
+                                "part": "chat-message-time",
+                                "children": [
+                                  {
+                                    "text": "{{message.time}}"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "p",
+                            "part": "chat-message-text",
+                            "children": [
+                              {
+                                "text": "{{message.text}}"
+                              }
+                            ]
+                          }
+                        ]
                       }
                     ]
+                  },
+                  {
+                    "tag": "form",
+                    "part": "chat-composer",
+                    "events": {
+                      "submit": "send-message"
+                    },
+                    "children": [
+                      {
+                        "tag": "input",
+                        "part": "chat-input",
+                        "bindValue": "message",
+                        "attributes": {
+                          "type": "text",
+                          "maxlength": 1000,
+                          "autocomplete": "off",
+                          "placeholder": "发送频道消息",
+                          "aria-label": "发送频道消息"
+                        }
+                      },
+                      {
+                        "tag": "button",
+                        "part": "chat-send",
+                        "attributes": {
+                          "type": "submit",
+                          "aria-label": "发送消息"
+                        },
+                        "children": [
+                          {
+                            "text": "发送"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "widget": "voice.screen-share-player",
+                "part": "screen-player"
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "members-panel",
+            "attributes": {
+              "aria-label": "频道成员 / Members"
+            },
+            "children": [
+              {
+                "tag": "header",
+                "part": "members-heading",
+                "children": [
+                  {
+                    "tag": "h2",
+                    "part": "section-label",
+                    "children": [
+                      {
+                        "text": "成员 / MEMBERS"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "ul",
+                "part": "member-list",
+                "children": [
+                  {
+                    "tag": "li",
+                    "part": "member-row",
+                    "repeat": {
+                      "path": "session.members",
+                      "as": "member"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "member-avatar",
+                        "children": [
+                          {
+                            "text": "{{member.name}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "member-name",
+                        "children": [
+                          {
+                            "text": "{{member.name}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "speaking-indicator",
+                        "when": {
+                          "path": "member.speaking",
+                          "equals": true
+                        },
+                        "attributes": {
+                          "aria-label": "正在讲话"
+                        },
+                        "children": [
+                          {
+                            "text": "正在讲话"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "member-muted-state",
+                        "when": {
+                          "path": "member.status",
+                          "equals": "muted"
+                        },
+                        "attributes": {
+                          "aria-label": "麦克风已静音"
+                        },
+                        "children": [
+                          {
+                            "text": "已静音"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "member-away-state",
+                        "when": {
+                          "path": "member.status",
+                          "equals": "away"
+                        },
+                        "attributes": {
+                          "aria-label": "离开"
+                        },
+                        "children": [
+                          {
+                            "text": "离开中"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "whisper-controls",
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "whisper-start",
+                    "when": {
+                      "path": "whisper.status.active",
+                      "equals": false
+                    },
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "开始悄悄话"
+                    },
+                    "events": {
+                      "click": "whisper-on"
+                    },
+                    "children": [
+                      {
+                        "text": "悄悄话"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "whisper-stop",
+                    "when": {
+                      "path": "whisper.status.active",
+                      "equals": true
+                    },
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "停止悄悄话"
+                    },
+                    "events": {
+                      "click": "whisper-off"
+                    },
+                    "children": [
+                      {
+                        "text": "悄悄话中"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "voice-dock",
+            "attributes": {
+              "aria-label": "语音控制 / Voice controls"
+            },
+            "children": [
+              {
+                "tag": "div",
+                "part": "voice-dock-heading",
+                "children": [
+                  {
+                    "tag": "span",
+                    "part": "connection-indicator",
+                    "children": [
+                      {
+                        "text": "●"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "strong",
+                    "part": "voice-channel-name",
+                    "children": [
+                      {
+                        "text": "{{session.status.channelName}}"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "voice-dock-caption",
+                    "children": [
+                      {
+                        "text": "语音已连接"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "voice-dock-actions",
+                "children": [
+                  {
+                    "widget": "voice.screen-share-start",
+                    "part": "screen-share-start"
+                  },
+                  {
+                    "widget": "voice.audio-controls",
+                    "part": "audio-controls"
+                  },
+                  {
+                    "tag": "button",
+                    "part": "disconnect-control",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "断开语音"
+                    },
+                    "events": {
+                      "click": "disconnect"
+                    },
+                    "children": [
+                      {
+                        "text": "离开"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "part": "identity-entry",
+            "when": {
+              "path": "session.status.userName"
+            },
+            "attributes": {
+              "role": "group",
+              "aria-label": "当前 TeamSpeak 身份"
+            },
+            "children": [
+              {
+                "tag": "span",
+                "part": "identity-monogram",
+                "children": [
+                  {
+                    "text": "TS"
+                  }
+                ]
+              },
+              {
+                "tag": "span",
+                "part": "identity-name",
+                "children": [
+                  {
+                    "text": "{{session.status.userName}}"
                   }
                 ]
               }

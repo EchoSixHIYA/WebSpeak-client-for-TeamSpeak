@@ -456,19 +456,47 @@ test("a v4 surface cannot compete with a v3 surface on the same public page", as
   );
 });
 
-test("the distributable KAAK v3 package validates end to end", async () => {
+test("the distributable KAAK package provides full home and voice surfaces", async () => {
   const archive = await readFile(new URL("../../../docs/examples/kaak-voice.wskin", import.meta.url));
+  const bundledArchive = await readFile(new URL("../../public/skins/kaak-voice.wskin", import.meta.url));
+  assert.deepEqual(archive, bundledArchive, "the downloadable example and bundled skin stay in sync");
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
   assert.equal(skin.schemaVersion, 3);
-  assert.deepEqual(skin.pluginData?.components.map((component) => component.id), ["kaak-channel-sidebar", "kaak-members-sidebar"]);
-  assert.equal(skin.pluginData?.components[0].root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
-  assert.ok(skin.pluginData?.components[0].permissions.includes("session.members.read"));
-  assert.equal(skin.pluginData?.components[0].root.children?.[1].children?.[0].children?.[1].children?.[0].repeat?.path, "channel.members");
-  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-row"'));
-  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-channel-sidebar.channel-members"'));
-  assert.ok(skin.css.includes('data-ws-plugin-part="kaak-members-sidebar.member-row-content"'));
+  const home = skin.pluginData?.components.find((component) => component.page === "home");
+  const voice = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.id, component.mode]), [
+    ["kaak-home", "surface"],
+    ["kaak-workspace", "surface"],
+  ]);
+  assert.ok(home?.permissions.includes("ui.surface.replace"));
+  assert.ok(voice?.permissions.includes("ui.surface.replace"));
+  assert.ok(voice?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voice?.permissions.includes("session.channels.read"));
+  assert.ok(voice?.permissions.includes("session.members.read"));
+  assert.ok(voice?.permissions.includes("chat.channel.read"));
+  assert.ok(voice?.permissions.includes("chat.channel.send"));
+  assert.ok(voice?.permissions.includes("audio.microphone.control"));
+  assert.ok(voice?.permissions.includes("audio.output.control"));
+  assert.ok(voice?.permissions.includes("voice.screenShare.control"));
+  function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
+    if (!node) return undefined;
+    if (node.part === part) return node;
+    for (const child of node.children ?? []) {
+      const found = findPart(child, part);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const channelRow = findPart(voice?.root, "channel-row");
+  assert.equal(channelRow?.events?.click, "select-channel");
+  assert.equal(channelRow?.events?.dblclick, "join-channel");
+  assert.equal(findPart(voice?.root, "chat-input")?.bindValue, "message");
+  assert.equal(findPart(voice?.root, "screen-share-start")?.widget, "voice.screen-share-start");
+  assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
+  assert.ok(skin.css.includes("@media (max-width: 820px)"));
 });
 
 test("v4 skin packages validate Wasm entry ABI and cache it as application/wasm", async () => {

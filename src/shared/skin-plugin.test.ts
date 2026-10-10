@@ -163,22 +163,38 @@ test("schema v3 host audio controls require read and control permissions while v
   assert.equal(parseSkinPluginDocument(legacyDocument).components[0].root.children?.[0].widget, "voice.audio-controls");
 });
 
-test("KAAK v3 example splits validated channel and member data by component", async () => {
+test("KAAK v3 example declares the connection home and complete voice workspace", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
-  const channelSidebar = parsed.components.find((component) => component.id === "kaak-channel-sidebar");
-  const memberSidebar = parsed.components.find((component) => component.id === "kaak-members-sidebar");
-  assert.ok(channelSidebar);
-  assert.ok(memberSidebar);
-  assert.deepEqual(channelSidebar.permissions, ["session.channels.read", "session.members.read", "session.channel.join"]);
-  assert.equal(channelSidebar.actions["join-channel"].type, "voice.joinChannel");
-  assert.equal(channelSidebar.root.children?.[1].children?.[0].children?.[0].events?.dblclick, "join-channel");
-  assert.equal(channelSidebar.root.children?.[1].children?.[0].repeat?.path, "session.channels");
-  const nestedMembers = channelSidebar.root.children?.[1].children?.[0].children?.[1].children?.[0];
-  assert.equal(nestedMembers?.repeat?.path, "channel.members");
-  assert.equal(nestedMembers?.children?.[1].children?.[0].text, "{{member.name}}");
-  assert.deepEqual(memberSidebar.permissions, ["session.members.read"]);
-  assert.equal(memberSidebar.root.children?.[2].children?.[0].repeat?.path, "session.members");
+  const home = parsed.components.find((component) => component.id === "kaak-home");
+  const workspace = parsed.components.find((component) => component.id === "kaak-workspace");
+  assert.ok(home);
+  assert.ok(workspace);
+  assert.equal(home.page, "home");
+  assert.equal(home.mode, "surface");
+  assert.deepEqual(home.permissions, ["ui.surface.replace"]);
+  assert.equal(home.root.children?.[1].children?.[3].widget, "home.connection-form");
+
+  assert.equal(workspace.page, "voice");
+  assert.equal(workspace.mode, "surface");
+  assert.ok(workspace.permissions.includes("session.channels.read"));
+  assert.ok(workspace.permissions.includes("session.members.read"));
+  assert.ok(workspace.permissions.includes("chat.channel.send"));
+  assert.ok(workspace.permissions.includes("audio.microphone.control"));
+  assert.equal(workspace.actions["join-channel"].type, "voice.joinChannel");
+  assert.equal(workspace.actions["send-message"].type, "chat.sendMessage");
+
+  const nodes: SkinPluginNode[] = [];
+  const visit = (node: SkinPluginNode): void => {
+    nodes.push(node);
+    node.children?.forEach(visit);
+  };
+  visit(workspace.root);
+  assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
+  assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"));
+  assert.ok(nodes.some((node) => node.repeat?.path === "session.channels" && node.children?.[0].events?.dblclick === "join-channel"));
+  assert.ok(nodes.some((node) => node.repeat?.path === "session.members"));
+  assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));
 });
 
 test("skin plugin binds form controls only to declared local state", () => {

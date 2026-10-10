@@ -3,6 +3,7 @@ import { createSkinOperation, type SkinLoadOptions } from "./skin-operation.js";
 export type { SkinCatalogEntry } from "../../../src/shared/skin-catalog.js";
 
 export const BUILTIN_ILLUSIA_SKIN_ID = "community.illusia-voice";
+export const BUILTIN_KAAK_SKIN_ID = "community.kaak-voice";
 
 export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
@@ -42,9 +43,21 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
     builtIn: true,
     previewKind: "illusia",
   },
+  {
+    id: BUILTIN_KAAK_SKIN_ID,
+    name: "KAAK",
+    version: "3.0.0",
+    author: "WebSpeak Project",
+    license: "AGPL-3.0-only",
+    description: "A complete dark voice workspace with server switching, channels, chat, members, and host-owned voice controls.",
+    minAppVersion: "0.2.7-preview",
+    installedAt: 0,
+    builtIn: true,
+  },
 ];
 
 const BUILTIN_ILLUSIA_PACKAGE_URL = "/skins/illusia-voice.wskin";
+const BUILTIN_KAAK_PACKAGE_URL = "/skins/kaak-voice.wskin";
 let publicDirectoryLoaded = false;
 let publicEnabledSkinIds = new Set<string>(BUILTIN_SKIN_CATALOG.map((skin) => skin.id));
 let publicDefaultSkinId = "builtin.light";
@@ -60,7 +73,9 @@ export function isPublicSkinEnabled(id: string): boolean {
 }
 
 export function getBundledSkinPackageUrl(id: string): string | null {
-  return id === BUILTIN_ILLUSIA_SKIN_ID ? BUILTIN_ILLUSIA_PACKAGE_URL : null;
+  if (id === BUILTIN_ILLUSIA_SKIN_ID) return BUILTIN_ILLUSIA_PACKAGE_URL;
+  if (id === BUILTIN_KAAK_SKIN_ID) return BUILTIN_KAAK_PACKAGE_URL;
+  return null;
 }
 
 export async function listPublicSkins(options: SkinLoadOptions = {}): Promise<SkinCatalogEntry[]> {
@@ -76,7 +91,7 @@ export async function listPublicSkins(options: SkinLoadOptions = {}): Promise<Sk
     const directorySkins = (payload as { skins: unknown[] }).skins.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
       const skin = value as Record<string, unknown>;
-      if (typeof skin.id !== "string" || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(skin.id) || skin.id.startsWith("builtin.") || skin.id === BUILTIN_ILLUSIA_SKIN_ID) return [];
+      if (typeof skin.id !== "string" || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(skin.id) || skin.id.startsWith("builtin.") || BUILTIN_SKIN_CATALOG.some((entry) => entry.id === skin.id)) return [];
       if ([skin.name, skin.version, skin.author, skin.license, skin.minAppVersion].some((field) => typeof field !== "string")) return [];
       const previewUrl = typeof skin.previewUrl === "string" && skin.previewUrl === `/api/skins/${skin.id}/preview` ? skin.previewUrl : undefined;
       return [{
