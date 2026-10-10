@@ -681,11 +681,11 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
-  align-content: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
   justify-content: center;
-  justify-items: center;
+  align-items: stretch;
   gap: 12px;
   margin: 14px 0 16px;
   padding: 0;
@@ -697,6 +697,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   width: 100%;
+  flex: 0 1 218px;
   max-width: 218px;
   min-width: 0;
   min-height: 274px;
@@ -1006,9 +1007,6 @@
     grid-template-columns: 52px 184px minmax(260px, 1fr) 48px;
   }
   [data-ws-plugin-part="kaak-workspace.identity-entry"] { width: 52px; }
-  [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-  }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card {
     max-width: 190px;
     min-height: 236px;
@@ -1110,7 +1108,7 @@
   [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] { min-height: 22px; border: 0; }
   [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] .section-label { max-width: 160px; font-size: 8px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }
-  [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; align-items: stretch; gap: 8px; overflow: auto hidden; margin: 3px 0 0; padding: 2px 2px 4px; }
+  [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid { display: flex; flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-start; min-width: 0; min-height: 0; align-items: stretch; gap: 8px; overflow: auto hidden; margin: 3px 0 0; padding: 2px 2px 4px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card { flex: 0 0 174px; min-height: 0; height: 100%; border-radius: 9px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap { padding: 8px 8px 2px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap::before,
