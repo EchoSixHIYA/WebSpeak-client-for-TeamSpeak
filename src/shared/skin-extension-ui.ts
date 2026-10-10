@@ -16,7 +16,7 @@ import {
 } from "./skin-plugin.js";
 import { parseSkinExtensionUiInput, SKIN_EXTENSION_UI_EVENT_NAMES } from "./skin-extension-ui-input.js";
 
-export const SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES = 16 * 1024;
+export const SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES = 256 * 1024;
 
 const LOCAL_UI_ACTIONS = new Set<SkinPluginAction>(["ui.setState", "ui.toggleState"]);
 const GENERATED_COMPONENT_LIMIT = 64;
@@ -24,33 +24,16 @@ const GENERATED_RUNTIME_HOST_WIDGETS = new Set<SkinPluginHostWidget>(["voice.scr
 const GENERATED_CHILD_LIMIT = 256;
 const GENERATED_ATTRIBUTE_LIMIT = 64;
 const GENERATED_BLOCKED_ELEMENTS = new Set([
-  "base", "embed", "frame", "frameset", "iframe", "link", "meta", "object", "portal", "script", "style", "template",
-]);
-const GENERATED_SAFE_ELEMENTS = new Set([
-  "a", "abbr", "address", "article", "aside", "b", "blockquote", "br", "button", "caption", "circle", "cite", "code", "col",
-  "colgroup", "dd", "del", "details", "dfn", "div", "dl", "dt", "em", "fieldset", "figcaption", "figure", "footer", "g", "h1",
-  "form", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "input", "kbd", "label", "legend", "li", "line", "main", "mark",
-  "nav", "ol", "option", "output", "p", "path", "polygon", "polyline", "pre", "progress", "q", "rect", "s", "section", "select",
-  "small", "span", "stop", "strong", "sub", "summary", "sup", "svg", "table", "tbody", "td", "text", "textarea", "tfoot", "th",
-  "thead", "time", "tr", "u", "ul", "use", "wbr",
+  "animate", "animatemotion", "animatetransform", "applet", "base", "embed", "fencedframe", "foreignobject", "frame", "frameset",
+  "iframe", "link", "math", "meta", "noembed", "noframes", "object", "plaintext", "portal", "script", "set", "style", "template", "webview", "xmp",
 ]);
 const GENERATED_VOID_ELEMENTS = new Set([
   "br", "col", "hr", "img", "input", "line", "path", "polygon", "polyline", "rect", "stop", "use", "wbr",
 ]);
-const GENERATED_SAFE_ATTRIBUTES = new Set([
-  "accept", "alt", "aria-label", "aria-labelledby", "aria-describedby", "aria-live", "aria-current", "aria-expanded", "aria-hidden",
-  "aria-pressed", "aria-selected", "autocomplete", "checked", "cite", "class", "colspan", "contenteditable", "controls", "coords",
-  "datetime", "dir", "disabled", "draggable", "fill", "fill-rule", "height", "hidden", "high", "id", "inputmode", "label", "low",
-  "max", "maxlength", "min", "minlength", "multiple", "muted", "name", "open", "optimum", "placeholder", "preload", "readonly",
-  "required", "reversed", "role", "rows", "rowspan", "scope", "selected", "shape", "size", "span", "spellcheck", "start", "step",
-  "stroke", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-width", "tabindex",
-  "href", "title", "transform", "type", "value", "viewbox", "width", "wrap", "x", "x1", "x2", "y", "y1", "y2", "cx", "cy", "d", "r", "rx",
-  "ry", "points", "opacity", "preserveaspectratio", "vector-effect",
-]);
 const GENERATED_BLOCKED_ATTRIBUTES = new Set([
   "action", "archive", "background", "code", "codebase", "data", "download", "form", "formaction", "formmethod", "formenctype",
   "formtarget", "is", "manifest", "ping", "poster", "profile", "src", "srcdoc", "srcset", "style", "target", "xlink:href",
-  "autofocus", "autoplay", "command", "commandfor", "http-equiv", "nonce", "slot",
+  "autofocus", "autoplay", "command", "commandfor", "http-equiv", "nonce", "slot", "xml:base",
 ]);
 
 export class SkinExtensionUiOutputError extends Error {
@@ -137,9 +120,8 @@ function generatedNode(
   }
   if (hasTag) {
     const tag = boundedText(input.tag, 64, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "node.tag");
-    const customElementName = /^[a-z][a-z0-9]*-[a-z0-9-]+$/.test(tag);
-    if ((!GENERATED_SAFE_ELEMENTS.has(tag) && !customElementName) || GENERATED_BLOCKED_ELEMENTS.has(tag)) {
-      fail("SKIN_EXTENSION_UI_ELEMENT_INVALID", `The generated element '${tag}' is not allowed.`);
+    if (!/^[A-Za-z][A-Za-z0-9-]*$/.test(tag) || GENERATED_BLOCKED_ELEMENTS.has(tag.toLowerCase())) {
+      fail("SKIN_EXTENSION_UI_ELEMENT_INVALID", `The generated element '${tag}' is invalid or has active browser capabilities.`);
     }
     node.tag = tag;
   }
@@ -160,10 +142,8 @@ function generatedNode(
     }
     const attributes: Record<string, string | number | boolean> = Object.create(null) as Record<string, string | number | boolean>;
     for (const [key, value] of Object.entries(input.attributes)) {
-      const safeDataOrAria = key.startsWith("data-") || key.startsWith("aria-");
-      if (!/^[a-z][a-z0-9:_-]{0,63}$/.test(key) || key.startsWith("on")
-        || key.startsWith("data-ws-") || GENERATED_BLOCKED_ATTRIBUTES.has(key)
-        || (!GENERATED_SAFE_ATTRIBUTES.has(key) && !safeDataOrAria)) {
+      if (key !== key.toLowerCase() || !/^[a-z][a-z0-9:_-]{0,63}$/.test(key) || key.startsWith("on")
+        || key.startsWith("data-ws-") || GENERATED_BLOCKED_ATTRIBUTES.has(key)) {
         fail("SKIN_EXTENSION_UI_ATTRIBUTE_INVALID", `The generated attribute '${key}' is not allowed.`);
       }
       if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
@@ -257,7 +237,7 @@ function parseOutputInput(source: string): Record<string, unknown> {
     fail("SKIN_EXTENSION_UI_OUTPUT_INVALID", "Extension UI output must be a non-empty JSON string.");
   }
   if (new TextEncoder().encode(source).byteLength > SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES) {
-    fail("SKIN_EXTENSION_UI_OUTPUT_SIZE", "Extension UI output exceeds the 16 KiB UTF-8 limit.");
+    fail("SKIN_EXTENSION_UI_OUTPUT_SIZE", "Extension UI output exceeds the 256 KiB UTF-8 limit.");
   }
   let input: unknown;
   try { input = JSON.parse(source); }

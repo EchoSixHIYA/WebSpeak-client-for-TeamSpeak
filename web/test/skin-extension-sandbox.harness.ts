@@ -283,11 +283,22 @@ await test("Wasm can return one bounded UTF-8 UI payload to the host", async () 
   }
 });
 
-await test("Wasm UI output is rejected when it exceeds the host byte limit", async () => {
-  const { sandbox } = wasmExtension(createSkinExtensionWasmUiOutputProbe("x".repeat(16 * 1024 + 1)));
+await test("Wasm UI output above the former 16 KiB limit crosses the worker boundary", async () => {
+  const output = JSON.stringify({
+    schemaVersion: 4,
+    components: [{
+      id: "large-ui",
+      name: "Large UI",
+      page: "voice",
+      accessibleName: "Large UI",
+      root: { tag: "main", children: Array.from({ length: 4 }, () => ({ text: "x".repeat(7_000) })) },
+    }],
+  });
+  const { sandbox } = wasmExtension(createSkinExtensionWasmUiOutputProbe(output));
   try {
     await sandbox.ready;
-    await rejects(sandbox.result, "SKIN_EXTENSION_WASM_UI_OUTPUT_INVALID", "oversized UI output must fail closed");
+    const result = await sandbox.result;
+    equal(result.uiOutput, output, "the larger bounded UI payload should cross the worker boundary intact");
     await sandbox.stopped;
   } finally {
     sandbox.close("test-complete");

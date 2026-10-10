@@ -28,6 +28,16 @@ const eventProps: Record<string, string> = {
   pointerenter: "onPointerenter", pointerleave: "onPointerleave", dragstart: "onDragstart", dragover: "onDragover", drop: "onDrop",
 };
 
+const svgAttributeNames: Record<string, string> = {
+  basefrequency: "baseFrequency", clippathunits: "clipPathUnits", diffuseconstant: "diffuseConstant", edgemode: "edgeMode",
+  filterunits: "filterUnits", gradienttransform: "gradientTransform", gradientunits: "gradientUnits", kernelmatrix: "kernelMatrix",
+  kernelunitlength: "kernelUnitLength", lengthadjust: "lengthAdjust", markerheight: "markerHeight", markerunits: "markerUnits",
+  markerwidth: "markerWidth", numoctaves: "numOctaves", pathlength: "pathLength", pointsatx: "pointsAtX", pointsaty: "pointsAtY",
+  pointsatz: "pointsAtZ", preserveaspectratio: "preserveAspectRatio", primitiveunits: "primitiveUnits", refx: "refX", refy: "refY",
+  specularconstant: "specularConstant", specularexponent: "specularExponent", spreadmethod: "spreadMethod", startoffset: "startOffset",
+  textlength: "textLength", viewbox: "viewBox",
+};
+
 export default defineComponent({
   name: "SkinPluginOutlet",
   props: {
@@ -251,7 +261,7 @@ export default defineComponent({
       }
       const attrs: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(node.attributes ?? {})) {
-        attrs[key === "viewbox" ? "viewBox" : key] = typeof value === "string" ? interpolate(value, context, state) : value;
+        attrs[svgAttributeNames[key] ?? key] = typeof value === "string" ? interpolate(value, context, state) : value;
       }
       if (node.asset) {
         const url = assetUrl(node.asset);

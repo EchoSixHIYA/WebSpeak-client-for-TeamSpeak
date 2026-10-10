@@ -84,8 +84,8 @@ test("the fixed Wasmi artifact caps its own memory and stops guest execution at 
   });
   assert.equal(run(createSkinExtensionWasmUiInputProbe(true), uiInput).error, 13,
     "the host must reject a second UI input read in one guest invocation");
-  assert.equal(run(createSkinExtensionWasmUiOutputProbe("x".repeat(16 * 1024 + 1))).error, 12,
-    "the interpreter must reject a UI payload above its byte cap");
+  assert.equal(run(createSkinExtensionWasmUiOutputProbe("x".repeat(16 * 1024 + 1))).uiOutput?.length, 16 * 1024 + 1,
+    "the interpreter must accept payloads larger than the previous 16 KiB cap");
   assert.equal(run(createSkinExtensionWasmUiOutputProbe('{"type":"root"}', true)).error, 12,
     "the interpreter must reject more than one UI payload per execution");
 

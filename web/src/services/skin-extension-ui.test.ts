@@ -81,6 +81,53 @@ test("generated UI supports broad safe markup, ARIA/data attributes, and inert c
   assert.equal(document.components[0].root.children?.[1].tag, "button");
 });
 
+test("generated UI supports standard elements and attributes without a fixed presentation allowlist", () => {
+  const document = parseSkinExtensionUiOutput(generatedOutput("custom-layout", {
+    tag: "dialog",
+    attributes: { open: true, inert: true, "aria-roledescription": "voice panel", "data-layout-state": "expanded" },
+    children: [{ tag: "menu", attributes: { type: "toolbar", "aria-label": "Voice tools" }, children: [{ tag: "picture" }] }],
+  }));
+  assert.equal(document.components[0].root.tag, "dialog");
+  assert.equal(document.components[0].root.attributes?.inert, true);
+  assert.equal(document.components[0].root.children?.[0].tag, "menu");
+  assert.equal(document.components[0].root.children?.[0].children?.[0].tag, "picture");
+});
+
+test("generated SVG restores case-sensitive standard attribute names in host-rendered markup", async () => {
+  const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.test",
+    skinVersion: "1.0.0",
+    document: { schemaVersion: 3, components: [] },
+    extensionOutput: generatedOutput("svg-ui", {
+      tag: "svg",
+      attributes: { viewbox: "0 0 24 24", preserveaspectratio: "xMidYMid meet" },
+      children: [{ tag: "linearGradient", attributes: { id: "paint", gradientunits: "userSpaceOnUse" } }],
+    }),
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+  }));
+  assert.match(html, /viewBox="0 0 24 24"/);
+  assert.match(html, /preserveAspectRatio="xMidYMid meet"/);
+  assert.match(html, /gradientUnits="userSpaceOnUse"/);
+});
+
+test("generated UI can exceed the former 16 KiB output ceiling while staying within the new package-sized limit", () => {
+  const source = JSON.stringify({
+    schemaVersion: 4,
+    components: [{
+      id: "expanded-ui",
+      name: "Expanded UI",
+      page: "voice",
+      accessibleName: "Expanded UI",
+      root: { tag: "main", children: Array.from({ length: 4 }, () => ({ text: "x".repeat(7_000) })) },
+    }],
+  });
+  assert.ok(new TextEncoder().encode(source).byteLength > 16 * 1024);
+  assert.ok(parseSkinExtensionUiOutput(source).components.length === 1);
+});
+
 test("generated screen-share host widget requires permission and renders as an interactive host control", async () => {
   const source = generatedOutput("share-control", {
     tag: "section",
@@ -264,7 +311,8 @@ test("generated UI rejects executable elements, event handlers, and network/navi
   expectOutputError(generatedOutput("runtime-ui", { tag: "img", attributes: { src: "https://example.invalid/a.png" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
   expectOutputError(generatedOutput("runtime-ui", { tag: "a", attributes: { href: "https://example.invalid/" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
   expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { style: "display:none" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
-  expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { mystery: "value" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+  expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { "bad name": "value" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+  expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { Onclick: "run" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
   expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { "data-ws-part": "spoofed" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
 });
 

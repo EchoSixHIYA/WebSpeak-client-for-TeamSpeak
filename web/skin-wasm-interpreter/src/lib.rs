@@ -6,7 +6,7 @@ use wasmi::{
 const SOURCE_LIMIT: usize = 256 * 1024;
 const STATUS_LIMIT: usize = 512;
 const UI_INPUT_LIMIT: usize = 64 * 1024;
-const UI_OUTPUT_LIMIT: usize = 16 * 1024;
+const UI_OUTPUT_LIMIT: usize = 256 * 1024;
 const MEMORY_LIMIT_BYTES: usize = 64 * 64 * 1024;
 const STATUS_READ_LIMIT: u32 = 10;
 const FUEL_LIMIT: u64 = 10_000_000;
