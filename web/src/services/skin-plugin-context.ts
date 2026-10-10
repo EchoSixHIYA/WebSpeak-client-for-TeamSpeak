@@ -5,6 +5,7 @@ export interface SkinPluginQuickServer {
   id: string;
   label: string;
   monogram: string;
+  tone: number;
   current: boolean;
   kind: "favorite" | "recent";
   favorite: boolean;
@@ -12,6 +13,12 @@ export interface SkinPluginQuickServer {
 
 function randomOpaqueId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `quick-server-${Math.random().toString(36).slice(2)}`;
+}
+
+function safeLabelTone(label: string): number {
+  let hash = 0;
+  for (let index = 0; index < label.length; index++) hash = (Math.imul(hash, 31) + label.charCodeAt(index)) | 0;
+  return (hash >>> 0) % 7;
 }
 
 function containsConnectionTarget(label: string, address: string): boolean {
@@ -47,6 +54,7 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
           id: opaqueId,
           label: safeLabel,
           monogram: Array.from(safeLabel)[0] ?? "?",
+          tone: safeLabelTone(safeLabel),
           current: isCurrent(server),
           kind: server.isFavorite ? "favorite" : "recent",
           favorite: server.isFavorite,

@@ -258,6 +258,9 @@
                       {
                         "tag": "span",
                         "part": "server-monogram",
+                        "attributes": {
+                          "data-tone": "{{server.tone}}"
+                        },
                         "children": [
                           {
                             "text": "{{server.monogram}}"

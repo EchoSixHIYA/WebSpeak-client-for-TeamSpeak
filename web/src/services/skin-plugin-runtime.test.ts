@@ -68,6 +68,7 @@ test("skin quick-server data redacts connection targets and resolves only host-g
     ["Recent 2", "R"],
     ["Friends", "F"],
   ]);
+  assert.ok(rows.every(({ tone }) => Number.isInteger(tone) && tone >= 0 && tone < 7));
   assert.deepEqual(rows.map(({ label, kind, favorite, current }) => [label, kind, favorite, current]), [
     ["Favorite 1", "favorite", true, false],
     ["Recent 2", "recent", false, false],
@@ -75,6 +76,10 @@ test("skin quick-server data redacts connection targets and resolves only host-g
   ]);
   assert.equal(JSON.stringify(rows).includes("192.0.2.10"), false);
   assert.equal(JSON.stringify(rows).includes("voice.example"), false);
+  const friendsTone = rows.find(({ label }) => label === "Friends")?.tone;
+  const reorderedTone = projection.project([servers[2], servers[0], servers[1]], (server) => server.id === "voice2.example:9987")
+    .find(({ label }) => label === "Friends")?.tone;
+  assert.equal(reorderedTone, friendsTone, "a server keeps its color tone when its saved-list position changes");
   assert.equal(projection.resolve("opaque-1")?.address, "192.0.2.10:9987");
   assert.equal(projection.resolve("192.0.2.10:9987"), undefined);
 });
