@@ -5,6 +5,8 @@
   min-width: 0;
 }
 
+.ws-skin-mount-slot { display: contents; }
+
 .ws-plugin-consent-backdrop {
   position: fixed;
   inset: 0;

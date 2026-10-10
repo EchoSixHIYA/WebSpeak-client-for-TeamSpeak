@@ -9,7 +9,7 @@ import {
   type SkinExtensionSandboxHandle,
 } from "../src/services/skin-extension-sandbox.js";
 import {
-  createSkinExtensionWasmSandboxPrototype,
+  createSkinExtensionWasmSandbox,
   SKIN_EXTENSION_WASM_RUNTIME_ENABLED,
   type SkinExtensionWasmSandboxHandle,
 } from "../src/services/skin-extension-wasm-sandbox.js";
@@ -95,7 +95,7 @@ function wasmExtension(
     permissions,
   });
   let statusReads = 0;
-  const sandbox = createSkinExtensionWasmSandboxPrototype({
+  const sandbox = createSkinExtensionWasmSandbox({
     manifest,
     approval: createSkinExtensionApproval(manifest),
     wasmBytes,
@@ -103,7 +103,6 @@ function wasmExtension(
       statusReads += 1;
       return readSessionStatus(signal);
     },
-    prototypeOnly: true,
   });
   return { sandbox, get statusReads() { return statusReads; } };
 }
@@ -205,9 +204,9 @@ async function waitForReady(sandbox: SkinExtensionSandboxHandle): Promise<void> 
   }
 }
 
-await test("production extension runtime remains disabled", async () => {
+await test("production keeps JavaScript disabled and enables the bounded Wasm runtime", async () => {
   assert(SKIN_EXTENSION_RUNTIME_ENABLED === false, "Executable extensions must remain disabled.");
-  assert(SKIN_EXTENSION_WASM_RUNTIME_ENABLED === false, "The Wasm prototype must remain disabled in production.");
+  assert(SKIN_EXTENSION_WASM_RUNTIME_ENABLED === true, "The bounded Wasm runtime should be available after explicit approval.");
 });
 
 await test("a data worker inherits network CSP and can be terminated while its owner stays responsive", async () => {
@@ -256,7 +255,7 @@ await test("opaque-origin sandbox still permits its own URL navigation", async (
   }
 });
 
-await test("the development Wasm prototype bounds linear memory at 64 pages", async () => {
+await test("the approved Wasm runtime bounds linear memory at 64 pages", async () => {
   const { sandbox } = wasmExtension(createSkinExtensionWasmCappedRunProbe());
   try {
     await sandbox.ready;

@@ -47,6 +47,7 @@ test("plugin digest is deterministic and binds all declared source, style, asset
   assert.notEqual(first, await computeSkinRuntimePluginDigest(definition, files(undefined, undefined, "icon-v2")));
   assert.notEqual(first, await computeSkinRuntimePluginDigest(plugin({ permissions: [] }), packageFiles));
   assert.notEqual(first, await computeSkinRuntimePluginDigest(plugin({ mode: "surface", permissions: ["ui.surface.replace"] }), packageFiles));
+  assert.notEqual(first, await computeSkinRuntimePluginDigest(plugin({ mount: "voice.chat.before" }), packageFiles));
 });
 
 test("plugin approval is pinned to skin and plugin versions, content digest, and permission policy", async () => {

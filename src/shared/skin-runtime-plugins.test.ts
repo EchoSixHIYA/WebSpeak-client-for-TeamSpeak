@@ -70,6 +70,26 @@ test("surface replacement is an explicit page-scoped plugin capability", () => {
   );
 });
 
+test("runtime plugins can request explicit access to values from their own UI inputs", () => {
+  const inputReader = parseSkinRuntimePluginDocument(document([{ ...plugin, permissions: ["ui.input.read"] }]) as never);
+  assert.deepEqual(inputReader.plugins[0].permissions, ["ui.input.read"]);
+});
+
+test("runtime widget mount slots are page-scoped and included in the parsed descriptor", () => {
+  const voiceWidget = parseSkinRuntimePluginDocument(document([{ ...plugin, mount: "voice.chat.before" }]) as never);
+  assert.equal(voiceWidget.plugins[0].mount, "voice.chat.before");
+  for (const value of [
+    { ...plugin, mount: "voice.chat.before", page: "home" },
+    { ...plugin, mount: "admin.header" },
+    { ...plugin, mode: "surface", mount: "voice.workspace.overlay", permissions: ["ui.surface.replace"] },
+  ]) {
+    assert.throws(
+      () => parseSkinRuntimePluginDocument(document([value]) as never),
+      (error: unknown) => error instanceof SkinRuntimePluginValidationError && error.code === "SKIN_RUNTIME_PLUGIN_MOUNT_INVALID",
+    );
+  }
+});
+
 test("v4 plugin descriptors reject unknown fields, path escape, wrong ownership, and executable assets", () => {
   const cases: Array<[unknown, string]> = [
     [{ ...plugin, arbitraryCodeHook: "run" }, "SKIN_RUNTIME_PLUGIN_FIELD_INVALID"],

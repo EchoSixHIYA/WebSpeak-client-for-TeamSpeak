@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 3,
+  "components": [
+    {
+      "id": "harbor-home",
+      "name": "Harbor connection home",
+      "page": "home",
+      "mode": "surface",
+      "accessibleName": "WebSpeak connection page",
+      "permissions": ["ui.surface.replace"],
+      "actions": {},
+      "root": {
+        "tag": "main",
+        "part": "home",
+        "children": [
+          {
+            "tag": "header",
+            "part": "home-header",
+            "children": [
+              { "tag": "span", "part": "brand-mark", "children": [{ "text": "W" }] },
+              { "tag": "span", "part": "brand-name", "children": [{ "text": "WEBSPEAK" }] },
+              { "widget": "app.language-switcher", "part": "language" },
+              { "widget": "app.skin-switcher", "part": "skin" }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "connection-card",
+            "children": [
+              { "tag": "p", "part": "eyebrow", "children": [{ "text": "VOICE CLIENT" }] },
+              { "tag": "h1", "part": "title", "children": [{ "text": "Connect with your community" }] },
+              { "tag": "p", "part": "description", "children": [{ "text": "Choose a TeamSpeak server and return to your voice channels." }] },
+              { "widget": "home.connection-form", "part": "connection-form" }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "home-footer",
+            "children": [{ "text": "Your connection and identity stay under WebSpeak's control." }]
+          }
+        ]
+      }
+    },
+    {
+      "id": "harbor-workspace",
+      "name": "Harbor voice workspace",
+      "page": "voice",
+      "mode": "surface",
+      "accessibleName": "WebSpeak voice workspace",
+      "permissions": [
+        "ui.surface.replace",
+        "session.status.read",
+        "session.channels.read",
+        "session.members.read",
+        "session.channel.join",
+        "servers.quickList.read",
+        "servers.quickList.switch"
+      ],
+      "actions": {
+        "switch-server": {
+          "type": "quickServers.switch",
+          "args": { "quickServerId": "{{server.id}}" }
+        },
+        "join-channel": {
+          "type": "voice.joinChannel",
+          "args": { "channelId": "{{channel.id}}" }
+        }
+      },
+      "root": {
+        "tag": "main",
+        "part": "workspace",
+        "children": [
+          {
+            "tag": "header",
+            "part": "topbar",
+            "children": [
+              { "tag": "span", "part": "brand-mark", "children": [{ "text": "W" }] },
+              { "tag": "span", "part": "brand-name", "children": [{ "text": "WEBSPEAK" }] },
+              { "tag": "span", "part": "server-title", "children": [{ "text": "{{session.status.serverLabel}}" }] },
+              { "widget": "app.language-switcher", "part": "language" },
+              { "widget": "app.skin-switcher", "part": "skin" }
+            ]
+          },
+          {
+            "tag": "nav",
+            "part": "server-rail",
+            "attributes": { "aria-label": "Favorite and recent servers" },
+            "children": [
+              {
+                "tag": "div",
+                "part": "quick-server-item",
+                "repeat": { "path": "servers.quickList", "as": "server" },
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "quick-server",
+                    "attributes": {
+                      "type": "button",
+                      "aria-current": "{{server.current}}",
+                      "aria-label": "Switch to {{server.label}}"
+                    },
+                    "events": { "click": "switch-server" },
+                    "children": [
+                      { "tag": "span", "part": "server-monogram", "children": [{ "text": "{{server.label}}" }] },
+                      {
+                        "tag": "span",
+                        "part": "server-kind",
+                        "when": { "path": "server.favorite", "equals": true },
+                        "children": [{ "text": "Saved" }]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "server-kind",
+                        "when": { "path": "server.kind", "equals": "recent" },
+                        "children": [{ "text": "Recent" }]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "channel-panel",
+            "attributes": { "aria-label": "Server channels" },
+            "children": [
+              {
+                "tag": "header",
+                "part": "server-summary",
+                "children": [
+                  { "tag": "strong", "part": "server-name", "children": [{ "text": "{{session.status.serverLabel}}" }] },
+                  { "tag": "small", "part": "server-subtitle", "children": [{ "text": "VOICE CHANNELS" }] }
+                ]
+              },
+              {
+                "tag": "nav",
+                "part": "channel-list",
+                "attributes": { "aria-label": "Channels" },
+                "children": [
+                  { "tag": "h2", "part": "section-label", "children": [{ "text": "CHANNELS" }] },
+                  {
+                    "tag": "div",
+                    "part": "channel-item",
+                    "repeat": { "path": "session.channels", "as": "channel" },
+                    "children": [
+                      {
+                        "tag": "button",
+                        "part": "channel-row",
+                        "attributes": {
+                          "type": "button",
+                          "aria-current": "{{channel.current}}",
+                          "aria-label": "Join {{channel.name}}"
+                        },
+                        "events": { "dblclick": "join-channel" },
+                        "children": [
+                          { "tag": "span", "part": "channel-glyph", "children": [{ "text": "◉" }] },
+                          { "tag": "span", "part": "channel-name", "children": [{ "text": "{{channel.name}}" }] },
+                          { "tag": "small", "part": "channel-count", "children": [{ "text": "{{channel.memberCount}}" }] }
+                        ]
+                      },
+                      {
+                        "tag": "ul",
+                        "part": "channel-voice-members",
+                        "when": { "path": "channel.current", "equals": true },
+                        "attributes": { "aria-label": "Members connected to this channel" },
+                        "children": [
+                          {
+                            "tag": "li",
+                            "part": "channel-voice-member",
+                            "repeat": { "path": "channel.members", "as": "voicemember" },
+                            "children": [
+                              { "tag": "span", "part": "channel-member-avatar", "children": [{ "text": "{{voicemember.name}}" }] },
+                              { "tag": "span", "part": "channel-member-name", "children": [{ "text": "{{voicemember.name}}" }] },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-state",
+                                "when": { "path": "voicemember.self", "equals": true },
+                                "children": [{ "text": "YOU" }]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-state",
+                                "when": { "path": "voicemember.speaking", "equals": true },
+                                "attributes": { "aria-label": "Speaking" },
+                                "children": [{ "text": "●" }]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "conversation",
+            "attributes": { "aria-label": "Current channel conversation" },
+            "children": [
+              {
+                "tag": "header",
+                "part": "conversation-heading",
+                "children": [
+                  { "tag": "span", "part": "conversation-glyph", "children": [{ "text": "◉" }] },
+                  { "tag": "h1", "part": "channel-title", "children": [{ "text": "{{session.status.channelName}}" }] },
+                  {
+                    "tag": "span",
+                    "part": "connection-state",
+                    "when": { "path": "session.status.connected", "equals": true },
+                    "children": [{ "text": "CONNECTED" }]
+                  }
+                ]
+              },
+              { "widget": "voice.chat-panel", "part": "chat" },
+              { "widget": "voice.screen-share-player", "part": "screen-player" }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "members-panel",
+            "attributes": { "aria-label": "Members in this channel" },
+            "children": [
+              {
+                "tag": "header",
+                "part": "members-heading",
+                "children": [
+                  { "tag": "h2", "part": "section-label", "children": [{ "text": "MEMBERS" }] }
+                ]
+              },
+              {
+                "tag": "ul",
+                "part": "member-list",
+                "children": [
+                  {
+                    "tag": "li",
+                    "part": "member-row",
+                    "repeat": { "path": "session.members", "as": "member" },
+                    "children": [
+                      { "tag": "span", "part": "member-avatar", "children": [{ "text": "{{member.name}}" }] },
+                      { "tag": "span", "part": "member-name", "children": [{ "text": "{{member.name}}" }] },
+                      {
+                        "tag": "span",
+                        "part": "speaking-indicator",
+                        "when": { "path": "member.speaking", "equals": true },
+                        "attributes": { "aria-label": "Speaking" },
+                        "children": [{ "text": "SPEAKING" }]
+                      }
+                    ]
+                  }
+                ]
+              },
+              { "widget": "voice.whisper-controls", "part": "whisper-controls" }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "voice-dock",
+            "attributes": { "aria-label": "Voice controls" },
+            "children": [
+              {
+                "tag": "div",
+                "part": "voice-dock-heading",
+                "children": [
+                  { "tag": "span", "part": "connection-indicator", "children": [{ "text": "●" }] },
+                  { "tag": "strong", "part": "voice-channel-name", "children": [{ "text": "{{session.status.channelName}}" }] },
+                  { "tag": "span", "part": "voice-dock-caption", "children": [{ "text": "VOICE CONNECTED" }] }
+                ]
+              },
+              { "widget": "voice.audio-controls", "part": "audio-controls" },
+              { "widget": "voice.disconnect-control", "part": "disconnect-control" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

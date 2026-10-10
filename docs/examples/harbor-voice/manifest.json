@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "packageType": "open-skin",
+  "id": "community.harbor-voice",
+  "name": "Harbor Voice Workspace",
+  "version": "1.0.0",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "A KOOK-inspired dark voice workspace using only WebSpeak host controls and public session data.",
+  "entry": "skin.css",
+  "components": "components.json",
+  "minAppVersion": "0.2.7-preview"
+}

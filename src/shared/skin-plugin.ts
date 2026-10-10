@@ -13,6 +13,7 @@ export const SKIN_PLUGIN_RENDER_NODE_LIMIT = 8192;
 
 export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.surface.replace": Object.freeze({ policyVersion: 1, description: "Replace the built-in public page with a custom skin surface; the host recovery controls remain available." }),
+  "ui.input.read": Object.freeze({ policyVersion: 1, description: "Read values entered or autofilled in this plugin's own input fields. Never enter passwords or other secrets." }),
   "session.status.read": Object.freeze({ policyVersion: 1, description: "Read the current connection and channel summary." }),
   "session.channels.read": Object.freeze({ policyVersion: 1, description: "Read the public TeamSpeak channel tree; the demo page uses synthetic sample data." }),
   "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names and speaking states; the demo page uses synthetic sample data." }),

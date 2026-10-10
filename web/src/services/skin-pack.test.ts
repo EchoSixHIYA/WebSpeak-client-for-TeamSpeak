@@ -4,7 +4,7 @@ import test from "node:test";
 import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
-import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import type { SkinPluginDocument, SkinPluginNode } from "../../../src/shared/skin-plugin.js";
 import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 
 const manifest = {
@@ -511,6 +511,37 @@ test("the full voice surface example packages home, voice, and host-owned contro
   assert.ok(voiceSurface?.permissions.includes("session.channels.read"));
   assert.ok(voiceSurface?.permissions.includes("session.members.read"));
   assert.ok(skin.css.includes("@media (max-width: 800px)"));
+});
+
+test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspace", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/harbor-voice.wskin", import.meta.url));
+  const file = new File([archive], "harbor-voice.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.harbor-voice");
+  assert.equal(skin.pluginData?.schemaVersion, 3);
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.page, component.mode]), [
+    ["home", "surface"], ["voice", "surface"],
+  ]);
+  const voiceSurface = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voiceSurface?.permissions.includes("session.channel.join"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
+    if (!node) return undefined;
+    if (node.part === part) return node;
+    for (const child of node.children ?? []) {
+      const found = findPart(child, part);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const channelRow = findPart(voiceSurface?.root, "channel-row");
+  assert.equal(channelRow?.events?.dblclick, "join-channel", "channel switching follows TeamSpeak's double-click join behavior");
+  const channelVoiceMembers = findPart(voiceSurface?.root, "channel-voice-members");
+  assert.equal(channelVoiceMembers?.when?.path, "channel.current");
+  assert.equal(findPart(channelVoiceMembers, "channel-voice-member")?.repeat?.path, "channel.members");
+  assert.ok(skin.css.includes("@media (max-width: 820px)"));
+  assert.ok(!skin.css.includes("https://"), "the skin uses no remote artwork or font resources");
 });
 
 function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = {}): File {

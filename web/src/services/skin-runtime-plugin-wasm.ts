@@ -14,7 +14,7 @@ import { SKIN_PLUGIN_ACTION_PERMISSIONS } from "../../../src/shared/skin-plugin.
 import { projectSkinRuntimePluginContext, SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import {
-  createSkinExtensionWasmSandboxPrototype,
+  createSkinExtensionWasmSandbox,
   type SkinExtensionWasmSandboxHandle,
 } from "./skin-extension-wasm-sandbox.js";
 
@@ -35,22 +35,20 @@ export interface SkinRuntimePluginWasmOptions {
   /** Trusted WebClient snapshot; it is projected using the plugin's declared read permissions. */
   context?: unknown;
   readSessionStatus: (signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>;
-  prototypeOnly: true;
 }
 
-const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, ...SKIN_PLUGIN_ACTION_PERMISSIONS, "ui.surface.replace"]);
+const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS, ...SKIN_PLUGIN_ACTION_PERMISSIONS, "ui.surface.replace", "ui.input.read"]);
 
 /** Starts a Wasm entry only after rechecking the exact package digest and local approval. */
-export async function createSkinRuntimePluginWasmSandboxPrototype(
+export async function createSkinRuntimePluginWasmSandbox(
   options: SkinRuntimePluginWasmOptions,
 ): Promise<SkinExtensionWasmSandboxHandle> {
-  if (options.prototypeOnly !== true) throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_PROTOTYPE_ONLY", "The Wasm runner is a development-only security prototype.");
   const plugin = parseSkinRuntimePluginDocument({ schemaVersion: 1, plugins: [options.plugin] }).plugins[0];
   if (plugin.runtime !== "wasm") throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_ENTRY_INVALID", "Only a Wasm plugin entry can use the bounded Wasm runner.");
 
   const unsupportedPermission = plugin.permissions.find((permission) => !WASM_PROTOTYPE_PERMISSIONS.has(permission));
   if (unsupportedPermission) {
-    throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_PERMISSION_UNSUPPORTED", `The Wasm prototype does not implement ${unsupportedPermission}.`);
+    throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_PERMISSION_UNSUPPORTED", `The Wasm runtime does not implement ${unsupportedPermission}.`);
   }
 
   const digest = await computeSkinRuntimePluginDigest(plugin, options.files);
@@ -80,12 +78,11 @@ export async function createSkinRuntimePluginWasmSandboxPrototype(
   });
 
   // This legacy approval object is created only after the v4 digest-bound host approval above.
-  return createSkinExtensionWasmSandboxPrototype({
+  return createSkinExtensionWasmSandbox({
     manifest,
     approval: createSkinExtensionApproval(manifest),
     wasmBytes,
     uiInput,
     readSessionStatus: options.readSessionStatus,
-    prototypeOnly: true,
   });
 }

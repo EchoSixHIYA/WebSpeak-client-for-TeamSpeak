@@ -21,7 +21,7 @@ import {
   SKIN_EXTENSION_UI_INPUT_LIMIT_BYTES,
 } from "../../../src/shared/skin-extension-ui-input.js";
 
-export const SKIN_EXTENSION_WASM_RUNTIME_ENABLED = false as const;
+export const SKIN_EXTENSION_WASM_RUNTIME_ENABLED = true as const;
 
 export class SkinExtensionWasmSandboxError extends Error {
   constructor(readonly code: string, message: string) {
@@ -46,8 +46,6 @@ export interface SkinExtensionWasmSandboxOptions {
   /** Bounded local component state and optional safe fields from a trusted UI event. */
   uiInput?: unknown;
   readSessionStatus: (signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>;
-  /** This prototype is available only to the development security harness. */
-  prototypeOnly: true;
 }
 
 export interface SkinExtensionWasmSandboxHandle {
@@ -72,9 +70,8 @@ function messageSize(value: unknown): number {
   catch { return SKIN_EXTENSION_WASM_MESSAGE_LIMIT + 1; }
 }
 
-/** Development-only Wasm runner: no author JavaScript is evaluated and every job owns one terminable Worker. */
-export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWasmSandboxOptions): SkinExtensionWasmSandboxHandle {
-  if (options.prototypeOnly !== true) throw new SkinExtensionWasmSandboxError("SKIN_EXTENSION_WASM_PROTOTYPE_ONLY", "The Wasm runner is a development-only security prototype.");
+/** Runs one approved Wasm module in a disposable worker with bounded memory and execution. */
+export function createSkinExtensionWasmSandbox(options: SkinExtensionWasmSandboxOptions): SkinExtensionWasmSandboxHandle {
   if (!(options.wasmBytes instanceof Uint8Array) || !options.wasmBytes.byteLength || options.wasmBytes.byteLength > SKIN_EXTENSION_WASM_SOURCE_LIMIT) {
     throw new SkinExtensionWasmSandboxError("SKIN_EXTENSION_WASM_SIZE", "The extension module is empty or exceeds its source limit.");
   }
@@ -92,7 +89,7 @@ export function createSkinExtensionWasmSandboxPrototype(options: SkinExtensionWa
   const wasmBytes = options.wasmBytes.slice();
   const worker = new Worker(new URL("./skin-extension-wasm-worker.ts", import.meta.url), {
     type: "module",
-    name: "webspeak-skin-extension-wasm-prototype",
+    name: "webspeak-skin-extension-wasm",
   });
 
   let active = true;

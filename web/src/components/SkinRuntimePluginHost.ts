@@ -1,14 +1,15 @@
-import { computed, defineComponent, h, onUnmounted, ref, Teleport, watch, type PropType, type VNodeChild } from "vue";
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, shallowRef, Teleport, watch, type PropType, type VNodeChild } from "vue";
 import type { SkinExtensionSessionStatus } from "../../../src/shared/skin-extension.js";
 import { computeSkinRuntimePluginDigest, createSkinRuntimePluginApproval, isSkinRuntimePluginApproved, type SkinRuntimePluginApproval } from "../../../src/shared/skin-runtime-plugin-approval.js";
 import type { SkinRuntimePlugin, SkinRuntimePluginDocument, SkinRuntimePluginPage } from "../../../src/shared/skin-runtime-plugins.js";
 import { parseSkinExtensionUiInput, type SkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
-import { SKIN_PLUGIN_ACTION_PERMISSIONS, skinPluginActionPermission, type SkinPluginAction, type SkinPluginDocument, type SkinPluginHostWidget } from "../../../src/shared/skin-plugin.js";
+import { SKIN_PLUGIN_ACTION_PERMISSIONS, SKIN_PLUGIN_PERMISSIONS, skinPluginActionPermission, type SkinPluginAction, type SkinPluginDocument, type SkinPluginHostWidget } from "../../../src/shared/skin-plugin.js";
 import { SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import SkinPluginOutlet from "./SkinPluginOutlet.js";
 import { approveSkinRuntimePlugin, getSkinRuntimePluginApproval, revokeSkinRuntimePluginApprovals } from "../services/skin-runtime-plugin-approval.js";
 import { createSkinRuntimePluginSession } from "../services/skin-runtime-plugin-session.js";
-import { createSkinRuntimePluginWasmSandboxPrototype } from "../services/skin-runtime-plugin-wasm.js";
+import { createSkinRuntimePluginWasmSandbox } from "../services/skin-runtime-plugin-wasm.js";
+import { skinRuntimePluginWasmGovernor } from "../services/skin-runtime-plugin-wasm-governor.js";
 import type { SkinExtensionWasmSandboxHandle } from "../services/skin-extension-wasm-sandbox.js";
 import { resolveSkinCssAssets } from "../services/skin-pack.js";
 
@@ -17,6 +18,7 @@ const SUPPORTED_PERMISSIONS = new Set([
   ...SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS,
   ...SKIN_PLUGIN_ACTION_PERMISSIONS,
   "ui.surface.replace",
+  "ui.input.read",
 ]);
 type HostActionHandler = (args: Record<string, string | number | boolean>) => void | Promise<void>;
 
@@ -24,16 +26,15 @@ type Session = ReturnType<typeof createSkinRuntimePluginSession>;
 type RunHandle = { result: Promise<{ uiOutput: string | null }>; close(reason?: string): void };
 
 function isSupported(plugin: SkinRuntimePlugin): boolean {
-  return import.meta.env.DEV && plugin.runtime === "wasm"
+  return plugin.runtime === "wasm"
     && plugin.permissions.every((permission) => SUPPORTED_PERMISSIONS.has(permission));
 }
 
 function pluginReason(plugin: SkinRuntimePlugin): string {
-  if (!import.meta.env.DEV) return "The Wasm runtime prototype is disabled in production builds. / Wasm 运行时原型在生产构建中保持关闭。";
   if (plugin.runtime !== "wasm") return "JavaScript plugins are not enabled. / JavaScript 插件尚未启用。";
   const permission = plugin.permissions.find((candidate) => !SUPPORTED_PERMISSIONS.has(candidate));
   return permission
-    ? `This prototype does not implement ${permission}. / 当前原型尚未实现 ${permission}。`
+    ? `This runtime does not implement ${permission}. / 当前运行时尚未实现 ${permission}。`
     : "";
 }
 
@@ -49,31 +50,40 @@ function createRun(
 ): RunHandle {
   let sandbox: SkinExtensionWasmSandboxHandle | null = null;
   let cancelled = false;
+  let releaseSlot: (() => void) | null = null;
+  const abortController = new AbortController();
   const result = (async () => {
-    const nextSandbox = await createSkinRuntimePluginWasmSandboxPrototype({
-      skinId,
-      skinVersion,
-      plugin,
-      approval,
-      files,
-      uiInput: input,
-      context,
-      readSessionStatus,
-      prototypeOnly: true,
-    });
-    if (cancelled) {
-      nextSandbox.close("page-or-skin-changed");
-      throw new Error("Plugin run was closed before startup.");
+    releaseSlot = await skinRuntimePluginWasmGovernor.acquire(abortController.signal);
+    try {
+      if (cancelled) throw new Error("Plugin run was closed before startup.");
+      const nextSandbox = await createSkinRuntimePluginWasmSandbox({
+        skinId,
+        skinVersion,
+        plugin,
+        approval,
+        files,
+        uiInput: input,
+        context,
+        readSessionStatus,
+      });
+      if (cancelled) {
+        nextSandbox.close("page-or-skin-changed");
+        throw new Error("Plugin run was closed before startup.");
+      }
+      sandbox = nextSandbox;
+      await nextSandbox.ready;
+      const outcome = await nextSandbox.result;
+      return { uiOutput: outcome.uiOutput };
+    } finally {
+      releaseSlot?.();
+      releaseSlot = null;
     }
-    sandbox = nextSandbox;
-    await nextSandbox.ready;
-    const outcome = await nextSandbox.result;
-    return { uiOutput: outcome.uiOutput };
   })();
   return {
     result,
     close(reason) {
       cancelled = true;
+      abortController.abort(reason);
       sandbox?.close(reason);
     },
   };
@@ -89,6 +99,7 @@ export default defineComponent({
     styles: { type: Object as PropType<Record<string, string>>, default: () => ({}) },
     assets: { type: Object as PropType<Record<string, Blob>>, default: () => ({}) },
     page: { type: String as PropType<SkinRuntimePluginPage>, required: true },
+    mountRevision: { type: String, default: "" },
     context: { type: Object as PropType<Record<string, unknown>>, default: () => ({}) },
     actions: { type: Object as PropType<Partial<Record<SkinPluginAction, HostActionHandler>>>, default: () => ({}) },
     widgets: { type: Object as PropType<Partial<Record<SkinPluginHostWidget, () => VNodeChild>>>, default: () => ({}) },
@@ -110,6 +121,7 @@ export default defineComponent({
     const outputs = ref<Record<string, string | null>>({});
     const surfaces = ref(new Set<string>());
     const suppressedSurfaces = ref(new Set<string>());
+    const mountTargets = shallowRef<Record<string, Element>>({});
     let digestRun = 0;
     let disposed = false;
     let contextRefreshTimer: number | undefined;
@@ -128,6 +140,17 @@ export default defineComponent({
     });
     const activeSurface = computed(() => pagePlugins.value.some((plugin) => plugin.mode === "surface"
       && surfaces.value.has(plugin.id) && !suppressedSurfaces.value.has(plugin.id)));
+
+    function refreshMountTargets(): void {
+      if (typeof document === "undefined") return;
+      const targets: Record<string, Element> = Object.create(null) as Record<string, Element>;
+      for (const plugin of pagePlugins.value) {
+        if (!plugin.mount) continue;
+        const target = document.querySelector(`[data-ws-skin-mount="${plugin.mount}"]`);
+        if (target) targets[plugin.id] = target;
+      }
+      mountTargets.value = targets;
+    }
 
     function publishSurfaceState(): void {
       emit("surface-change", activeSurface.value);
@@ -322,6 +345,8 @@ export default defineComponent({
       }, 100);
     }, { deep: true });
     watch(activeSurface, publishSurfaceState, { flush: "sync" });
+    onMounted(() => { void nextTick(refreshMountTargets); });
+    watch([() => props.page, () => props.mountRevision, activeSurface], () => { void nextTick(refreshMountTargets); }, { flush: "post" });
     onUnmounted(() => {
       disposed = true;
       digestRun += 1;
@@ -334,7 +359,7 @@ export default defineComponent({
       for (const plugin of currentPlugins) {
         const generatedOutput = suppressedSurfaces.value.has(plugin.id) ? null : outputs.value[plugin.id] ?? null;
         const pluginAssets = outputAssets(plugin);
-        nodes.push(h("div", {
+        const layoutRoot = h("div", {
           key: `${props.skinId}:${plugin.id}:layout-root:${props.page}`,
           class: "ws-runtime-plugin-root",
           "data-ws-runtime-plugin-root": plugin.id,
@@ -357,7 +382,9 @@ export default defineComponent({
           onExtensionEvent: (event: unknown) => dispatch(plugin.id, event),
           onSurfaceChange: (active: boolean) => surfaceChanged(plugin.id, active),
           onRestoreSkin: () => emit("restore-skin"),
-        })]));
+        })]);
+        const mountTarget = plugin.mount ? mountTargets.value[plugin.id] : undefined;
+        nodes.push(mountTarget ? h(Teleport, { to: mountTarget }, [layoutRoot]) : layoutRoot);
       }
 
       const controls: VNodeChild[] = [];
@@ -403,12 +430,15 @@ export default defineComponent({
             return h("div", { class: "ws-plugin-consent-item", key: plugin.id }, [
               h("strong", null, `${plugin.name} · ${plugin.mode === "surface" ? "整页界面 / surface" : "组件 / widget"}`),
               h("ul", null, [
-                ...plugin.permissions.map((permission) => h("li", { key: permission }, permission)),
+              ...plugin.permissions.map((permission) => h("li", { key: permission }, [
+                h("code", null, permission),
+                h("span", null, ` — ${SKIN_PLUGIN_PERMISSIONS[permission].description}`),
+              ])),
                 h("li", { key: "status" }, status),
               ]),
             ]);
           }),
-          h("p", { class: "ws-plugin-consent-note" }, "当前开发原型支持 Wasm、权限化公开数据和 ui.surface.replace；已批准的宿主动作只能由可信的明确用户操作触发，并仍由 WebSpeak 校验会话和参数。数据字段只按清单中的读取权限投影，授权绑定到此皮肤版本、插件清单和所有插件文件的 SHA-256。/ This development prototype supports Wasm, permission-filtered public data, and ui.surface.replace. Approved host actions require a trusted explicit user event and are still validated by WebSpeak against the current session and arguments. Data is projected by the read permissions in the descriptor, and approval is bound to this skin version, descriptor, and every plugin file by SHA-256."),
+          h("p", { class: "ws-plugin-consent-note" }, "插件在隔离的 Wasm worker 中运行；界面与数据能力由 WebSpeak 按下列权限控制。宿主动作只能由可信的明确用户操作触发，并仍会按当前会话和参数校验。数据字段只按清单中的读取权限投影，授权绑定到此皮肤版本、插件清单和所有插件文件的 SHA-256。/ Plugins run in an isolated Wasm worker. WebSpeak gates UI and data capabilities by the permissions below. Host actions require a trusted explicit user event and are still validated against the current session and arguments. Data is projected by the read permissions in the descriptor, and approval is bound to this skin version, descriptor, and every plugin file by SHA-256."),
           h("div", { class: "ws-plugin-consent-actions" }, showApproval
             ? [
               h("button", { type: "button", class: "secondary", onClick: keepDisabled }, "暂不启用 / Keep disabled"),

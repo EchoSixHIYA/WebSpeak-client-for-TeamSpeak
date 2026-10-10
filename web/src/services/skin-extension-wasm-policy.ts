@@ -65,7 +65,7 @@ function skipSignedLeb128(bytes: Uint8Array, offset: number, end: number, maxByt
 function requireScalarValueType(bytes: Uint8Array, offset: number, end: number): number {
   if (offset >= end) throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_INVALID", "The extension module contains a truncated value type.");
   if (!SCALAR_VALUE_TYPES.has(bytes[offset])) {
-    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm prototype accepts numeric scalar types only; reference, vector, and GC types are disabled.");
+    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm runtime accepts numeric scalar types only; reference, vector, and GC types are disabled.");
   }
   return offset + 1;
 }
@@ -76,7 +76,7 @@ function validateTypeSection(bytes: Uint8Array, start: number, end: number): voi
   for (let typeIndex = 0; typeIndex < cursor.value; typeIndex += 1) {
     if (cursor.next >= end) throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_INVALID", "The extension type section is truncated.");
     if (bytes[cursor.next++] !== 0x60) {
-      throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm prototype accepts function types only; GC and recursive types are disabled.");
+      throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm runtime accepts function types only; GC and recursive types are disabled.");
     }
     const parameters = readU32(bytes, cursor.next, end);
     cursor.next = parameters.next;
@@ -100,7 +100,7 @@ function readBlockType(bytes: Uint8Array, offset: number, end: number): number {
   const valueType = bytes[offset];
   if (valueType === 0x40 || SCALAR_VALUE_TYPES.has(valueType)) return offset + 1;
   if (valueType === 0x6f || valueType === 0x70 || valueType === 0x7b || valueType === 0x63 || valueType === 0x64) {
-    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "Reference and vector block types are disabled in the Wasm prototype.");
+    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "Reference and vector block types are disabled in the Wasm runtime.");
   }
   return skipSignedLeb128(bytes, offset, end, 5);
 }
@@ -210,7 +210,7 @@ function scanFunctionBody(bytes: Uint8Array, start: number, end: number): number
       }
       throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "Table, GC, SIMD, thread, and unknown Wasm extension instructions are disabled.");
     }
-    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm prototype accepts scalar core instructions only; reference, GC, SIMD, thread, and unknown extension instructions are disabled.");
+    throw new SkinExtensionWasmPolicyError("SKIN_EXTENSION_WASM_UNSUPPORTED_FEATURE", "The Wasm runtime accepts scalar core instructions only; reference, GC, SIMD, thread, and unknown extension instructions are disabled.");
   }
   return localCount;
 }

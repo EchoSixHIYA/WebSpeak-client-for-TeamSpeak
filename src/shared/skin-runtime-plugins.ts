@@ -10,6 +10,14 @@ export const SKIN_RUNTIME_PLUGIN_STYLE_LIMIT_BYTES = 512 * 1024;
 export type SkinRuntimePluginPage = "home" | "voice";
 export type SkinRuntimePluginMode = "widget" | "surface";
 export type SkinRuntimePluginRuntime = "javascript" | "wasm";
+export const SKIN_RUNTIME_PLUGIN_MOUNT_SLOTS = Object.freeze([
+  "home.header.after", "home.content.before", "home.content.after", "home.footer.before",
+  "voice.server-rail.before", "voice.server-rail.after", "voice.header.before", "voice.header.after",
+  "voice.activity.before", "voice.activity.after", "voice.chat.before", "voice.chat.after",
+  "voice.channel-panel.before", "voice.channel-panel.after", "voice.audio-dock.before", "voice.audio-dock.after",
+  "voice.mobile-nav.before", "voice.mobile-nav.after", "voice.workspace.overlay",
+] as const);
+export type SkinRuntimePluginMountSlot = typeof SKIN_RUNTIME_PLUGIN_MOUNT_SLOTS[number];
 
 export interface SkinRuntimePlugin {
   id: string;
@@ -19,6 +27,7 @@ export interface SkinRuntimePlugin {
   runtime: SkinRuntimePluginRuntime;
   page: SkinRuntimePluginPage;
   mode: SkinRuntimePluginMode;
+  mount?: SkinRuntimePluginMountSlot;
   entry: string;
   style?: string;
   assets: readonly string[];
@@ -40,6 +49,27 @@ export class SkinRuntimePluginValidationError extends Error {
 const PLUGIN_ID = /^[a-z][a-z0-9-]{0,63}$/;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const PERMISSIONS = new Set<string>(Object.keys(SKIN_PLUGIN_PERMISSIONS));
+const MOUNT_SLOT_PAGES: Readonly<Record<SkinRuntimePluginMountSlot, SkinRuntimePluginPage>> = Object.freeze({
+  "home.header.after": "home",
+  "home.content.before": "home",
+  "home.content.after": "home",
+  "home.footer.before": "home",
+  "voice.server-rail.before": "voice",
+  "voice.server-rail.after": "voice",
+  "voice.header.before": "voice",
+  "voice.header.after": "voice",
+  "voice.activity.before": "voice",
+  "voice.activity.after": "voice",
+  "voice.chat.before": "voice",
+  "voice.chat.after": "voice",
+  "voice.channel-panel.before": "voice",
+  "voice.channel-panel.after": "voice",
+  "voice.audio-dock.before": "voice",
+  "voice.audio-dock.after": "voice",
+  "voice.mobile-nav.before": "voice",
+  "voice.mobile-nav.after": "voice",
+  "voice.workspace.overlay": "voice",
+});
 const ASSET_PATH = /^plugins\/([a-z][a-z0-9-]{0,63})\/assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:png|jpe?g|webp|avif|gif|woff2)$/i;
 
 function invalid(code: string, message: string): never {
@@ -88,7 +118,7 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
   const plugins: SkinRuntimePlugin[] = [];
   for (const raw of input.plugins) {
     if (!isRecord(raw)) invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "A plugin definition must be an object.");
-    onlyKeys(raw, ["id", "name", "version", "apiVersion", "runtime", "page", "mode", "entry", "style", "assets", "permissions"], "Plugin definition");
+    onlyKeys(raw, ["id", "name", "version", "apiVersion", "runtime", "page", "mode", "mount", "entry", "style", "assets", "permissions"], "Plugin definition");
 
     const id = text(raw.id, "plugin.id", 64);
     if (!PLUGIN_ID.test(id) || ids.has(id)) invalid("SKIN_RUNTIME_PLUGIN_ID_INVALID", "Plugin IDs must be unique lowercase slugs.");
@@ -99,6 +129,16 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
     if (raw.apiVersion !== 1) invalid("SKIN_RUNTIME_PLUGIN_API_UNSUPPORTED", "The plugin API version is not supported.");
     if (raw.page !== "home" && raw.page !== "voice") invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "Plugins may target only the public home or voice page.");
     if (raw.mode !== "widget" && raw.mode !== "surface") invalid("SKIN_RUNTIME_PLUGIN_MANIFEST_INVALID", "Plugin mode must be widget or surface.");
+    let mount: SkinRuntimePluginMountSlot | undefined;
+    if (raw.mount !== undefined) {
+      if (typeof raw.mount !== "string" || !(SKIN_RUNTIME_PLUGIN_MOUNT_SLOTS as readonly string[]).includes(raw.mount)) {
+        invalid("SKIN_RUNTIME_PLUGIN_MOUNT_INVALID", "Plugin mount must use a registered public UI slot.");
+      }
+      mount = raw.mount as SkinRuntimePluginMountSlot;
+      if (MOUNT_SLOT_PAGES[mount] !== raw.page || raw.mode === "surface") {
+        invalid("SKIN_RUNTIME_PLUGIN_MOUNT_INVALID", "Mount slots must match the plugin page and are available to widget plugins only.");
+      }
+    }
 
     const runtime = raw.runtime === undefined
       ? (typeof raw.entry === "string" && raw.entry.toLowerCase().endsWith(".wasm") ? "wasm" : "javascript")
@@ -153,6 +193,7 @@ export function parseSkinRuntimePluginDocument(input: unknown): SkinRuntimePlugi
       runtime,
       page: raw.page,
       mode: raw.mode,
+      ...(mount ? { mount } : {}),
       entry,
       ...(style ? { style } : {}),
       assets,

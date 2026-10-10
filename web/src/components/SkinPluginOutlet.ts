@@ -182,13 +182,14 @@ export default defineComponent({
       if (!component.runtimeCallbacks) return;
       const callbackEvent: Record<string, unknown> = { componentId: component.id, handlerId, eventName };
       if (typeof KeyboardEvent !== "undefined" && event instanceof KeyboardEvent) callbackEvent.key = event.key;
-      if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLInputElement) {
+      const mayReadUserInput = props.extensionPermissions.includes("ui.input.read");
+      if (mayReadUserInput && (eventName === "input" || eventName === "change") && event.target instanceof HTMLInputElement) {
         if (["password", "file", "hidden"].includes(event.target.type)) return;
         if (event.target.type === "checkbox") callbackEvent.checked = event.target.checked;
         else if (event.target.value.length <= 2_048) callbackEvent.value = event.target.value;
-      } else if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLTextAreaElement) {
+      } else if (mayReadUserInput && (eventName === "input" || eventName === "change") && event.target instanceof HTMLTextAreaElement) {
         if (event.target.value.length <= 2_048) callbackEvent.value = event.target.value;
-      } else if ((eventName === "input" || eventName === "change") && event.target instanceof HTMLSelectElement
+      } else if (mayReadUserInput && (eventName === "input" || eventName === "change") && event.target instanceof HTMLSelectElement
         && event.target.value.length <= 2_048) {
         callbackEvent.value = event.target.value;
       }

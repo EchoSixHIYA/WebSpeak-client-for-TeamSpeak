@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import "./skin-runtime-plugin-session.test.js";
+import "./skin-runtime-plugin-wasm-governor.test.js";
 import {
   computeSkinRuntimePluginDigest,
   createSkinRuntimePluginApproval,
@@ -8,7 +9,7 @@ import {
 import { parseSkinRuntimePluginDocument } from "../../../src/shared/skin-runtime-plugins.js";
 import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 import {
-  createSkinRuntimePluginWasmSandboxPrototype,
+  createSkinRuntimePluginWasmSandbox,
   SkinRuntimePluginWasmError,
 } from "./skin-runtime-plugin-wasm.js";
 
@@ -37,14 +38,13 @@ async function approvedFiles(source = createSkinExtensionWasmPrefixByteImmediate
 test("Wasm plugin startup rechecks the exact digest approval before creating a Worker", async () => {
   const { files, approval } = await approvedFiles();
   const staleApproval = { ...approval, digest: "0".repeat(64) };
-  await assert.rejects(createSkinRuntimePluginWasmSandboxPrototype({
+  await assert.rejects(createSkinRuntimePluginWasmSandbox({
     skinId: "community.sample",
     skinVersion: "2.0.0",
     plugin,
     approval: staleApproval,
     files,
     readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
-    prototypeOnly: true,
   }), (error: unknown) => error instanceof SkinRuntimePluginWasmError && error.code === "SKIN_EXTENSION_WASM_APPROVAL_INVALID");
 });
 
@@ -75,14 +75,13 @@ test("Wasm prototype accepts a host-mediated channel join permission", async () 
   Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
   Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
   try {
-    const handle = await createSkinRuntimePluginWasmSandboxPrototype({
+    const handle = await createSkinRuntimePluginWasmSandbox({
       skinId: "community.sample",
       skinVersion: "2.0.0",
       plugin: writePlugin,
       approval,
       files,
       readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
-      prototypeOnly: true,
     });
     assert.equal((await handle.result).uiOutput, null);
   } finally {
@@ -122,7 +121,7 @@ test("approved read permissions project only their public fields into each Wasm 
   Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
   Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
   try {
-    const handle = await createSkinRuntimePluginWasmSandboxPrototype({
+    const handle = await createSkinRuntimePluginWasmSandbox({
       skinId: "community.sample",
       skinVersion: "2.0.0",
       plugin: readPlugin,
@@ -136,7 +135,6 @@ test("approved read permissions project only their public fields into each Wasm 
         favorites: { items: [{ id: "favorite-1", label: "Saved", address: "another-private.example:9987" }] },
       },
       readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
-      prototypeOnly: true,
     });
     await handle.result;
     const parsedInput = JSON.parse(inputJson) as { data: unknown };
@@ -176,14 +174,13 @@ test("approved Wasm entries run as disposable workers with bounded interpreter o
   Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
   Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
   try {
-    const handle = await createSkinRuntimePluginWasmSandboxPrototype({
+    const handle = await createSkinRuntimePluginWasmSandbox({
       skinId: "community.sample",
       skinVersion: "2.0.0",
       plugin,
       approval,
       files,
       readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
-      prototypeOnly: true,
     });
     assert.deepEqual(await handle.result, {
       result: 7,

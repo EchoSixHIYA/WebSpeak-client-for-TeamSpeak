@@ -222,7 +222,7 @@ test("generated UI callbacks reject unsupported events, malformed IDs, and passw
   expectOutputError(generatedOutput("runtime-ui", { tag: "button", events: { click: "run" } }), "SKIN_EXTENSION_UI_OUTPUT_SCHEMA");
 });
 
-test("SkinPluginOutlet emits callback data only for a trusted user event", async () => {
+test("SkinPluginOutlet emits only trusted callbacks and gates user-entered values by permission", async () => {
   interface HostNode {
     type: string;
     props: Record<string, unknown>;
@@ -265,43 +265,77 @@ test("SkinPluginOutlet emits callback data only for a trusted user event", async
       id: "base", name: "Base", page: "voice", accessibleName: "Base", permissions: [], actions: {}, root: { tag: "p", children: [{ text: "Base" }] },
     }],
   };
-  const emitted: unknown[] = [];
-  const host = createHostNode("root");
-  const app = renderer.createApp(SkinPluginOutlet, {
-    skinId: "community.test",
-    skinVersion: "1.0.0",
-    document,
-    extensionOutput: JSON.stringify({
-      schemaVersion: 5,
-      components: [{
-        id: "server-rail", name: "Server rail", page: "voice", accessibleName: "Saved voice servers",
-        state: { expanded: false },
-        root: { tag: "button", attributes: { type: "button" }, events: { click: "select-server" }, children: [{ text: "Home" }] },
-      }],
-    }),
-    page: "voice",
-    data: {},
-    assets: {},
-    actions: {},
-    "onExtension-event": (payload: unknown) => emitted.push(payload),
+  const output = JSON.stringify({
+    schemaVersion: 5,
+    components: [{
+      id: "server-rail", name: "Server rail", page: "voice", accessibleName: "Saved voice servers",
+      state: { expanded: false },
+      root: { tag: "div", children: [
+        { tag: "button", attributes: { type: "button" }, events: { click: "select-server" }, children: [{ text: "Home" }] },
+        { tag: "input", attributes: { type: "text" }, events: { input: "search" } },
+      ] },
+    }],
   });
-  app.mount(host);
-  await nextTick();
-  const findButton = (node: HostNode): HostNode | undefined => node.type === "button" ? node : node.children.map(findButton).find(Boolean);
-  const button = findButton(host);
-  const describe = (node: HostNode): string => `${node.type}[${node.text}](${node.children.map(describe).join(",")})`;
-  assert.ok(button, describe(host));
-  const onClick = button.props.onClick as (event: Event) => void;
-  onClick({ isTrusted: false, target: null } as unknown as Event);
-  assert.equal(emitted.length, 0, "script-created events must not reach extension logic");
-  onClick({ isTrusted: true, target: null } as unknown as Event);
-  assert.equal(emitted.length, 1);
-  const payload = emitted[0] as { skinId: string; componentId: string; input: { state: Record<string, unknown>; event: Record<string, unknown> } };
-  assert.equal(payload.skinId, "community.test");
-  assert.equal(payload.componentId, "server-rail");
-  assert.deepEqual({ ...payload.input.state }, { expanded: false });
-  assert.deepEqual(payload.input.event, { componentId: "server-rail", handlerId: "select-server", eventName: "click" });
-  app.unmount();
+  class MockInputElement {
+    type = "text";
+    value = "private search text";
+    checked = false;
+  }
+  const previousInputConstructor = Object.getOwnPropertyDescriptor(globalThis, "HTMLInputElement");
+  Object.defineProperty(globalThis, "HTMLInputElement", { configurable: true, value: MockInputElement });
+  const find = (node: HostNode, type: string): HostNode | undefined => node.type === type ? node : node.children.map((child) => find(child, type)).find(Boolean);
+  const runInput = async (permissions: string[]) => {
+    const emitted: unknown[] = [];
+    const host = createHostNode("root");
+    const app = renderer.createApp(SkinPluginOutlet, {
+      skinId: "community.test", skinVersion: "1.0.0", document, extensionOutput: output,
+      extensionPermissions: permissions, page: "voice", data: {}, assets: {}, actions: {},
+      "onExtension-event": (payload: unknown) => emitted.push(payload),
+    });
+    app.mount(host);
+    await nextTick();
+    const input = find(host, "input");
+    assert.ok(input);
+    (input.props.onInput as (event: Event) => void)({ isTrusted: true, target: new MockInputElement() } as unknown as Event);
+    app.unmount();
+    return emitted[0] as { input: { event: Record<string, unknown> } };
+  };
+  try {
+    const deniedHost = createHostNode("root");
+    const deniedEvents: unknown[] = [];
+    const deniedApp = renderer.createApp(SkinPluginOutlet, {
+      skinId: "community.test", skinVersion: "1.0.0", document, extensionOutput: output,
+      page: "voice", data: {}, assets: {}, actions: {},
+      "onExtension-event": (payload: unknown) => deniedEvents.push(payload),
+    });
+    deniedApp.mount(deniedHost);
+    await nextTick();
+    const button = find(deniedHost, "button");
+    const input = find(deniedHost, "input");
+    assert.ok(button && input);
+    const onClick = button.props.onClick as (event: Event) => void;
+    onClick({ isTrusted: false, target: null } as unknown as Event);
+    assert.equal(deniedEvents.length, 0, "script-created events must not reach extension logic");
+    onClick({ isTrusted: true, target: null } as unknown as Event);
+    const deniedValueEvent = input.props.onInput as (event: Event) => void;
+    deniedValueEvent({ isTrusted: true, target: new MockInputElement() } as unknown as Event);
+    const clickPayload = deniedEvents[0] as { skinId: string; componentId: string; input: { state: Record<string, unknown>; event: Record<string, unknown> } };
+    assert.equal(clickPayload.skinId, "community.test");
+    assert.equal(clickPayload.componentId, "server-rail");
+    assert.deepEqual({ ...clickPayload.input.state }, { expanded: false });
+    assert.deepEqual(clickPayload.input.event, { componentId: "server-rail", handlerId: "select-server", eventName: "click" });
+    const deniedValuePayload = deniedEvents[1] as { input: { event: Record<string, unknown> } };
+    assert.deepEqual(deniedValuePayload.input.event, { componentId: "server-rail", handlerId: "search", eventName: "input" });
+    deniedApp.unmount();
+
+    const approvedValuePayload = await runInput(["ui.input.read"]);
+    assert.deepEqual(approvedValuePayload.input.event, {
+      componentId: "server-rail", handlerId: "search", eventName: "input", value: "private search text",
+    });
+  } finally {
+    if (previousInputConstructor) Object.defineProperty(globalThis, "HTMLInputElement", previousInputConstructor);
+    else Reflect.deleteProperty(globalThis, "HTMLInputElement");
+  }
 });
 
 test("generated UI rejects executable elements, event handlers, and network/navigation sinks", () => {

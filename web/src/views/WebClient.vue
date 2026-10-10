@@ -33,6 +33,7 @@
       :styles="activeSkin.runtimePluginStyles ?? {}"
       :assets="activeSkin.assets"
       :page="showVoiceShell ? 'voice' : 'home'"
+      :mount-revision="accessMode"
       :context="skinPluginContext"
       :actions="skinPluginActions"
       :widgets="skinPluginWidgets"
@@ -58,11 +59,13 @@
         @skin-change="onSkinChange"
         @language-change="persistLanguage"
       />
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="home.header.after"></div>
 
       <main
         class="join-content"
         data-ws-part="home.content"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.content.before"></div>
         <div
           class="join-copy"
           data-ws-part="home.hero"
@@ -253,12 +256,14 @@
             {{ t("connectionAuthorized") }}</div
           >
         </div>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.content.after"></div>
       </main>
 
       <footer
         class="join-footer"
         data-ws-part="home.footer"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.footer.before"></div>
         <span>WebSpeak</span><span class="footer-separator">·</span
         ><span>{{ t("teamSpeakClient") }}</span
         ><span class="footer-spacer"></span
@@ -330,6 +335,7 @@
         data-ws-part="voice.favorite-servers.rail"
         :aria-label="t('quickServers')"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.before"></div>
         <div class="favorite-server-rail-list" data-ws-part="voice.favorite-servers.rail.list">
           <div
             v-for="server in quickServers"
@@ -375,6 +381,7 @@
           :title="t('addFavoriteServer')"
           @click.stop="favoriteServerDialogOpen = true"
         ><Icon name="plus" :size="20" /></button>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.after"></div>
       </aside>
 
       <nav
@@ -446,6 +453,7 @@
           class="workspace-header"
           data-ws-part="voice.header"
         >
+          <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.header.before"></div>
           <div
             class="breadcrumbs"
             data-ws-part="voice.breadcrumbs"
@@ -522,12 +530,13 @@
               class="disconnect-button"
               :aria-label="t('exit')"
               @click="leaveVoiceWorkspace"
-              ><Icon
+            ><Icon
                 name="door"
                 :size="17"
               /><span>{{ t("exit") }}</span></button
             >
           </div>
+          <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.header.after"></div>
         </header>
 
         <div
@@ -616,6 +625,7 @@
             class="workspace-content"
             data-ws-part="voice.content"
           >
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.activity.before"></div>
             <section
               :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]"
               data-ws-part="voice.activity"
@@ -705,6 +715,8 @@
               </div>
             </section>
 
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.activity.after"></div>
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.chat.before"></div>
             <ChatPanel
               :model="chat"
               :t="t"
@@ -716,10 +728,12 @@
               :message-avatar="messageAvatar"
               :format-time="formatTime"
             />
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.chat.after"></div>
           </div>
         </div>
       </main>
 
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.channel-panel.before"></div>
       <ChannelMemberPanel
         v-model:query="memberQuery"
         :model="memberControls"
@@ -740,6 +754,7 @@
           <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="t('speaker')" :title="outputMuted ? t('outputMuted') : t('speaker')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="20" /><span>{{ t('speaker') }}</span></button>
           <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="leaveVoiceWorkspace"><Icon name="door" :size="18" /></button>
         </div>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.audio-dock.before"></div>
         <AudioDock
           v-if="!isMobileViewport"
           :model="audioDockState"
@@ -749,7 +764,9 @@
           @settings="settingsOpen = true"
           @output-mute="toggleOutputMute"
         />
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.audio-dock.after"></div>
       </ChannelMemberPanel>
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.channel-panel.after"></div>
 
       <section
         v-if="mobileSection === 'more'"
@@ -810,6 +827,7 @@
         data-ws-part="voice.mobile-nav"
         :aria-label="t('mobileNavigation')"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.mobile-nav.before"></div>
         <button
           type="button"
           :class="{ active: mobileSection === 'channels' }"
@@ -845,12 +863,14 @@
           :class="{ active: mobileSection === 'more' }"
           :aria-current="mobileSection === 'more' ? 'page' : undefined"
           @click="selectMobileSection('more')"
-          ><Icon
+        ><Icon
             name="more"
             :size="18"
           /><span>{{ t("mobileMore") }}</span></button
         >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.mobile-nav.after"></div>
       </nav>
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
 
     <IdentityImportDialog

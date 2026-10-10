@@ -82,6 +82,7 @@ export async function computeSkinRuntimePluginDigest(
     runtime: plugin.runtime,
     page: plugin.page,
     mode: plugin.mode,
+    ...(plugin.mount ? { mount: plugin.mount } : {}),
     entry: plugin.entry,
     ...(plugin.style ? { style: plugin.style } : {}),
     assets: [...plugin.assets].sort(),
