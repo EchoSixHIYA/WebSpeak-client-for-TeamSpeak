@@ -192,6 +192,6 @@
 - 原页核查：字体栈依据 KOOK 设置页的已记录观察；当前浏览器桥接连接超时，未声称本轮重新打开页面验证。
 - 文档与分发包：KAAK 升至 3.1.37，更新目录版本、包版本断言、说明及两份 `.wskin` 分发包。
 - 验证结果：`npm run skin:kaak:build`、`npm run web:build` 通过；`node --import tsx --test web/src/services/skin-pack.test.ts web/src/services/skin-catalog.test.ts` 23/23 通过；`git diff --check` 通过。
-- 同步状态：本地 `dev` 比远端多两个已验证提交；GitHub 当前仍指向 `1037982`，本轮 HTTPS 推送无法连接 443 端口，累积提交待连通后推送。
+- 同步状态：Git HTTPS 到 443 的直连仍不可用；通过 GitHub 仓库连接器按预期 SHA 快进推送 3.1.36 与 3.1.37 两个提交（`2d92ca8`、`a3bdee9`）。已在本地重建相同提交对象，`dev` 与 `origin/dev` 同步。
 - 影响文件/提交：KAAK 首页样式、清单、内置目录、包测试、说明和工作日志；不改 WebSpeak 宿主或语音引擎。
 - 当前状态与下一步：KAAK 三个主要表面共享相同字体栈。继续核对 KOOK 语音工作区与 KAAK 的成员、聊天和设置交互，屏幕分享按要求跳过。
