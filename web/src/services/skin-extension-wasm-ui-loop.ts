@@ -74,13 +74,13 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
       activeRun = run;
       const result = await run.result;
       if (closed || activeRun !== run) return false;
-      lastState = { ...input.state };
       if (result.uiOutput !== null) {
         const nextDocument = options.parseOutput?.(result.uiOutput) ?? parseSkinExtensionUiOutput(result.uiOutput);
+        await options.onOutput?.(result.uiOutput, nextDocument, input);
         output = result.uiOutput;
         document = nextDocument;
-        await options.onOutput?.(output, nextDocument, input);
       }
+      lastState = { ...input.state };
       return true;
     } catch (error) {
       if (!closed) report(error);

@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   createSkinExtensionWasmCappedRunProbe,
   createSkinExtensionWasmInfiniteRunProbe,
+  createSkinExtensionWasmLargeUiOutputProbe,
+  createSkinExtensionWasmOversizedUiOutputProbe,
   createSkinExtensionWasmPrefixByteImmediateProbe,
   createSkinExtensionWasmUiInputProbe,
   createSkinExtensionWasmUiOutputProbe,
@@ -88,6 +90,12 @@ test("the fixed Wasmi artifact caps its own memory and stops guest execution at 
     "the interpreter must accept payloads larger than the previous 16 KiB cap");
   assert.equal(run(createSkinExtensionWasmUiOutputProbe('{"type":"root"}', true)).error, 12,
     "the interpreter must reject more than one UI payload per execution");
+  const largeUiOutput = `{"text":"${"x".repeat(240 * 1024)}"}`;
+  const largeUiResult = run(createSkinExtensionWasmLargeUiOutputProbe(240 * 1024));
+  assert.equal(largeUiResult.error, 0, "the interpreter must accept a large payload that remains under the output limit");
+  assert.equal(largeUiResult.uiOutput, largeUiOutput);
+  assert.equal(run(createSkinExtensionWasmOversizedUiOutputProbe()).error, 12,
+    "the interpreter must reject UI output beyond its 256 KiB cap before copying it");
 
   const memory = runtime.memory;
   const currentPages = memory.buffer.byteLength / (64 * 1024);

@@ -96,6 +96,69 @@ export function createSkinExtensionWasmUiOutputProbe(output = '{"type":"root"}',
   ]);
 }
 
+/** Calls the UI bridge with a payload length just beyond its 256 KiB output cap. */
+export function createSkinExtensionWasmOversizedUiOutputProbe(): Uint8Array {
+  const oversizedLength = 256 * 1024 + 1;
+  const body = [
+    0,
+    0x41, 0x00,
+    0x41, ...signedLeb128(oversizedLength),
+    0x10, 0x00,
+    0x1a,
+    0x41, 0x07,
+    0x0b,
+  ];
+  return Uint8Array.from([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+    ...section(1, [2, 0x60, 2, 0x7f, 0x7f, 1, 0x7f, 0x60, 0, 1, 0x7f]),
+    ...section(2, [
+      2,
+      ...name("env"), ...name("memory"), 0x02, 0x01, 1, 64,
+      ...name("env"), ...name("ui_emit_json"), 0x00, 0,
+    ]),
+    ...section(3, [1, 1]),
+    ...section(7, [1, ...name("run"), 0, 1]),
+    ...section(10, [1, body.length, ...body]),
+  ]);
+}
+
+/** Grows bounded guest memory, fills a large JSON payload, and emits it through the host bridge. */
+export function createSkinExtensionWasmLargeUiOutputProbe(fillerLength: number): Uint8Array {
+  const outputPointer = 16;
+  const prefix = Array.from(new TextEncoder().encode('{"text":"'));
+  const fillerPointer = outputPointer + prefix.length;
+  const suffixPointer = fillerPointer + fillerLength;
+  const outputLength = prefix.length + fillerLength + 2;
+  const body = [
+    0,
+    0x41, 0x03, 0x40, 0x00, 0x1a,
+    0x41, ...signedLeb128(fillerPointer),
+    0x41, ...signedLeb128(0x78),
+    0x41, ...signedLeb128(fillerLength),
+    0xfc, 0x0b, 0x00,
+    0x41, ...signedLeb128(suffixPointer), 0x41, ...signedLeb128(0x22), 0x3a, 0x00, 0x00,
+    0x41, ...signedLeb128(suffixPointer + 1), 0x41, ...signedLeb128(0x7d), 0x3a, 0x00, 0x00,
+    0x41, ...signedLeb128(outputPointer),
+    0x41, ...signedLeb128(outputLength),
+    0x10, 0x00, 0x1a,
+    0x41, 0x07,
+    0x0b,
+  ];
+  return Uint8Array.from([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+    ...section(1, [2, 0x60, 2, 0x7f, 0x7f, 1, 0x7f, 0x60, 0, 1, 0x7f]),
+    ...section(2, [
+      2,
+      ...name("env"), ...name("memory"), 0x02, 0x01, 1, 64,
+      ...name("env"), ...name("ui_emit_json"), 0x00, 0,
+    ]),
+    ...section(3, [1, 1]),
+    ...section(7, [1, ...name("run"), 0, 1]),
+    ...section(10, [1, body.length, ...body]),
+    ...section(11, [1, 0, 0x41, outputPointer, 0x0b, ...unsignedLeb128(prefix.length), ...prefix]),
+  ]);
+}
+
 /** Reads the host-provided bounded local state/event JSON once and echoes it through UI output. */
 export function createSkinExtensionWasmUiInputProbe(readTwice = false): Uint8Array {
   const readInput = [

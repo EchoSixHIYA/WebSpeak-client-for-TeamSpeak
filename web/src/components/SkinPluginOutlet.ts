@@ -4,6 +4,7 @@ import {
   SKIN_PLUGIN_PERMISSIONS,
   SKIN_PLUGIN_RENDER_NODE_LIMIT,
   SKIN_PLUGIN_REPEAT_LIMIT,
+  listSkinPluginAssetPaths,
   parseSkinPluginDocument,
   type SkinPluginActionDefinition,
   type SkinPluginComponent,
@@ -120,12 +121,35 @@ export default defineComponent({
       refresh.value += 1;
     }, { immediate: true });
     watch(() => [props.skinId, props.skinVersion, props.assets] as const, () => assetUrls.clear());
+    watch(renderedComponents, (components) => {
+      assetUrls.retain(listSkinPluginAssetPaths({ schemaVersion: 3, components }));
+      const activeStateKeys = new Set(components.map(componentStateKey));
+      for (const key of Object.keys(stateByComponent)) {
+        if (!activeStateKeys.has(key)) delete stateByComponent[key];
+      }
+    }, { immediate: true });
     watch(activeSurface, (surface) => emit("surface-change", Boolean(surface)), { immediate: true, flush: "sync" });
 
+    function componentStateKey(component: SkinPluginComponent): string {
+      return JSON.stringify([props.skinId, props.skinVersion, props.componentNamespace, component.id]);
+    }
+
     function localState(component: SkinPluginComponent): Record<string, Scalar> {
-      const key = `${props.skinId}/${component.id}`;
-      if (!stateByComponent[key]) stateByComponent[key] = { ...(component.state ?? {}) };
-      return stateByComponent[key];
+      const key = componentStateKey(component);
+      const defaults = component.state ?? {};
+      let state = stateByComponent[key];
+      if (!state) {
+        state = { ...defaults };
+        stateByComponent[key] = state;
+        return state;
+      }
+      for (const stateKey of Object.keys(state)) {
+        if (!Object.hasOwn(defaults, stateKey)) delete state[stateKey];
+      }
+      for (const [stateKey, value] of Object.entries(defaults)) {
+        if (!Object.hasOwn(state, stateKey) || typeof state[stateKey] !== typeof value) state[stateKey] = value;
+      }
+      return state;
     }
 
     function permissionLabel(permission: string): string {

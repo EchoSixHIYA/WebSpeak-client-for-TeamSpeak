@@ -33,7 +33,7 @@ const GENERATED_VOID_ELEMENTS = new Set([
 const GENERATED_BLOCKED_ATTRIBUTES = new Set([
   "action", "archive", "background", "code", "codebase", "data", "download", "form", "formaction", "formmethod", "formenctype",
   "formtarget", "is", "manifest", "ping", "poster", "profile", "src", "srcdoc", "srcset", "style", "target", "xlink:href",
-  "autofocus", "autoplay", "command", "commandfor", "http-equiv", "nonce", "slot", "xml:base",
+  "autofocus", "autoplay", "command", "commandfor", "http-equiv", "nonce", "popover", "popovertarget", "popovertargetaction", "slot", "xml:base",
 ]);
 
 export class SkinExtensionUiOutputError extends Error {

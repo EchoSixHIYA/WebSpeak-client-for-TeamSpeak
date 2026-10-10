@@ -8,7 +8,24 @@ import {
 
 /** Normalize an older declarative package before editing while preserving its validated data. */
 export function editableSkinPluginDocument(input: unknown): SkinPluginDocument {
-  const parsed = parseSkinPluginDocument(input);
+  // The package parser materializes the schema-v1 default `mode: "widget"` in
+  // its normalized object. Remove that derived field before validating the
+  // normalized document again, since schema v1 itself does not declare mode.
+  const source = input && typeof input === "object" && !Array.isArray(input)
+    && (input as { schemaVersion?: unknown }).schemaVersion === 1
+    && Array.isArray((input as { components?: unknown }).components)
+    ? {
+      ...(input as Record<string, unknown>),
+      components: ((input as { components: unknown[] }).components).map((component) => {
+        if (!component || typeof component !== "object" || Array.isArray(component)
+          || (component as { mode?: unknown }).mode !== "widget") return component;
+        const withoutDefaultMode = { ...(component as Record<string, unknown>) };
+        delete withoutDefaultMode.mode;
+        return withoutDefaultMode;
+      }),
+    }
+    : input;
+  const parsed = parseSkinPluginDocument(source);
   if (parsed.schemaVersion === 3) return parsed;
   const components = parsed.components.map((component) => {
     const permissions = new Set(component.permissions);
@@ -197,6 +214,7 @@ export function getSkinPluginNode(input: SkinPluginDocument, componentId: string
 
 /** Give a duplicated subtree fresh stable layout parts so it cannot alias its source nodes. */
 export function duplicateSkinPluginNode(input: SkinPluginDocument, componentId: string, path: readonly number[]): SkinPluginNode {
+  if (!path.length) throw new Error("A component root cannot be duplicated.");
   const document = editableSkinPluginDocument(input);
   const component = document.components[componentIndex(document, componentId)];
   const source = nodeAt(component, path);

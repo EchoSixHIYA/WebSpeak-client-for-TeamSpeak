@@ -48,6 +48,7 @@ test("skin CSS permits visual decoration but prevents layout, text-flow, and con
   assert.match(skin.css, /animation: ws-ocean-night-fade-wave 1s/);
 
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { display: none; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { d\\69splay: none; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { position: fixed; inset: 0; z-index: 99999; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.member"] { padding: 30px; transform: scale(1.2); }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home.hero.title"] { font-size: 3rem; line-height: 1; white-space: nowrap; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
@@ -62,6 +63,9 @@ test("skin CSS permits visual decoration but prevents layout, text-flow, and con
   await assert.rejects(importSkinPack(makeSkin(".internal-class { color: red; }")), (error: unknown) => error instanceof Error && error.message.includes("must use :root"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="demo.voice-card"].private-component { color: red; }')), (error: unknown) => error instanceof Error && error.message.includes("must use :root"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: image-set("https://example.invalid/remote.png" 1x); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: u\\72l("https://example.invalid/escaped.png"); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: u\\72l(h\\74 tps\\3a //example.invalid/escaped-scheme.png); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('@font-face { font-family: "Local Font"; src: l\\6f cal("Arial"); } [data-ws-part="home"] { color: teal; }')), (error: unknown) => error instanceof Error && error.message.includes("local() is not allowed"));
 });
 
 test("custom skins can override theme appearance without !important or private class selectors", () => {

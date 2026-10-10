@@ -134,13 +134,14 @@ export class SkinPluginValidationError extends Error {
   }
 }
 
-const ELEMENTS = new Set([
+export const SKIN_PLUGIN_ALLOWED_ELEMENTS = Object.freeze([
   "article", "aside", "b", "blockquote", "br", "button", "caption", "circle", "cite", "code", "dd", "del", "details", "div", "dl", "dt",
   "em", "fieldset", "figcaption", "figure", "footer", "form", "g", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "input",
   "kbd", "label", "legend", "li", "line", "main", "mark", "nav", "ol", "option", "output", "p", "path", "polyline", "pre", "progress", "q",
   "rect", "s", "section", "select", "small", "span", "strong", "sub", "summary", "sup", "svg", "table", "tbody", "td", "textarea", "th", "thead",
   "time", "tr", "u", "ul", "wbr",
-]);
+] as const);
+const ELEMENTS = new Set<string>(SKIN_PLUGIN_ALLOWED_ELEMENTS);
 const VOID_ELEMENTS = new Set(["br", "circle", "hr", "img", "input", "line", "path", "polyline", "rect", "wbr"]);
 const ATTRIBUTES = new Set([
   "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",

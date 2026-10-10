@@ -26,6 +26,10 @@ export function createSkinPluginAssetUrlCache() {
     clear(): void {
       for (const path of urls.keys()) release(path);
     },
+    retain(paths: Iterable<string>): void {
+      const retained = new Set(paths);
+      for (const path of urls.keys()) if (!retained.has(path)) release(path);
+    },
     get size(): number { return urls.size; },
   };
 }

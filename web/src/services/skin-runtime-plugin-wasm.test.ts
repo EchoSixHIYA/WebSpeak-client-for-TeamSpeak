@@ -198,3 +198,43 @@ test("approved Wasm entries run as disposable workers with bounded interpreter o
     else Reflect.deleteProperty(globalThis, "window");
   }
 });
+
+test("a worker that exceeds the execution deadline is terminated and releases its handle", async () => {
+  const { files, approval } = await approvedFiles();
+  const previousWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  let terminated = 0;
+  class HangingWorker {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    postMessage(): void {
+      queueMicrotask(() => this.onmessage?.({ data: { type: "running" } } as MessageEvent<unknown>));
+    }
+    terminate(): void { terminated += 1; }
+  }
+  Object.defineProperty(globalThis, "Worker", { configurable: true, value: HangingWorker });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { setTimeout, clearTimeout } });
+  try {
+    const handle = await createSkinRuntimePluginWasmSandbox({
+      skinId: "community.sample",
+      skinVersion: "2.0.0",
+      plugin,
+      approval,
+      files,
+      readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
+    });
+    await handle.ready;
+    await assert.rejects(handle.result, (error: unknown) =>
+      error instanceof Error && "code" in error && error.code === "SKIN_EXTENSION_WASM_EXECUTION_TIMEOUT");
+    await handle.stopped;
+    assert.equal(handle.closeReason, "execution-timeout");
+    assert.equal(handle.closed, true);
+    assert.equal(terminated, 1, "the host must terminate the worker when its execution deadline expires");
+  } finally {
+    if (previousWorker) Object.defineProperty(globalThis, "Worker", previousWorker);
+    else Reflect.deleteProperty(globalThis, "Worker");
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});

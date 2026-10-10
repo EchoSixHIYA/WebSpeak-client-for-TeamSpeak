@@ -26,7 +26,7 @@ test("skin registry validates, lists, replaces, serves, and removes packages", a
   assert.equal(await registry.readArchive("sample-skin"), null);
   const firstArchive = createZip([
     ["manifest.json", Buffer.from(JSON.stringify(manifest))],
-    ["skin.css", Buffer.from(".voice-card { background: url(assets/background.png); }")],
+    ["skin.css", Buffer.from('[data-ws-part="voice.member"] { background: url(assets/background.png); }')],
     ["content.json", Buffer.from(JSON.stringify({ defaultLocale: "en", locales: { en: { home: { title: "Hello" } } } }))],
     ["assets/background.png", Buffer.from([1, 2, 3, 4])],
     ["assets/preview.png", Buffer.from([5, 6, 7, 8])],
@@ -45,7 +45,7 @@ test("skin registry validates, lists, replaces, serves, and removes packages", a
   const replacement = { ...manifest, version: "2.0.0", content: undefined, preview: undefined };
   const secondArchive = createZip([
     ["manifest.json", Buffer.from(JSON.stringify(replacement))],
-    ["skin.css", Buffer.from(".voice-card { border-radius: 0; }")],
+    ["skin.css", Buffer.from('[data-ws-part="voice.member"] { border-radius: 0; }')],
   ]);
   const second = await registry.save(secondArchive, "sample-skin");
   assert.equal(second.version, "2.0.0");
@@ -128,7 +128,7 @@ test("server accepts validated declarative v2 layouts and rejects permissions or
 
   const unknownComponentArchive = createZip([
     ["manifest.json", Buffer.from(JSON.stringify(manifestV2))],
-    ["skin.css", Buffer.from(".voice-card { color: teal; }")],
+    ["skin.css", Buffer.from('[data-ws-part="voice.member"] { color: teal; }')],
     ["layout.json", Buffer.from(JSON.stringify({ schemaVersion: 1, pages: { home: { desktop: { "home.unknown": { x: 1 } } } } }))],
   ]);
   await assert.rejects(registry.save(unknownComponentArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_LAYOUT_INVALID");
@@ -188,6 +188,58 @@ test("server accepts a v3 open visual skin without a components document", async
   const saved = await registry.save(archive, "sample-skin");
   assert.equal(saved.id, "sample-skin");
   assert.deepEqual(await registry.readArchive("sample-skin"), archive);
+});
+
+test("server applies the browser CSS scope and package-only resource policy to every stylesheet", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-css-policy-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const unsafeLegacySelector = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, content: undefined, preview: undefined }))],
+    ["skin.css", Buffer.from(".private-class { color: teal; }")],
+  ]);
+  await assert.rejects(registry.save(unsafeLegacySelector, "sample-skin"), (error: unknown) =>
+    error instanceof SkinRegistryError && error.code === "SKIN_CSS_SELECTOR");
+
+  const remoteSkinCss = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, content: undefined, preview: undefined }))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { background-image: url("https://example.invalid/track.png"); }')],
+  ]);
+  await assert.rejects(registry.save(remoteSkinCss, "sample-skin"), (error: unknown) =>
+    error instanceof SkinRegistryError && error.code === "SKIN_EXTERNAL_RESOURCE");
+
+  const manifestV4 = {
+    ...manifest,
+    schemaVersion: 4,
+    packageType: "open-skin",
+    content: undefined,
+    preview: undefined,
+    plugins: "plugins.json",
+  };
+  const plugins = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.js",
+      style: "plugins/voice-toolbar/style.css",
+      assets: [],
+      permissions: [],
+    }],
+  };
+  const remotePluginCss = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify(manifestV4))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { color: teal; }')],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+    ["plugins/voice-toolbar/index.js", Buffer.from("export {}; ")],
+    ["plugins/voice-toolbar/style.css", Buffer.from('.toolbar { background-image: u\\72l("https://example.invalid/track.png"); }')],
+  ]);
+  await assert.rejects(registry.save(remotePluginCss, "sample-skin"), (error: unknown) =>
+    error instanceof SkinRegistryError && error.code === "SKIN_EXTERNAL_RESOURCE");
 });
 
 test("server validates v4 plugin manifests and package files without executing author code", async (context) => {
@@ -308,7 +360,7 @@ test("skin registry rejects path traversal and mismatched local ZIP headers", as
   const registry = new SkinRegistry(directory);
   const goodFiles: Array<[string, Buffer]> = [
     ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, content: undefined, preview: undefined }))],
-    ["skin.css", Buffer.from(".voice-card { color: teal; }")],
+    ["skin.css", Buffer.from('[data-ws-part="voice.member"] { color: teal; }')],
   ];
 
   await assert.rejects(registry.save(createZip([["../escape.png", Buffer.from([1])], ...goodFiles]), "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_PATH_INVALID");

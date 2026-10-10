@@ -13,7 +13,7 @@ import {
   removeSkinPluginNode,
   replaceSkinPluginNode,
 } from "../../../src/shared/skin-plugin-editor.js";
-import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { parseSkinPluginDocument, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import {
   clearSkinPluginAuthoringDocument,
   exportSkinPluginAuthoringDocument,
@@ -101,12 +101,30 @@ test("component order is editable and stays within the selected skin document", 
 test("duplicating a nested component node gives copied layout parts unique stable IDs", () => {
   const source = document();
   source.components[0].root.children![0] = {
-    tag: "div", part: "message", children: [{ tag: "span", part: "author", text: "Author" }],
+    tag: "div", part: "message", children: [{ tag: "span", part: "author", children: [{ text: "Author" }] }],
   };
   const copy = duplicateSkinPluginNode(source, "voice-panel", [0]);
   assert.equal(copy.part, "message-copy");
   assert.equal(copy.children?.[0].part, "author-copy");
   assert.throws(() => duplicateSkinPluginNode(source, "voice-panel", []), /root cannot be duplicated/i);
+});
+
+test("repeated node duplication skips existing layout part IDs", () => {
+  const source = document();
+  source.components[0].root.children = [
+    { tag: "div", part: "message", children: [{ tag: "span", part: "author" }] },
+    { tag: "div", part: "message-copy", children: [{ tag: "span", part: "author-copy" }] },
+    { tag: "div", part: "message-copy-2", children: [{ tag: "span", part: "author-copy-2" }] },
+  ];
+
+  const first = duplicateSkinPluginNode(source, "voice-panel", [0]);
+  assert.equal(first.part, "message-copy-3");
+  assert.equal(first.children?.[0].part, "author-copy-3");
+
+  const withFirstCopy = addSkinPluginNodeSibling(source, "voice-panel", [0], first);
+  const second = duplicateSkinPluginNode(withFirstCopy, "voice-panel", [0]);
+  assert.equal(second.part, "message-copy-4");
+  assert.equal(second.children?.[0].part, "author-copy-4");
 });
 
 test("component editor rejects unsafe markup and invalid permission/action combinations", () => {
@@ -124,11 +142,23 @@ test("component editor rejects unsafe markup and invalid permission/action combi
 });
 
 test("older package trees upgrade to editable schema v3 without losing their component", () => {
-  const legacy = { ...document(), schemaVersion: 2 } as unknown as SkinPluginDocument;
-  const editable = editableSkinPluginDocument(legacy);
-  assert.equal(editable.schemaVersion, 3);
-  assert.equal(editable.components[0].root.tag, "section");
+  for (const schemaVersion of [1, 2]) {
+    const legacy = { ...document(), schemaVersion } as unknown as SkinPluginDocument;
+    const editable = editableSkinPluginDocument(legacy);
+    assert.equal(editable.schemaVersion, 3);
+    assert.equal(editable.components[0].root.tag, "section");
+  }
 
+  const normalizedV1 = parseSkinPluginDocument({ ...document(), schemaVersion: 1 });
+  assert.equal(normalizedV1.components[0].mode, "widget", "the package parser materializes the schema-v1 default mode");
+  assert.equal(editableSkinPluginDocument(normalizedV1).schemaVersion, 3,
+    "revalidating a normalized legacy package must safely strip the parser-generated default before migration");
+  assert.throws(() => parseSkinPluginDocument({
+    ...document(), schemaVersion: 1,
+    components: [{ ...document().components[0], mode: "surface" }],
+  }), /Page surfaces require components schema version 2/i);
+
+  const legacy = { ...document(), schemaVersion: 2 } as unknown as SkinPluginDocument;
   const legacyWithWidget = structuredClone(legacy);
   legacyWithWidget.components[0].permissions = [];
   legacyWithWidget.components[0].root = { tag: "section", children: [{ widget: "voice.audio-controls" }] };

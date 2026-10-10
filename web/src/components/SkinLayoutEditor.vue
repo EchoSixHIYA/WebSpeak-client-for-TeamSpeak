@@ -1,7 +1,8 @@
 <template>
   <Teleport to="body">
-    <div v-if="editor.available.value" class="skin-layout-editor" data-ws-layout-editor>
+    <div v-if="editor.available.value" ref="editorRoot" class="skin-layout-editor" data-ws-layout-editor @keydown.esc.stop.prevent="editor.setOpen(false)">
       <button
+        ref="triggerButton"
         class="skin-layout-trigger"
         type="button"
         :aria-expanded="editor.isOpen.value"
@@ -25,7 +26,7 @@
             <h2>{{ editor.labels.value.title }}</h2>
             <p>{{ editor.labels.value.hint }}</p>
           </div>
-          <button type="button" class="skin-layout-close" :aria-label="editor.labels.value.close" @click="editor.setOpen(false)">×</button>
+          <button ref="closeButton" type="button" class="skin-layout-close" :aria-label="editor.labels.value.close" @click="editor.setOpen(false)">×</button>
         </header>
 
         <label class="skin-layout-toggle">
@@ -135,11 +136,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { useSkinLayoutEditor } from "../composables/useSkinLayoutEditor.js";
+import { promoteHostEditorToTopLayer } from "../services/host-editor-top-layer.js";
 
 const editor = useSkinLayoutEditor();
+const editorRoot = ref<HTMLElement | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+const triggerButton = ref<HTMLButtonElement | null>(null);
+const closeButton = ref<HTMLButtonElement | null>(null);
+
+watch(editorRoot, promoteHostEditorToTopLayer, { flush: "post" });
+watch(editor.isOpen, async (isOpen) => {
+  await nextTick();
+  (isOpen ? closeButton.value : triggerButton.value)?.focus();
+});
 
 async function onImport(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
@@ -151,10 +162,22 @@ async function onImport(event: Event): Promise<void> {
 <style scoped>
 .skin-layout-editor {
   position: fixed;
-  z-index: 2147483000;
+  inset: auto;
+  z-index: 2147483647;
+  top: auto;
+  left: auto;
   right: 14px;
   bottom: 14px;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  border: 0;
   color: #172033;
+  background: transparent;
   font: 13px/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -199,28 +222,28 @@ async function onImport(event: Event): Promise<void> {
 .skin-layout-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .skin-layout-heading h2 { margin: 0; font-size: 16px; }
 .skin-layout-heading p { margin: 5px 0 0; color: #475569; font-size: 12px; }
-.skin-layout-close { width: 32px; height: 32px; border-radius: 8px; color: #334155; background: #f1f5f9; font-size: 22px !important; cursor: pointer; }
-.skin-layout-toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+.skin-layout-close { width: 44px; height: 44px; border-radius: 8px; color: #334155; background: #f1f5f9; font-size: 22px !important; cursor: pointer; }
+.skin-layout-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .skin-layout-field { display: grid; gap: 6px; }
 .skin-layout-field > span,
 .skin-layout-range label,
 .skin-layout-colors span { color: #475569; font-size: 12px; }
 .skin-layout-field input[type="search"],
-.skin-layout-field select { width: 100%; min-height: 36px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 8px; color: #172033; background: #fff; }
+.skin-layout-field select { width: 100%; min-height: 44px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 8px; color: #172033; background: #fff; }
 .skin-layout-range { display: grid; gap: 3px; }
 .skin-layout-range label { display: flex; justify-content: space-between; gap: 8px; }
 .skin-layout-range output { color: #172033; font-variant-numeric: tabular-nums; }
-.skin-layout-range input { width: 100%; accent-color: #4f46e5; }
+.skin-layout-range input { width: 100%; min-height: 44px; accent-color: #4f46e5; }
 .skin-layout-colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .skin-layout-colors label { display: grid; gap: 4px; }
-.skin-layout-colors input { width: 100%; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; }
+.skin-layout-colors input { width: 100%; height: 44px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; }
 .skin-layout-actions { display: flex; flex-wrap: wrap; gap: 7px; }
-.skin-layout-actions button { min-height: 36px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px; color: #172033; background: #f8fafc; cursor: pointer; }
+.skin-layout-actions button { min-height: 44px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px; color: #172033; background: #f8fafc; cursor: pointer; }
 .skin-layout-actions button:disabled { opacity: .5; cursor: not-allowed; }
 .skin-layout-file { display: none; }
 .skin-layout-status { margin: 0; color: #4338ca; }
 .skin-layout-warning { margin: 0; padding: 8px 10px; border: 1px solid #fcd34d; border-radius: 8px; color: #854d0e; background: #fffbeb; }
-.skin-layout-warning button { min-height: 32px; margin-top: 6px; padding: 0 9px; border: 1px solid #d97706; border-radius: 7px; color: #78350f; background: #fff; cursor: pointer; }
+.skin-layout-warning button { min-height: 44px; margin-top: 6px; padding: 0 9px; border: 1px solid #d97706; border-radius: 7px; color: #78350f; background: #fff; cursor: pointer; }
 .skin-layout-context { margin: 0; color: #64748b; font-size: 11px; overflow-wrap: anywhere; }
 .skin-layout-editor :focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
 .skin-layout-focus-list { display: grid; gap: 6px; max-height: 220px; overflow: auto; margin: 0; padding: 0; list-style: none; }
@@ -233,7 +256,7 @@ async function onImport(event: Event): Promise<void> {
 .skin-layout-focus-name { flex: 1; }
 .skin-layout-focus-name small, .skin-layout-focus-size small { color: #475569; font-size: 10px; }
 .skin-layout-focus-size { flex: 0 0 auto; text-align: right; }
-.skin-layout-focus-overlay { position: fixed; z-index: 2147482999; inset: 0; pointer-events: none; }
+.skin-layout-focus-overlay { position: fixed; z-index: 2147483647; inset: 0; pointer-events: none; }
 .skin-layout-focus-marker { position: fixed; box-sizing: border-box; display: grid; place-items: start; padding: 0 2px; border: 2px solid #15803d; border-radius: 3px; color: #fff; background: #15803d40; font: 700 11px/16px ui-sans-serif, system-ui, sans-serif; }
 .skin-layout-focus-marker.is-small { border-color: #b91c1c; background: #b91c1c40; }
 

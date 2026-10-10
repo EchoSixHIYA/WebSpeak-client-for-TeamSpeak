@@ -45,3 +45,51 @@ test("Wasm worker governor rejects queued work after the bounded wait", async ()
   assert.equal(governor.pendingRuns, 0);
   release();
 });
+
+test("Wasm worker governor stays bounded and drains a saturated burst in FIFO order", async () => {
+  const maxConcurrentRuns = 2;
+  const maxPendingRuns = 64;
+  const burstSize = 2_000;
+  const governor = createSkinRuntimePluginWasmGovernor({
+    maxConcurrentRuns,
+    maxPendingRuns,
+    queueTimeoutMs: 10_000,
+  });
+  const started: number[] = [];
+  let active = 0;
+  let peakActive = 0;
+  const acquisitions = Array.from({ length: burstSize }, (_, index) => governor.acquire(new AbortController().signal)
+    .then((release) => {
+      active += 1;
+      peakActive = Math.max(peakActive, active);
+      started.push(index);
+      return {
+        index,
+        release: () => {
+          active -= 1;
+          release();
+        },
+      };
+    }, (error: unknown) => ({ index, error })));
+
+  assert.equal(governor.activeRuns, maxConcurrentRuns);
+  assert.equal(governor.pendingRuns, maxPendingRuns);
+  const overflow = await Promise.all(acquisitions.slice(maxConcurrentRuns + maxPendingRuns));
+  assert.equal(overflow.length, burstSize - maxConcurrentRuns - maxPendingRuns);
+  assert.ok(overflow.every((item) => "error" in item
+    && item.error instanceof SkinRuntimePluginWasmGovernorError
+    && item.error.code === "SKIN_EXTENSION_WASM_QUEUE_FULL"));
+
+  for (let index = 0; index < maxConcurrentRuns + maxPendingRuns; index += maxConcurrentRuns) {
+    const batch = await Promise.all(acquisitions.slice(index, index + maxConcurrentRuns));
+    assert.ok(batch.every((item) => "release" in item));
+    batch.forEach((item) => {
+      if ("release" in item) item.release();
+    });
+  }
+
+  assert.deepEqual(started, Array.from({ length: maxConcurrentRuns + maxPendingRuns }, (_, index) => index));
+  assert.equal(peakActive, maxConcurrentRuns);
+  assert.equal(governor.activeRuns, 0);
+  assert.equal(governor.pendingRuns, 0);
+});

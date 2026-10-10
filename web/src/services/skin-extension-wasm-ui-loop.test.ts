@@ -6,7 +6,7 @@ import {
 } from "./skin-extension-wasm-ui-loop.js";
 import type { SkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 
-function uiOutput(count: number): string {
+function uiOutput(count: number, handlerId = "increment"): string {
   return JSON.stringify({
     schemaVersion: 5,
     components: [{
@@ -15,7 +15,7 @@ function uiOutput(count: number): string {
       page: "voice",
       accessibleName: "Local counter",
       state: { count },
-      root: { tag: "button", events: { click: "increment" }, children: [{ text: String(count) }] },
+      root: { tag: "button", events: { click: handlerId }, children: [{ text: String(count) }] },
     }],
   });
 }
@@ -73,6 +73,30 @@ test("runtime data refresh reruns the guest without fabricating a user event", a
   assert.equal(jobs.length, 3);
   assert.equal(jobs[2].event, null);
   assert.deepEqual({ ...jobs[2].state }, { count: 3 });
+  loop.close();
+});
+
+test("host-rejected UI output does not replace the callback document", async () => {
+  const jobs: SkinExtensionUiInput[] = [];
+  const rejectedOutput = uiOutput(1, "unaccepted");
+  const loop = createSkinExtensionWasmUiLoopPrototype({
+    createRun(input) {
+      jobs.push(input);
+      return {
+        result: Promise.resolve({ uiOutput: input.event ? rejectedOutput : uiOutput(0) }),
+        close: () => undefined,
+      };
+    },
+    onOutput(output) {
+      if (output === rejectedOutput) throw new Error("Host rejected the generated document.");
+    },
+  });
+
+  assert.equal(await loop.start(), true);
+  assert.equal(await loop.dispatch(clickInput(0)), false);
+  assert.equal(loop.output, uiOutput(0));
+  assert.equal(await loop.dispatch(clickInput(1, "unaccepted")), false);
+  assert.equal(jobs.length, 2, "callbacks from a host-rejected document must not be accepted");
   loop.close();
 });
 

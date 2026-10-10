@@ -58,3 +58,33 @@ test("a missing plugin asset releases a cached URL instead of returning stale ar
     URL.revokeObjectURL = originalRevoke;
   }
 });
+
+test("plugin asset URLs are released when their final component reference is removed", () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  const created: string[] = [];
+  const revoked: string[] = [];
+  URL.createObjectURL = () => {
+    const url = `blob:skin-retain-${created.length + 1}`;
+    created.push(url);
+    return url;
+  };
+  URL.revokeObjectURL = (url) => { revoked.push(url); };
+
+  try {
+    const cache = createSkinPluginAssetUrlCache();
+    cache.resolve("assets/used.png", { "assets/used.png": new Blob(["used"]) });
+    cache.resolve("assets/removed.png", { "assets/removed.png": new Blob(["removed"]) });
+
+    cache.retain(["assets/used.png"]);
+    assert.deepEqual(revoked, ["blob:skin-retain-2"]);
+    assert.equal(cache.size, 1);
+
+    cache.retain([]);
+    assert.deepEqual(revoked, ["blob:skin-retain-2", "blob:skin-retain-1"]);
+    assert.equal(cache.size, 0);
+  } finally {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+  }
+});

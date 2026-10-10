@@ -1,4 +1,5 @@
 import type { SkinCatalogEntry as SharedSkinCatalogEntry } from "../shared/skin-catalog.js";
+import { compileSkinCss, SkinCssValidationError, type SkinCssSchemaVersion } from "../shared/skin-css.js";
 import { parseSkinLayoutJson } from "../shared/skin-layout.js";
 import { listSkinPluginAssetPaths, parseSkinPluginJson, type SkinPluginDocument } from "../shared/skin-plugin.js";
 import {
@@ -232,7 +233,7 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
   if (expectedId && manifest.id !== expectedId) throw new SkinRegistryError("The skin ID does not match the upload target.", "SKIN_ID_MISMATCH");
   const cssBytes = fileBytes.get(manifest.entry);
   if (!cssBytes || !cssBytes.byteLength || cssBytes.byteLength > MAX_CSS_BYTES) throw new SkinRegistryError("The CSS entry is missing or exceeds 512 KiB.", "SKIN_CSS_SIZE");
-  decodeUtf8(cssBytes, "The CSS entry is not valid UTF-8.");
+  const cssSource = decodeUtf8(cssBytes, "The CSS entry is not valid UTF-8.");
 
   let runtimePlugins: SkinRuntimePluginDocument | undefined;
   if (manifest.plugins) {
@@ -280,6 +281,23 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
     if (mimeType.startsWith("image/") && data.byteLength > MAX_IMAGE_BYTES) throw new SkinRegistryError("Each image must be smaller than 16 MiB.", "SKIN_IMAGE_SIZE");
     if (mimeType.startsWith("font/") && data.byteLength > MAX_FONT_BYTES) throw new SkinRegistryError("Fonts must be smaller than 4 MiB.", "SKIN_FONT_SIZE");
   }
+  const cssAssets = new Set([...fileBytes.keys()].filter((packagePath) =>
+    imageMime(packagePath) !== null || packagePath.toLowerCase().endsWith(".woff2")));
+  validateSkinCss(cssSource, manifest.id, cssAssets, manifest.schemaVersion);
+  for (const plugin of runtimePlugins?.plugins ?? []) {
+    if (!plugin.style) continue;
+    const styleBytes = fileBytes.get(plugin.style);
+    if (!styleBytes) throw new SkinRegistryError(`A declared plugin style is missing: ${plugin.style}`, "SKIN_RUNTIME_PLUGIN_FILE_MISSING");
+    const pluginCssAssets = new Set([...cssAssets].filter((packagePath) =>
+      packagePath.startsWith("assets/") || packagePath.startsWith(`plugins/${plugin.id}/assets/`)));
+    validateSkinCss(
+      decodeUtf8(styleBytes, "Plugin style files must contain valid UTF-8."),
+      manifest.id,
+      pluginCssAssets,
+      manifest.schemaVersion,
+      plugin.id,
+    );
+  }
   if (manifest.content) {
     const content = fileBytes.get(manifest.content);
     if (!content || content.byteLength > MAX_CONTENT_BYTES) throw new SkinRegistryError("content.json is missing or exceeds 256 KiB.", "SKIN_CONTENT_SIZE");
@@ -309,6 +327,22 @@ function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: Pa
     if (!previewBytes || !previewMime || previewBytes.byteLength > MAX_IMAGE_BYTES) throw new SkinRegistryError("The preview must be a supported image inside the package.", "SKIN_PREVIEW_INVALID");
   }
   return { manifest, ...(previewBytes ? { previewBytes, previewMime } : {}) };
+}
+
+function validateSkinCss(
+  source: string,
+  skinId: string,
+  assets: Set<string>,
+  schemaVersion: SkinCssSchemaVersion,
+  pluginId?: string,
+): void {
+  try { compileSkinCss(source, skinId, assets, schemaVersion, pluginId); }
+  catch (error) {
+    const cssError = error instanceof SkinCssValidationError
+      ? error
+      : new SkinCssValidationError(error instanceof Error ? error.message : "The CSS file is invalid.", "SKIN_CSS_INVALID");
+    throw new SkinRegistryError(cssError.message, cssError.code);
+  }
 }
 
 function inspectArchive(bytes: Buffer): SkinArchiveEntry[] {

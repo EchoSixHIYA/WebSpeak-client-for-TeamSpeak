@@ -115,3 +115,41 @@ test("a local order override is applied only to the registered element", () => {
   assert.equal(pluginRoot.dataset.wsLayoutOrder, "true");
   assert.equal(pluginRoot.style.values.get("--ws-layout-order"), "3");
 });
+
+test("arbitrary component nodes accept local layout edits while interactive nodes keep a 44px target", () => {
+  const root = new FakeElement();
+  root.dataset.wsPage = "home";
+  root.dataset.wsSkin = "test.skin";
+  const content = append(root, new FakeElement());
+  content.dataset.wsPart = "skin.home.demo-banner.node-root-0";
+  const button = append(root, new FakeElement());
+  button.dataset.wsPart = "skin.home.demo-banner.control-node-root-1";
+
+  const collection = JSON.stringify({
+    schemaVersion: 2,
+    skins: {
+      "test.skin": {
+        schemaVersion: 1,
+        pages: { home: { desktop: {
+          "skin.home.demo-banner.node-root-0": { x: 24, y: 36, width: 280, height: 96, visible: false },
+          "skin.home.demo-banner.control-node-root-1": { order: 5 },
+        } } },
+      },
+    },
+    recoveries: {},
+  });
+  setGlobal("localStorage", { getItem: () => collection, setItem: () => undefined });
+  setGlobal("document", { querySelectorAll: () => [root] });
+  setGlobal("window", { matchMedia: () => ({ matches: false }) });
+
+  runtime.refreshSkinLayout();
+
+  assert.equal(content.dataset.wsLayoutActive, "true");
+  assert.equal(content.dataset.wsLayoutHidden, "true");
+  assert.equal(content.style.values.get("--ws-layout-x"), "24px");
+  assert.equal(content.style.values.get("--ws-layout-y"), "36px");
+  assert.equal(content.style.values.get("--ws-layout-width"), "280px");
+  assert.equal(content.style.values.get("--ws-layout-height"), "96px");
+  assert.equal(button.style.values.get("--ws-layout-order"), "5");
+  assert.equal(button.dataset.wsLayoutTouchTarget, "44");
+});

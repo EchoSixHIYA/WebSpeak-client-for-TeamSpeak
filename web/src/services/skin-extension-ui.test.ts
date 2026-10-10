@@ -350,6 +350,12 @@ test("generated UI rejects executable elements, event handlers, and network/navi
   expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { "data-ws-part": "spoofed" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
 });
 
+test("generated UI cannot create browser top-layer popovers that cover host controls", () => {
+  expectOutputError(generatedOutput("runtime-ui", { tag: "div", attributes: { popover: "manual" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+  expectOutputError(generatedOutput("runtime-ui", { tag: "button", attributes: { popovertarget: "host-editor" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+  expectOutputError(generatedOutput("runtime-ui", { tag: "button", attributes: { popovertargetaction: "show" } }), "SKIN_EXTENSION_UI_ATTRIBUTE_INVALID");
+});
+
 test("generated UI enforces component and per-node child limits", () => {
   const tooManyComponents = JSON.stringify({
     schemaVersion: 4,

@@ -213,6 +213,14 @@ test("skin plugin rejects undeclared permissions, arbitrary paths, and executabl
   const externalSvgPaint = validDocument();
   externalSvgPaint.components[0].root.children![0].attributes = { fill: "url(https://example.invalid/payload.svg#paint)" };
   errorCode(() => parseSkinPluginDocument(externalSvgPaint), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
+
+  const skinOwnedPopover = validDocument();
+  skinOwnedPopover.components[0].root.children![0].attributes = { popover: "manual" };
+  errorCode(() => parseSkinPluginDocument(skinOwnedPopover), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
+
+  const skinOwnedPopoverTrigger = validDocument();
+  skinOwnedPopoverTrigger.components[0].root.children![0].attributes = { popovertarget: "host-editor" };
+  errorCode(() => parseSkinPluginDocument(skinOwnedPopoverTrigger), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
 });
 
 test("skin plugin restricts repeated fields to the selected collection", () => {
