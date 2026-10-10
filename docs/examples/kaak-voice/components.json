@@ -779,21 +779,6 @@
             },
             "children": [
               {
-                "tag": "header",
-                "part": "voice-stage-heading",
-                "children": [
-                  {
-                    "tag": "h2",
-                    "part": "section-label",
-                    "children": [
-                      {
-                        "text": "房间成员 / IN VOICE"
-                      }
-                    ]
-                  }
-                ]
-              },
-              {
                 "widget": "voice.member-cards",
                 "part": "member-cards"
               },

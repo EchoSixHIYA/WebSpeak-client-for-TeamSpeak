@@ -755,14 +755,6 @@
   background: var(--skin-kaak-bg);
 }
 
-[data-ws-plugin-part="kaak-workspace.voice-stage-heading"] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 48px;
-  border-bottom: 1px solid var(--skin-kaak-border);
-}
-
 [data-ws-plugin-part="kaak-workspace.chat-panel-toggle"] {
   display: grid;
   flex: 0 0 36px;
@@ -804,9 +796,6 @@
   height: 44px;
   margin: 0;
 }
-
-[data-ws-plugin-part="kaak-workspace.voice-stage-heading"] .section-label { margin: 0; }
-[data-ws-plugin-part="kaak-workspace.member-total"] { color: var(--skin-kaak-dim); font-size: 11px; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] {
   flex: 1 1 auto;
@@ -1257,8 +1246,6 @@
     height: 40px;
   }
 
-  [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] { min-height: 22px; border: 0; }
-  [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] .section-label { max-width: 160px; font-size: 8px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid { display: flex; flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-start; min-width: 0; min-height: 0; align-items: center; gap: 8px; overflow: auto hidden; margin: 3px 0 0; padding: 2px 2px 4px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card { flex: 0 0 220px; width: 220px; max-width: none; min-height: 0; height: auto; aspect-ratio: 1.82; border-radius: 9px; }

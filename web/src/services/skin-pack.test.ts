@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.13");
+  assert.equal(skin.version, "3.1.14");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -510,6 +510,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(voice?.root.attributes?.["data-chat-open"], "{{state.chatopen}}");
   assert.equal(findPart(voice?.root, "server-monogram")?.children?.[0]?.text, "{{server.monogram}}");
   assert.equal(findPart(voice?.root, "server-monogram")?.attributes?.["data-tone"], "{{server.tone}}");
+  assert.equal(findPart(voice?.root, "voice-stage-heading"), undefined);
   assert.deepEqual(findPart(voice?.root, "channel-voice-members")?.when, { path: "channel.members", empty: false });
   assert.equal(findPart(voice?.root, "channel-voice-member")?.repeat?.path, "channel.members");
   assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");
@@ -530,6 +531,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
+  assert.doesNotMatch(skin.css, /kaak-workspace\.voice-stage-heading/);
   assert.match(skin.css, /grid-template-columns: 80px 290px/);
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
   assert.match(skin.css, /grid-template-rows: 40px/);
