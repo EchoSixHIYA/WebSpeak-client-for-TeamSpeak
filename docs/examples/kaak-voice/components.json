@@ -779,6 +779,59 @@
             },
             "children": [
               {
+                "tag": "div",
+                "part": "voice-stage-heading-item",
+                "repeat": {
+                  "path": "session.channels",
+                  "as": "stagechannel"
+                },
+                "children": [
+                  {
+                    "tag": "header",
+                    "part": "voice-stage-heading",
+                    "when": {
+                      "path": "stagechannel.current",
+                      "equals": true
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "voice-stage-glyph",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "text": "◖"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "h2",
+                        "part": "voice-stage-title",
+                        "children": [
+                          {
+                            "text": "{{stagechannel.name}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "voice-stage-member-count",
+                        "attributes": {
+                          "aria-label": "频道成员数 / Channel member count"
+                        },
+                        "children": [
+                          {
+                            "text": "{{stagechannel.memberCount}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
                 "widget": "voice.member-cards",
                 "part": "member-cards"
               },

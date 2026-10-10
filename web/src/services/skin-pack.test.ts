@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.17");
+  assert.equal(skin.version, "3.1.18");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -510,7 +510,12 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(voice?.root.attributes?.["data-chat-open"], "{{state.chatopen}}");
   assert.equal(findPart(voice?.root, "server-monogram")?.children?.[0]?.text, "{{server.monogram}}");
   assert.equal(findPart(voice?.root, "server-monogram")?.attributes?.["data-tone"], "{{server.tone}}");
-  assert.equal(findPart(voice?.root, "voice-stage-heading"), undefined);
+  const voiceStageHeadingItem = findPart(voice?.root, "voice-stage-heading-item");
+  assert.equal(voiceStageHeadingItem?.repeat?.path, "session.channels");
+  const voiceStageHeading = findPart(voiceStageHeadingItem, "voice-stage-heading");
+  assert.deepEqual(voiceStageHeading?.when, { path: "stagechannel.current", equals: true });
+  assert.equal(findPart(voiceStageHeading, "voice-stage-title")?.children?.[0]?.text, "{{stagechannel.name}}");
+  assert.equal(findPart(voiceStageHeading, "voice-stage-member-count")?.children?.[0]?.text, "{{stagechannel.memberCount}}");
   assert.deepEqual(findPart(voice?.root, "channel-voice-members")?.when, { path: "channel.members", empty: false });
   assert.equal(findPart(voice?.root, "channel-voice-member")?.repeat?.path, "channel.members");
   assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");
@@ -531,7 +536,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
-  assert.doesNotMatch(skin.css, /kaak-workspace\.voice-stage-heading/);
+  assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="true"\][\s\S]*?voice-stage-heading[\s\S]*?display: none;/);
+  assert.match(skin.css, /kaak-workspace"\]:has\(\[data-ws-plugin-part="kaak-workspace\.chat-panel-toggle"\]\[aria-expanded="false"\]\)[\s\S]*?grid-template-columns: 80px 290px minmax\(280px, 1fr\) 52px;/);
   assert.match(skin.css, /grid-template-columns: 80px 290px/);
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
   assert.match(skin.css, /grid-template-rows: 40px/);
@@ -539,9 +546,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
   assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /voice-card[\s\S]*?max-width: 480px;/);
-  assert.match(skin.css, /data-chat-open="true"[\s\S]*?voice-card > strong[\s\S]*?display: none;/);
-  assert.match(skin.css, /data-chat-open="false"[\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);
-  assert.match(skin.css, /data-chat-open="false"[\s\S]*?grid-template-columns:[^;]*52px;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="true"\][\s\S]*?voice-card > strong[\s\S]*?display: none;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?grid-template-columns:[^;]*52px;/);
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
   assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);
