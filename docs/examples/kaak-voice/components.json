@@ -648,30 +648,26 @@
                     ]
                   }
                 ]
-              },
-              {
-                "widget": "voice.screen-share-player",
-                "part": "screen-player"
               }
             ]
           },
           {
             "tag": "aside",
-            "part": "members-panel",
+            "part": "voice-stage",
             "attributes": {
-              "aria-label": "频道成员 / Members"
+              "aria-label": "语音房间 / Voice room"
             },
             "children": [
               {
                 "tag": "header",
-                "part": "members-heading",
+                "part": "voice-stage-heading",
                 "children": [
                   {
                     "tag": "h2",
                     "part": "section-label",
                     "children": [
                       {
-                        "text": "成员 / MEMBERS"
+                        "text": "房间成员 / IN VOICE"
                       }
                     ]
                   }
@@ -683,15 +679,6 @@
                 "children": [
                   {
                     "tag": "li",
-                    "part": "member-group-label",
-                    "children": [
-                      {
-                        "text": "在线 / ONLINE"
-                      }
-                    ]
-                  },
-                  {
-                    "tag": "li",
                     "part": "member-row",
                     "repeat": {
                       "path": "session.members",
@@ -699,74 +686,119 @@
                     },
                     "children": [
                       {
-                        "tag": "span",
-                        "part": "member-avatar",
+                        "tag": "div",
+                        "part": "member-avatar-stage",
                         "children": [
                           {
-                            "text": "{{member.avatarInitial}}"
+                            "tag": "span",
+                            "part": "member-avatar",
+                            "children": [
+                              {
+                                "text": "{{member.avatarInitial}}"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "member-speaking-ring",
+                            "when": {
+                              "path": "member.speaking",
+                              "equals": true
+                            },
+                            "attributes": {
+                              "aria-hidden": "true"
+                            }
                           }
                         ]
                       },
                       {
-                        "tag": "span",
-                        "part": "member-name",
+                        "tag": "div",
+                        "part": "member-card-footer",
                         "children": [
                           {
-                            "text": "{{member.name}}"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "speaking-indicator",
-                        "when": {
-                          "path": "member.speaking",
-                          "equals": true
-                        },
-                        "attributes": {
-                          "aria-label": "正在讲话"
-                        },
-                        "children": [
+                            "tag": "span",
+                            "part": "member-name",
+                            "children": [
+                              {
+                                "text": "{{member.name}}"
+                              }
+                            ]
+                          },
                           {
-                            "text": "正在讲话"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "member-muted-state",
-                        "when": {
-                          "path": "member.status",
-                          "equals": "muted"
-                        },
-                        "attributes": {
-                          "aria-label": "麦克风已静音"
-                        },
-                        "children": [
+                            "tag": "span",
+                            "part": "speaking-indicator",
+                            "when": {
+                              "path": "member.speaking",
+                              "equals": true
+                            },
+                            "attributes": {
+                              "aria-label": "正在讲话"
+                            },
+                            "children": [
+                              {
+                                "tag": "span",
+                                "part": "member-speaking-wave",
+                                "attributes": {
+                                  "aria-hidden": "true"
+                                },
+                                "children": [
+                                  { "tag": "i", "part": "member-speaking-bar" },
+                                  { "tag": "i", "part": "member-speaking-bar" },
+                                  { "tag": "i", "part": "member-speaking-bar" }
+                                ]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "member-speaking-label",
+                                "children": [
+                                  {
+                                    "text": "正在讲话"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
                           {
-                            "text": "已静音"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "member-away-state",
-                        "when": {
-                          "path": "member.status",
-                          "equals": "away"
-                        },
-                        "attributes": {
-                          "aria-label": "离开"
-                        },
-                        "children": [
+                            "tag": "span",
+                            "part": "member-muted-state",
+                            "when": {
+                              "path": "member.status",
+                              "equals": "muted"
+                            },
+                            "attributes": {
+                              "aria-label": "麦克风已静音"
+                            },
+                            "children": [
+                              {
+                                "text": "已静音"
+                              }
+                            ]
+                          },
                           {
-                            "text": "离开中"
+                            "tag": "span",
+                            "part": "member-away-state",
+                            "when": {
+                              "path": "member.status",
+                              "equals": "away"
+                            },
+                            "attributes": {
+                              "aria-label": "离开"
+                            },
+                            "children": [
+                              {
+                                "text": "离开中"
+                              }
+                            ]
                           }
                         ]
                       }
                     ]
                   }
                 ]
+              },
+              {
+                "widget": "voice.screen-share-player",
+                "part": "screen-player"
               },
               {
                 "tag": "div",
