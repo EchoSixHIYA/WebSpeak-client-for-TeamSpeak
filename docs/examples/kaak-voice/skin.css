@@ -1629,6 +1629,7 @@
 [data-ws-part="voice.audio-settings"] .settings-header h2 {
   color: #f2f3f5;
   font-size: 32px;
+  font-weight: 600;
   letter-spacing: -.025em;
 }
 
