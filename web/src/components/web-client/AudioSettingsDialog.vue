@@ -84,8 +84,7 @@
                 :checked="noiseSuppressionEnabled"
                 :aria-label="t('noiseSuppression')"
                 @change="onNoiseSuppressionToggle" /></label
-            ><template v-if="isMobileViewport"
-              ><div class="settings-range-row"
+            ><div class="settings-range-row"
                 ><label class="settings-label">{{ t("inputVolume") }}</label
                 ><strong>{{ Math.round(inputVolume * 100) }}%</strong></div
               ><input
@@ -96,8 +95,7 @@
                 :value="inputVolume * 100"
                 :style="rangeStyle(inputVolume, 1)"
                 :aria-label="t('inputVolume')"
-                @input="onInputVolume" /></template
-            ><div class="settings-range-row"
+                @input="onInputVolume" /><div class="settings-range-row"
               ><label class="settings-label">{{ t("voxThreshold") }}</label
               ><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div
             ><input
@@ -169,8 +167,7 @@
                 name="info"
                 :size="16"
               /><span>{{ t("outputDeviceUnsupported") }}</span></p
-            ><template v-if="isMobileViewport"
-              ><div class="settings-range-row"
+            ><div class="settings-range-row"
                 ><label class="settings-label">{{ t("speakers") }}</label
                 ><strong>{{ Math.round(outputVolume * 100) }}%</strong></div
               ><input
@@ -181,8 +178,7 @@
                 :value="outputVolume * 100"
                 :style="rangeStyle(outputVolume, 1)"
                 :aria-label="t('outputVolume')"
-                @input="onOutputVolume" /></template
-            ><div class="settings-range-row"
+                @input="onOutputVolume" /><div class="settings-range-row"
               ><label class="settings-label">{{ t("notificationVolume") }}</label
               ><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div
             ><input
