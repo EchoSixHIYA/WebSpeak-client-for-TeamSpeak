@@ -4,7 +4,7 @@ KAAK is a schema v3 open-skin package with full connection and voice-workspace s
 
 The single TeamSpeak voice-channel group in the left tree collapses and expands with a short two-way height and fade transition like KOOK's voice group; the separate KOOK text-channel group remains outside this pass. A first click selects a channel and reveals a brief “双击加入” hint; the hint disappears on the active room. The current voice-room heading keeps the channel name and live member count visible above the participant stage while the attached chat is expanded, matching KOOK's room view.
 
-The design target is the voice-client portion of KOOK, as requested by the project owner. It does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
+The design target is the voice-client portion of KOOK, as requested by the project owner. It does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server. The voice performance card also closes on outside click or Escape; Escape returns focus to its trigger, and its entrance/exit motion respects reduced-motion preferences.
 
 ## Reference access note
 

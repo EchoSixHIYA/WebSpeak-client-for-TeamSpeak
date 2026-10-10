@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.33");
+  assert.equal(skin.version, "3.1.34");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -553,6 +553,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #35373d/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
+  assert.match(skin.css, /voice-performance-panel-enter-active[\s\S]*?transition: opacity \.16s/);
+  assert.match(skin.css, /voice-performance-panel-leave-active/);
+  assert.match(skin.css, /voice-performance-panel-enter-from,[\s\S]*?voice-performance-panel-leave-to \{\s*opacity: 0;/);
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /voice-channel-list[\s\S]*?grid-template-rows: 1fr;[\s\S]*?transition: grid-template-rows \.18s ease/);
   assert.match(skin.css, /data-voice-group-open="false"[\s\S]*?voice-channel-list[\s\S]*?grid-template-rows: 0fr;[\s\S]*?visibility: hidden;[\s\S]*?visibility 0s linear \.18s/);

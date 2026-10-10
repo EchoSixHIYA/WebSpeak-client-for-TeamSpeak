@@ -1,9 +1,11 @@
 <template>
   <div
+    ref="root"
     class="network-performance"
     data-ws-part="voice.performance"
   >
     <button
+      ref="trigger"
       type="button"
       class="performance-trigger"
       :title="t('voiceStatus')"
@@ -18,14 +20,15 @@
         name="chevron-down"
         :size="13"
     /></button>
-    <section
-      v-if="performancePanelOpen"
-      class="performance-panel"
-      data-ws-part="voice.performance.panel"
-      role="dialog"
-      :aria-label="t('voiceStatus')"
-      @click.stop
-    >
+    <Transition name="voice-performance-panel">
+      <section
+        v-if="performancePanelOpen"
+        class="performance-panel"
+        data-ws-part="voice.performance.panel"
+        role="dialog"
+        :aria-label="t('voiceStatus')"
+        @click.stop
+      >
       <header
         ><div
           ><strong>{{ t("voiceStatus") }}</strong
@@ -209,18 +212,21 @@
           >
         </div>
       </section>
-    </section>
+      </section>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import Icon from "../Icon.vue";
 import type { useWebClientPerformance } from "../../composables/useWebClientPerformance.js";
 import type { ScreenShareWebRtcStats } from "../../composables/useVoiceWebSocket.js";
 const props = defineProps<{ model: ReturnType<typeof useWebClientPerformance>; screenShareWebRtcStats: ScreenShareWebRtcStats; showScreenShare?: boolean; t: (key: string) => string }>();
 const showScreenShare = props.showScreenShare !== false;
 const { panelOpen: performancePanelOpen, running: performanceRunning, stats: performanceStats, togglePanel: togglePerformancePanel, refresh: refreshPerformanceProbe } = props.model;
+const root = ref<HTMLElement | null>(null);
+const trigger = ref<HTMLButtonElement | null>(null);
 const t = props.t;
 const voiceHealthLabel = computed(() => t(({ disconnected: "voiceHealthDisconnected", sampling: "voiceHealthSampling", connecting: "voiceHealthConnecting", warning: "voiceHealthWarning", active: "voiceHealthActive", quiet: "voiceHealthQuiet" } as const)[performanceStats.value.health]));
 const voiceTransportLabel = computed(() => t(({ webrtc: "voiceTransportWebRTC", websocket: "voiceTransportWebSocket", negotiating: "voiceTransportNegotiating", disconnected: "voiceTransportDisconnected" } as const)[performanceStats.value.transport]));
@@ -232,5 +238,29 @@ const voiceMicrophoneLabel = computed(() => performanceStats.value.microphoneMut
     : performanceStats.value.microphonePermission === "denied" || performanceStats.value.microphonePermission === "granted"
       ? t("voiceMicUnavailable")
       : t("voiceMicWaiting"));
+
+function onOutsidePointerDown(event: PointerEvent): void {
+  if (performancePanelOpen.value && !root.value?.contains(event.target as Node)) {
+    togglePerformancePanel();
+  }
+}
+
+function onEscape(event: KeyboardEvent): void {
+  if (!performancePanelOpen.value || event.key !== "Escape") return;
+  event.preventDefault();
+  event.stopPropagation();
+  togglePerformancePanel();
+  void nextTick(() => trigger.value?.focus());
+}
+
+onMounted(() => {
+  document.addEventListener("pointerdown", onOutsidePointerDown, true);
+  document.addEventListener("keydown", onEscape, true);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("pointerdown", onOutsidePointerDown, true);
+  document.removeEventListener("keydown", onEscape, true);
+});
 
 </script>

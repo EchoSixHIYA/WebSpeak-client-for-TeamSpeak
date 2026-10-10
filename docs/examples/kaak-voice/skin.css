@@ -1435,12 +1435,23 @@
   border: 1px solid #3b3c42;
   border-radius: 12px;
   box-shadow: 0 16px 36px #0009;
-  animation: kaak-performance-enter .16s cubic-bezier(.2, .75, .25, 1) both;
 }
 
-@keyframes kaak-performance-enter {
-  from { opacity: 0; transform: translateY(7px) scale(.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-active,
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-active {
+  transition: opacity .16s cubic-bezier(.2, .75, .25, 1), transform .16s cubic-bezier(.2, .75, .25, 1);
+}
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-from,
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-to {
+  opacity: 0;
+  transform: translateY(7px) scale(.985);
+}
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-to,
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel header strong {
@@ -1805,7 +1816,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-ws-plugin-part="kaak-workspace.channel-join-hint"] { animation: none; }
-  [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel { animation: none; }
+  [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-active,
+  [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-active { transition-duration: .01ms; }
   [data-ws-part="voice.audio-settings"] .settings-select-chevron,
   [data-ws-part="voice.audio-settings"] .settings-select-menu-enter-active,
   [data-ws-part="voice.audio-settings"] .settings-select-menu-leave-active { transition: none; }
