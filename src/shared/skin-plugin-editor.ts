@@ -1,6 +1,6 @@
 import {
-  SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS,
   parseSkinPluginDocument,
+  skinPluginWidgetPermissions,
   type SkinPluginComponent,
   type SkinPluginDocument,
   type SkinPluginNode,
@@ -30,7 +30,7 @@ export function editableSkinPluginDocument(input: unknown): SkinPluginDocument {
   const components = parsed.components.map((component) => {
     const permissions = new Set(component.permissions);
     const visit = (node: SkinPluginNode) => {
-      if (node.widget) SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[node.widget]?.forEach((permission) => permissions.add(permission));
+      if (node.widget) skinPluginWidgetPermissions(node.widget, node.options).forEach((permission) => permissions.add(permission));
       node.children?.forEach(visit);
     };
     visit(component.root);

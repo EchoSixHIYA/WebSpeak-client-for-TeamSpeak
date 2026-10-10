@@ -145,7 +145,7 @@
         }}</p
       >
       <section
-        v-if="screenShareWebRtcStats.peers.length"
+        v-if="showScreenShare && screenShareWebRtcStats.peers.length"
         class="webrtc-stats"
         data-ws-part="voice.performance.webrtc-stats"
         aria-live="polite"
@@ -218,7 +218,8 @@ import { computed } from "vue";
 import Icon from "../Icon.vue";
 import type { useWebClientPerformance } from "../../composables/useWebClientPerformance.js";
 import type { ScreenShareWebRtcStats } from "../../composables/useVoiceWebSocket.js";
-const props = defineProps<{ model: ReturnType<typeof useWebClientPerformance>; screenShareWebRtcStats: ScreenShareWebRtcStats; t: (key: string) => string }>();
+const props = defineProps<{ model: ReturnType<typeof useWebClientPerformance>; screenShareWebRtcStats: ScreenShareWebRtcStats; showScreenShare?: boolean; t: (key: string) => string }>();
+const showScreenShare = props.showScreenShare !== false;
 const { panelOpen: performancePanelOpen, running: performanceRunning, stats: performanceStats, togglePanel: togglePerformancePanel, refresh: refreshPerformanceProbe } = props.model;
 const t = props.t;
 const voiceHealthLabel = computed(() => t(({ disconnected: "voiceHealthDisconnected", sampling: "voiceHealthSampling", connecting: "voiceHealthConnecting", warning: "voiceHealthWarning", active: "voiceHealthActive", quiet: "voiceHealthQuiet" } as const)[performanceStats.value.health]));

@@ -944,9 +944,6 @@
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span { display: none; }
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="true"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong { display: none; }
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="true"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:hover > strong { display: block; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-actions,
-[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-live-indicator,
-[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-stop-button { display: none; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-member-action { position: absolute; z-index: 2; top: 9px; right: 9px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #ffffff22; border-radius: 50%; color: var(--skin-kaak-text); background: #17181bcc; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty { display: grid; min-height: 160px; place-content: center; justify-items: center; gap: 8px; color: var(--skin-kaak-muted); text-align: center; }
@@ -1373,6 +1370,12 @@
   border: 1px solid #3b3c42;
   border-radius: 12px;
   box-shadow: 0 16px 36px #0009;
+  animation: kaak-performance-enter .16s cubic-bezier(.2, .75, .25, 1) both;
+}
+
+@keyframes kaak-performance-enter {
+  from { opacity: 0; transform: translateY(7px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel header strong {
@@ -1406,8 +1409,13 @@
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-audio-details,
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-route {
   color: #a4a6ad;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.45;
 }
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-metrics small { font-size: 10px; }
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-metrics strong,
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-status-summary strong { font-variant-numeric: tabular-nums; }
 
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-refresh {
   color: #91e5a6;
@@ -1441,15 +1449,66 @@
 [data-ws-plugin-part="kaak-workspace"] .dock-slider-heading strong {
   color: #80df98;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 [data-ws-plugin-part="kaak-workspace"] .dock-slider {
   height: 22px;
   margin: 8px 0 0;
-  appearance: auto;
-  accent-color: #58c877;
-  background: transparent !important;
+  appearance: none;
+  border: 0;
+  border-radius: 99px;
+  background: linear-gradient(to right, #58c877 0%, #58c877 var(--ws-range-progress, 0%), #414248 var(--ws-range-progress, 0%), #414248 100%) center / 100% 4px no-repeat !important;
+  cursor: pointer;
 }
+
+[data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-runnable-track,
+[data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: transparent; }
+[data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-track,
+[data-ws-part="voice.audio-settings"] .settings-range::-moz-range-track { height: 4px; border-radius: 99px; background: transparent; }
+[data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-progress,
+[data-ws-part="voice.audio-settings"] .settings-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #58c877; }
+[data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  margin-top: -5.5px;
+  appearance: none;
+  border: 2px solid #202126;
+  border-radius: 50%;
+  background: #d8f6df;
+  box-shadow: 0 0 0 1px #58c87780, 0 2px 7px #0008;
+  transition: box-shadow .14s ease, transform .14s ease, background-color .14s ease;
+}
+[data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #202126;
+  border-radius: 50%;
+  background: #d8f6df;
+  box-shadow: 0 0 0 1px #58c87780, 0 2px 7px #0008;
+  transition: box-shadow .14s ease, transform .14s ease, background-color .14s ease;
+}
+[data-ws-plugin-part="kaak-workspace"] .dock-slider:hover::-webkit-slider-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range:hover::-webkit-slider-thumb,
+[data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible::-webkit-slider-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range:focus-visible::-webkit-slider-thumb {
+  background: #fff;
+  box-shadow: 0 0 0 3px #58c87745, 0 2px 8px #0009;
+  transform: scale(1.12);
+}
+[data-ws-plugin-part="kaak-workspace"] .dock-slider:hover::-moz-range-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range:hover::-moz-range-thumb,
+[data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible::-moz-range-thumb,
+[data-ws-part="voice.audio-settings"] .settings-range:focus-visible::-moz-range-thumb {
+  background: #fff;
+  box-shadow: 0 0 0 3px #58c87745, 0 2px 8px #0009;
+  transform: scale(1.12);
+}
+[data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible,
+[data-ws-part="voice.audio-settings"] .settings-range:focus-visible { outline: 2px solid #58c87770; outline-offset: 4px; }
+[data-ws-part="voice.audio-settings"] .settings-range-row strong { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
 
 [data-ws-plugin-part="kaak-workspace"] .dock-audio-button {
   border: 1px solid transparent;
@@ -1537,7 +1596,12 @@
 [data-ws-part="voice.audio-settings"] .settings-select {
   min-height: 42px;
   color: #e9eaed;
-  background: #2a2b31;
+  appearance: none;
+  padding-right: 42px;
+  background:
+    linear-gradient(45deg, transparent 50%, #aeb0b7 50%) calc(100% - 17px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #aeb0b7 50%, transparent 50%) calc(100% - 13px) 50% / 6px 6px no-repeat,
+    #2a2b31;
   border: 1px solid #414249;
   border-radius: 9px;
   font-size: 14px;
@@ -1545,7 +1609,10 @@
 }
 
 [data-ws-part="voice.audio-settings"] .settings-select:hover:not(:disabled) {
-  background: #303137;
+  background:
+    linear-gradient(45deg, transparent 50%, #aeb0b7 50%) calc(100% - 17px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #aeb0b7 50%, transparent 50%) calc(100% - 13px) 50% / 6px 6px no-repeat,
+    #303137;
   border-color: #595a62;
 }
 
@@ -1558,6 +1625,10 @@
   color: #e9eaed;
   background: #2a2b31;
 }
+
+[data-ws-part="voice.audio-settings"] .settings-select:active:not(:disabled) { border-color: #70d48a; }
+[data-ws-part="voice.audio-settings"] .settings-select:disabled { cursor: not-allowed; opacity: .55; }
+[data-ws-part="voice.audio-settings"] .settings-select option:checked { color: #e9eaed; background: #303b34; }
 
 [data-ws-part="voice.audio-settings"] .microphone-control,
 [data-ws-part="voice.audio-settings"] .audio-diagnostic,
@@ -1599,9 +1670,11 @@
 [data-ws-part="voice.audio-settings"] .settings-range {
   height: 22px;
   margin: 8px 0 20px;
-  appearance: auto;
-  accent-color: #58c877;
-  background: transparent !important;
+  appearance: none;
+  border: 0;
+  border-radius: 99px;
+  background: linear-gradient(to right, #58c877 0%, #58c877 var(--ws-range-progress, 0%), #414248 var(--ws-range-progress, 0%), #414248 100%) center / 100% 4px no-repeat !important;
+  cursor: pointer;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-range-row strong {
@@ -1652,4 +1725,12 @@
   }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong { font-size: 13px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span { font-size: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel { animation: none; }
+  [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
+  [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,
+  [data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-thumb,
+  [data-ws-part="voice.audio-settings"] .settings-range::-moz-range-thumb { transition: none; }
 }

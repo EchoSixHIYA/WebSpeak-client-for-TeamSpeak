@@ -116,8 +116,6 @@
         "audio.status.read",
         "audio.microphone.control",
         "audio.output.control",
-        "voice.screenShare.read",
-        "voice.screenShare.control",
         "voice.whisper.status.read",
         "voice.whisper.control",
         "voice.disconnect"
@@ -859,7 +857,10 @@
               },
               {
                 "widget": "voice.member-cards",
-                "part": "member-cards"
+                "part": "member-cards",
+                "options": {
+                  "screenShare": false
+                }
               },
               {
                 "tag": "div",
@@ -940,7 +941,10 @@
                   },
                   {
                     "widget": "voice.performance-panel",
-                    "part": "performance-panel"
+                    "part": "performance-panel",
+                    "options": {
+                      "screenShare": false
+                    }
                   },
                   {
                     "tag": "button",

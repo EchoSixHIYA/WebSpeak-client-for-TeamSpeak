@@ -12,6 +12,7 @@ import {
   type SkinPluginDocument,
   type SkinPluginHostWidget,
   type SkinPluginNode,
+  type SkinPluginWidgetOptions,
   type SkinPluginPermission,
 } from "../../../src/shared/skin-plugin.js";
 import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
@@ -22,7 +23,7 @@ import { createSkinPluginAssetUrlCache } from "../services/skin-plugin-asset-url
 type Scalar = string | number | boolean;
 type SafeContext = Record<string, unknown>;
 type HostAction = (args: Record<string, Scalar>, component: SkinPluginComponent) => void | Promise<void>;
-type HostWidget = () => VNodeChild;
+type HostWidget = (options?: SkinPluginWidgetOptions) => VNodeChild;
 
 const eventProps: Record<string, string> = {
   click: "onClick", dblclick: "onDblclick", change: "onChange", input: "onInput", submit: "onSubmit", keydown: "onKeydown", keyup: "onKeyup",
@@ -265,7 +266,7 @@ export default defineComponent({
           "data-ws-plugin-part": node.part ? `${component.id}.${node.part}` : component.id,
           "data-ws-part": layoutPart(component, node, nodePath),
           "aria-label": component.accessibleName,
-        }, [widget()]);
+        }, [widget(node.options)]);
       }
       if (!node.tag) {
         const text = interpolate(node.text ?? "", context, state);

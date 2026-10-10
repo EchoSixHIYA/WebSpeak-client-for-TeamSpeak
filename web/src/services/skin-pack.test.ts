@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.27");
+  assert.equal(skin.version, "3.1.28");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -483,8 +483,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(voice?.permissions.includes("chat.channel.send"));
   assert.ok(voice?.permissions.includes("audio.microphone.control"));
   assert.ok(voice?.permissions.includes("audio.output.control"));
-  assert.ok(voice?.permissions.includes("voice.screenShare.read"));
-  assert.ok(voice?.permissions.includes("voice.screenShare.control"));
+  assert.equal(voice?.permissions.includes("voice.screenShare.read"), false);
+  assert.equal(voice?.permissions.includes("voice.screenShare.control"), false);
   function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
     if (!node) return undefined;
     if (node.part === part) return node;
@@ -527,9 +527,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");
   assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "语音房间 / Voice room");
   assert.equal(findPart(voice?.root, "member-cards")?.widget, "voice.member-cards");
+  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: false });
   assert.equal(findPart(voice?.root, "member-list"), undefined);
   assert.equal(findPart(voice?.root, "screen-player"), undefined);
   assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
+  assert.deepEqual(findPart(voice?.root, "performance-panel")?.options, { screenShare: false });
   assert.equal(findPart(voice?.root, "chat-input")?.bindValue, "message");
   assert.equal(findPart(voice?.root, "chat-input")?.attributes?.placeholder, "给 #{{session.status.channelName}} 发消息");
   assert.equal(findPart(voice?.root, "conversation-glyph")?.children?.[0]?.text, "#");

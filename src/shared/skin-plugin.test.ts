@@ -175,6 +175,43 @@ test("schema v3 member cards require a separate permission to display cached pro
   assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.member-cards");
 });
 
+test("schema v3 trusted widgets can omit screen-share UI and request only the permissions they use", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].permissions = ["session.members.read", "session.memberAvatars.read"];
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.member-cards", options: { screenShare: false } }] };
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[0]?.options, { screenShare: false });
+
+  const memberCardsDefault = structuredClone(document);
+  memberCardsDefault.components[0].root.children![0] = { widget: "voice.member-cards" };
+  errorCode(() => parseSkinPluginDocument(memberCardsDefault), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const performanceWithoutShare = structuredClone(document);
+  performanceWithoutShare.components[0].permissions = [];
+  performanceWithoutShare.components[0].root.children![0] = { widget: "voice.performance-panel", options: { screenShare: false } };
+  assert.equal(parseSkinPluginDocument(performanceWithoutShare).components[0].root.children?.[0]?.widget, "voice.performance-panel");
+
+  const performanceWithShare = structuredClone(performanceWithoutShare);
+  performanceWithShare.components[0].root.children![0] = { widget: "voice.performance-panel", options: { screenShare: true } };
+  errorCode(() => parseSkinPluginDocument(performanceWithShare), "SKIN_PLUGIN_PERMISSION_MISSING");
+  performanceWithShare.components[0].permissions = ["voice.screenShare.read"];
+  assert.equal(parseSkinPluginDocument(performanceWithShare).components[0].root.children?.[0]?.widget, "voice.performance-panel");
+
+  const invalidOption = structuredClone(document);
+  invalidOption.components[0].root.children![0] = { widget: "voice.member-cards", options: { screenShare: "false" } as never };
+  errorCode(() => parseSkinPluginDocument(invalidOption), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+
+  const legacyOption = structuredClone(document);
+  legacyOption.schemaVersion = 2;
+  legacyOption.components[0].root.children![0] = { widget: "voice.member-cards", options: { screenShare: false } };
+  errorCode(() => parseSkinPluginDocument(legacyOption), "SKIN_PLUGIN_SCHEMA_UNSUPPORTED");
+
+  const misplacedOption = structuredClone(document);
+  misplacedOption.components[0].root.children![0] = { tag: "div", options: { screenShare: false } } as never;
+  errorCode(() => parseSkinPluginDocument(misplacedOption), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+});
+
 test("KAAK v3 example declares the connection home and complete voice workspace", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
@@ -205,7 +242,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   visit(workspace.root);
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
   assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
-  assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"));
+  assert.ok(!nodes.some((node) => node.widget === "voice.screen-share-start"), "KOOK clone excludes screen sharing");
   assert.ok(nodes.some((node) => node.repeat?.path === "session.channels" && node.children?.[0].events?.dblclick === "join-channel"));
   assert.ok(!nodes.some((node) => node.repeat?.path === "session.members"), "member imagery stays inside the trusted host widget");
   assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));

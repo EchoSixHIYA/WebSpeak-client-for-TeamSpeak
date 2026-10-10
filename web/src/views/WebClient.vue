@@ -1020,7 +1020,7 @@ import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLo
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
 import { createSkinPluginQuickServerProjection } from "../services/skin-plugin-context.js";
 import { loadSkinPluginAuthoringDocument } from "../services/skin-plugin-authoring.js";
-import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import type { SkinPluginDocument, SkinPluginWidgetOptions } from "../../../src/shared/skin-plugin.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
@@ -1740,11 +1740,12 @@ const skinPluginWidgets = {
     onSelectChannel: selectChannel,
     onVolumeInput: onVolInput,
   }),
-  "voice.member-cards": () => h(VoiceMemberCards, {
+  "voice.member-cards": (options?: SkinPluginWidgetOptions) => h(VoiceMemberCards, {
     currentMembers: currentMembers.value,
     isMobileViewport: isMobileViewport.value,
-    sharing: memberSharingState,
-    controls: screenShareControls,
+    showScreenShare: options?.screenShare !== false,
+    sharing: options?.screenShare === false ? undefined : memberSharingState,
+    controls: options?.screenShare === false ? undefined : screenShareControls,
     isSpeaking,
     avatarStyle,
     avatarInitial,
@@ -1805,9 +1806,10 @@ const skinPluginWidgets = {
     t,
     onClear: clearWhisperTargets,
   }) : null,
-  "voice.performance-panel": () => h(VoicePerformancePanel, {
+  "voice.performance-panel": (options?: SkinPluginWidgetOptions) => h(VoicePerformancePanel, {
     model: performance,
     screenShareWebRtcStats,
+    showScreenShare: options?.screenShare !== false,
     t,
   }),
   "voice.connection-controls": () => h("div", { class: "ws-plugin-connection-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
@@ -2009,7 +2011,10 @@ function formatTime(timestamp: number) {
 
 function rangeStyle(value: number, max: number) {
   const percent = Math.max(0, Math.min(100, (value / max) * 100));
-  return { background: `linear-gradient(to right, #006a64 0%, #006a64 ${percent}%, #e7eceb ${percent}%, #e7eceb 100%)` };
+  return {
+    "--ws-range-progress": `${percent}%`,
+    background: `linear-gradient(to right, #006a64 0%, #006a64 ${percent}%, #e7eceb ${percent}%, #e7eceb 100%)`,
+  };
 }
 
 function onVolInput(clientId: number, event: Event) {

@@ -56,6 +56,10 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.disconnect-control",
 ] as const);
 export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
+export interface SkinPluginWidgetOptions {
+  /** Hide screen-share UI and its stream details for widgets that support it. */
+  screenShare?: boolean;
+}
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
   "voice.audio-controls": widgetPermissions("audio.status.read", "audio.microphone.control", "audio.output.control"),
@@ -67,11 +71,21 @@ export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostW
   "voice.screen-share-start": widgetPermissions("voice.screenShare.control"),
   "voice.whisper-controls": widgetPermissions("voice.whisper.status.read", "voice.whisper.control"),
 });
+export function skinPluginWidgetPermissions(
+  widget: SkinPluginHostWidget,
+  options?: SkinPluginWidgetOptions,
+): readonly SkinPluginPermission[] {
+  if (widget === "voice.performance-panel") return options?.screenShare === true ? widgetPermissions("voice.screenShare.read") : [];
+  const permissions = SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[widget] ?? [];
+  if (options?.screenShare !== false || widget !== "voice.member-cards") return permissions;
+  return permissions.filter((permission) => permission !== "voice.screenShare.read" && permission !== "voice.screenShare.control");
+}
 export function missingSkinPluginWidgetPermission(
   widget: SkinPluginHostWidget,
   permissions: readonly SkinPluginPermission[],
+  options?: SkinPluginWidgetOptions,
 ): SkinPluginPermission | undefined {
-  return SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[widget]?.find((permission) => !permissions.includes(permission));
+  return skinPluginWidgetPermissions(widget, options).find((permission) => !permissions.includes(permission));
 }
 export type SkinPluginEvent =
   | "click" | "dblclick" | "change" | "input" | "submit" | "keydown"
@@ -91,6 +105,7 @@ export interface SkinPluginActionDefinition {
 
 export interface SkinPluginNode {
   widget?: SkinPluginHostWidget;
+  options?: SkinPluginWidgetOptions;
   tag?: string;
   text?: string;
   part?: string;
@@ -381,23 +396,36 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       componentNodes += 1;
       if (componentNodes > (inputSchemaVersion >= 3 ? SKIN_PLUGIN_NODE_LIMIT : 256)) fail("SKIN_PLUGIN_COMPLEXITY_LIMIT", "A component contains too many template nodes.");
       if (depth > (inputSchemaVersion >= 3 ? SKIN_PLUGIN_TREE_DEPTH_LIMIT : 16) || !isRecord(rawNode)) fail("SKIN_PLUGIN_TREE_INVALID", "A component tree is too deep or contains an invalid node.");
-      onlyKeys(rawNode, new Set(["widget", "tag", "text", "part", "className", "attributes", "asset", "bindValue", "repeat", "when", "events", "children"]), "Component node");
+      onlyKeys(rawNode, new Set(["widget", "options", "tag", "text", "part", "className", "attributes", "asset", "bindValue", "repeat", "when", "events", "children"]), "Component node");
       if (inputSchemaVersion === 1 && rawNode.widget !== undefined) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Host widgets require components schema version 2.");
       const nodeKinds = Number(rawNode.widget !== undefined) + Number(rawNode.tag !== undefined) + Number(rawNode.text !== undefined);
       if (nodeKinds !== 1) fail("SKIN_PLUGIN_TREE_INVALID", "Each component node must define exactly one of widget, tag, or text.");
+      if (rawNode.options !== undefined && rawNode.widget === undefined) fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "Only host widgets may declare widget options.");
       const node: SkinPluginNode = {};
       if (rawNode.widget !== undefined) {
         if (typeof rawNode.widget !== "string" || !HOST_WIDGETS.has(rawNode.widget)) fail("SKIN_PLUGIN_WIDGET_INVALID", "The component requests an unsupported host widget.");
         if (page === "demo") fail("SKIN_PLUGIN_WIDGET_INVALID", "Host widgets are available only on the home and voice client pages.");
+        if (rawNode.options !== undefined && inputSchemaVersion < 3) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Host widget options require components schema version 3.");
         // Preserve existing schema v2 packages; newly authored v3 widgets must declare every
         // permission needed by the trusted host UI they embed. Screen-share start was already gated.
+        let options: SkinPluginWidgetOptions | undefined;
+        if (rawNode.options !== undefined) {
+          if (!isRecord(rawNode.options)
+            || (rawNode.widget !== "voice.member-cards" && rawNode.widget !== "voice.performance-panel")
+            || Object.keys(rawNode.options).some((key) => key !== "screenShare")
+            || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")) {
+            fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "This host widget uses unsupported options.");
+          }
+          options = { ...(rawNode.options.screenShare !== undefined ? { screenShare: rawNode.options.screenShare } : {}) };
+        }
         const requiredPermission = inputSchemaVersion >= 3 || rawNode.widget === "voice.screen-share-start"
-          ? missingSkinPluginWidgetPermission(rawNode.widget as SkinPluginHostWidget, permissions)
+          ? missingSkinPluginWidgetPermission(rawNode.widget as SkinPluginHostWidget, permissions, options)
           : undefined;
         if (requiredPermission) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The ${rawNode.widget} widget requires ${requiredPermission}.`);
-        const widgetOnlyKeys = new Set(["widget", "part", "className", "when"]);
+        const widgetOnlyKeys = new Set(["widget", "options", "part", "className", "when"]);
         onlyKeys(rawNode, widgetOnlyKeys, "Host widget node");
         node.widget = rawNode.widget as SkinPluginHostWidget;
+        if (options) node.options = options;
       }
       if (rawNode.tag !== undefined) {
         if (typeof rawNode.tag !== "string" || !ELEMENTS.has(rawNode.tag)) fail("SKIN_PLUGIN_ELEMENT_INVALID", "The component uses an unsupported HTML element.");
