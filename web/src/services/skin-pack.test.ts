@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.28");
+  assert.equal(skin.version, "3.1.29");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -497,6 +497,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const channelRow = findPart(voice?.root, "channel-row");
   assert.equal(channelRow?.events?.click, "select-channel");
   assert.equal(channelRow?.events?.dblclick, "join-channel");
+  assert.deepEqual(findPart(channelRow, "channel-join-hint")?.when, { path: "state.selectedchannel", equals: "{{channel.id}}" });
+  assert.equal(findPart(channelRow, "channel-join-hint")?.children?.[0]?.text, "双击加入");
   assert.equal(findPart(voice?.root, "text-channel-group-toggle"), undefined);
   assert.equal(findPart(voice?.root, "text-channel-list"), undefined);
   const voiceGroupToggle = findPart(voice?.root, "voice-channel-group-toggle");
@@ -542,6 +544,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "screen-share-start"), undefined);
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
+  assert.match(skin.css, /channel-row"\]\[aria-current="true"\][\s\S]*?channel-join-hint[\s\S]*?display: none;/);
+  assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-channel-join-hint/);
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
   assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);

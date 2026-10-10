@@ -504,6 +504,25 @@
   white-space: nowrap;
 }
 
+[data-ws-plugin-part="kaak-workspace.channel-join-hint"] {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: #8cdda0;
+  background: #58c87718;
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+  animation: kaak-channel-join-hint .14s ease both;
+}
+
+[data-ws-plugin-part="kaak-workspace.channel-row"][aria-current="true"] [data-ws-plugin-part="kaak-workspace.channel-join-hint"] { display: none; }
+
+@keyframes kaak-channel-join-hint {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 [data-ws-plugin-part="kaak-workspace.channel-count"] {
   color: var(--skin-kaak-dim);
   font-size: 10px;
@@ -1728,6 +1747,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-ws-plugin-part="kaak-workspace.channel-join-hint"] { animation: none; }
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel { animation: none; }
   [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
   [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,

@@ -424,6 +424,19 @@
                                   },
                                   {
                                     "tag": "small",
+                                    "part": "channel-join-hint",
+                                    "when": {
+                                      "path": "state.selectedchannel",
+                                      "equals": "{{channel.id}}"
+                                    },
+                                    "children": [
+                                      {
+                                        "text": "双击加入"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tag": "small",
                                     "part": "channel-count",
                                     "children": [
                                       {
