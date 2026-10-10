@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.40");
+  assert.equal(skin.version, "3.1.41");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -566,6 +566,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /settings-select-option:hover \{ background: #ffffff0f; \}/);
   assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{\s*width: 16px;\s*height: 16px;\s*margin-top: -6px;/);
   assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-moz-range-thumb \{\s*width: 16px;\s*height: 16px;/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{[\s\S]*?border: 2px solid #6cbf00;[\s\S]*?background: #fff;[\s\S]*?box-shadow: none;/);
+  assert.match(skin.css, /settings-range:hover::-webkit-slider-thumb,[\s\S]*?box-shadow: 0 0 0 3px rgba\(108, 191, 0, \.5\);/);
+  assert.doesNotMatch(skin.css, /settings-range:hover::-webkit-slider-thumb,[\s\S]*?transform: scale\(1\.12\);/);
+  assert.match(skin.css, /settings-range::-moz-range-progress \{ height: 4px; border-radius: 99px; background: #6cbf00; \}/);
   assert.match(skin.css, /voice-performance-panel-enter-active[\s\S]*?transition: opacity \.16s/);
   assert.match(skin.css, /voice-performance-panel-leave-active/);
   assert.match(skin.css, /voice-performance-panel-enter-from,[\s\S]*?voice-performance-panel-leave-to \{\s*opacity: 0;/);

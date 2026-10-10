@@ -1535,7 +1535,7 @@
   appearance: none;
   border: 0;
   border-radius: 99px;
-  background: linear-gradient(to right, #58c877 0%, #58c877 var(--ws-range-progress, 0%), #414248 var(--ws-range-progress, 0%), #414248 100%) center / 100% 4px no-repeat !important;
+  background: linear-gradient(to right, #6cbf00 0%, #6cbf00 var(--ws-range-progress, 0%), #ffffff1a var(--ws-range-progress, 0%), #ffffff1a 100%) center / 100% 4px no-repeat !important;
   cursor: pointer;
 }
 
@@ -1544,47 +1544,43 @@
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-track,
 [data-ws-part="voice.audio-settings"] .settings-range::-moz-range-track { height: 4px; border-radius: 99px; background: transparent; }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-progress,
-[data-ws-part="voice.audio-settings"] .settings-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #58c877; }
+[data-ws-part="voice.audio-settings"] .settings-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #6cbf00; }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   margin-top: -6px;
   appearance: none;
-  border: 2px solid #202126;
+  border: 2px solid #6cbf00;
   border-radius: 50%;
-  background: #d8f6df;
-  box-shadow: 0 0 0 1px #58c87780, 0 2px 7px #0008;
-  transition: box-shadow .14s ease, transform .14s ease, background-color .14s ease;
+  background: #fff;
+  box-shadow: none;
+  transition: box-shadow .14s ease;
 }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  border: 2px solid #202126;
+  border: 2px solid #6cbf00;
   border-radius: 50%;
-  background: #d8f6df;
-  box-shadow: 0 0 0 1px #58c87780, 0 2px 7px #0008;
-  transition: box-shadow .14s ease, transform .14s ease, background-color .14s ease;
+  background: #fff;
+  box-shadow: none;
+  transition: box-shadow .14s ease;
 }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider:hover::-webkit-slider-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range:hover::-webkit-slider-thumb,
 [data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible::-webkit-slider-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range:focus-visible::-webkit-slider-thumb {
-  background: #fff;
-  box-shadow: 0 0 0 3px #58c87745, 0 2px 8px #0009;
-  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(108, 191, 0, .5);
 }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider:hover::-moz-range-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range:hover::-moz-range-thumb,
 [data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible::-moz-range-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range:focus-visible::-moz-range-thumb {
-  background: #fff;
-  box-shadow: 0 0 0 3px #58c87745, 0 2px 8px #0009;
-  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(108, 191, 0, .5);
 }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider:focus-visible,
-[data-ws-part="voice.audio-settings"] .settings-range:focus-visible { outline: 2px solid #58c87770; outline-offset: 4px; }
+[data-ws-part="voice.audio-settings"] .settings-range:focus-visible { outline: none; }
 [data-ws-part="voice.audio-settings"] .settings-range-row strong { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
 
 [data-ws-plugin-part="kaak-workspace"] .dock-audio-button {
@@ -1806,7 +1802,7 @@
   appearance: none;
   border: 0;
   border-radius: 99px;
-  background: linear-gradient(to right, #58c877 0%, #58c877 var(--ws-range-progress, 0%), #414248 var(--ws-range-progress, 0%), #414248 100%) center / 100% 4px no-repeat !important;
+  background: linear-gradient(to right, #6cbf00 0%, #6cbf00 var(--ws-range-progress, 0%), #ffffff1a var(--ws-range-progress, 0%), #ffffff1a 100%) center / 100% 4px no-repeat !important;
   cursor: pointer;
 }
 
