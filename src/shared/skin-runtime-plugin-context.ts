@@ -25,7 +25,7 @@ interface CollectionProjection {
 }
 
 const COLLECTIONS: readonly CollectionProjection[] = Object.freeze([
-  { path: ["session", "channels"], permission: "session.channels.read", fields: new Set(["id", "name", "parentId", "depth", "memberCount", "current"]), maxItems: 128 },
+  { path: ["session", "channels"], permission: "session.channels.read", fields: new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]), maxItems: 128 },
   { path: ["session", "members"], permission: "session.members.read", fields: new Set(["id", "name", "channelId", "status", "speaking", "self"]), maxItems: 256 },
   { path: ["favorites", "items"], permission: "favorites.read", fields: new Set(["id", "label", "current", "kind"]), maxItems: 100 },
   { path: ["servers", "quickList"], permission: "servers.quickList.read", fields: new Set(["id", "label", "current", "kind", "favorite"]), maxItems: 100 },
@@ -46,8 +46,8 @@ const CONTEXTS: readonly ContextProjection[] = Object.freeze([
   { path: ["screenShare", "status"], permission: "voice.screenShare.status.read", fields: new Set(["active", "starting", "viewing"]) },
 ]);
 
-const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "audio", "microphoneMuted", "outputMuted", "active", "starting", "viewing"]);
-const NUMBER_FIELDS = new Set(["depth", "memberCount", "targetCount", "ownerClientId", "viewerCount"]);
+const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "audio", "microphoneMuted", "outputMuted", "active", "starting", "viewing", "maxClientsLimited"]);
+const NUMBER_FIELDS = new Set(["depth", "memberCount", "targetCount", "ownerClientId", "viewerCount", "maxClients"]);
 const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   id: 128,
   streamId: 128,
@@ -63,6 +63,7 @@ const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   source: 48,
   kind: 48,
   time: 48,
+  memberCountLabel: 12,
   text: 1_024,
 });
 
@@ -86,7 +87,7 @@ function readPath(value: unknown, path: readonly string[]): unknown {
 function boundedValue(field: string, value: unknown): string | number | boolean | null | undefined {
   if (value === null) return field === "parentId" ? null : undefined;
   if (BOOLEAN_FIELDS.has(field)) return typeof value === "boolean" ? value : undefined;
-  if (NUMBER_FIELDS.has(field)) return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000
+  if (NUMBER_FIELDS.has(field)) return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= (field === "maxClients" ? 65_535 : 1_000_000_000)
     ? value
     : undefined;
   if (typeof value !== "string") return undefined;

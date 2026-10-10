@@ -216,7 +216,7 @@ const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
   "screenShare.streams": "voice.screenShare.read",
 };
 const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
-  "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "current"]),
+  "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]),
   "session.members": new Set(["id", "name", "avatarInitial", "channelId", "status", "speaking", "self"]),
   "favorites.items": new Set(["id", "label", "current", "kind"]),
   "servers.quickList": new Set(["id", "label", "monogram", "tone", "current", "kind", "favorite"]),

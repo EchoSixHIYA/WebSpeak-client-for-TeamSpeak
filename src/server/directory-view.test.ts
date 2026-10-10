@@ -5,7 +5,7 @@ import { mapChannelTree, normalizeDirectorySnapshot } from "./directory-view.js"
 import { parseServerMessage } from "../shared/server-messages.js";
 
 const directory = (): TSDirectorySnapshot => ({
-  channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Lobby", description: "" }, { id: 18446744073709551615n, parentID: 1n, order: 1n, name: "Room", description: "" }],
+  channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Lobby", description: "" }, { id: 18446744073709551615n, parentID: 1n, order: 1n, name: "Room", description: "", maxClients: 10, maxClientsLimited: true }],
   clients: [{ id: 2, channelID: 1n, nickname: "Member", uid: "uid-2", type: 0, serverGroups: [], away: true, inputMuted: true }],
 });
 
@@ -36,5 +36,7 @@ test("directory presentation survives JSON transport with large IDs, member flag
   assert.equal(decoded.channels[0]?.members?.[0]?.inputMuted, true);
   assert.equal(decoded.channels[0]?.members?.[0]?.away, true);
   assert.equal(decoded.channels[0]?.members?.[0]?.avatar, "data:image/png;base64,test");
+  assert.equal(decoded.channels[1]?.maxClients, 10);
+  assert.equal(decoded.channels[1]?.maxClientsLimited, true);
   assert.deepEqual(decoded.channels[1]?.members, []);
 });

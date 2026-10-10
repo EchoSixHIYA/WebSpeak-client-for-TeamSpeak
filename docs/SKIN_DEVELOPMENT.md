@@ -123,6 +123,8 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。重复列表可使用注册的公开集合；频道重复项仅能再重复其 `channel.members`，并且需要额外批准 `session.members.read`。宿主每个组件的实际渲染节点最多 8192 个，防止嵌套集合放大界面。v3/v4 的作者默认布局使用与 v2 相同的有界 layout schema；可通过 `skin.<page>.<component-id>` 指定声明式自定义组件，通过 `skin.<page>.runtime_plugin_root_<plugin-id>` 指定 v4 插件根。用户的本地布局覆盖优先于包默认值。schema v2 另允许固定宿主控件节点，例如：
 
+申请 `session.channels.read` 的 `session.channels` 列表还提供 `memberCount`、两位数显示用的 `memberCountLabel`、`maxClients` 和 `maxClientsLimited`。后两个字段仅在 TeamSpeak 返回有效上限数据时出现；`maxClientsLimited: false` 表示频道不限人数。它们与频道树一起属于公开只读数据，不会授予服务器写入能力。
+
 ```json
 {
   "schemaVersion": 2,

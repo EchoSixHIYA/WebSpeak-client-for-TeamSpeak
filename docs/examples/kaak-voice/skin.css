@@ -509,6 +509,10 @@
   font-size: 10px;
 }
 
+[data-ws-plugin-part="kaak-workspace.channel-capacity"] {
+  color: var(--skin-kaak-dim);
+}
+
 [data-ws-plugin-part="kaak-workspace.channel-voice-members"] {
   display: grid;
   gap: 1px;
@@ -773,6 +777,7 @@
 [data-ws-plugin-part="kaak-workspace.voice-stage-title"] { min-width: 0; margin: 0; overflow: hidden; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 [data-ws-plugin-part="kaak-workspace.voice-stage-member-count"] { color: var(--skin-kaak-muted); font-size: 12px; }
 [data-ws-plugin-part="kaak-workspace.voice-stage-member-count"]::before { content: "-"; margin-right: 6px; color: var(--skin-kaak-dim); }
+[data-ws-plugin-part="kaak-workspace.voice-stage-capacity"] { color: var(--skin-kaak-dim); }
 
 [data-ws-plugin-part="kaak-workspace.chat-panel-toggle"] {
   display: grid;

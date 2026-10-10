@@ -9,7 +9,7 @@ test("runtime context exposes only fields covered by declared read permissions",
   const projected = projectSkinRuntimePluginContext(["session.channels.read"], {
     session: {
       status: { connected: true, serverLabel: "voice.internal.example:9987" },
-      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, current: true, address: "voice.internal.example:9987", members: [{ name: "private nested member" }] }],
+      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, memberCountLabel: "02", maxClients: 10, maxClientsLimited: true, current: true, address: "voice.internal.example:9987", members: [{ name: "private nested member" }] }],
       members: [{ id: "member-1", name: "private member" }],
     },
     favorites: { items: [{ id: "opaque-1", label: "Saved", address: "secret.example:9987" }] },
@@ -17,7 +17,7 @@ test("runtime context exposes only fields covered by declared read permissions",
 
   assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
     session: {
-      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, current: true }],
+      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, memberCountLabel: "02", maxClients: 10, maxClientsLimited: true, current: true }],
     },
   });
   assert.equal(JSON.stringify(projected).includes("voice.internal.example"), false);
@@ -48,6 +48,22 @@ test("runtime context redacts connection targets from quick-list labels and drop
   assert.equal(JSON.stringify(projected).includes("192.0.2.55"), false);
   assert.equal(JSON.stringify(projected).includes("internal.example"), false);
   assert.equal(JSON.stringify(projected).includes("2001:db8::1"), false);
+});
+
+test("runtime channel limits are bounded public metadata and do not admit neighboring fields", () => {
+  const projected = projectSkinRuntimePluginContext(["session.channels.read"], {
+    session: {
+      channels: [{
+        id: "channel-1", name: "Lobby", memberCount: 2, memberCountLabel: "02",
+        maxClients: 65_536, maxClientsLimited: true, address: "voice.internal.example:9987",
+      }],
+    },
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
+    session: { channels: [{ id: "channel-1", name: "Lobby", memberCount: 2, memberCountLabel: "02", maxClientsLimited: true }] },
+  });
+  assert.equal(JSON.stringify(projected).includes("voice.internal.example"), false);
 });
 
 test("profile-picture display permission does not expose image data to declarative or Wasm contexts", () => {

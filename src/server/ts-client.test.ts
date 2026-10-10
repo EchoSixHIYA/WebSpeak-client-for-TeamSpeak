@@ -258,6 +258,38 @@ test("a current avatar download preserves its bytes and rejects a mismatched ide
   assert.equal(f.sdk.downloaded, 1);
 });
 
+test("public channel capacity survives directory snapshots and follows channel edits", () => {
+  const f = fixture();
+  const snapshots: Array<{ channels: Array<{ id: bigint; maxClients?: number; maxClientsLimited?: boolean }>; clients: unknown[] }> = [];
+  f.client.on("directorySnapshot", snapshot => snapshots.push(snapshot));
+
+  f.sdk.emit("rawNotification", {
+    name: "notifychannelcreated",
+    params: { cid: "1", channel_maxclients: "10", channel_flag_maxclients_unlimited: "0" },
+  });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, 10);
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClientsLimited, true);
+
+  f.sdk.emit("rawNotification", { name: "notifychanneledited", params: { cid: "1", channel_maxclients: "12" } });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, 12);
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClientsLimited, true);
+
+  f.sdk.emit("rawNotification", { name: "notifychanneldeleted", params: { cid: "1" } });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, undefined);
+});
+
 test("a retired SDK client's disconnect cannot invalidate a current avatar request", async () => {
   const f = fixture();
   const replacement = new SdkStub();

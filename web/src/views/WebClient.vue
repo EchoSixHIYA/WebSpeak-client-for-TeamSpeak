@@ -1556,6 +1556,10 @@ const skinPluginContext = computed(() => ({
         parentId: item.parentID,
         depth: item.depth,
         memberCount: item.members.length,
+        memberCountLabel: String(item.members.length).padStart(2, "0"),
+        ...(typeof item.maxClients === "number" && typeof item.maxClientsLimited === "boolean"
+          ? { maxClients: item.maxClients, maxClientsLimited: item.maxClientsLimited }
+          : {}),
         current: item.id === currentChannel.value?.id,
         members,
       };

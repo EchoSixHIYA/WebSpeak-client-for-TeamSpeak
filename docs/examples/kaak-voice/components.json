@@ -429,7 +429,20 @@
                                     "part": "channel-count",
                                     "children": [
                                       {
-                                        "text": "{{channel.memberCount}}"
+                                        "text": "{{channel.memberCountLabel}}"
+                                      },
+                                      {
+                                        "tag": "span",
+                                        "part": "channel-capacity",
+                                        "when": {
+                                          "path": "channel.maxClientsLimited",
+                                          "equals": true
+                                        },
+                                        "children": [
+                                          {
+                                            "text": "/{{channel.maxClients}}"
+                                          }
+                                        ]
                                       }
                                     ]
                                   },
@@ -823,7 +836,20 @@
                         },
                         "children": [
                           {
-                            "text": "{{stagechannel.memberCount}}"
+                            "text": "{{stagechannel.memberCountLabel}}"
+                          },
+                          {
+                            "tag": "span",
+                            "part": "voice-stage-capacity",
+                            "when": {
+                              "path": "stagechannel.maxClientsLimited",
+                              "equals": true
+                            },
+                            "children": [
+                              {
+                                "text": "/{{stagechannel.maxClients}}"
+                              }
+                            ]
                           }
                         ]
                       }

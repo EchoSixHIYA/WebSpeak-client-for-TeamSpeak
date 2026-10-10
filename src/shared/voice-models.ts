@@ -19,6 +19,10 @@ export interface ChannelInfo {
   order?: string;
   name: string;
   description?: string;
+  /** Maximum clients for this channel, when TeamSpeak reports a finite or unlimited setting. */
+  maxClients?: number;
+  /** False means the channel has no individual client limit. */
+  maxClientsLimited?: boolean;
   members?: ChannelMember[];
 }
 

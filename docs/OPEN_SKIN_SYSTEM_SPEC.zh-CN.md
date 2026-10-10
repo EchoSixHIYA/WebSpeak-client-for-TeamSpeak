@@ -47,7 +47,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 当前公开只读能力如下：
 
 - session.status.read：连接状态、当前频道和显示名称。
-- session.channels.read：公开频道树、频道名称、层级、人数和当前频道标志。
+- session.channels.read：公开频道树、频道名称、层级、当前人数、TeamSpeak 公布的频道人数上限及当前频道标志；不限人数的频道不显示上限，不包含服务器地址或频道密码。
 - session.members.read：可见成员名称、由名称派生的首字标记、所在频道、在线状态、说话状态及本人标志；不提供成员头像图像。
 - session.memberAvatars.read：允许可信 `voice.member-cards` 宿主控件显示当前可见成员的已缓存 TeamSpeak 头像；图像字节和 URL 不会传给皮肤声明树或 Wasm 插件上下文。
 - chat.channel.read：当前公开文字频道中可见的消息。

@@ -20,6 +20,7 @@ import { describeTeamSpeakError, normalizeTeamSpeakError, normalizeTeamSpeakKick
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { createAccelerationRelayClient, type AccelerationRelayClient, type AccelerationRelayOptions } from "./acceleration-relay.js";
+import { applyChannelCapacityNotification, parseChannelCapacities, type ChannelCapacity } from "./channel-capacity.js";
 
 export interface TSClientOptions {
   target: TeamSpeakTarget;
@@ -48,7 +49,8 @@ export interface TSClientAvatar {
 // so every avatar silently fell back to its initial letter.
 const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
 
-export type TSDirectorySnapshot = DirectorySnapshot;
+export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity>;
+export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
 export type TSDirectoryClient = DirectoryClientInfo;
 export type TSRawNotification = RawNotification;
 
@@ -92,6 +94,7 @@ export class TSClient extends EventEmitter {
   private inputStateQueue: Promise<void> = Promise.resolve();
   private preferredChannelId = 0n;
   private accelerationClient: AccelerationRelayClient | null = null;
+  private readonly channelCapacities = new Map<bigint, ChannelCapacity>();
   // Reason id of the most recent self leave, kept so the SDK `kicked` event can
   // tell a plain kick (4) from a kick with ban (5). The SDK only forwards the
   // reason message to its `kicked` handler, not the reason id.
@@ -109,6 +112,7 @@ export class TSClient extends EventEmitter {
     this.syncedInputMuted = null;
     this.inputStateQueue = Promise.resolve();
     this.selfLeaveReasonId = null;
+    this.channelCapacities.clear();
     if (!this.adapter || !this.client) {
       let transportTarget = this.options.target;
       if (this.options.acceleration && !this.accelerationClient) {
@@ -163,7 +167,20 @@ export class TSClient extends EventEmitter {
         tsListChannels(client),
         tsListClients(client),
       ]);
-      this.emit("directorySnapshot", { channels, clients });
+      try {
+        // The high-level SDK directory type intentionally omits channel limit
+        // metadata. Its raw client-protocol rows still include the public
+        // maximum-client properties, so retain those without another SDK API.
+        const rows = await client.execCommandWithResponse("channellist", 5_000);
+        const capacities = parseChannelCapacities(rows);
+        for (const [id, capacity] of capacities) this.channelCapacities.set(id, capacity);
+      } catch (error: unknown) {
+        this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not read TeamSpeak channel limits");
+      }
+      this.emit("directorySnapshot", {
+        channels: channels.map((channel) => ({ ...channel, ...this.channelCapacities.get(channel.id) })),
+        clients,
+      });
     } catch (error: unknown) {
       this.logger.warn({
         failureCode: "DIRECTORY_SNAPSHOT_UNAVAILABLE",
@@ -273,13 +290,14 @@ export class TSClient extends EventEmitter {
     client.on("directorySnapshot", (snapshot) => {
       if (this.client !== client) return;
       this.emit("directorySnapshot", {
-        channels: snapshot.channels.slice(),
+        channels: snapshot.channels.map((channel) => ({ ...channel, ...this.channelCapacities.get(channel.id) })),
         clients: snapshot.clients.slice(),
       });
     });
 
     client.on("rawNotification", (notification: RawNotification) => {
       if (this.client !== client) return;
+      applyChannelCapacityNotification(notification.name, notification.params, this.channelCapacities);
       this.emit("rawNotification", {
         name: notification.name,
         params: { ...notification.params },
@@ -310,6 +328,7 @@ export class TSClient extends EventEmitter {
       }
       this.connected = false;
       this.clientId = 0;
+      this.channelCapacities.clear();
       this.emit("disconnected", err);
     });
 

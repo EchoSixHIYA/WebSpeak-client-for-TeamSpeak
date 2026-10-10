@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.20");
+  assert.equal(skin.version, "3.1.21");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -515,7 +515,12 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const voiceStageHeading = findPart(voiceStageHeadingItem, "voice-stage-heading");
   assert.deepEqual(voiceStageHeading?.when, { path: "stagechannel.current", equals: true });
   assert.equal(findPart(voiceStageHeading, "voice-stage-title")?.children?.[0]?.text, "{{stagechannel.name}}");
-  assert.equal(findPart(voiceStageHeading, "voice-stage-member-count")?.children?.[0]?.text, "{{stagechannel.memberCount}}");
+  assert.equal(findPart(voiceStageHeading, "voice-stage-member-count")?.children?.[0]?.text, "{{stagechannel.memberCountLabel}}");
+  assert.deepEqual(findPart(voiceStageHeading, "voice-stage-capacity")?.when, { path: "stagechannel.maxClientsLimited", equals: true });
+  assert.equal(findPart(voiceStageHeading, "voice-stage-capacity")?.children?.[0]?.text, "/{{stagechannel.maxClients}}");
+  assert.equal(findPart(voice?.root, "channel-count")?.children?.[0]?.text, "{{channel.memberCountLabel}}");
+  assert.deepEqual(findPart(voice?.root, "channel-capacity")?.when, { path: "channel.maxClientsLimited", equals: true });
+  assert.equal(findPart(voice?.root, "channel-capacity")?.children?.[0]?.text, "/{{channel.maxClients}}");
   assert.deepEqual(findPart(voice?.root, "channel-voice-members")?.when, { path: "channel.members", empty: false });
   assert.equal(findPart(voice?.root, "channel-voice-member")?.repeat?.path, "channel.members");
   assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");

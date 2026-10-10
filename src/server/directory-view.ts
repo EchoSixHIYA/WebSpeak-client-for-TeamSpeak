@@ -8,6 +8,9 @@ export function mapChannelTree(snapshot: TSDirectorySnapshot, avatarCache = new 
     order: String(channel.order),
     name: channel.name || "未命名频道",
     description: channel.description || "",
+    ...(typeof channel.maxClients === "number" && typeof channel.maxClientsLimited === "boolean"
+      ? { maxClients: channel.maxClients, maxClientsLimited: channel.maxClientsLimited }
+      : {}),
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
       .map((client) => {
