@@ -3,7 +3,7 @@
   "packageType": "open-skin",
   "id": "community.kaak-voice",
   "name": "KAAK",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "author": "WebSpeak Project",
   "license": "AGPL-3.0-only",
   "description": "A complete dark voice-client workspace inspired by modern voice apps, built with WebSpeak host controls and public TeamSpeak data.",

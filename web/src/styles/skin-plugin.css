@@ -43,6 +43,10 @@
   min-height: var(--ws-viewport-height, 100vh);
 }
 
+/* Keep the skin-owned surface wrapper as the layout root; flatten its semantic
+   root node so the authored panel parts can participate in that layout. */
+.ws-plugin-surface > [data-ws-plugin-part] { display: contents; }
+
 .ws-plugin-host-widget {
   min-width: 0;
   min-height: 0;

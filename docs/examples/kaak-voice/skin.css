@@ -720,6 +720,8 @@
   white-space: nowrap;
 }
 [data-ws-plugin-part="kaak-workspace"] .desktop-audio-dock {
+  position: static;
+  inset: auto;
   min-width: 0;
   margin: 0;
   padding: 4px;
