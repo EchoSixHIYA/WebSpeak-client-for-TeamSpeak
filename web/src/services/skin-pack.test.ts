@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.29");
+  assert.equal(skin.version, "3.1.30");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -509,6 +509,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const chatToggle = findPart(voice?.root, "chat-panel-toggle");
   assert.equal(chatToggle?.events?.click, "toggle-chat-panel");
   assert.equal(chatToggle?.attributes?.["aria-expanded"], "{{state.chatopen}}");
+  const chatExpand = findPart(voice?.root, "chat-panel-expand");
+  assert.deepEqual(chatExpand?.when, { path: "state.chatopen", equals: false });
+  assert.equal(chatExpand?.events?.click, "toggle-chat-panel");
+  assert.equal(chatExpand?.attributes?.["aria-expanded"], "{{state.chatopen}}");
   assert.deepEqual(findPart(voice?.root, "chat")?.when, { path: "state.chatopen", equals: true });
   assert.equal(voice?.root.attributes?.["data-chat-open"], "{{state.chatopen}}");
   assert.equal(findPart(voice?.root, "server-monogram")?.children?.[0]?.text, "{{server.monogram}}");
@@ -550,7 +554,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
   assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);
   assert.doesNotMatch(skin.css, /aria-expanded="true"\]\s*[^\n]*voice-stage-heading[^\n]*display: none;/);
-  assert.match(skin.css, /kaak-workspace"\]:has\(\[data-ws-plugin-part="kaak-workspace\.chat-panel-toggle"\]\[aria-expanded="false"\]\)[\s\S]*?grid-template-columns: 80px 290px minmax\(280px, 1fr\) 52px;/);
+  assert.match(skin.css, /kaak-workspace"\]:has\(\[data-ws-plugin-part="kaak-workspace\.chat-panel-toggle"\]\[aria-expanded="false"\]\)[\s\S]*?grid-template-columns: 80px 290px minmax\(280px, 1fr\) 0;/);
   assert.match(skin.css, /grid-template-columns: 80px 290px/);
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
   assert.match(skin.css, /grid-template-rows: 40px/);
@@ -564,7 +568,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /aria-expanded="true"\]\) \[data-ws-plugin-part="kaak-workspace\.member-cards"\] \.voice-card > strong \{ display: none; \}/);
   assert.match(skin.css, /aria-expanded="true"\]\) \[data-ws-plugin-part="kaak-workspace\.member-cards"\] \.voice-card:hover > strong \{ display: block; \}/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);
-  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?grid-template-columns:[^;]*52px;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?grid-template-columns:[^;]*0;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-stage[\s\S]*?grid-column: 3 \/ 5;/);
+  assert.match(skin.css, /kaak-workspace\.chat-panel-expand[\s\S]*?background: var\(--skin-kaak-accent\);/);
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
   assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);

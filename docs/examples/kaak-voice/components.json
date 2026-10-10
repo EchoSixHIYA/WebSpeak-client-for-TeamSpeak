@@ -863,6 +863,27 @@
                             ]
                           }
                         ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "chat-panel-expand",
+                        "when": {
+                          "path": "state.chatopen",
+                          "equals": false
+                        },
+                        "attributes": {
+                          "type": "button",
+                          "aria-expanded": "{{state.chatopen}}",
+                          "aria-label": "展开当前语音频道文字聊天 / Expand current voice channel chat"
+                        },
+                        "events": {
+                          "click": "toggle-chat-panel"
+                        },
+                        "children": [
+                          {
+                            "text": "#"
+                          }
+                        ]
                       }
                     ]
                   }

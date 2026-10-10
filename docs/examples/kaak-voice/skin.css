@@ -128,11 +128,11 @@
   color: var(--skin-kaak-text);
   background: var(--skin-kaak-bg);
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  transition: grid-template-columns .2s ease;
+  transition: grid-template-columns .24s cubic-bezier(.2, .75, .25, 1), grid-template-rows .24s cubic-bezier(.2, .75, .25, 1);
 }
 
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
-  grid-template-columns: 80px 290px minmax(280px, 1fr) 52px;
+  grid-template-columns: 80px 290px minmax(280px, 1fr) 0;
 }
 
 [data-ws-plugin-part="kaak-workspace"] .language-switcher .language-trigger,
@@ -600,6 +600,7 @@
   padding: 0 24px 14px;
   border-left: 1px solid var(--skin-kaak-border);
   background: #26272b;
+  transition: opacity .16s ease, visibility 0s linear;
 }
 
 [data-ws-plugin-part="kaak-workspace.conversation-heading"] {
@@ -778,6 +779,11 @@
   background: var(--skin-kaak-bg);
 }
 
+[data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.voice-stage"] {
+  grid-column: 3 / 5;
+  border-right: 0;
+}
+
 [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] {
   flex: 0 0 46px;
   display: flex;
@@ -821,22 +827,45 @@
 
 [data-ws-plugin-part="kaak-workspace.chat-panel-chevron"] { display: block; }
 
+[data-ws-plugin-part="kaak-workspace.chat-panel-expand"] {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 9px;
+  color: #102016;
+  background: var(--skin-kaak-accent);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0004;
+  transition: filter .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-panel-expand"]:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px #0006;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-panel-expand"]:focus-visible {
+  outline: 2px solid #b6f4c5;
+  outline-offset: 2px;
+}
+
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.conversation"] {
-  grid-template-rows: 48px;
-  gap: 0;
-  padding: 0 4px;
-}
-
-[data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.conversation-heading"] {
-  justify-content: center;
-  border-bottom: 0;
-}
-
-[data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.chat-panel-toggle"] {
-  flex-basis: 44px;
-  width: 44px;
-  height: 44px;
-  margin: 0;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .16s ease, visibility 0s linear .24s;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] {
@@ -1102,7 +1131,7 @@
     grid-template-columns: 56px 204px minmax(340px, 1fr) minmax(280px, 32vw);
   }
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
-    grid-template-columns: 56px 204px minmax(340px, 1fr) 48px;
+    grid-template-columns: 56px 204px minmax(340px, 1fr) 0;
   }
   [data-ws-plugin-part="kaak-workspace.identity-entry"] { width: 56px; }
   [data-ws-plugin-part="kaak-workspace.server-rail"] { padding-inline: 3px; }
@@ -1114,7 +1143,7 @@
     grid-template-columns: 52px 184px minmax(260px, 1fr) minmax(260px, 29vw);
   }
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
-    grid-template-columns: 52px 184px minmax(260px, 1fr) 48px;
+    grid-template-columns: 52px 184px minmax(260px, 1fr) 0;
   }
   [data-ws-plugin-part="kaak-workspace.identity-entry"] { width: 52px; }
   [data-ws-plugin-part="kaak-workspace.server-rail"] { padding-inline: 1px; }
@@ -1188,7 +1217,7 @@
   [data-ws-plugin-part="kaak-workspace.voice-group-chevron"] { width: auto; font-size: 20px; }
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
     grid-template-columns: 56px minmax(0, 1fr);
-    grid-template-rows: 50px 126px minmax(176px, 24dvh) 44px 74px;
+    grid-template-rows: 50px 126px minmax(176px, 24dvh) 0 74px;
   }
   [data-ws-plugin-part="kaak-workspace.voice-channel-list"] { flex: 0 0 auto; }
   [data-ws-plugin-part="kaak-workspace.voice-channel-items"] { flex-direction: row; align-items: flex-start; gap: 5px; }
@@ -1207,7 +1236,10 @@
     border-bottom: 1px solid var(--skin-kaak-border);
   }
 
+  [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.voice-stage"] { grid-column: 2; }
+
   [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] { flex-basis: 38px; margin: -5px -8px 0; padding: 0 8px; }
+  [data-ws-plugin-part="kaak-workspace.chat-panel-expand"] { flex-basis: 34px; width: 34px; height: 34px; border-radius: 8px; }
 
   [data-ws-plugin-part="kaak-workspace.conversation"] {
     grid-column: 2;
@@ -1215,17 +1247,6 @@
     grid-template-rows: 40px minmax(0, 1fr) auto;
     gap: 6px;
     padding: 0 8px 6px;
-  }
-
-  [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.conversation"] {
-    grid-template-rows: 40px;
-    padding: 0 4px;
-  }
-
-  [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.chat-panel-toggle"] {
-    flex-basis: 40px;
-    width: 40px;
-    height: 40px;
   }
 
   [data-ws-plugin-part="kaak-workspace.member-cards"] { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }
@@ -1283,11 +1304,14 @@
     min-height: 0;
   }
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
-    grid-template-rows: 46px 104px minmax(138px, 25dvh) 44px 62px;
+    grid-template-rows: 46px 104px minmax(138px, 25dvh) 0 62px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-ws-plugin-part="kaak-workspace"] { transition: none; }
+  [data-ws-plugin-part="kaak-workspace.conversation"],
+  [data-ws-plugin-part="kaak-workspace.chat-panel-expand"] { transition: none; }
   [data-ws-plugin-part="kaak-home"] *,
   [data-ws-plugin-part="kaak-workspace"] * {
     scroll-behavior: auto;
