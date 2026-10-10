@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.34");
+  assert.equal(skin.version, "3.1.35");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -569,6 +569,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.server-monogram[\s\S]*?width: 48px;[\s\S]*?height: 48px;/);
   assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
   assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
+  assert.match(skin.css, /\.voice-card\s*\{[\s\S]*?transition: border-color \.18s ease, background-color \.18s ease, box-shadow \.18s ease;/);
   assert.match(skin.css, /voice-card[\s\S]*?max-width: 480px;/);
   assert.match(skin.css, /\.ws-voice-member-move \{ transition: transform \.28s/);
   assert.match(skin.css, /\.ws-voice-member-enter-from,[\s\S]*?\.ws-voice-member-leave-to \{ opacity: 0; transform: translateY\(10px\) scale\(\.975\); \}/);

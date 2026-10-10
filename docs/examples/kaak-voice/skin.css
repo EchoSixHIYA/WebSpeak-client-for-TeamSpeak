@@ -919,7 +919,7 @@
   background: #26272b;
   box-shadow: none;
   text-align: left;
-  transition: border-color .18s ease, background-color .18s ease;
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .ws-voice-member-move { transition: transform .28s cubic-bezier(.22, .61, .36, 1); }
