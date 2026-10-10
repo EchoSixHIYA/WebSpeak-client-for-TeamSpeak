@@ -12,6 +12,7 @@ import vuePlugin from "@vitejs/plugin-vue";
 let vite;
 let SkinPluginEditor;
 let authoring;
+let focusedNode;
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
 class MemoryStorage {
@@ -22,7 +23,7 @@ class MemoryStorage {
 }
 
 const hostNode = (tag, type = "element") => ({
-  tag, type, props: {}, text: "", children: [], parent: null, value: "", listeners: new Map(), focus() {},
+  tag, type, props: {}, text: "", children: [], parent: null, value: "", listeners: new Map(), focus() { focusedNode = this; },
   addEventListener(name, listener) {
     const listeners = this.listeners.get(name) ?? [];
     listeners.push(listener);
@@ -156,6 +157,7 @@ after(async () => {
 });
 
 test("component editor creates, changes, and deletes a skin component tree through its UI", async () => {
+  focusedNode = null;
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
   const baseDocument = {
     schemaVersion: 3,
@@ -187,7 +189,10 @@ test("component editor creates, changes, and deletes a skin component tree throu
   try {
     clickButton(root, "组件结构");
     await nextTick();
+    await nextTick();
     assert.equal(app._instance.setupState.open, true, "the trigger opens the editor");
+    assert.equal(focusedNode?.props["aria-label"], "关闭", "opening moves keyboard focus to the close control");
+    assert.equal(visit(root, node => node.tag === "button" && nodeText(node).trim() === "组件结构")?.props["aria-expanded"], true);
     clickButton(root, "新增组件");
     await nextTick();
     const key = authoring.getSkinPluginAuthoringStorageKey("community.example", "1.0.0");
@@ -275,8 +280,10 @@ test("component editor creates, changes, and deletes a skin component tree throu
     assert.equal(panel.props["aria-modal"], "false");
     panel.props.onKeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
     await nextTick();
+    await nextTick();
     assert.equal(visit(root, node => node.tag === "section" && node.props.role === "dialog"), null,
       "Escape closes the editor dialog");
+    assert.equal(nodeText(focusedNode), "组件结构", "closing returns keyboard focus to the trigger");
   } finally {
     app.unmount();
   }
