@@ -1557,6 +1557,14 @@
   border-color: var(--skin-kaak-accent-hover);
 }
 
+[data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-refresh:disabled .ui-icon {
+  animation: kaak-performance-refresh-spin .72s linear infinite;
+}
+
+@keyframes kaak-performance-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
 [data-ws-plugin-part="kaak-workspace"] .dock-hover-panel {
   color: #e9eaed;
   background: #202126;
@@ -2075,6 +2083,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-ws-plugin-part="kaak-workspace.channel-join-hint"] { animation: none; }
+  [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-refresh:disabled .ui-icon { animation: none; }
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-active,
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-active { transition-duration: .01ms; }
   [data-ws-part="voice.audio-settings"] .settings-select-chevron,
