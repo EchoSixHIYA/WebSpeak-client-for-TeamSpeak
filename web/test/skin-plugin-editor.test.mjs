@@ -11,6 +11,7 @@ import vuePlugin from "@vitejs/plugin-vue";
 
 let vite;
 let SkinPluginEditor;
+let SkinPluginOutlet;
 let authoring;
 let focusedNode;
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -133,6 +134,7 @@ before(async () => {
     appType: "custom",
   });
   ({ default: SkinPluginEditor } = await vite.ssrLoadModule("/src/components/SkinPluginEditor.vue"));
+  ({ default: SkinPluginOutlet } = await vite.ssrLoadModule("/src/components/SkinPluginOutlet.ts"));
   const require = createRequire(import.meta.url);
   const { parse, compileScript, compileTemplate } = require("../node_modules/@vue/compiler-sfc");
   const filename = fileURLToPath(new URL("../src/components/SkinPluginEditor.vue", import.meta.url));
@@ -284,6 +286,74 @@ test("component editor creates, changes, and deletes a skin component tree throu
     assert.equal(visit(root, node => node.tag === "section" && node.props.role === "dialog"), null,
       "Escape closes the editor dialog");
     assert.equal(nodeText(focusedNode), "组件结构", "closing returns keyboard focus to the trigger");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("component create, update, and delete immediately change the rendered skin preview", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.preview";
+  const skinVersion = "1.0.0";
+  const baseDocument = { schemaVersion: 3, components: [] };
+  const revision = Vue.ref(0);
+  const props = { skinId, skinVersion, baseDocument, page: "voice", lang: "zh" };
+  const preview = Vue.defineComponent({
+    setup() {
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+        }),
+        Vue.h(SkinPluginEditor, { ...props, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(preview);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    clickButton(root, "组件结构");
+    await nextTick();
+    await nextTick();
+    clickButton(root, "新增组件");
+    await nextTick();
+
+    let rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(rendered, "the newly created component is rendered in the page preview");
+    assert.match(nodeText(rendered), /新建组件/);
+
+    const saved = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    const updated = {
+      ...saved.components[0],
+      name: "Preview component",
+      accessibleName: "Preview component",
+      root: { tag: "section", children: [{ text: "预览已更新" }] },
+    };
+    editTextarea(root, JSON.stringify(updated, null, 2));
+    await nextTick();
+    clickButton(root, "应用定义");
+    await nextTick();
+
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(rendered);
+    assert.match(nodeText(rendered), /预览已更新/, "applying a component definition updates the rendered preview immediately");
+
+    clickButton(root, "删除组件");
+    await nextTick();
+    assert.equal(visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1"), null,
+      "deleting the component removes it from the rendered page preview");
   } finally {
     app.unmount();
   }
