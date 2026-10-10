@@ -415,7 +415,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
 
   function preferScreenShareCodecs(peer: RTCPeerConnection): void {
     const transceiver = peer.getTransceivers().find((candidate) => candidate.sender.track?.kind === "video" || candidate.receiver.track?.kind === "video");
-    const capabilities = typeof RTCRtpReceiver !== "undefined" ? RTCRtpReceiver.getCapabilities?.("video") : null;
+    const capabilities = typeof RTCRtpSender !== "undefined" ? RTCRtpSender.getCapabilities?.("video") : null;
     if (!transceiver?.setCodecPreferences || !capabilities?.codecs?.length) return;
     // Prefer H.264/AV1 for screen content: both compress text/UI far better
     // than VP8 at the bitrates typical of relayed screen shares. VP8 stays as
