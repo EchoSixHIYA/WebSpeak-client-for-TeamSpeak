@@ -907,6 +907,8 @@
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar { position: relative; z-index: 1; width: 64px; height: 64px; border: 0; box-shadow: 0 0 0 4px #11121666; font-size: 24px; text-shadow: 0 2px 6px #0008; transition: box-shadow .2s ease; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar { box-shadow: 0 0 0 4px #58c877aa, 0 0 18px #58c87755; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] [data-ws-part="voice.member.mic-status"] { top: 10px; right: 10px; width: 25px; height: 25px; border: 0; border-radius: 4px; color: #c8c9ce; background: #111216d9; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:has(.voice-member-action) [data-ws-part="voice.member.mic-status"] { right: 50px; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong,
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span {

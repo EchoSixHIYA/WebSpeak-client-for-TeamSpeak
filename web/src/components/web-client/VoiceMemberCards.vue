@@ -38,6 +38,16 @@
           >{{ member.avatar ? "" : avatarInitial(member.nickname) }}</div
         >
         <span
+          v-if="member.inputMuted"
+          class="voice-muted-indicator"
+          data-ws-part="voice.member.mic-status"
+          data-ws-state="muted"
+          role="img"
+          :aria-label="t('inputMuted')"
+          :title="t('inputMuted')"
+          ><Icon name="mic-off" :size="14" /></span
+        >
+        <span
           v-if="screenShareStreamForMember(member)"
           class="screen-share-live-indicator"
           data-ws-part="voice.member.live-indicator"
@@ -158,3 +168,25 @@ const { streamForMember: screenShareStreamForMember, toggleForMember: toggleScre
 const emit = defineEmits<{ memberActions: [member: ChannelMember]; stopShare: [] }>();
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
 </script>
+
+<style scoped>
+.voice-muted-indicator {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ffffff18;
+  border-radius: 5px;
+  color: #f0f0f2;
+  background: #17181bd9;
+  pointer-events: none;
+}
+
+.voice-card:has(.voice-member-action) .voice-muted-indicator {
+  right: 50px;
+}
+</style>
