@@ -811,6 +811,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   align-content: center;
   justify-content: center;
+  justify-items: center;
   align-items: center;
   gap: 12px;
   box-sizing: border-box;
@@ -825,20 +826,20 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   width: 100%;
-  max-width: 560px;
+  max-width: 480px;
   min-width: 0;
   min-height: 0;
   aspect-ratio: 1.82;
   overflow: hidden;
   padding: 0;
-  border: 1px solid #ffffff16;
-  border-radius: 11px;
+  border: 1px solid #ffffff18;
+  border-radius: 6px;
   color: var(--skin-kaak-text);
-  background: #202125;
-  box-shadow: 0 10px 28px #0003;
+  background: #26272b;
+  box-shadow: none;
   text-align: left;
   animation: kaak-member-card-arrive .32s cubic-bezier(.2, .75, .25, 1) both;
-  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  transition: border-color .18s ease, background-color .18s ease;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(2) { animation-delay: 35ms; }
@@ -855,25 +856,16 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  content: "";
-  background:
-    radial-gradient(ellipse at 52% 38%, #454750 0, #32343a 34%, transparent 70%),
-    linear-gradient(160deg, #2c2d33 0%, #232429 60%, #1b1c20 100%);
-  transition: transform .32s ease, filter .32s ease;
+  display: none;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:hover {
   z-index: 3;
-  transform: translateY(-3px);
-  border-color: #ffffff35;
-  box-shadow: 0 16px 34px #0006;
+  border-color: #ffffff30;
+  background: #292a2f;
 }
 
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:hover::before { transform: scale(1.045); filter: brightness(1.08); }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card.speaking { border-color: #58c87788; box-shadow: 0 0 0 1px #58c87722, 0 10px 28px #0005; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card.speaking { border-color: #58c87788; box-shadow: 0 0 0 1px #58c87722; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap {
   position: relative;
@@ -884,28 +876,18 @@
   width: 100%;
   min-height: 0;
   margin: 0;
-  padding: 14px 12px 4px;
+  padding: 10px;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap::before,
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap::after {
   position: absolute;
   inset: 0;
-  width: 96px;
-  height: 96px;
-  margin: auto;
-  border: 1px solid #ffffff0c;
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-  transition: transform .25s ease, border-color .25s ease;
+  display: none;
 }
 
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:hover .voice-avatar-wrap::before { transform: scale(1.06); border-color: #ffffff1d; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar { position: relative; z-index: 1; width: 72px; height: 72px; border: 3px solid #ffffff20; box-shadow: 0 0 0 6px #11121655, inset 0 2px 8px #ffffff1a, 0 14px 30px #0006; font-size: 26px; text-shadow: 0 2px 9px #0008; transition: transform .25s ease, box-shadow .25s ease; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:hover .voice-avatar { transform: scale(1.035); box-shadow: 0 0 0 7px #11121666, inset 0 2px 8px #ffffff1a, 0 18px 34px #0008; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar-wrap::before { border: 2px solid #58c877b8; animation: kaak-member-speaking-ring 1.8s ease-out infinite; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar-wrap::after { border-color: #58c877; animation: kaak-member-speaking-ring 1.8s ease-out .9s infinite; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar { position: relative; z-index: 1; width: 64px; height: 64px; border: 0; box-shadow: 0 0 0 4px #11121666; font-size: 24px; text-shadow: 0 2px 6px #0008; transition: box-shadow .2s ease; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar { box-shadow: 0 0 0 4px #58c877aa, 0 0 18px #58c87755; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong,
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span {
@@ -924,6 +906,24 @@
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span { grid-row: 3; margin: 0; padding-top: 3px; padding-bottom: 12px; color: #b2b3b9; font-size: 10px; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] > span { color: #b2a8ff; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] > span::after { display: inline-block; margin-left: 7px; color: #b2a8ff; content: "▂▆▃"; font-size: 10px; letter-spacing: 1px; line-height: 1; vertical-align: 1px; transform-origin: center; animation: kaak-member-speaking-wave .72s ease-in-out infinite alternate; }
+[data-ws-plugin-part="kaak-workspace"]:has([data-chat-open="true"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card { grid-template-rows: minmax(0, 1fr); }
+[data-ws-plugin-part="kaak-workspace"]:has([data-chat-open="true"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong,
+[data-ws-plugin-part="kaak-workspace"]:has([data-chat-open="true"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span { display: none; }
+[data-ws-plugin-part="kaak-workspace"]:has([data-chat-open="false"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > strong {
+  position: absolute;
+  right: auto;
+  bottom: 8px;
+  left: 8px;
+  display: block;
+  max-width: calc(100% - 16px);
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: #f5f5f6;
+  background: #111216d9;
+  font-size: 12px;
+  font-weight: 500;
+}
+[data-ws-plugin-part="kaak-workspace"]:has([data-chat-open="false"]) [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card > span { display: none; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-actions { grid-column: 1; grid-row: 4; padding: 0 12px 12px; background: #17181bf5; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-self="true"] .screen-share-card-actions { display: none; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button { min-height: 36px; border-color: #ffffff1a; border-radius: 7px; color: var(--skin-kaak-text); background: #292a2f; }
@@ -933,11 +933,6 @@
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty { display: grid; min-height: 160px; place-content: center; justify-items: center; gap: 8px; color: var(--skin-kaak-muted); text-align: center; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty strong { color: var(--skin-kaak-text); font-size: 14px; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty > span:last-child { font-size: 11px; }
-
-@keyframes kaak-member-speaking-ring {
-  0% { transform: scale(.84); opacity: .72; }
-  100% { transform: scale(1.42); opacity: 0; }
-}
 
 @keyframes kaak-member-speaking-wave {
   0% { transform: scaleY(.65); opacity: .7; }
