@@ -93,6 +93,20 @@ function screenShareOutput(): string {
   });
 }
 
+function screenShareActionOutput(request: boolean): string {
+  return JSON.stringify({
+    schemaVersion: 6,
+    components: [{
+      id: "voice-ui",
+      name: "Voice UI",
+      page: "voice",
+      accessibleName: "Voice workspace",
+      root: { tag: "button", events: { click: "start-share" }, children: [{ text: "Start sharing" }] },
+    }],
+    ...(request ? { request: { type: "voice.startScreenShare", args: {} } } : {}),
+  });
+}
+
 function sessionWithOutput(value: string, onError: (error: Error) => void = () => undefined) {
   return createSkinRuntimePluginSession({
     plugin,
@@ -129,6 +143,30 @@ test("runtime plugin session validates generated host widgets against manifest p
   assert.equal((errors[0] as { code?: string } | undefined)?.code, "SKIN_EXTENSION_UI_PERMISSION_MISSING");
   assert.equal(denied.output, null);
   denied.close();
+});
+
+test("runtime plugins must start screen capture from the trusted host control", async () => {
+  const actions: unknown[] = [];
+  const errors: Error[] = [];
+  const session = createSkinRuntimePluginSession({
+    plugin: screenSharePlugin,
+    createRun: (input) => ({
+      result: Promise.resolve({ uiOutput: screenShareActionOutput(Boolean(input.event)) }),
+      close: () => undefined,
+    }),
+    onAction: (action) => { actions.push(action); },
+    onError: (error) => errors.push(error),
+  });
+
+  assert.equal(await session.start(), true);
+  assert.equal(await session.dispatch({
+    schemaVersion: 1,
+    state: {},
+    event: { componentId: "voice-ui", handlerId: "start-share", eventName: "click" },
+  }), false);
+  assert.equal((errors[0] as SkinRuntimePluginSessionError | undefined)?.code, "SKIN_RUNTIME_PLUGIN_USER_ACTIVATION_REQUIRED");
+  assert.deepEqual(actions, [], "the asynchronous Wasm bridge never calls the browser capture API");
+  session.close();
 });
 
 test("runtime plugin session rejects output targeting a different page", async () => {

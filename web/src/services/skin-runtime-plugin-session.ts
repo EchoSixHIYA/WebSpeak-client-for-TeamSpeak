@@ -48,6 +48,12 @@ export function createSkinRuntimePluginSession(options: SkinRuntimePluginSession
       }
       const action = parseSkinExtensionUiActionRequest(nextOutput, options.plugin.permissions);
       if (action) {
+        if (action.type === "voice.startScreenShare") {
+          throw new SkinRuntimePluginSessionError(
+            "SKIN_RUNTIME_PLUGIN_USER_ACTIVATION_REQUIRED",
+            "Starting screen capture must use the trusted host control so the browser receives the user's activation.",
+          );
+        }
         if (!input.event) {
           throw new SkinRuntimePluginSessionError("SKIN_RUNTIME_PLUGIN_ACTION_WITHOUT_EVENT", "A host action can only follow a trusted UI event.");
         }
