@@ -864,33 +864,6 @@
                     ]
                   },
                   {
-                    "tag": "span",
-                    "part": "voice-dock-caption",
-                    "children": [
-                      {
-                        "text": "语音已连接"
-                      }
-                    ]
-                  },
-                  {
-                    "widget": "voice.performance-panel",
-                    "part": "performance-panel"
-                  }
-                ]
-              },
-              {
-                "tag": "div",
-                "part": "voice-dock-actions",
-                "children": [
-                  {
-                    "widget": "voice.screen-share-start",
-                    "part": "screen-share-start"
-                  },
-                  {
-                    "widget": "voice.audio-controls",
-                    "part": "audio-controls"
-                  },
-                  {
                     "tag": "button",
                     "part": "disconnect-control",
                     "attributes": {
@@ -905,6 +878,20 @@
                         "text": "离开"
                       }
                     ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "voice-dock-actions",
+                "children": [
+                  {
+                    "widget": "voice.screen-share-start",
+                    "part": "screen-share-start"
+                  },
+                  {
+                    "widget": "voice.audio-controls",
+                    "part": "audio-controls"
                   }
                 ]
               }

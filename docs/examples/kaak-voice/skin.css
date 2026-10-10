@@ -925,6 +925,7 @@
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] > span { color: #b2a8ff; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] > span::after { display: inline-block; margin-left: 7px; color: #b2a8ff; content: "▂▆▃"; font-size: 10px; letter-spacing: 1px; line-height: 1; vertical-align: 1px; transform-origin: center; animation: kaak-member-speaking-wave .72s ease-in-out infinite alternate; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-actions { grid-column: 1; grid-row: 4; padding: 0 12px 12px; background: #17181bf5; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-self="true"] .screen-share-card-actions { display: none; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button { min-height: 36px; border-color: #ffffff1a; border-radius: 7px; color: var(--skin-kaak-text); background: #292a2f; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button:hover { border-color: #58c87788; background: #303137; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-member-action { position: absolute; z-index: 2; top: 9px; right: 9px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #ffffff22; border-radius: 50%; color: var(--skin-kaak-text); background: #17181bcc; }
@@ -950,6 +951,7 @@
   align-self: end;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 6px 8px;
   min-width: 0;
   padding: 9px;
@@ -962,50 +964,23 @@
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(0, 1fr) 34px;
   align-items: center;
   gap: 2px 7px;
 }
 
-[data-ws-plugin-part="kaak-workspace.performance-panel"] {
-  grid-column: 3;
-  grid-row: 1 / 3;
-  align-self: center;
-}
-
-[data-ws-plugin-part="kaak-workspace.performance-panel"] [data-ws-part="voice.performance"] > button {
-  min-height: 28px;
-  padding: 0 7px;
-  border-color: var(--skin-kaak-border);
-  border-radius: 7px;
-  color: var(--skin-kaak-muted);
-  background: var(--skin-kaak-raised);
-  font-size: 9px;
-}
-
-[data-ws-plugin-part="kaak-workspace.performance-panel"] [data-ws-part="voice.performance.panel"] {
-  top: auto;
-  right: auto;
-  left: 0;
-  bottom: calc(100% + 8px);
-  width: min(380px, calc(100vw - 96px));
-  z-index: 20;
-  color: var(--skin-kaak-text);
-  background: var(--skin-kaak-panel);
-  border-color: var(--skin-kaak-border);
-}
-
 [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] {
   grid-column: 1 / -1;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 7px;
   min-width: 0;
 }
 
 [data-ws-plugin-part="kaak-workspace.connection-indicator"] {
-  grid-row: span 2;
+  grid-row: 1;
+  align-self: center;
   color: var(--skin-kaak-accent);
   font-size: 9px;
 }
@@ -1018,15 +993,10 @@
   white-space: nowrap;
 }
 
-[data-ws-plugin-part="kaak-workspace.voice-dock-caption"] {
-  color: var(--skin-kaak-dim);
-  font-size: 8px;
-  letter-spacing: .05em;
-}
-
 [data-ws-plugin-part="kaak-workspace.audio-controls"] {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
   min-width: 0;
 }
@@ -1047,30 +1017,39 @@
 [data-ws-plugin-part="kaak-workspace.microphone-control"][aria-pressed="true"],
 [data-ws-plugin-part="kaak-workspace.output-control"][aria-pressed="true"] { color: var(--skin-kaak-danger); }
 [data-ws-plugin-part="kaak-workspace.disconnect-control"] { color: var(--skin-kaak-danger); }
+[data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"] { grid-column: 3; grid-row: 1; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"] { width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 50%; color: #ff667e; background: transparent; font-size: 0; cursor: pointer; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"]::before { content: "⏻"; font-size: 20px; line-height: 1; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"]:hover { color: #ff8498; background: #3a292b; }
 [data-ws-plugin-part="kaak-workspace.output-volume"] { width: 72px; accent-color: var(--skin-kaak-accent); }
 [data-ws-plugin-part="kaak-workspace.whisper-controls"] { display: flex; gap: 6px; margin-top: 12px; }
-[data-ws-plugin-part="kaak-workspace.screen-share-start"] { flex: 0 0 auto; }
+[data-ws-plugin-part="kaak-workspace.screen-share-start"] { display: block; width: 100%; }
 [data-ws-plugin-part="kaak-workspace.screen-share-start"] button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--skin-kaak-border);
-  border-radius: 7px;
-  color: var(--skin-kaak-muted);
-  background: var(--skin-kaak-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #79d90d;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
+  transition: background-color .16s ease, transform .16s ease;
 }
 [data-ws-plugin-part="kaak-workspace.screen-share-start"] button:hover:not(:disabled),
-[data-ws-plugin-part="kaak-workspace.screen-share-start"] button:focus-visible { color: var(--skin-kaak-accent); }
+[data-ws-plugin-part="kaak-workspace.screen-share-start"] button:focus-visible { background: #8bea1f; transform: translateY(-1px); }
 [data-ws-plugin-part="kaak-workspace.screen-share-start"] button:disabled { opacity: .45; cursor: not-allowed; }
 [data-ws-plugin-part="kaak-workspace.screen-share-start"] button span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+  position: static;
+  width: auto;
+  height: auto;
   overflow: hidden;
-  clip-path: inset(50%);
+  clip-path: none;
   white-space: nowrap;
 }
 [data-ws-plugin-part="kaak-workspace"] .desktop-audio-dock {
@@ -1270,17 +1249,17 @@
     border-right: 0;
     border-bottom: 0;
   }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-column: auto; grid-row: auto; grid-template-columns: 10px minmax(0, 1fr) auto; }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] { grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 3px; }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-caption"] { display: none; }
-  [data-ws-plugin-part="kaak-workspace.disconnect-control"] { grid-column: 2; grid-row: 1; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-column: 1; grid-row: 1; grid-template-columns: 10px minmax(0, 1fr) 34px; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] { display: flex; grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 3px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-controls { display: flex; gap: 4px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-toggle { min-width: 44px; min-height: 44px; border-radius: 7px; color: var(--skin-kaak-muted); background: var(--skin-kaak-raised); }
   [data-ws-plugin-part="kaak-workspace.microphone-control"],
   [data-ws-plugin-part="kaak-workspace.output-control"],
   [data-ws-plugin-part="kaak-workspace.disconnect-control"] { min-width: 42px; min-height: 44px; }
   [data-ws-plugin-part="kaak-workspace.output-volume"] { width: 58px; }
-  [data-ws-plugin-part="kaak-workspace.screen-share-start"] button { width: 42px; height: 44px; }
+  [data-ws-plugin-part="kaak-workspace.screen-share-start"] { width: auto; flex: 0 0 auto; }
+  [data-ws-plugin-part="kaak-workspace.screen-share-start"] button { width: 42px; min-height: 44px; padding: 0; }
+  [data-ws-plugin-part="kaak-workspace.screen-share-start"] button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 
 @media (max-width: 460px) {
