@@ -1,6 +1,6 @@
 # KAAK voice skin
 
-The participant stage uses larger profile portraits (104px on desktop, reduced for narrow layouts). A live speaking state adds a pulsing accent ring and a visible waveform marker, including when participant names are hidden while chat is open.
+The participant stage uses larger profile portraits (104px on desktop, reduced for narrow layouts). A live speaking state adds a pulsing accent ring and a visible waveform marker, including when participant names are hidden while chat is open. The ring and speaking status use KAAK's shared green accent.
 
 The voice-channel sidebar follows KOOK's observed typography: 16px/700 server title, 12px/700 group title, 14px/700 channel title, and 12px/400 low-contrast member count.
 

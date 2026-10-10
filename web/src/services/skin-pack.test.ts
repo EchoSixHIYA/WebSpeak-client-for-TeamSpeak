@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.47");
+  assert.equal(skin.version, "3.1.48");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -553,6 +553,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
   assert.match(skin.css, /--skin-kaak-accent-hover: #7ac51a;/);
+  assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] > span \{\s*color: var\(--skin-kaak-accent\);\s*\}/);
+  assert.doesNotMatch(skin.css, /#b2a8ff/i);
   assert.match(skin.css, /performance-trigger \{[\s\S]*?color: var\(--skin-kaak-accent\);/);
   assert.match(skin.css, /performance-trigger:hover,[\s\S]*?\{\s*color: var\(--skin-kaak-accent-hover\);/);
   assert.match(skin.css, /performance-metrics strong \{\s*color: var\(--skin-kaak-accent\);/);
