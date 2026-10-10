@@ -1,6 +1,6 @@
 # KAAK voice skin
 
-KAAK is a schema v3 open-skin package with full connection and voice-workspace surfaces. Its voice page uses a narrow server rail, grouped TeamSpeak channels with inline voice participants, a central text chat, an online-member column, and a lower-left voice dock. Channel selection is single-click; joining is double-click. The narrow layout keeps the host's mobile controls available.
+KAAK is a schema v3 open-skin package with full connection and voice-workspace surfaces. Its voice page uses a narrow server rail, hierarchical TeamSpeak channels with inline participants under every occupied channel, a central text chat, an online-member column, and a lower-left voice dock. The dock includes WebSpeak's host-owned voice-quality panel. The roster labels connected clients as online; it does not fabricate an offline list because TeamSpeak only supplies connected members. Channel selection is single-click; joining is double-click. The narrow layout keeps the host's mobile controls available.
 
 The design target is the voice-client portion of KOOK, as requested by the project owner. It does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server.
 
@@ -12,7 +12,7 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 The connection page and voice workspace are full-page declarative surfaces in [components.json](./kaak-voice/components.json). The voice surface requests only the capabilities it uses: visible server shortcuts, channel and member data, channel joining, channel chat, voice status, microphone/output controls, whisper controls, disconnect, and screen sharing. The host renders trusted connection, language, skin, audio, and screen-share controls. It rechecks permissions and connection state when each action runs; approval is local to this skin version and can be revoked from the host access control.
 
-The skin does not receive server addresses, passwords, identity keys, raw audio, private messages, or arbitrary network/storage APIs. Its markup is data-only; it contains no executable JavaScript or Wasm. The `/demo` page uses synthetic data and does not connect to TeamSpeak.
+Member avatar circles use the first character derived from the visible nickname; KAAK does not read profile image files. The skin does not receive server addresses, passwords, identity keys, raw audio, private messages, or arbitrary network/storage APIs. Its markup is data-only; it contains no executable JavaScript or Wasm. The `/demo` page uses synthetic data and does not connect to TeamSpeak.
 
 ## Files
 

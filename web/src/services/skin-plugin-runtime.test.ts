@@ -63,6 +63,11 @@ test("skin quick-server data redacts connection targets and resolves only host-g
   const projection = createSkinPluginQuickServerProjection(() => `opaque-${++sequence}`);
   const rows = projection.project(servers, (server) => server.id === "voice2.example:9987");
 
+  assert.deepEqual(rows.map(({ label, monogram }) => [label, monogram]), [
+    ["Favorite 1", "F"],
+    ["Recent 2", "R"],
+    ["Friends", "F"],
+  ]);
   assert.deepEqual(rows.map(({ label, kind, favorite, current }) => [label, kind, favorite, current]), [
     ["Favorite 1", "favorite", true, false],
     ["Recent 2", "recent", false, false],

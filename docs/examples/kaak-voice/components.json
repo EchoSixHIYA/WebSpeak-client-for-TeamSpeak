@@ -245,7 +245,7 @@
                         "part": "server-monogram",
                         "children": [
                           {
-                            "text": "{{server.label}}"
+                            "text": "{{server.monogram}}"
                           }
                         ]
                       },
@@ -394,8 +394,8 @@
                         "tag": "ul",
                         "part": "channel-voice-members",
                         "when": {
-                          "path": "channel.current",
-                          "equals": true
+                          "path": "channel.members",
+                          "empty": false
                         },
                         "attributes": {
                           "aria-label": "此频道中的语音成员 / Voice members in this channel"
@@ -414,7 +414,7 @@
                                 "part": "channel-member-avatar",
                                 "children": [
                                   {
-                                    "text": "{{voicemember.name}}"
+                                    "text": "{{voicemember.avatarInitial}}"
                                   }
                                 ]
                               },
@@ -683,6 +683,15 @@
                 "children": [
                   {
                     "tag": "li",
+                    "part": "member-group-label",
+                    "children": [
+                      {
+                        "text": "在线 / ONLINE"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "li",
                     "part": "member-row",
                     "repeat": {
                       "path": "session.members",
@@ -694,7 +703,7 @@
                         "part": "member-avatar",
                         "children": [
                           {
-                            "text": "{{member.name}}"
+                            "text": "{{member.avatarInitial}}"
                           }
                         ]
                       },
@@ -844,6 +853,10 @@
                         "text": "语音已连接"
                       }
                     ]
+                  },
+                  {
+                    "widget": "voice.performance-panel",
+                    "part": "performance-panel"
                   }
                 ]
               },

@@ -4,6 +4,7 @@ import test from "node:test";
 import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
+import { BUILTIN_SKIN_CATALOG } from "./skin-catalog.js";
 import type { SkinPluginDocument, SkinPluginNode } from "../../../src/shared/skin-plugin.js";
 import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 
@@ -463,7 +464,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.0.1");
+  assert.equal(skin.version, "3.0.6");
+  assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
   const voice = skin.pluginData?.components.find((component) => component.page === "voice");
@@ -493,6 +495,13 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const channelRow = findPart(voice?.root, "channel-row");
   assert.equal(channelRow?.events?.click, "select-channel");
   assert.equal(channelRow?.events?.dblclick, "join-channel");
+  assert.equal(findPart(voice?.root, "server-monogram")?.children?.[0]?.text, "{{server.monogram}}");
+  assert.deepEqual(findPart(voice?.root, "channel-voice-members")?.when, { path: "channel.members", empty: false });
+  assert.equal(findPart(voice?.root, "channel-voice-member")?.repeat?.path, "channel.members");
+  assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");
+  assert.equal(findPart(voice?.root, "member-group-label")?.children?.[0]?.text, "在线 / ONLINE");
+  assert.equal(findPart(voice?.root, "member-avatar")?.children?.[0]?.text, "{{member.avatarInitial}}");
+  assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
   assert.equal(findPart(voice?.root, "chat-input")?.bindValue, "message");
   assert.equal(findPart(voice?.root, "screen-share-start")?.widget, "voice.screen-share-start");
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");

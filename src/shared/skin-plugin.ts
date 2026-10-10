@@ -16,7 +16,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.input.read": Object.freeze({ policyVersion: 1, description: "Read values entered or autofilled in this plugin's own input fields. Never enter passwords or other secrets." }),
   "session.status.read": Object.freeze({ policyVersion: 1, description: "Read the current connection and channel summary." }),
   "session.channels.read": Object.freeze({ policyVersion: 1, description: "Read the public TeamSpeak channel tree; the demo page uses synthetic sample data." }),
-  "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names and speaking states; the demo page uses synthetic sample data." }),
+  "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names, initials derived from those names, and speaking states; the demo page uses synthetic sample data." }),
   "chat.channel.read": Object.freeze({ policyVersion: 1, description: "Read the current public text channel; the demo page uses synthetic sample data." }),
   "chat.channel.send": Object.freeze({ policyVersion: 1, description: "Send to the current public text channel; the demo page only simulates this action." }),
   "favorites.read": Object.freeze({ policyVersion: 1, description: "Read favorite labels and opaque local identifiers, without server addresses or credentials." }),
@@ -216,9 +216,9 @@ const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
 };
 const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "current"]),
-  "session.members": new Set(["id", "name", "channelId", "status", "speaking", "self"]),
+  "session.members": new Set(["id", "name", "avatarInitial", "channelId", "status", "speaking", "self"]),
   "favorites.items": new Set(["id", "label", "current", "kind"]),
-  "servers.quickList": new Set(["id", "label", "current", "kind", "favorite"]),
+  "servers.quickList": new Set(["id", "label", "monogram", "current", "kind", "favorite"]),
   "chat.messages": new Set(["id", "author", "text", "time", "kind", "channelId"]),
   "screenShare.streams": new Set(["streamId", "source", "ownerClientId", "ownerNickname", "name", "audio", "viewerCount"]),
 };
@@ -248,6 +248,12 @@ function identifier(value: unknown, field: string): string {
   const result = boundedText(value, field, 64);
   if (!/^[a-z][a-z0-9-]*$/.test(result)) fail("SKIN_PLUGIN_FIELD_INVALID", `${field} must use a lowercase identifier.`);
   return result;
+}
+function isNestedChannelMembersPath(path: string, aliases: ReadonlyMap<string, string>): boolean {
+  const separator = path.lastIndexOf(".");
+  return separator > 0
+    && path.slice(separator + 1) === "members"
+    && aliases.get(path.slice(0, separator)) === "session.channels";
 }
 function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>, stateKeys: ReadonlySet<string>): SkinPluginPermission[] {
   const found = new Set<SkinPluginPermission>();
@@ -442,9 +448,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (!isRecord(rawNode.repeat)) fail("SKIN_PLUGIN_REPEAT_INVALID", "A repeat declaration must be an object.");
         onlyKeys(rawNode.repeat, new Set(["path", "as"]), "Repeat declaration");
         const path = boundedText(rawNode.repeat.path, "repeat.path", 120);
-        const nestedChannelMembers = path.split(".").length === 2
-          && path.endsWith(".members")
-          && aliases.get(path.slice(0, path.lastIndexOf("."))) === "session.channels";
+        const nestedChannelMembers = isNestedChannelMembersPath(path, aliases);
         if (!(path === "session.channels" || path === "session.members" || path === "favorites.items" || path === "servers.quickList" || path === "chat.messages" || path === "screenShare.streams" || nestedChannelMembers)) {
           fail("SKIN_PLUGIN_REPEAT_INVALID", "A component may repeat only a registered public collection or the members of a repeated channel.");
         }
@@ -458,20 +462,23 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (!isRecord(rawNode.when)) fail("SKIN_PLUGIN_CONDITION_INVALID", "A condition must be an object.");
         onlyKeys(rawNode.when, new Set(inputSchemaVersion >= 3 ? ["path", "equals", "empty"] : ["path", "equals"]), "Component condition");
         const path = boundedText(rawNode.when.path, "condition.path", 120);
-        for (const permission of bindingPermissions(`{{${path}}}`, aliases, stateKeys)) {
-          if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The condition data requires ${permission}.`);
-        }
         const equals = rawNode.when.equals;
         if (equals !== undefined && typeof equals !== "string" && typeof equals !== "number" && typeof equals !== "boolean") fail("SKIN_PLUGIN_CONDITION_INVALID", "A condition comparison must be scalar.");
         const empty = rawNode.when.empty;
         if (empty !== undefined && (inputSchemaVersion < 3 || typeof empty !== "boolean" || equals !== undefined)) fail("SKIN_PLUGIN_CONDITION_INVALID", "An empty-collection condition must be a schema v3 boolean and cannot also compare a scalar.");
+        const nestedChannelMembers = isNestedChannelMembersPath(path, aliases);
+        if (nestedChannelMembers && empty === undefined) fail("SKIN_PLUGIN_CONDITION_INVALID", "Nested channel member conditions must test whether the collection is empty.");
+        const conditionPermissions = nestedChannelMembers ? ["session.members.read" as const] : bindingPermissions(`{{${path}}}`, aliases, stateKeys);
+        for (const permission of conditionPermissions) {
+          if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The condition data requires ${permission}.`);
+        }
         if (typeof equals === "string") {
           if (inputSchemaVersion < 3 && equals.includes("{{")) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Data-bound condition comparisons require schema v3.");
           for (const permission of bindingPermissions(equals, aliases, stateKeys)) {
             if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The condition comparison data requires ${permission}.`);
           }
         }
-        if (empty !== undefined && !["chat.messages", "session.channels", "session.members", "favorites.items", "servers.quickList", "screenShare.streams"].includes(path)) {
+        if (empty !== undefined && !nestedChannelMembers && !["chat.messages", "session.channels", "session.members", "favorites.items", "servers.quickList", "screenShare.streams"].includes(path)) {
           fail("SKIN_PLUGIN_CONDITION_INVALID", "An empty condition must reference a registered public collection.");
         }
         node.when = { path, ...(equals === undefined ? {} : { equals }), ...(empty === undefined ? {} : { empty }) };

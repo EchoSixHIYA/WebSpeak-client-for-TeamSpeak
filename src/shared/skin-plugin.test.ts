@@ -255,12 +255,31 @@ test("skin plugins can repeat channel members only under a channel alias and wit
     children: [{
       tag: "li",
       repeat: { path: "channel.members", as: "member" },
-      children: [{ text: "{{channel.name}} — {{member.name}}" }],
+      children: [{ text: "{{channel.name}} — {{member.avatarInitial}} {{member.name}}" }],
     }],
   }];
   const parsed = parseSkinPluginDocument(document);
   const nestedMember = parsed.components[0].root.children?.[0].children?.[0];
   assert.deepEqual(nestedMember?.repeat, { path: "channel.members", as: "member" });
+  assert.equal(nestedMember?.children?.[0]?.text, "{{channel.name}} — {{member.avatarInitial}} {{member.name}}");
+
+  const membersOnly = structuredClone(document);
+  membersOnly.components[0].root.children = [{
+    tag: "ul",
+    when: { path: "channel.members", empty: false },
+    children: [{ tag: "li", repeat: { path: "channel.members", as: "member" } }],
+  }];
+  const parsedCondition = parseSkinPluginDocument(membersOnly).components[0].root.children?.[0];
+  assert.deepEqual(parsedCondition?.when, { path: "channel.members", empty: false });
+
+  const missingConditionPermission = structuredClone(membersOnly);
+  missingConditionPermission.components[0].permissions = ["session.channels.read", "session.channel.join"];
+  missingConditionPermission.components[0].root.children![0].children = [];
+  errorCode(() => parseSkinPluginDocument(missingConditionPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const invalidNestedCondition = structuredClone(membersOnly);
+  invalidNestedCondition.components[0].root.children![0].when = { path: "channel.members" };
+  errorCode(() => parseSkinPluginDocument(invalidNestedCondition), "SKIN_PLUGIN_CONDITION_INVALID");
 
   const missingPermission = structuredClone(document);
   missingPermission.components[0].permissions = ["session.channels.read", "session.channel.join"];

@@ -1532,6 +1532,7 @@ const skinPluginFavorites = computed(() => skinPluginQuickList.value
 const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => item.members.map((member) => ({
   id: String(member.id),
   name: member.nickname,
+  avatarInitial: Array.from(member.nickname.trim())[0] ?? "?",
   channelId: item.id,
   status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
   speaking: speakingIds.has(member.id),

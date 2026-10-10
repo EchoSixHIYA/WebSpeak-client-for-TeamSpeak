@@ -4,6 +4,7 @@ import { splitTeamSpeakTarget } from "./teamspeak-target.js";
 export interface SkinPluginQuickServer {
   id: string;
   label: string;
+  monogram: string;
   current: boolean;
   kind: "favorite" | "recent";
   favorite: boolean;
@@ -45,6 +46,7 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
         return {
           id: opaqueId,
           label: safeLabel,
+          monogram: Array.from(safeLabel)[0] ?? "?",
           current: isCurrent(server),
           kind: server.isFavorite ? "favorite" : "recent",
           favorite: server.isFavorite,

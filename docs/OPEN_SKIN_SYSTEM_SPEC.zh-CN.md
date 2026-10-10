@@ -48,7 +48,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 
 - session.status.read：连接状态、当前频道和显示名称。
 - session.channels.read：公开频道树、频道名称、层级、人数和当前频道标志。
-- session.members.read：可见成员名称、所在频道、在线状态、说话状态及本人标志。
+- session.members.read：可见成员名称、由名称派生的首字标记、所在频道、在线状态、说话状态及本人标志；不提供成员头像图像。
 - chat.channel.read：当前公开文字频道中可见的消息。
 - favorites.read：收藏项名称、类型、是否当前项和随机不透明本地令牌；不提供地址或凭据。
 - servers.quickList.read：统一后的收藏和最近连接名称、当前项、分类与随机不透明本地令牌；不提供地址或凭据。

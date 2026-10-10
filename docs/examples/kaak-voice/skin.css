@@ -171,13 +171,12 @@
 
 [data-ws-plugin-part="kaak-workspace.quick-server"] {
   display: grid;
-  justify-items: center;
-  gap: 3px;
-  width: 52px;
-  min-height: 54px;
-  padding: 4px;
+  place-items: center;
+  width: 50px;
+  min-height: 50px;
+  padding: 1px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 50%;
   color: var(--skin-kaak-muted);
   background: transparent;
   cursor: pointer;
@@ -191,26 +190,31 @@
 
 [data-ws-plugin-part="kaak-workspace.quick-server"][aria-current="true"] {
   color: var(--skin-kaak-text);
-  background: var(--skin-kaak-raised);
   box-shadow: inset 3px 0 var(--skin-kaak-accent);
 }
 
 [data-ws-plugin-part="kaak-workspace.server-monogram"] {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   overflow: hidden;
   border: 1px solid #ffffff12;
-  border-radius: 13px;
+  border-radius: 50%;
   color: var(--skin-kaak-text);
   background: linear-gradient(145deg, #383a40, #222429);
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 800;
   text-align: center;
 }
 
+[data-ws-plugin-part="kaak-workspace.quick-server"][aria-current="true"] [data-ws-plugin-part="kaak-workspace.server-monogram"] {
+  border-color: var(--skin-kaak-accent);
+  background: color-mix(in srgb, var(--skin-kaak-accent) 18%, #222429);
+}
+
 [data-ws-plugin-part="kaak-workspace.server-kind"] {
+  display: none;
   color: var(--skin-kaak-dim);
   font-size: 8px;
   line-height: 1;
@@ -570,6 +574,16 @@
   list-style: none;
 }
 
+[data-ws-plugin-part="kaak-workspace.member-group-label"] {
+  grid-column: 1 / -1;
+  margin: 8px 5px 2px;
+  color: var(--skin-kaak-dim);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  list-style: none;
+}
+
 [data-ws-plugin-part="kaak-workspace.member-row"] {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
@@ -636,9 +650,37 @@
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
+  grid-template-columns: 10px minmax(0, 1fr) auto;
   align-items: center;
   gap: 2px 7px;
+}
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] [data-ws-part="voice.performance"] > button {
+  min-height: 28px;
+  padding: 0 7px;
+  border-color: var(--skin-kaak-border);
+  border-radius: 7px;
+  color: var(--skin-kaak-muted);
+  background: var(--skin-kaak-raised);
+  font-size: 9px;
+}
+
+[data-ws-plugin-part="kaak-workspace.performance-panel"] [data-ws-part="voice.performance.panel"] {
+  top: auto;
+  right: auto;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(380px, calc(100vw - 96px));
+  z-index: 20;
+  color: var(--skin-kaak-text);
+  background: var(--skin-kaak-panel);
+  border-color: var(--skin-kaak-border);
 }
 
 [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] {
@@ -852,6 +894,7 @@
     overflow: auto hidden;
     margin: 0;
   }
+  [data-ws-plugin-part="kaak-workspace.member-group-label"] { align-self: center; margin: 0 3px; white-space: nowrap; }
   [data-ws-plugin-part="kaak-workspace.member-row"] { flex: 0 0 auto; grid-template-columns: 28px auto; min-height: 38px; padding: 2px 4px; }
   [data-ws-plugin-part="kaak-workspace.member-avatar"] { width: 26px; height: 26px; }
   [data-ws-plugin-part="kaak-workspace.speaking-indicator"] { display: none; }
@@ -871,7 +914,7 @@
     border-right: 0;
     border-bottom: 0;
   }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-column: auto; grid-row: auto; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-column: auto; grid-row: auto; grid-template-columns: 10px minmax(0, 1fr) auto; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] { grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 3px; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-caption"] { display: none; }
   [data-ws-plugin-part="kaak-workspace.disconnect-control"] { grid-column: 2; grid-row: 1; }
