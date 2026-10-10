@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.43");
+  assert.equal(skin.version, "3.1.44");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -596,6 +596,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /voice-avatar-wrap::after \{[\s\S]*?content: "";[\s\S]*?border: 2px solid #6cbf0088;/);
   assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] \.voice-avatar-wrap::after \{ display: block; animation: ws-community-kaak-voice-kaak-member-speaking-ring 1\.08s/);
   assert.match(skin.css, /voice-card\[data-ws-speaking="true"\]::after \{ display: block; animation: ws-community-kaak-voice-kaak-member-speaking-wave \.72s ease-in-out infinite alternate/);
+  assert.match(skin.css, /server-name"\]\s*\{[\s\S]*?font-size: 16px;[\s\S]*?font-weight: 700;[\s\S]*?line-height: 24px;/);
+  assert.match(skin.css, /voice-channel-group-toggle"\]\s*\{[\s\S]*?font-size: 12px;[\s\S]*?font-weight: 700;[\s\S]*?letter-spacing: normal;/);
+  assert.match(skin.css, /channel-name"\]\s*\{[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 700;[\s\S]*?line-height: 24px;/);
+  assert.match(skin.css, /channel-count"\]\s*\{[\s\S]*?color: rgba\(230, 234, 240, \.4\);[\s\S]*?font-size: 12px;[\s\S]*?font-weight: 400;/);
+  assert.match(skin.css, /channel-capacity"\]\s*\{[\s\S]*?color: rgba\(230, 234, 240, \.4\);[\s\S]*?font-size: 12px;[\s\S]*?font-weight: 400;/);
   assert.match(skin.css, /\.ws-voice-member-move \{ transition: transform \.28s/);
   assert.match(skin.css, /\.ws-voice-member-enter-from,[\s\S]*?\.ws-voice-member-leave-to \{ opacity: 0; transform: translateY\(10px\) scale\(\.975\); \}/);
   assert.match(skin.css, /data-ws-part="voice\.member\.mic-status"[\s\S]*?color: #c8c9ce;[\s\S]*?background: #111216d9;/);
