@@ -675,7 +675,9 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid {
@@ -706,7 +708,21 @@
   background: #202125;
   box-shadow: 0 10px 28px #0003;
   text-align: left;
+  animation: kaak-member-card-arrive .32s cubic-bezier(.2, .75, .25, 1) both;
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(2) { animation-delay: 35ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(3) { animation-delay: 70ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(4) { animation-delay: 105ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(5) { animation-delay: 140ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(6) { animation-delay: 175ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(7) { animation-delay: 210ms; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:nth-child(8) { animation-delay: 245ms; }
+
+@keyframes kaak-member-card-arrive {
+  from { opacity: 0; filter: blur(3px); }
+  to { opacity: 1; filter: blur(0); }
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card::before {
@@ -1093,7 +1109,7 @@
 
   [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] { min-height: 22px; border: 0; }
   [data-ws-plugin-part="kaak-workspace.voice-stage-heading"] .section-label { max-width: 160px; font-size: 8px; }
-  [data-ws-plugin-part="kaak-workspace.member-cards"] { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
+  [data-ws-plugin-part="kaak-workspace.member-cards"] { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; scrollbar-gutter: auto; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-grid { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; align-items: stretch; gap: 8px; overflow: auto hidden; margin: 3px 0 0; padding: 2px 2px 4px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card { flex: 0 0 174px; min-height: 0; height: 100%; border-radius: 9px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap { padding: 8px 8px 2px; }
