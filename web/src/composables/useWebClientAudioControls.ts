@@ -106,19 +106,21 @@ export function useWebClientAudioControls({
     setNotificationVolume(Number((event.target as HTMLInputElement).value) / 100);
   }
 
-  async function onInputDeviceChange(event: Event): Promise<void> {
+  async function onInputDeviceChange(selection: Event | string): Promise<void> {
     const isCurrent = beginSettingsRequest();
     try {
-      await setInputDevice((event.target as HTMLSelectElement).value);
+      const deviceId = typeof selection === "string" ? selection : (selection.target as HTMLSelectElement).value;
+      await setInputDevice(deviceId);
     } catch (error: unknown) {
       if (isCurrent()) settingsError.value = microphoneErrorMessage(error, "无法切换麦克风");
     }
   }
 
-  async function onOutputDeviceChange(event: Event): Promise<void> {
+  async function onOutputDeviceChange(selection: Event | string): Promise<void> {
     const isCurrent = beginSettingsRequest();
     try {
-      await setOutputDevice((event.target as HTMLSelectElement).value);
+      const deviceId = typeof selection === "string" ? selection : (selection.target as HTMLSelectElement).value;
+      await setOutputDevice(deviceId);
     } catch (error: unknown) {
       if (isCurrent()) settingsError.value = localizedMessage(error instanceof Error ? error.message : "无法切换扬声器");
     }

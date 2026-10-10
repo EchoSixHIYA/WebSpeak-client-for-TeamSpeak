@@ -12,6 +12,7 @@
   --skin-kaak-accent: #58c877;
   --skin-kaak-danger: #e36b6b;
   --skin-kaak-radius: 9px;
+  --skin-kaak-font: "PingFang SC", "Microsoft YaHei New", 微软雅黑, "Microsoft Yahei", "Microsoft JhengHei", 宋体, SimSun, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 [data-ws-plugin-part="kaak-home"] {
@@ -127,7 +128,7 @@
   overflow: hidden;
   color: var(--skin-kaak-text);
   background: var(--skin-kaak-bg);
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--skin-kaak-font);
   transition: grid-template-columns .24s cubic-bezier(.2, .75, .25, 1), grid-template-rows .24s cubic-bezier(.2, .75, .25, 1);
 }
 
@@ -1573,7 +1574,7 @@
   border: 1px solid #3b3c42;
   border-radius: 14px;
   box-shadow: 0 22px 60px #000b;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--skin-kaak-font);
 }
 
 .modal-backdrop:has([data-ws-part="voice.audio-settings"]) {
@@ -1594,7 +1595,7 @@
 
 [data-ws-part="voice.audio-settings"] .settings-header h2 {
   color: #f2f3f5;
-  font-size: 24px;
+  font-size: 32px;
   letter-spacing: -.025em;
 }
 
@@ -1612,7 +1613,7 @@
 
 [data-ws-part="voice.audio-settings"] .settings-section h3 {
   color: #eceef0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-section h3 .ui-icon {
@@ -1623,7 +1624,7 @@
 [data-ws-part="voice.audio-settings"] .settings-range-row strong,
 [data-ws-part="voice.audio-settings"] .settings-error {
   color: #aeb0b7;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-hint,
@@ -1637,25 +1638,21 @@
 }
 
 [data-ws-part="voice.audio-settings"] .settings-select {
-  min-height: 42px;
+  display: flex;
+  min-height: 40px;
   color: #e9eaed;
   appearance: none;
-  padding-right: 42px;
-  background:
-    linear-gradient(45deg, transparent 50%, #aeb0b7 50%) calc(100% - 17px) 50% / 6px 6px no-repeat,
-    linear-gradient(135deg, #aeb0b7 50%, transparent 50%) calc(100% - 13px) 50% / 6px 6px no-repeat,
-    #2a2b31;
+  padding: 0 12px;
+  background: #2a2b31;
   border: 1px solid #414249;
   border-radius: 9px;
+  font-family: var(--skin-kaak-font);
   font-size: 14px;
   transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-select:hover:not(:disabled) {
-  background:
-    linear-gradient(45deg, transparent 50%, #aeb0b7 50%) calc(100% - 17px) 50% / 6px 6px no-repeat,
-    linear-gradient(135deg, #aeb0b7 50%, transparent 50%) calc(100% - 13px) 50% / 6px 6px no-repeat,
-    #303137;
+  background: #303137;
   border-color: #595a62;
 }
 
@@ -1664,14 +1661,29 @@
   box-shadow: 0 0 0 3px #58c87730;
 }
 
-[data-ws-part="voice.audio-settings"] .settings-select option {
-  color: #e9eaed;
-  background: #2a2b31;
-}
-
 [data-ws-part="voice.audio-settings"] .settings-select:active:not(:disabled) { border-color: #70d48a; }
 [data-ws-part="voice.audio-settings"] .settings-select:disabled { cursor: not-allowed; opacity: .55; }
-[data-ws-part="voice.audio-settings"] .settings-select option:checked { color: #e9eaed; background: #303b34; }
+[data-ws-part="voice.audio-settings"] .settings-select-chevron { color: #aeb0b7; }
+[data-ws-part="voice.audio-settings"] .settings-select[aria-expanded="true"] .settings-select-chevron { color: #80df98; }
+[data-ws-part="voice.audio-settings"] .settings-select-menu {
+  padding: 4px 0;
+  color: #e9eaed;
+  border-color: #45464d;
+  border-radius: 7px;
+  background: #35373d;
+  box-shadow: 0 12px 28px #000a;
+}
+[data-ws-part="voice.audio-settings"] .settings-select-option {
+  min-height: 32px;
+  padding-inline: 12px;
+  color: #e5e6e9;
+  font-size: 14px;
+}
+[data-ws-part="voice.audio-settings"] .settings-select-option:hover,
+[data-ws-part="voice.audio-settings"] .settings-select-option.active,
+[data-ws-part="voice.audio-settings"] .settings-select-option[aria-selected="true"] {
+  background: #ffffff1a;
+}
 
 [data-ws-part="voice.audio-settings"] .microphone-control,
 [data-ws-part="voice.audio-settings"] .audio-diagnostic,
@@ -1773,6 +1785,9 @@
 @media (prefers-reduced-motion: reduce) {
   [data-ws-plugin-part="kaak-workspace.channel-join-hint"] { animation: none; }
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-panel { animation: none; }
+  [data-ws-part="voice.audio-settings"] .settings-select-chevron,
+  [data-ws-part="voice.audio-settings"] .settings-select-menu-enter-active,
+  [data-ws-part="voice.audio-settings"] .settings-select-menu-leave-active { transition: none; }
   [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
   [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,
   [data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-thumb,

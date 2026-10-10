@@ -35,20 +35,14 @@
               class="settings-label"
               for="input-device"
               >{{ t("microphone") }}</label
-            ><select
+            ><AudioDeviceSelect
               id="input-device"
-              class="settings-select"
-              :value="selectedInputDeviceId"
+              :model-value="selectedInputDeviceId"
+              :options="inputDeviceOptions"
+              :label="t('microphone')"
               :disabled="!inputDevices.length"
               @change="onInputDeviceChange"
-              ><option value="">{{ t("defaultMicrophone") }}</option
-              ><option
-                v-for="(device, index) in inputDevices"
-                :key="device.deviceId || `microphone-${index}`"
-                :value="device.deviceId"
-                >{{ device.label || t("microphoneNumber", { index: index + 1 }) }}</option
-              ></select
-            ><p
+            /><p
               v-if="audioSettingsError"
               class="settings-error"
               >{{ localizedMessage(audioSettingsError) }}</p
@@ -160,21 +154,15 @@
               class="settings-label"
               for="output-device"
               >{{ t("outputDevice") }}</label
-            ><select
+            ><AudioDeviceSelect
               v-if="outputDeviceSupported"
               id="output-device"
-              class="settings-select"
-              :value="selectedOutputDeviceId"
+              :model-value="selectedOutputDeviceId"
+              :options="outputDeviceOptions"
+              :label="t('outputDevice')"
               :disabled="!outputDevices.length"
               @change="onOutputDeviceChange"
-              ><option value="">{{ t("defaultOutput") }}</option
-              ><option
-                v-for="(device, index) in outputDevices"
-                :key="device.deviceId || `speaker-${index}`"
-                :value="device.deviceId"
-                >{{ device.label || t("speakerNumber", { index: index + 1 }) }}</option
-              ></select
-            ><p
+            /><p
               v-else
               class="mode-note"
               ><Icon
@@ -241,8 +229,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import Icon from "../Icon.vue";
+import AudioDeviceSelect from "./AudioDeviceSelect.vue";
 import { useDialogFocus } from "../../composables/useDialogFocus.js";
 import type { useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientAudioControls } from "../../composables/useWebClientAudioControls.js";
@@ -325,4 +314,19 @@ const {
   meterBarHeight,
   toggleMicrophone,
 } = props.controls;
+
+const inputDeviceOptions = computed(() => [
+  { value: "", label: props.t("defaultMicrophone") },
+  ...inputDevices.map((device, index) => ({
+    value: device.deviceId,
+    label: device.label || props.t("microphoneNumber", { index: index + 1 }),
+  })),
+]);
+const outputDeviceOptions = computed(() => [
+  { value: "", label: props.t("defaultOutput") },
+  ...outputDevices.map((device, index) => ({
+    value: device.deviceId,
+    label: device.label || props.t("speakerNumber", { index: index + 1 }),
+  })),
+]);
 </script>

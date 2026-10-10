@@ -52,6 +52,17 @@ test("a completed newer device selection retires older errors", async t => {
   assert.equal(controls.settingsError.value, "");
 });
 
+test("the custom device picker can select input and output devices by ID", async t => {
+  const selected = [];
+  const { controls } = mount(t, {
+    setInputDevice: async deviceId => selected.push(["input", deviceId]),
+    setOutputDevice: async deviceId => selected.push(["output", deviceId]),
+  });
+  await controls.onInputDeviceChange("microphone-id");
+  await controls.onOutputDeviceChange("speaker-id");
+  assert.deepEqual(selected, [["input", "microphone-id"], ["output", "speaker-id"]]);
+});
+
 test("an earlier selection cannot replace the current selection's error", async t => {
   const old = deferred();
   const { controls } = mount(t, { setInputDevice: () => old.promise, setOutputDevice: async () => { throw new Error("current output"); } });
