@@ -9,7 +9,7 @@
   --skin-kaak-text: #f0f1f3;
   --skin-kaak-muted: #a0a2a8;
   --skin-kaak-dim: #777a82;
-  --skin-kaak-accent: #58c877;
+  --skin-kaak-accent: #6cbf00;
   --skin-kaak-danger: #e36b6b;
   --skin-kaak-radius: 9px;
   --skin-kaak-font: "PingFang SC", "Microsoft YaHei New", 微软雅黑, "Microsoft Yahei", "Microsoft JhengHei", 宋体, SimSun, "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -520,7 +520,7 @@
   padding: 3px 5px;
   border-radius: 4px;
   color: #8cdda0;
-  background: #58c87718;
+  background: #6cbf0018;
   font-size: 9px;
   line-height: 1;
   white-space: nowrap;
@@ -707,7 +707,7 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.chat-message-body"][data-kind="self"] [data-ws-plugin-part="kaak-workspace.chat-message-avatar"] {
-  border-color: #58c87755;
+  border-color: #6cbf0055;
   background: linear-gradient(145deg, #286c49, #194b3b);
 }
 
@@ -940,7 +940,7 @@
   background: #292a2f;
 }
 
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card.speaking { border-color: #58c87788; box-shadow: 0 0 0 1px #58c87722; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card.speaking { border-color: #6cbf0088; box-shadow: 0 0 0 1px #6cbf0022; }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar-wrap {
   position: relative;
@@ -962,7 +962,7 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar { position: relative; z-index: 1; width: 64px; height: 64px; border: 0; box-shadow: 0 0 0 4px #11121666; font-size: 24px; text-shadow: 0 2px 6px #0008; transition: box-shadow .2s ease; }
-[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar { box-shadow: 0 0 0 4px #58c877aa, 0 0 18px #58c87755; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card[data-ws-speaking="true"] .voice-avatar { box-shadow: 0 0 0 4px #6cbf00aa, 0 0 18px #6cbf0055; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] [data-ws-part="voice.member.mic-status"] { top: 10px; right: 10px; width: 25px; height: 25px; border: 0; border-radius: 4px; color: #c8c9ce; background: #111216d9; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card:has(.voice-member-action) [data-ws-part="voice.member.mic-status"] { right: 50px; }
 
@@ -1776,8 +1776,8 @@
 [data-ws-part="voice.audio-settings"] .mic-test-header button,
 [data-ws-part="voice.audio-settings"] .save-button {
   color: #102317;
-  background: #58c877;
-  border-color: #58c877;
+  background: #6cbf00;
+  border-color: #6cbf00;
   font-size: 13px;
   font-weight: 700;
   transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
@@ -1786,8 +1786,15 @@
 [data-ws-part="voice.audio-settings"] .microphone-toggle:hover,
 [data-ws-part="voice.audio-settings"] .mic-test-header button:hover,
 [data-ws-part="voice.audio-settings"] .save-button:hover {
-  background: #78dc91;
-  border-color: #78dc91;
+  background: #7ac51a;
+  border-color: #7ac51a;
+}
+
+[data-ws-part="voice.audio-settings"] .microphone-toggle:not(.muted):active,
+[data-ws-part="voice.audio-settings"] .mic-test-header button:active,
+[data-ws-part="voice.audio-settings"] .save-button:active {
+  background: #60ab00;
+  border-color: #60ab00;
 }
 
 [data-ws-part="voice.audio-settings"] .microphone-toggle.muted {
@@ -1836,8 +1843,8 @@
 }
 
 [data-ws-part="voice.audio-settings"] .meter i.active {
-  background: #58c877;
-  box-shadow: 0 0 8px #58c87770;
+  background: #6cbf00;
+  box-shadow: 0 0 8px #6cbf0070;
 }
 
 [data-ws-part="voice.audio-settings"] .audio-level-track {
@@ -1845,7 +1852,7 @@
 }
 
 [data-ws-part="voice.audio-settings"] .audio-level-track i {
-  background: #58c877;
+  background: #6cbf00;
 }
 
 @media (max-width: 820px) {
