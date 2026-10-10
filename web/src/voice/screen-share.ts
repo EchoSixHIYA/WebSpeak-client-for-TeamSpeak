@@ -8,6 +8,7 @@ export interface ScreenShareOutputSettings {
   maxWidth?: number;
   maxHeight?: number;
   maxFrameRate?: number;
+  maxBitrate?: number;
 }
 
 export interface ScreenShareCaptureStats {
@@ -379,10 +380,31 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       const firstEncoding = { ...encodings[0] };
       if (scaleResolutionDownBy > 1.01) firstEncoding.scaleResolutionDownBy = scaleResolutionDownBy;
       if (targetFrameRate) firstEncoding.maxFramerate = targetFrameRate;
+      // Give the encoder a generous bitrate budget for screen content so the
+      // congestion controller does not squeeze it down to a blurry trickle on
+      // relayed (TURN) links. By default the budget scales with the target
+      // output height (1080p -> 8 Mbps, 720p -> 5 Mbps, 480p -> 3 Mbps,
+      // 360p -> 1.5 Mbps); a user-provided maxBitrate always wins so viewers
+      // can trade quality against network headroom manually.
+      const outputHeight = targetHeight ?? sourceHeight;
+      const userBitrate = typeof requested?.maxBitrate === "number" && requested.maxBitrate > 0 ? requested.maxBitrate : null;
+      const maxBitrate = userBitrate ?? (
+        outputHeight && outputHeight > 0
+          ? outputHeight >= 1080
+            ? 8_000_000
+            : outputHeight >= 720
+              ? 5_000_000
+              : outputHeight >= 480
+                ? 3_000_000
+                : 1_500_000
+          : 8_000_000
+      );
+      firstEncoding.maxBitrate = maxBitrate;
       parameters.encodings = [firstEncoding, ...encodings.slice(1)];
-      // Prefer keeping motion smooth and let the encoder reduce detail/resolution
-      // before it throws away large numbers of frames under pressure.
-      parameters.degradationPreference = "maintain-framerate";
+      // Prefer keeping resolution/detail crisp under pressure and let the
+      // encoder drop frame rate instead; screen share quality is judged by
+      // readability of the shared content.
+      parameters.degradationPreference = "maintain-resolution";
       await sender.setParameters(parameters);
     } catch {
       // Older browsers may reject one of the optional sender parameters. The
@@ -395,10 +417,15 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     const transceiver = peer.getTransceivers().find((candidate) => candidate.sender.track?.kind === "video" || candidate.receiver.track?.kind === "video");
     const capabilities = typeof RTCRtpReceiver !== "undefined" ? RTCRtpReceiver.getCapabilities?.("video") : null;
     if (!transceiver?.setCodecPreferences || !capabilities?.codecs?.length) return;
-    const vp8 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/vp8");
-    if (!vp8.length) return;
-    const remaining = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() !== "video/vp8");
-    try { transceiver.setCodecPreferences([...vp8, ...remaining]); } catch { /* older browsers may reject codec preference changes */ }
+    // Prefer H.264/AV1 for screen content: both compress text/UI far better
+    // than VP8 at the bitrates typical of relayed screen shares. VP8 stays as
+    // a fallback when neither is available.
+    const h264 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/h264");
+    const av1 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/av1");
+    const preferred = h264.length ? h264 : av1.length ? av1 : capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/vp8");
+    if (!preferred.length) return;
+    const remaining = capabilities.codecs.filter((codec) => !preferred.includes(codec));
+    try { transceiver.setCodecPreferences([...preferred, ...remaining]); } catch { /* older browsers may reject codec preference changes */ }
   }
 
   async function flushScreenShareCandidates(peerId: string, peer: RTCPeerConnection): Promise<void> {
