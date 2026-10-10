@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.23");
+  assert.equal(skin.version, "3.1.24");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -542,7 +542,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
   assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);
-  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="true"\][\s\S]*?voice-stage-heading[\s\S]*?display: none;/);
+  assert.doesNotMatch(skin.css, /aria-expanded="true"\]\s*[^\n]*voice-stage-heading[^\n]*display: none;/);
   assert.match(skin.css, /kaak-workspace"\]:has\(\[data-ws-plugin-part="kaak-workspace\.chat-panel-toggle"\]\[aria-expanded="false"\]\)[\s\S]*?grid-template-columns: 80px 290px minmax\(280px, 1fr\) 52px;/);
   assert.match(skin.css, /grid-template-columns: 80px 290px/);
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
