@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.11");
+  assert.equal(skin.version, "3.1.12");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -518,6 +518,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "screen-player")?.widget, "voice.screen-share-player");
   assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
   assert.equal(findPart(voice?.root, "chat-input")?.bindValue, "message");
+  assert.equal(findPart(voice?.root, "chat-input")?.attributes?.placeholder, "给 #{{session.status.channelName}} 发消息");
+  assert.equal(findPart(voice?.root, "conversation-glyph")?.children?.[0]?.text, "#");
+  assert.equal(findPart(voice?.root, "connection-state"), undefined);
   assert.equal(findPart(voice?.root, "chat-message-avatar")?.children?.[0]?.text, "{{message.author}}");
   assert.equal(findPart(voice?.root, "chat-message-body")?.children?.[0]?.part, "chat-message-heading");
   assert.equal(findPart(voice?.root, "chat-message-body")?.attributes?.["data-kind"], "{{message.kind}}");
@@ -536,6 +539,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
   assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);
+  assert.match(skin.css, /conversation[\s\S]*?grid-template-rows: 58px minmax\(0, 1fr\) auto/);
+  assert.match(skin.css, /chat-send[\s\S]*?::after \{ content: "➤";/);
   assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-ring/);
   assert.match(skin.css, /animation: ws-community-kaak-voice-kaak-member-speaking-ring 1\.8s ease-out infinite/);

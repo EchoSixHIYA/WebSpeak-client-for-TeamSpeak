@@ -571,13 +571,13 @@
   grid-column: 4;
   grid-row: 2;
   display: grid;
-  grid-template-rows: 48px minmax(0, 1fr) auto;
+  grid-template-rows: 58px minmax(0, 1fr) auto;
   gap: 10px;
   min-width: 0;
   min-height: 0;
-  padding: 0 17px 12px;
+  padding: 0 24px 14px;
   border-left: 1px solid var(--skin-kaak-border);
-  background: #303136;
+  background: #26272b;
 }
 
 [data-ws-plugin-part="kaak-workspace.conversation-heading"] {
@@ -601,13 +601,6 @@
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-[data-ws-plugin-part="kaak-workspace.connection-state"] {
-  color: var(--skin-kaak-accent);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .06em;
 }
 
 [data-ws-plugin-part="kaak-workspace"] [data-ws-part="voice.chat"] {
@@ -638,11 +631,14 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.chat-empty"] {
-  align-self: center;
-  margin: auto;
-  color: var(--skin-kaak-muted);
-  font-size: 13px;
+  align-self: stretch;
+  margin: 28px 0 0;
+  color: var(--skin-kaak-dim);
+  font-size: 11px;
+  line-height: 1.5;
 }
+
+[data-ws-plugin-part="kaak-workspace.chat-message-list"]:has([data-ws-plugin-part="kaak-workspace.chat-empty"]) { justify-content: flex-start; }
 
 [data-ws-plugin-part="kaak-workspace.chat-message"] {
   display: grid;
@@ -704,16 +700,16 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--skin-kaak-border);
-  border-radius: 9px;
-  background: var(--skin-kaak-panel);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: #303136;
 }
 
 [data-ws-plugin-part="kaak-workspace.chat-input"] {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  height: 36px;
   padding: 0 10px;
   border: 0;
   outline: 0;
@@ -722,15 +718,23 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.chat-send"] {
-  min-width: 54px;
-  min-height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
   border: 0;
-  border-radius: 7px;
-  color: #111;
-  background: var(--skin-kaak-accent);
-  font-weight: 700;
+  border-radius: 50%;
+  color: var(--skin-kaak-muted);
+  background: transparent;
+  font-size: 0;
   cursor: pointer;
 }
+
+[data-ws-plugin-part="kaak-workspace.chat-send"]::after { content: "➤"; font-size: 15px; }
+[data-ws-plugin-part="kaak-workspace.chat-send"]:hover { color: var(--skin-kaak-text); background: #ffffff0b; }
 
 [data-ws-plugin-part="kaak-workspace"] .chat-panel { min-height: 0; background: transparent; }
 [data-ws-plugin-part="kaak-workspace"] .chat-heading { border-color: var(--skin-kaak-border); }

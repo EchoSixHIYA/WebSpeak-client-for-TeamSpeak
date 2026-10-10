@@ -571,7 +571,7 @@
                     "part": "conversation-glyph",
                     "children": [
                       {
-                        "text": "◉"
+                        "text": "#"
                       }
                     ],
                     "when": {
@@ -593,19 +593,6 @@
                     }
                   },
                   {
-                    "tag": "span",
-                    "part": "connection-state",
-                    "when": {
-                      "path": "state.chatopen",
-                      "equals": true
-                    },
-                    "children": [
-                      {
-                        "text": "已连接"
-                      }
-                    ]
-                  },
-                  {
                     "tag": "button",
                     "part": "chat-panel-toggle",
                     "attributes": {
@@ -625,8 +612,8 @@
                           "equals": true
                         },
                         "children": [
-                          {
-                            "text": "›"
+                      {
+                        "text": "×"
                           }
                         ]
                       },
@@ -754,8 +741,8 @@
                           "type": "text",
                           "maxlength": 1000,
                           "autocomplete": "off",
-                          "placeholder": "发送频道消息",
-                          "aria-label": "发送频道消息"
+                          "placeholder": "给 #{{session.status.channelName}} 发消息",
+                          "aria-label": "给 #{{session.status.channelName}} 发消息"
                         }
                       },
                       {
