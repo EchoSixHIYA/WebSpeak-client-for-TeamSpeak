@@ -58,6 +58,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
+import { placeAudioDeviceMenu } from "../../services/audio-device-menu-placement.js";
 
 export interface AudioDeviceOption {
   value: string;
@@ -92,19 +93,13 @@ function updateMenuPosition(): void {
   const rect = trigger.value?.getBoundingClientRect();
   if (!rect || typeof window === "undefined") return;
 
-  const fullHeight = Math.min(240, props.options.length * 32 + 8);
-  const below = Math.max(0, window.innerHeight - rect.bottom - 8);
-  const above = Math.max(0, rect.top - 8);
-  const opensAbove = below < fullHeight && above > below;
-  const available = opensAbove ? above : below;
-  const height = Math.min(fullHeight, Math.max(80, available));
-  const top = opensAbove ? Math.max(8, rect.top - height - 4) : Math.min(rect.bottom + 4, window.innerHeight - height - 8);
+  const placement = placeAudioDeviceMenu(rect, { width: window.innerWidth, height: window.innerHeight }, props.options.length);
 
   menuStyle.value = {
-    top: `${top}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    maxHeight: `${height}px`,
+    top: `${placement.top}px`,
+    left: `${placement.left}px`,
+    width: `${placement.width}px`,
+    maxHeight: `${placement.maxHeight}px`,
   };
 }
 
