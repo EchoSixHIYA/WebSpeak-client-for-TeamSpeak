@@ -116,11 +116,11 @@
         "audio.status.read",
         "audio.microphone.control",
         "audio.output.control",
+        "voice.screenShare.read",
+        "voice.screenShare.control",
         "voice.whisper.status.read",
         "voice.whisper.control",
-        "voice.disconnect",
-        "voice.screenShare.read",
-        "voice.screenShare.control"
+        "voice.disconnect"
       ],
       "actions": {
         "switch-server": {
@@ -862,10 +862,6 @@
                 "part": "member-cards"
               },
               {
-                "widget": "voice.screen-share-player",
-                "part": "screen-player"
-              },
-              {
                 "tag": "div",
                 "part": "whisper-controls",
                 "children": [
@@ -943,6 +939,10 @@
                     ]
                   },
                   {
+                    "widget": "voice.performance-panel",
+                    "part": "performance-panel"
+                  },
+                  {
                     "tag": "button",
                     "part": "disconnect-control",
                     "attributes": {
@@ -964,10 +964,6 @@
                 "tag": "div",
                 "part": "voice-dock-actions",
                 "children": [
-                  {
-                    "widget": "voice.screen-share-start",
-                    "part": "screen-share-start"
-                  },
                   {
                     "widget": "voice.audio-controls",
                     "part": "audio-controls"
