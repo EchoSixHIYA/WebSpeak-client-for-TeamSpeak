@@ -6624,6 +6624,15 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
+:deep(.dock-hover-panel::before) {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -10px;
+  left: 0;
+  height: 10px;
+}
+
 :deep(.dock-hover-control:hover .dock-hover-panel),
 :deep(.dock-hover-control:focus-within .dock-hover-panel) {
   opacity: 1;
