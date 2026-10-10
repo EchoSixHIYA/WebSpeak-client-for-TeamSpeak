@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.19");
+  assert.equal(skin.version, "3.1.20");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -546,6 +546,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
   assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /voice-card[\s\S]*?max-width: 480px;/);
+  assert.match(skin.css, /\.ws-voice-member-move \{ transition: transform \.28s/);
+  assert.match(skin.css, /\.ws-voice-member-enter-from,[\s\S]*?\.ws-voice-member-leave-to \{ opacity: 0; transform: translateY\(10px\) scale\(\.975\); \}/);
   assert.match(skin.css, /data-ws-part="voice\.member\.mic-status"[\s\S]*?color: #c8c9ce;[\s\S]*?background: #111216d9;/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="true"\][\s\S]*?voice-card > strong[\s\S]*?display: none;/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);

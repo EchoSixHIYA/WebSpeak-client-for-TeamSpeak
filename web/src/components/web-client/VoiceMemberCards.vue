@@ -1,6 +1,9 @@
 <template>
-  <div
+  <TransitionGroup
     v-if="currentMembers.length"
+    name="ws-voice-member"
+    tag="div"
+    appear
     class="voice-grid"
     data-ws-part="voice.members"
   >
@@ -137,7 +140,7 @@
         >
       </div>
     </article>
-  </div>
+  </TransitionGroup>
   <div
     v-else
     class="voice-empty"
