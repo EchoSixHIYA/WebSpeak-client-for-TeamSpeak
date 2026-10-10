@@ -13,6 +13,7 @@ let vite;
 let SkinPluginEditor;
 let SkinPluginOutlet;
 let authoring;
+let approvals;
 let focusedNode;
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
@@ -35,6 +36,7 @@ const hostNode = (tag, type = "element") => ({
   },
   dispatchEvent(event) { for (const listener of this.listeners.get(event.type) ?? []) listener(event); },
 });
+const teleportRoot = hostNode("teleport-root");
 function insert(child, parent, anchor = null) {
   if (child.parent) {
     const previous = child.parent.children.indexOf(child);
@@ -61,6 +63,7 @@ const renderer = createRenderer({
     node.parent = null;
   },
   parentNode: node => node.parent,
+  querySelector: selector => selector === "body" ? teleportRoot : null,
   nextSibling(node) {
     if (!node.parent) return null;
     return node.parent.children[node.parent.children.indexOf(node) + 1] ?? null;
@@ -135,6 +138,7 @@ before(async () => {
   });
   ({ default: SkinPluginEditor } = await vite.ssrLoadModule("/src/components/SkinPluginEditor.vue"));
   ({ default: SkinPluginOutlet } = await vite.ssrLoadModule("/src/components/SkinPluginOutlet.ts"));
+  approvals = await vite.ssrLoadModule("/src/services/skin-plugin-approval.ts");
   const require = createRequire(import.meta.url);
   const { parse, compileScript, compileTemplate } = require("../node_modules/@vue/compiler-sfc");
   const filename = fileURLToPath(new URL("../src/components/SkinPluginEditor.vue", import.meta.url));
@@ -354,6 +358,75 @@ test("component create, update, and delete immediately change the rendered skin 
     await nextTick();
     assert.equal(visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1"), null,
       "deleting the component removes it from the rendered page preview");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("deleting the last surface component immediately restores the host page", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.surface";
+  const skinVersion = "1.0.0";
+  const baseDocument = {
+    schemaVersion: 3,
+    components: [{
+      id: "full-surface",
+      name: "Full surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Full voice page",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: { tag: "main", children: [{ text: "Custom voice surface" }] },
+    }],
+  };
+  approvals.approveSkinPluginComponents(skinId, skinVersion, baseDocument.components);
+  const revision = Vue.ref(0);
+  const surfaceActive = Vue.ref(false);
+  const props = { skinId, skinVersion, baseDocument, page: "voice", lang: "zh" };
+  const preview = Vue.defineComponent({
+    setup() {
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        surfaceActive.value ? null : Vue.h("section", { "data-native-host": "true" }, "WebSpeak host page"),
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+          manageSurfaceRecovery: false,
+          onSurfaceChange: (active) => { surfaceActive.value = active; },
+        }),
+        Vue.h(SkinPluginEditor, { ...props, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(preview);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    await nextTick();
+    assert.equal(surfaceActive.value, true, "the approved surface replaces the host page");
+    assert.equal(visit(root, node => node.props["data-native-host"] === "true"), null);
+
+    clickButton(root, "组件结构");
+    await nextTick();
+    await nextTick();
+    clickButton(root, "删除组件");
+    await nextTick();
+    await nextTick();
+
+    assert.equal(surfaceActive.value, false, "deleting the surface clears its active state");
+    assert.equal(visit(root, node => node.props["data-ws-plugin-surface"] === "voice"), null);
+    assert.match(nodeText(root), /WebSpeak host page/, "the host page is restored without requiring a skin reset");
   } finally {
     app.unmount();
   }
