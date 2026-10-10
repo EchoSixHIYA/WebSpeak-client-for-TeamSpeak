@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.32");
+  assert.equal(skin.version, "3.1.33");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -504,7 +504,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const voiceGroupToggle = findPart(voice?.root, "voice-channel-group-toggle");
   assert.equal(voiceGroupToggle?.events?.click, "toggle-voice-group");
   assert.equal(voiceGroupToggle?.attributes?.["aria-expanded"], "{{state.voicegroupopen}}");
-  assert.deepEqual(findPart(voice?.root, "voice-channel-list")?.when, { path: "state.voicegroupopen", equals: true });
+  assert.equal(findPart(voice?.root, "voice-channel-list")?.when, undefined, "the collapsible channel list stays mounted during its transition");
   assert.equal(voice?.root.attributes?.["data-voice-group-open"], "{{state.voicegroupopen}}");
   const chatToggle = findPart(voice?.root, "chat-panel-toggle");
   assert.equal(chatToggle?.events?.click, "toggle-chat-panel");
@@ -554,6 +554,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #35373d/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
+  assert.match(skin.css, /voice-channel-list[\s\S]*?grid-template-rows: 1fr;[\s\S]*?transition: grid-template-rows \.18s ease/);
+  assert.match(skin.css, /data-voice-group-open="false"[\s\S]*?voice-channel-list[\s\S]*?grid-template-rows: 0fr;[\s\S]*?visibility: hidden;[\s\S]*?visibility 0s linear \.18s/);
   assert.match(skin.css, /kaak-workspace\.server-monogram"\]\[data-tone="0"\]/);
   assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);
   assert.doesNotMatch(skin.css, /aria-expanded="true"\]\s*[^\n]*voice-stage-heading[^\n]*display: none;/);

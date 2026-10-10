@@ -373,10 +373,6 @@
                   {
                     "tag": "div",
                     "part": "voice-channel-list",
-                    "when": {
-                      "path": "state.voicegroupopen",
-                      "equals": true
-                    },
                     "children": [
                       {
                         "tag": "div",
