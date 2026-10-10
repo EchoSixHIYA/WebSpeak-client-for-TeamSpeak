@@ -1546,9 +1546,9 @@
 [data-ws-part="voice.audio-settings"] .settings-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #58c877; }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range::-webkit-slider-thumb {
-  width: 15px;
-  height: 15px;
-  margin-top: -5.5px;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
   appearance: none;
   border: 2px solid #202126;
   border-radius: 50%;
@@ -1558,8 +1558,8 @@
 }
 [data-ws-plugin-part="kaak-workspace"] .dock-slider::-moz-range-thumb,
 [data-ws-part="voice.audio-settings"] .settings-range::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
+  width: 16px;
+  height: 16px;
   border: 2px solid #202126;
   border-radius: 50%;
   background: #d8f6df;
@@ -1645,7 +1645,8 @@
 
 [data-ws-part="voice.audio-settings"] .settings-section h3 {
   color: #eceef0;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-section h3 .ui-icon {

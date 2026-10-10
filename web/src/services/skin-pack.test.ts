@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.35");
+  assert.equal(skin.version, "3.1.36");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -553,6 +553,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #35373d/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
+  assert.match(skin.css, /settings-section h3 \{\s*color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{\s*width: 16px;\s*height: 16px;\s*margin-top: -6px;/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-moz-range-thumb \{\s*width: 16px;\s*height: 16px;/);
   assert.match(skin.css, /voice-performance-panel-enter-active[\s\S]*?transition: opacity \.16s/);
   assert.match(skin.css, /voice-performance-panel-leave-active/);
   assert.match(skin.css, /voice-performance-panel-enter-from,[\s\S]*?voice-performance-panel-leave-to \{\s*opacity: 0;/);
