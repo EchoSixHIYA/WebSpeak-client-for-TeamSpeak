@@ -61,6 +61,19 @@
             ></select
           ></label
         >
+        <label
+          ><span>{{ t("screenShareBitrate") }}</span
+          ><select
+            v-model="screenShareBitratePreset"
+            :aria-label="t('screenShareBitrate')"
+            ><option
+              v-for="option in screenShareBitrateOptions"
+              :key="option.value"
+              :value="option.value"
+              >{{ t(option.label) }}</option
+            ></select
+          ></label
+        >
       </div>
       <p
         class="screen-share-settings-note"
@@ -95,8 +108,8 @@ import { ref } from "vue";
 import Icon from "../Icon.vue";
 import { useDialogFocus } from "../../composables/useDialogFocus.js";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
-const props = defineProps<{ model: Pick<ReturnType<typeof useWebClientScreenShare>, "resolutionOptions" | "frameRateOptions" | "resolutionPreset" | "frameRate" | "startWithSettings">; t: (key: string) => string }>();
-const { resolutionOptions: screenShareResolutionOptions, frameRateOptions: screenShareFrameRateOptions, resolutionPreset: screenShareResolutionPreset, frameRate: screenShareFrameRate, startWithSettings: startScreenShareWithSettings } = props.model;
+const props = defineProps<{ model: Pick<ReturnType<typeof useWebClientScreenShare>, "resolutionOptions" | "frameRateOptions" | "bitrateOptions" | "resolutionPreset" | "frameRate" | "bitratePreset" | "startWithSettings">; t: (key: string) => string }>();
+const { resolutionOptions: screenShareResolutionOptions, frameRateOptions: screenShareFrameRateOptions, bitrateOptions: screenShareBitrateOptions, resolutionPreset: screenShareResolutionPreset, frameRate: screenShareFrameRate, bitratePreset: screenShareBitratePreset, startWithSettings: startScreenShareWithSettings } = props.model;
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLElement | null>(null);
 const { onDialogKeydown } = useDialogFocus(dialog, () => emit("close"));

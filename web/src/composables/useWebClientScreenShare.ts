@@ -3,10 +3,18 @@ import type { ChannelMember, ScreenShareOutputSettings, ScreenShareStream } from
 
 export type ScreenShareResolutionPreset = "source" | "720p" | "1080p";
 
+export type ScreenShareBitratePreset = "auto" | "1.5" | "3" | "5" | "8" | "12";
+
 interface ScreenShareResolutionOption {
   value: ScreenShareResolutionPreset;
   width?: number;
   height?: number;
+  label: string;
+}
+
+interface ScreenShareBitrateOption {
+  value: ScreenShareBitratePreset;
+  bitrate?: number;
   label: string;
 }
 
@@ -50,10 +58,20 @@ export function useWebClientScreenShare({
     { value: "1080p", width: 1920, height: 1080, label: "screenShareResolution1080p" },
   ];
   const frameRateOptions = [5, 10, 15, 24, 30, 60];
+  const bitrateOptions: ScreenShareBitrateOption[] = [
+    { value: "auto", label: "screenShareBitrateAuto" },
+    { value: "1.5", bitrate: 1_500_000, label: "screenShareBitrate1_5M" },
+    { value: "3", bitrate: 3_000_000, label: "screenShareBitrate3M" },
+    { value: "5", bitrate: 5_000_000, label: "screenShareBitrate5M" },
+    { value: "8", bitrate: 8_000_000, label: "screenShareBitrate8M" },
+    { value: "12", bitrate: 12_000_000, label: "screenShareBitrate12M" },
+  ];
   const storedResolution = localStorage.getItem("webspeak:screen-share-resolution") as ScreenShareResolutionPreset | null;
   const resolutionPreset = ref<ScreenShareResolutionPreset>(resolutionOptions.some((option) => option.value === storedResolution) ? storedResolution! : "1080p");
   const storedFrameRate = Number(localStorage.getItem("webspeak:screen-share-framerate"));
   const frameRate = ref(frameRateOptions.includes(storedFrameRate) ? storedFrameRate : 15);
+  const storedBitrate = localStorage.getItem("webspeak:screen-share-bitrate") as ScreenShareBitratePreset | null;
+  const bitratePreset = ref<ScreenShareBitratePreset>(bitrateOptions.some((option) => option.value === storedBitrate) ? storedBitrate! : "auto");
   const settingsOpen = ref(false);
   const activeStream = computed<ScreenShareStream | null>(() => streams.find((stream) => stream.streamId === viewingStreamId.value) ?? null);
   const viewers = computed(() => activeStream.value?.viewers.slice(-5) ?? []);
@@ -115,12 +133,15 @@ export function useWebClientScreenShare({
 
   async function startWithSettings(): Promise<void> {
     const preset = resolutionOptions.find((option) => option.value === resolutionPreset.value);
+    const bitrateOption = bitrateOptions.find((option) => option.value === bitratePreset.value);
     const settings: ScreenShareOutputSettings = {
       ...(preset?.width && preset.height ? { maxWidth: preset.width, maxHeight: preset.height } : {}),
       maxFrameRate: frameRate.value,
+      ...(bitrateOption?.bitrate ? { maxBitrate: bitrateOption.bitrate } : {}),
     };
     localStorage.setItem("webspeak:screen-share-resolution", resolutionPreset.value);
     localStorage.setItem("webspeak:screen-share-framerate", String(frameRate.value));
+    localStorage.setItem("webspeak:screen-share-bitrate", bitratePreset.value);
     settingsOpen.value = false;
     await startScreenShare(true, settings);
   }
@@ -148,8 +169,10 @@ export function useWebClientScreenShare({
     fullscreen,
     resolutionOptions,
     frameRateOptions,
+    bitrateOptions,
     resolutionPreset,
     frameRate,
+    bitratePreset,
     settingsOpen,
     activeStream,
     viewers,
