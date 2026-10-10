@@ -8,6 +8,7 @@ import {
   revokeSkinPluginApprovals,
 } from "./skin-plugin-approval.js";
 import { createSkinPluginQuickServerProjection } from "./skin-plugin-context.js";
+import "./skin-plugin-asset-urls.test.js";
 
 function surfaceDocument(): SkinPluginDocument {
   return {

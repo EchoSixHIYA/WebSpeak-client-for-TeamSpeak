@@ -16,6 +16,7 @@ import {
 import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
 import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
+import { createSkinPluginAssetUrlCache } from "../services/skin-plugin-asset-urls.js";
 
 type Scalar = string | number | boolean;
 type SafeContext = Record<string, unknown>;
@@ -66,7 +67,7 @@ export default defineComponent({
     const manageOpen = ref(false);
     const refresh = ref(0);
     const stateByComponent = reactive<Record<string, Record<string, Scalar>>>({});
-    const objectUrls = new Map<string, string>();
+    const assetUrls = createSkinPluginAssetUrlCache();
     const validatedDocument = computed(() => {
       let document: SkinPluginDocument;
       const emptyRuntimeBase = Boolean(props.extensionOutput)
@@ -118,6 +119,7 @@ export default defineComponent({
       surfaceSuppressed.value = false;
       refresh.value += 1;
     }, { immediate: true });
+    watch(() => [props.skinId, props.skinVersion, props.assets] as const, () => assetUrls.clear());
     watch(activeSurface, (surface) => emit("surface-change", Boolean(surface)), { immediate: true, flush: "sync" });
 
     function localState(component: SkinPluginComponent): Record<string, Scalar> {
@@ -202,11 +204,7 @@ export default defineComponent({
     }
 
     function assetUrl(path: string): string | undefined {
-      const current = props.assets[path];
-      if (!(current instanceof Blob)) return undefined;
-      let url = objectUrls.get(path);
-      if (!url) { url = URL.createObjectURL(current); objectUrls.set(path, url); }
-      return url;
+      return assetUrls.resolve(path, props.assets);
     }
 
     function layoutComponentPath(component: SkinPluginComponent): string {
@@ -345,7 +343,7 @@ export default defineComponent({
       refresh.value += 1;
     }
 
-    onUnmounted(() => { objectUrls.forEach((url) => URL.revokeObjectURL(url)); objectUrls.clear(); });
+    onUnmounted(() => assetUrls.clear());
 
     return () => {
       const nodes: VNodeChild[] = renderedComponents.value.map((component) => h("div", {
