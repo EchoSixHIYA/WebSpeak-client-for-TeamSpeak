@@ -23,6 +23,7 @@
   gap: 28px;
   padding: clamp(16px, 4vw, 42px);
   color: var(--skin-kaak-text);
+  font-family: var(--skin-kaak-font);
   background:
     radial-gradient(ellipse at 50% 44%, #25272b 0, transparent 58%),
     var(--skin-kaak-bg);
