@@ -163,6 +163,18 @@ test("schema v3 host audio controls require read and control permissions while v
   assert.equal(parseSkinPluginDocument(legacyDocument).components[0].root.children?.[0].widget, "voice.audio-controls");
 });
 
+test("schema v3 member cards require a separate permission to display cached profile pictures", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].permissions = ["session.members.read", "voice.screenShare.read", "voice.screenShare.control"];
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.member-cards" }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions.push("session.memberAvatars.read");
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.member-cards");
+});
+
 test("KAAK v3 example declares the connection home and complete voice workspace", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
@@ -179,6 +191,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.equal(workspace.mode, "surface");
   assert.ok(workspace.permissions.includes("session.channels.read"));
   assert.ok(workspace.permissions.includes("session.members.read"));
+  assert.ok(workspace.permissions.includes("session.memberAvatars.read"));
   assert.ok(workspace.permissions.includes("chat.channel.send"));
   assert.ok(workspace.permissions.includes("audio.microphone.control"));
   assert.equal(workspace.actions["join-channel"].type, "voice.joinChannel");
@@ -191,9 +204,10 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   };
   visit(workspace.root);
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
+  assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"));
   assert.ok(nodes.some((node) => node.repeat?.path === "session.channels" && node.children?.[0].events?.dblclick === "join-channel"));
-  assert.ok(nodes.some((node) => node.repeat?.path === "session.members"));
+  assert.ok(!nodes.some((node) => node.repeat?.path === "session.members"), "member imagery stays inside the trusted host widget");
   assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));
 });
 

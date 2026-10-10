@@ -50,6 +50,24 @@ test("runtime context redacts connection targets from quick-list labels and drop
   assert.equal(JSON.stringify(projected).includes("2001:db8::1"), false);
 });
 
+test("profile-picture display permission does not expose image data to declarative or Wasm contexts", () => {
+  const context = {
+    session: {
+      members: [{ id: "member-1", name: "Visible member", channelId: "channel-1", status: "online", speaking: false, self: false, avatar: "data:image/png;base64,cHJpdmF0ZQ==" }],
+    },
+  };
+  const displayOnly = projectSkinRuntimePluginContext(["session.memberAvatars.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(displayOnly)), {});
+
+  const readableMembers = projectSkinRuntimePluginContext(["session.members.read", "session.memberAvatars.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(readableMembers)), {
+    session: {
+      members: [{ id: "member-1", name: "Visible member", channelId: "channel-1", status: "online", speaking: false, self: false }],
+    },
+  });
+  assert.equal(JSON.stringify(readableMembers).includes("data:image"), false);
+});
+
 test("large runtime context is capped across separately bounded collections", () => {
   const projected = projectSkinRuntimePluginContext(["session.channels.read", "chat.channel.read"], {
     session: {

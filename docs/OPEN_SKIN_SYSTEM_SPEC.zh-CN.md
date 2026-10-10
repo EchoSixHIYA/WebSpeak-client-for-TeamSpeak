@@ -16,7 +16,7 @@
 
 v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。宿主仍解析固定元素/属性白名单、固定数据集合、简单绑定与有限动作，再由 Vue 创建节点。每个自定义组件根和每个有 DOM 的节点都会作为独立本地布局项，可移动、调整尺寸、改变外观或隐藏。节点指定 `part` 后使用该标识；未指定时使用树路径，树结构调整后旧的本地覆盖可能要重新设置。可操作节点保留至少 44 px 的触控目标。作者不必使用固定宿主控件目录，但 v3 仍不足以表达任意自定义 UI 逻辑和完整插件生命周期。管理员面板和演示页不能被 surface 替换。
 
-宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。schema v3 的受保护控件会在导入时验证完整权限集合：音频控件要求 `audio.status.read`、`audio.microphone.control` 与 `audio.output.control`；聊天控件要求 `chat.channel.read` 与 `chat.channel.send`；成员卡片要求 `session.members.read` 及 `voice.screenShare.read`、`voice.screenShare.control`；屏幕共享播放器要求后两者；悄悄话控件要求 `voice.whisper.status.read` 与 `voice.whisper.control`；连接/断开控件要求 `voice.disconnect`。既有 schema v2 包仍按此前规则校验，`voice.screen-share-start` 则保留原有 `voice.screenShare.control` 要求。该控件仅限语音页；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
+宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。schema v3 的受保护控件会在导入时验证完整权限集合：音频控件要求 `audio.status.read`、`audio.microphone.control` 与 `audio.output.control`；聊天控件要求 `chat.channel.read` 与 `chat.channel.send`；成员卡片要求 `session.members.read`、`session.memberAvatars.read` 及 `voice.screenShare.read`、`voice.screenShare.control`；头像只在可信宿主控件内显示，不暴露给皮肤代码；屏幕共享播放器要求后两者；悄悄话控件要求 `voice.whisper.status.read` 与 `voice.whisper.control`；连接/断开控件要求 `voice.disconnect`。既有 schema v2 包仍按此前规则校验，`voice.screen-share-start` 则保留原有 `voice.screenShare.control` 要求。该控件仅限语音页；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
 
 v1-v3 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAssembly、远程脚本、任意 URL、表单导航、浏览器存储访问或网络调用。v4 可携带本地 JS/Wasm/CSS；JS 仍只校验和缓存，Wasm 在生产构建中经本地摘要授权后运行一次性有界任务，并经宿主解析、渲染动态 UI。运行时支持 `ui.surface.replace`、限定的公开只读数据权限和首版宿主动作效果；投影前由宿主按插件清单过滤字段，总快照最多 48 KiB，`ui_input_read` 输入最多 64 KiB。动作效果限于可信 UI 事件触发的同一轮调用、单个动作，并复用现有动作权限与参数校验。所有版本都拒绝未知协议字段、权限、动作和数据路径；v1-v3 拒绝未知节点/属性，v4 Wasm 输出则对标签名做语法验证、拒绝具备脚本/导航/嵌入能力的标签与属性，并将自定义标签惰性渲染为普通 `div`。
 
@@ -49,6 +49,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 - session.status.read：连接状态、当前频道和显示名称。
 - session.channels.read：公开频道树、频道名称、层级、人数和当前频道标志。
 - session.members.read：可见成员名称、由名称派生的首字标记、所在频道、在线状态、说话状态及本人标志；不提供成员头像图像。
+- session.memberAvatars.read：允许可信 `voice.member-cards` 宿主控件显示当前可见成员的已缓存 TeamSpeak 头像；图像字节和 URL 不会传给皮肤声明树或 Wasm 插件上下文。
 - chat.channel.read：当前公开文字频道中可见的消息。
 - favorites.read：收藏项名称、类型、是否当前项和随机不透明本地令牌；不提供地址或凭据。
 - servers.quickList.read：统一后的收藏和最近连接名称、当前项、分类与随机不透明本地令牌；不提供地址或凭据。

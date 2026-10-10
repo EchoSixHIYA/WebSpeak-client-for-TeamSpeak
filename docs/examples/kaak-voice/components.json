@@ -107,6 +107,7 @@
         "session.status.read",
         "session.channels.read",
         "session.members.read",
+        "session.memberAvatars.read",
         "session.channel.join",
         "servers.quickList.read",
         "servers.quickList.switch",
@@ -162,11 +163,18 @@
           "args": {
             "active": false
           }
+        },
+        "toggle-chat-panel": {
+          "type": "ui.toggleState",
+          "args": {
+            "key": "chatopen"
+          }
         }
       },
       "state": {
         "selectedchannel": "",
-        "message": ""
+        "message": "",
+        "chatopen": true
       },
       "root": {
         "tag": "main",
@@ -516,7 +524,11 @@
                       {
                         "text": "◉"
                       }
-                    ]
+                    ],
+                    "when": {
+                      "path": "state.chatopen",
+                      "equals": true
+                    }
                   },
                   {
                     "tag": "h1",
@@ -525,18 +537,62 @@
                       {
                         "text": "{{session.status.channelName}}"
                       }
-                    ]
+                    ],
+                    "when": {
+                      "path": "state.chatopen",
+                      "equals": true
+                    }
                   },
                   {
                     "tag": "span",
                     "part": "connection-state",
                     "when": {
-                      "path": "session.status.connected",
+                      "path": "state.chatopen",
                       "equals": true
                     },
                     "children": [
                       {
                         "text": "已连接"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "chat-panel-toggle",
+                    "attributes": {
+                      "type": "button",
+                      "aria-expanded": "{{state.chatopen}}",
+                      "aria-label": "收起或展开当前语音频道文字聊天 / Toggle current voice channel chat"
+                    },
+                    "events": {
+                      "click": "toggle-chat-panel"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "chat-panel-chevron",
+                        "when": {
+                          "path": "state.chatopen",
+                          "equals": true
+                        },
+                        "children": [
+                          {
+                            "text": "›"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "chat-panel-chevron",
+                        "when": {
+                          "path": "state.chatopen",
+                          "equals": false
+                        },
+                        "children": [
+                          {
+                            "text": "‹"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -647,7 +703,11 @@
                       }
                     ]
                   }
-                ]
+                ],
+                "when": {
+                  "path": "state.chatopen",
+                  "equals": true
+                }
               }
             ]
           },
@@ -674,127 +734,8 @@
                 ]
               },
               {
-                "tag": "ul",
-                "part": "member-list",
-                "children": [
-                  {
-                    "tag": "li",
-                    "part": "member-row",
-                    "repeat": {
-                      "path": "session.members",
-                      "as": "member"
-                    },
-                    "children": [
-                      {
-                        "tag": "div",
-                        "part": "member-avatar-stage",
-                        "children": [
-                          {
-                            "tag": "span",
-                            "part": "member-avatar",
-                            "children": [
-                              {
-                                "text": "{{member.avatarInitial}}"
-                              }
-                            ]
-                          },
-                          {
-                            "tag": "span",
-                            "part": "member-speaking-ring",
-                            "when": {
-                              "path": "member.speaking",
-                              "equals": true
-                            },
-                            "attributes": {
-                              "aria-hidden": "true"
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "div",
-                        "part": "member-card-footer",
-                        "children": [
-                          {
-                            "tag": "span",
-                            "part": "member-name",
-                            "children": [
-                              {
-                                "text": "{{member.name}}"
-                              }
-                            ]
-                          },
-                          {
-                            "tag": "span",
-                            "part": "speaking-indicator",
-                            "when": {
-                              "path": "member.speaking",
-                              "equals": true
-                            },
-                            "attributes": {
-                              "aria-label": "正在讲话"
-                            },
-                            "children": [
-                              {
-                                "tag": "span",
-                                "part": "member-speaking-wave",
-                                "attributes": {
-                                  "aria-hidden": "true"
-                                },
-                                "children": [
-                                  { "tag": "i", "part": "member-speaking-bar" },
-                                  { "tag": "i", "part": "member-speaking-bar" },
-                                  { "tag": "i", "part": "member-speaking-bar" }
-                                ]
-                              },
-                              {
-                                "tag": "span",
-                                "part": "member-speaking-label",
-                                "children": [
-                                  {
-                                    "text": "正在讲话"
-                                  }
-                                ]
-                              }
-                            ]
-                          },
-                          {
-                            "tag": "span",
-                            "part": "member-muted-state",
-                            "when": {
-                              "path": "member.status",
-                              "equals": "muted"
-                            },
-                            "attributes": {
-                              "aria-label": "麦克风已静音"
-                            },
-                            "children": [
-                              {
-                                "text": "已静音"
-                              }
-                            ]
-                          },
-                          {
-                            "tag": "span",
-                            "part": "member-away-state",
-                            "when": {
-                              "path": "member.status",
-                              "equals": "away"
-                            },
-                            "attributes": {
-                              "aria-label": "离开"
-                            },
-                            "children": [
-                              {
-                                "text": "离开中"
-                              }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
+                "widget": "voice.member-cards",
+                "part": "member-cards"
               },
               {
                 "widget": "voice.screen-share-player",
@@ -955,7 +896,10 @@
               }
             ]
           }
-        ]
+        ],
+        "attributes": {
+          "data-chat-open": "{{state.chatopen}}"
+        }
       }
     }
   ]
