@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.9");
+  assert.equal(skin.version, "3.1.11");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -525,11 +525,18 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
   assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
+  assert.match(skin.css, /kaak-workspace\.quick-server-item.*nth-of-type\(8n \+ 1\)/);
+  assert.match(skin.css, /grid-template-columns: 80px 290px/);
+  assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
+  assert.match(skin.css, /grid-template-rows: 40px/);
+  assert.match(skin.css, /kaak-workspace\.server-monogram[\s\S]*?width: 48px;[\s\S]*?height: 48px;/);
+  assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
+  assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /data-chat-open="false"[\s\S]*?grid-template-columns:[^;]*52px;/);
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
   assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);
-  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?min-height: 274px;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-ring/);
   assert.match(skin.css, /animation: ws-community-kaak-voice-kaak-member-speaking-ring 1\.8s ease-out infinite/);
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-wave/);
