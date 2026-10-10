@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.6");
+  assert.equal(skin.version, "3.1.7");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -515,6 +515,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "screen-player")?.widget, "voice.screen-share-player");
   assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
   assert.equal(findPart(voice?.root, "chat-input")?.bindValue, "message");
+  assert.equal(findPart(voice?.root, "chat-message-avatar")?.children?.[0]?.text, "{{message.author}}");
+  assert.equal(findPart(voice?.root, "chat-message-body")?.children?.[0]?.part, "chat-message-heading");
+  assert.equal(findPart(voice?.root, "chat-message-body")?.attributes?.["data-kind"], "{{message.kind}}");
   assert.equal(findPart(voice?.root, "screen-share-start")?.widget, "voice.screen-share-start");
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));

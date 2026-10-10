@@ -633,35 +633,56 @@
                         },
                         "children": [
                           {
-                            "tag": "header",
-                            "part": "chat-message-heading",
+                            "tag": "span",
+                            "part": "chat-message-avatar",
+                            "attributes": {
+                              "aria-hidden": "true"
+                            },
                             "children": [
                               {
-                                "tag": "strong",
-                                "part": "chat-message-author",
-                                "children": [
-                                  {
-                                    "text": "{{message.author}}"
-                                  }
-                                ]
-                              },
-                              {
-                                "tag": "time",
-                                "part": "chat-message-time",
-                                "children": [
-                                  {
-                                    "text": "{{message.time}}"
-                                  }
-                                ]
+                                "text": "{{message.author}}"
                               }
                             ]
                           },
                           {
-                            "tag": "p",
-                            "part": "chat-message-text",
+                            "tag": "div",
+                            "part": "chat-message-body",
+                            "attributes": {
+                              "data-kind": "{{message.kind}}"
+                            },
                             "children": [
                               {
-                                "text": "{{message.text}}"
+                                "tag": "header",
+                                "part": "chat-message-heading",
+                                "children": [
+                                  {
+                                    "tag": "strong",
+                                    "part": "chat-message-author",
+                                    "children": [
+                                      {
+                                        "text": "{{message.author}}"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tag": "time",
+                                    "part": "chat-message-time",
+                                    "children": [
+                                      {
+                                        "text": "{{message.time}}"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "tag": "p",
+                                "part": "chat-message-text",
+                                "children": [
+                                  {
+                                    "text": "{{message.text}}"
+                                  }
+                                ]
                               }
                             ]
                           }

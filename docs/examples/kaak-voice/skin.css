@@ -559,11 +559,60 @@
   font-size: 13px;
 }
 
-[data-ws-plugin-part="kaak-workspace.chat-message"] { min-width: 0; }
-[data-ws-plugin-part="kaak-workspace.chat-message-heading"] { display: flex; align-items: baseline; gap: 8px; }
-[data-ws-plugin-part="kaak-workspace.chat-message-author"] { color: var(--skin-kaak-text); font-size: 12px; }
+[data-ws-plugin-part="kaak-workspace.chat-message"] {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 0 10px;
+  min-width: 0;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-avatar"] {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 1px;
+  overflow: hidden;
+  border: 1px solid #ffffff18;
+  border-radius: 50%;
+  color: transparent;
+  background: linear-gradient(145deg, #3a3c42, #25262b);
+  font-size: 0;
+  font-weight: 800;
+  line-height: 0;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-avatar"]::first-letter {
+  color: #e7f8ec;
+  font-size: 14px;
+  line-height: 1;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-body"][data-kind="self"] [data-ws-plugin-part="kaak-workspace.chat-message-avatar"] {
+  border-color: #58c87755;
+  background: linear-gradient(145deg, #286c49, #194b3b);
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-body"] {
+  grid-column: 2;
+  min-width: 0;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-heading"] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  min-height: 20px;
+}
+
+[data-ws-plugin-part="kaak-workspace.chat-message-author"] { color: var(--skin-kaak-text); font-size: 12px; font-weight: 700; }
+[data-ws-plugin-part="kaak-workspace.chat-message-body"][data-kind="self"] [data-ws-plugin-part="kaak-workspace.chat-message-author"] { color: #a2e8b4; }
 [data-ws-plugin-part="kaak-workspace.chat-message-time"] { color: var(--skin-kaak-dim); font-size: 10px; }
-[data-ws-plugin-part="kaak-workspace.chat-message-text"] { margin: 3px 0 0; color: var(--skin-kaak-muted); font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
+[data-ws-plugin-part="kaak-workspace.chat-message-text"] { margin: 2px 0 0; color: #d3d4d8; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 [data-ws-plugin-part="kaak-workspace.chat-composer"] {
   display: flex;
