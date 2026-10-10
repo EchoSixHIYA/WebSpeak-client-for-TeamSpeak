@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.49");
+  assert.equal(skin.version, "3.1.50");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -474,6 +474,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     ["kaak-workspace", "surface"],
   ]);
   assert.ok(home?.permissions.includes("ui.surface.replace"));
+  assert.equal(voice?.stateScope, "session.status.channelId");
   assert.ok(voice?.permissions.includes("ui.surface.replace"));
   assert.ok(voice?.permissions.includes("servers.quickList.switch"));
   assert.ok(voice?.permissions.includes("session.channels.read"));

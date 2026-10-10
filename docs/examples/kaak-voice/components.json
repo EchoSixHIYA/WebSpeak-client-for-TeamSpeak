@@ -102,6 +102,7 @@
       "page": "voice",
       "mode": "surface",
       "accessibleName": "KAAK 语音工作区 / Voice workspace",
+      "stateScope": "session.status.channelId",
       "permissions": [
         "ui.surface.replace",
         "session.status.read",

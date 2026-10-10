@@ -175,6 +175,30 @@ test("schema v3 member cards require a separate permission to display cached pro
   assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.member-cards");
 });
 
+test("schema v3 scopes local UI state only to approved public scalar context fields", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].permissions.push("session.status.read");
+  document.components[0].stateScope = "session.status.channelId";
+  assert.equal(parseSkinPluginDocument(document).components[0].stateScope, "session.status.channelId");
+
+  const missingPermission = structuredClone(document);
+  missingPermission.components[0].permissions = missingPermission.components[0].permissions.filter((permission) => permission !== "session.status.read");
+  errorCode(() => parseSkinPluginDocument(missingPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const privateContext = structuredClone(document);
+  privateContext.components[0].stateScope = "session.credentials.privateKey";
+  errorCode(() => parseSkinPluginDocument(privateContext), "SKIN_PLUGIN_STATE_SCOPE_INVALID");
+
+  const collection = structuredClone(document);
+  collection.components[0].stateScope = "session.channels";
+  errorCode(() => parseSkinPluginDocument(collection), "SKIN_PLUGIN_STATE_SCOPE_INVALID");
+
+  const legacy = structuredClone(document);
+  legacy.schemaVersion = 2;
+  errorCode(() => parseSkinPluginDocument(legacy), "SKIN_PLUGIN_SCHEMA_UNSUPPORTED");
+});
+
 test("schema v3 trusted widgets can omit screen-share UI and request only the permissions they use", () => {
   const document = validDocument();
   document.schemaVersion = 3;

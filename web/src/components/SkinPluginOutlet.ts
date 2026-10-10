@@ -21,6 +21,7 @@ import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPlugi
 import { createSkinPluginAssetUrlCache } from "../services/skin-plugin-asset-urls.js";
 
 type Scalar = string | number | boolean;
+const LOCAL_STATE_SCOPE_LIMIT = 128;
 type SafeContext = Record<string, unknown>;
 type HostAction = (args: Record<string, Scalar>, component: SkinPluginComponent) => void | Promise<void>;
 type HostWidget = (options?: SkinPluginWidgetOptions) => VNodeChild;
@@ -68,7 +69,7 @@ export default defineComponent({
     const surfaceSuppressed = ref(false);
     const manageOpen = ref(false);
     const refresh = ref(0);
-    const stateByComponent = reactive<Record<string, Record<string, Scalar>>>({});
+    const stateByComponent = reactive<Record<string, Record<string, Record<string, Scalar>>>>({});
     const assetUrls = createSkinPluginAssetUrlCache();
     const validatedDocument = computed(() => {
       let document: SkinPluginDocument;
@@ -132,16 +133,26 @@ export default defineComponent({
     watch(activeSurface, (surface) => emit("surface-change", Boolean(surface)), { immediate: true, flush: "sync" });
 
     function componentStateKey(component: SkinPluginComponent): string {
-      return JSON.stringify([props.skinId, props.skinVersion, props.componentNamespace, component.id]);
+      return JSON.stringify([props.skinId, props.skinVersion, props.componentNamespace, component.id, component.stateScope ?? ""]);
     }
 
-    function localState(component: SkinPluginComponent): Record<string, Scalar> {
+    function localState(component: SkinPluginComponent, context: SafeContext): Record<string, Scalar> {
       const key = componentStateKey(component);
       const defaults = component.state ?? {};
-      let state = stateByComponent[key];
+      let scopedStates = stateByComponent[key];
+      if (!scopedStates) {
+        scopedStates = {};
+        stateByComponent[key] = scopedStates;
+      }
+      const scopeValue = component.stateScope ? resolvePath(component.stateScope, context, {}) : undefined;
+      const scopeKey = component.stateScope ? JSON.stringify(scopeValue ?? null) : "default";
+      let state = scopedStates[scopeKey];
       if (!state) {
+        if (component.stateScope && Object.keys(scopedStates).length >= LOCAL_STATE_SCOPE_LIMIT) {
+          delete scopedStates[Object.keys(scopedStates)[0]];
+        }
         state = { ...defaults };
-        stateByComponent[key] = state;
+        scopedStates[scopeKey] = state;
         return state;
       }
       for (const stateKey of Object.keys(state)) {
@@ -381,7 +392,7 @@ export default defineComponent({
         ...(props.componentNamespace ? { "data-ws-runtime-plugin": props.componentNamespace } : {}),
         ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
         "aria-label": component.accessibleName,
-      }, [renderNode(component, component.root, props.data, localState(component), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
+      }, [renderNode(component, component.root, props.data, localState(component, props.data), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
       const hasPermissions = matchingComponents.value.some((component) => component.permissions.length > 0);
       const showConsent = pendingApproval.value.length > 0 || manageOpen.value;
       const accessToggle = hasPermissions ? h(Teleport, { to: "body" }, [h("button", {

@@ -126,6 +126,8 @@ export interface SkinPluginComponent {
   mode?: SkinPluginComponentMode;
   accessibleName: string;
   permissions: SkinPluginPermission[];
+  /** Keep local UI state separate for each approved scalar context value. */
+  stateScope?: string;
   state?: Record<string, string | number | boolean>;
   /** Internal marker used only for generated Wasm views; rejected by package JSON validation. */
   runtimeCallbacks?: boolean;
@@ -244,6 +246,10 @@ const CONTEXT_FIELDS: Record<string, ReadonlySet<string>> = {
   "screenShare.status": new Set(["active", "starting", "viewing"]),
   "whisper.status": new Set(["active", "targetCount"]),
 };
+const COMPONENT_STATE_SCOPE_PATHS = new Set([
+  ...Array.from(SESSION_STATUS_FIELDS, (field) => `session.status.${field}`),
+  ...Object.entries(CONTEXT_FIELDS).flatMap(([path, fields]) => Array.from(fields, (field) => `${path}.${field}`)),
+]);
 const CONTEXT_PERMISSIONS: Record<string, SkinPluginPermission> = {
   "audio.status": "audio.status.read",
   "screenShare.status": "voice.screenShare.status.read",
@@ -319,7 +325,8 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
   const inputSchemaVersion = input.schemaVersion as 1 | 2 | 3;
   const components = input.components.map((rawComponent, componentIndex): SkinPluginComponent => {
     if (!isRecord(rawComponent)) fail("SKIN_PLUGIN_COMPONENT_INVALID", `Component ${componentIndex} must be an object.`);
-    onlyKeys(rawComponent, new Set(["id", "name", "page", "mode", "accessibleName", "permissions", "actions", "state", "root"]), "Skin plugin component");
+    onlyKeys(rawComponent, new Set(["id", "name", "page", "mode", "accessibleName", "permissions", "actions", "stateScope", "state", "root"]), "Skin plugin component");
+    if (inputSchemaVersion < 3 && rawComponent.stateScope !== undefined) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Scoped local state requires components schema version 3.");
     if (inputSchemaVersion === 1 && rawComponent.mode !== undefined) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Page surfaces require components schema version 2.");
     const id = identifier(rawComponent.id, "component.id");
     if (ids.has(id)) fail("SKIN_PLUGIN_COMPONENT_DUPLICATE", "Component IDs must be unique within the skin.");
@@ -337,6 +344,14 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (typeof permission !== "string" || !PERMISSIONS.has(permission)) fail("SKIN_PLUGIN_PERMISSION_UNKNOWN", "The component requests an unsupported permission.");
       if (permissions.includes(permission as SkinPluginPermission)) fail("SKIN_PLUGIN_PERMISSION_DUPLICATE", "A component permission is duplicated.");
       permissions.push(permission as SkinPluginPermission);
+    }
+    const stateScope = rawComponent.stateScope === undefined ? undefined : boundedText(rawComponent.stateScope, "component.stateScope", 96);
+    if (stateScope !== undefined) {
+      if (!COMPONENT_STATE_SCOPE_PATHS.has(stateScope)) fail("SKIN_PLUGIN_STATE_SCOPE_INVALID", "A component state scope must name a public scalar context field.");
+      const scopePermissions = bindingPermissions(`{{${stateScope}}}`, new Map(), new Set());
+      if (scopePermissions.length !== 1 || !permissions.includes(scopePermissions[0])) {
+        fail("SKIN_PLUGIN_PERMISSION_MISSING", "A component state scope requires the permission that exposes its context field.");
+      }
     }
     if (mode === "surface" && !permissions.includes("ui.surface.replace")) {
       fail("SKIN_PLUGIN_PERMISSION_MISSING", "A page surface requires ui.surface.replace so users can approve page replacement explicitly.");
@@ -546,7 +561,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
     if (mode === "surface" && (!root.tag || root.repeat || root.when || !root.children?.length)) {
       fail("SKIN_PLUGIN_TREE_INVALID", "A page surface root must be a visible container with at least one child.");
     }
-    return { id, name, page, mode, accessibleName, permissions, actions, ...(Object.keys(state).length ? { state } : {}), root };
+    return { id, name, page, mode, accessibleName, permissions, actions, ...(stateScope ? { stateScope } : {}), ...(Object.keys(state).length ? { state } : {}), root };
   });
   const surfaces = new Set<SkinPluginPage>();
   const widgetsByPage = new Map<SkinPluginPage, Set<SkinPluginHostWidget>>();

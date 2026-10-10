@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRenderer, createSSRApp, nextTick } from "vue";
+import { createRenderer, createSSRApp, defineComponent, h, nextTick, ref } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import { parseSkinPluginDocument, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import { approveSkinPluginComponents } from "./skin-plugin-approval.js";
@@ -51,6 +51,110 @@ test("Wasm UI output uses the v3 schema and supports local-only interaction", ()
 
   assert.equal(document.schemaVersion, 3);
   assert.equal(document.components[0].actions.toggle.type, "ui.toggleState");
+});
+
+test("scoped local state keeps each voice channel's chat visibility independent", async () => {
+  const skinId = "community.kaak-state-scope-test";
+  const skinVersion = "1.0.0";
+  const document = parseSkinPluginDocument({
+    schemaVersion: 3,
+    components: [{
+      id: "voice-workspace",
+      name: "Voice workspace",
+      page: "voice",
+      accessibleName: "Voice workspace",
+      permissions: ["session.status.read"],
+      stateScope: "session.status.channelId",
+      state: { chatopen: true },
+      actions: { toggle: { type: "ui.toggleState", args: { key: "chatopen" } } },
+      root: { tag: "main", children: [
+        { tag: "button", attributes: { type: "button" }, events: { click: "toggle" }, children: [{ text: "Toggle chat" }] },
+        { tag: "span", when: { path: "state.chatopen", equals: true }, children: [{ text: "Open" }] },
+        { tag: "span", when: { path: "state.chatopen", equals: false }, children: [{ text: "Closed" }] },
+      ] },
+    }],
+  });
+  const storage = new Map<string, string>();
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value); },
+    },
+  });
+  try {
+  approveSkinPluginComponents(skinId, skinVersion, document.components);
+
+  interface HostNode { type: string; props: Record<string, unknown>; text: string; children: HostNode[]; parent?: HostNode }
+  const createHostNode = (type: string, text = ""): HostNode => ({ type, props: {}, text, children: [] });
+  const body = createHostNode("body");
+  const renderer = createRenderer<HostNode, HostNode>({
+    patchProp(node, key, _previous, next) { node.props[key] = next; },
+    insert(node, parent, anchor) {
+      node.parent = parent;
+      const oldIndex = parent.children.indexOf(node);
+      if (oldIndex >= 0) parent.children.splice(oldIndex, 1);
+      const anchorIndex = anchor ? parent.children.indexOf(anchor) : -1;
+      parent.children.splice(anchorIndex >= 0 ? anchorIndex : parent.children.length, 0, node);
+    },
+    remove(node) {
+      if (!node.parent) return;
+      const index = node.parent.children.indexOf(node);
+      if (index >= 0) node.parent.children.splice(index, 1);
+      node.parent = undefined;
+    },
+    createElement: (type) => createHostNode(type),
+    createText: (text) => createHostNode("#text", text),
+    createComment: (text) => createHostNode("#comment", text),
+    setText(node, text) { node.text = text; },
+    setElementText(node, text) { node.children = []; node.text = text; },
+    parentNode: (node) => node.parent ?? null,
+    querySelector: (selector) => selector === "body" ? body : null,
+    nextSibling(node) {
+      if (!node.parent) return null;
+      return node.parent.children[node.parent.children.indexOf(node) + 1] ?? null;
+    },
+  });
+  const channelId = ref("voice-a");
+  const outlet = defineComponent(() => () => h(SkinPluginOutlet, {
+    skinId,
+    skinVersion,
+    document,
+    page: "voice",
+    data: { session: { status: { channelId: channelId.value } } },
+    assets: {},
+    actions: {},
+  }));
+  const host = createHostNode("root");
+  const app = renderer.createApp(outlet);
+  const textContent = (node: HostNode): string => node.text + node.children.map(textContent).join("");
+  const findButton = (node: HostNode): HostNode | undefined => node.type === "button" ? node : node.children.map(findButton).find(Boolean);
+  const toggle = async () => {
+    const button = findButton(host);
+    assert.ok(button);
+    (button.props.onClick as (event: Event) => void)({ isTrusted: true, target: null } as unknown as Event);
+    await nextTick();
+  };
+
+  app.mount(host);
+  await nextTick();
+  assert.match(textContent(host), /Open/);
+  await toggle();
+  assert.match(textContent(host), /Closed/);
+
+  channelId.value = "voice-b";
+  await nextTick();
+  assert.match(textContent(host), /Open/, "a new channel starts from the declared default");
+  await toggle();
+  channelId.value = "voice-a";
+  await nextTick();
+  assert.match(textContent(host), /Closed/, "returning to a channel restores its own visibility state");
+  app.unmount();
+  } finally {
+    if (previousStorage) Object.defineProperty(globalThis, "localStorage", previousStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
 });
 
 test("Wasm UI output rejects malformed, oversized, legacy, and capability-bearing documents", () => {
