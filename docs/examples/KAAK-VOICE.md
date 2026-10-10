@@ -6,6 +6,8 @@ The single TeamSpeak voice-channel group in the left tree collapses and expands 
 
 The design target is the voice-client portion of KOOK, as requested by the project owner. It does not include discovery, companion/party, event, store, advertising, administrator, or other service-operator pages. It does not add a KOOK account flow, direct messages, server administration, or channels absent from the connected TeamSpeak server. The voice performance card also closes on outside click or Escape; Escape returns focus to its trigger, and its entrance/exit motion respects reduced-motion preferences.
 
+The device picker now follows the public KOOK style geometry: a 40px trigger with 12px corners, a menu with 12px corners and 8px inset, and 32px rows with 2px gaps and 8px corners. Hover and selected rows use distinct low-contrast fills. The shared host measures the rendered menu before applying viewport limits, so skin-defined padding and row spacing stay visible without a KAAK-specific placement path.
+
 ## Reference access note
 
 The owner authorized inspection of the first two voice rooms in the KOOK server. Both rooms were entered and viewed; the microphone remained off and no message was sent. The in-room view confirmed a single large participant tile in the center, a separate right-side panel for the active voice channel's text chat, a narrow server rail, grouped voice channels, and a compact voice-control dock near the lower left. The chat was empty, so no message contents were recorded. Server/room identifiers and member names were not recorded.

@@ -1678,47 +1678,86 @@
 
 [data-ws-part="voice.audio-settings"] .settings-select {
   display: flex;
+  position: relative;
   min-height: 40px;
-  color: #e9eaed;
+  color: #e6eaf0;
   appearance: none;
-  padding: 0 12px;
-  background: #2a2b31;
-  border: 1px solid #414249;
-  border-radius: 9px;
+  padding: 0 48px 0 16px;
+  background: transparent;
+  border: 1px solid #ffffff1a;
+  border-radius: 12px;
   font-family: var(--skin-kaak-font);
   font-size: 14px;
-  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
+  line-height: 20px;
+  transition: border-color .16s ease, box-shadow .16s ease;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-select:hover:not(:disabled) {
-  background: #303137;
-  border-color: #595a62;
+  border-color: #6cbf00;
 }
 
 [data-ws-part="voice.audio-settings"] .settings-select:focus-visible {
-  border-color: #70d48a;
-  box-shadow: 0 0 0 3px #58c87730;
+  border-color: #6cbf00;
+  box-shadow: 0 0 0 3px #6cbf001a;
 }
 
-[data-ws-part="voice.audio-settings"] .settings-select:active:not(:disabled) { border-color: #70d48a; }
+[data-ws-part="voice.audio-settings"] .settings-select:active:not(:disabled),
+[data-ws-part="voice.audio-settings"] .settings-select[aria-expanded="true"]:not(:disabled) {
+  border-color: #6cbf00;
+  box-shadow: 0 0 0 3px #6cbf001a;
+}
 [data-ws-part="voice.audio-settings"] .settings-select:disabled { cursor: not-allowed; opacity: .55; }
-[data-ws-part="voice.audio-settings"] .settings-select-chevron { color: #aeb0b7; }
-[data-ws-part="voice.audio-settings"] .settings-select[aria-expanded="true"] .settings-select-chevron { color: #80df98; }
+[data-ws-part="voice.audio-settings"] .settings-select-chevron { color: #e6eaf0; }
+[data-ws-part="voice.audio-settings"] .settings-select[aria-expanded="true"] .settings-select-chevron { transform: translateY(-50%); }
+[data-ws-part="voice.audio-settings"] .settings-select-chevron {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  transform: translateY(-50%);
+  transition: color .2s ease;
+}
+[data-ws-part="voice.audio-settings"] .settings-select-chevron::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  transition: transform .2s ease;
+}
+[data-ws-part="voice.audio-settings"] .settings-select[aria-expanded="true"] .settings-select-chevron::before {
+  transform: rotate(225deg);
+}
+[data-ws-part="voice.audio-settings"] .settings-select-label {
+  width: 100%;
+}
 [data-ws-part="voice.audio-settings"] .settings-select-menu {
-  padding: 4px 0;
-  color: #e9eaed;
-  border-color: #45464d;
-  border-radius: 7px;
-  background: #35373d;
-  box-shadow: 0 12px 28px #000a;
+  padding: 8px;
+  color: #e6eaf0;
+  border: 0;
+  border-radius: 12px;
+  background: #25262a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .32);
 }
 [data-ws-part="voice.audio-settings"] .settings-select-option {
+  height: 32px;
   min-height: 32px;
-  padding-inline: 12px;
-  color: #e5e6e9;
+  margin-bottom: 2px;
+  padding-inline: 8px;
+  color: #e6eaf0;
   font-size: 14px;
+  line-height: 32px;
+  border-radius: 8px;
 }
-[data-ws-part="voice.audio-settings"] .settings-select-option:hover,
+[data-ws-part="voice.audio-settings"] .settings-select-option:last-child { margin-bottom: 0; }
+[data-ws-part="voice.audio-settings"] .settings-select-option:hover { background: #ffffff0f; }
 [data-ws-part="voice.audio-settings"] .settings-select-option.active,
 [data-ws-part="voice.audio-settings"] .settings-select-option[aria-selected="true"] {
   background: #ffffff1a;
@@ -1826,6 +1865,7 @@
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-enter-active,
   [data-ws-plugin-part="kaak-workspace.performance-panel"] .voice-performance-panel-leave-active { transition-duration: .01ms; }
   [data-ws-part="voice.audio-settings"] .settings-select-chevron,
+  [data-ws-part="voice.audio-settings"] .settings-select-chevron::before,
   [data-ws-part="voice.audio-settings"] .settings-select-menu-enter-active,
   [data-ws-part="voice.audio-settings"] .settings-select-menu-leave-active { transition: none; }
   [data-ws-plugin-part="kaak-workspace"] .dock-slider::-webkit-slider-thumb,

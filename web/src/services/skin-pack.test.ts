@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.39");
+  assert.equal(skin.version, "3.1.40");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -552,11 +552,18 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-channel-join-hint/);
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-home"\] \{[^}]*font-family: var\(--skin-kaak-font\);/);
-  assert.match(skin.css, /settings-select-menu[\s\S]*?background: #35373d/);
+  assert.match(skin.css, /settings-select-menu[\s\S]*?background: #25262a/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
   assert.match(skin.css, /settings-header h2 \{\s*color: #f2f3f5;\s*font-size: 32px;\s*font-weight: 600;/);
   assert.match(skin.css, /settings-section h3 \{\s*color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-label \{\s*font-weight: 400;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select \{[\s\S]*?border-radius: 12px;/);
+  assert.match(skin.css, /settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-menu \{[\s\S]*?padding: 8px;[\s\S]*?border-radius: 12px;[\s\S]*?background: #25262a;[\s\S]*?box-shadow: 0 2px 8px rgba\(0, 0, 0, \.32\);/);
+  assert.match(skin.css, /settings-select:focus-visible \{\s*border-color: #6cbf00;\s*box-shadow: 0 0 0 3px #6cbf001a;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-option \{[\s\S]*?height: 32px;[\s\S]*?margin-bottom: 2px;[\s\S]*?padding-inline: 8px;[\s\S]*?border-radius: 8px;/);
+  assert.match(skin.css, /settings-select\[aria-expanded="true"\] \.settings-select-chevron::before \{\s*transform: rotate\(225deg\);/);
+  assert.match(skin.css, /settings-select-option:hover \{ background: #ffffff0f; \}/);
   assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{\s*width: 16px;\s*height: 16px;\s*margin-top: -6px;/);
   assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-moz-range-thumb \{\s*width: 16px;\s*height: 16px;/);
   assert.match(skin.css, /voice-performance-panel-enter-active[\s\S]*?transition: opacity \.16s/);

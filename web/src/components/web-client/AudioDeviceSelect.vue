@@ -30,6 +30,7 @@
     <Transition name="settings-select-menu">
       <ul
         v-if="open"
+        ref="menu"
         :id="listboxId"
         class="settings-select-menu"
         role="listbox"
@@ -76,6 +77,7 @@ const emit = defineEmits<{ change: [value: string] }>();
 
 const root = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
+const menu = ref<HTMLUListElement | null>(null);
 const open = ref(false);
 const activeIndex = ref(-1);
 const menuStyle = ref<CSSProperties>({});
@@ -91,9 +93,13 @@ function optionId(index: number): string {
 
 function updateMenuPosition(): void {
   const rect = trigger.value?.getBoundingClientRect();
-  if (!rect || typeof window === "undefined") return;
+  const menuElement = menu.value;
+  if (!rect || !menuElement || typeof window === "undefined") return;
 
-  const placement = placeAudioDeviceMenu(rect, { width: window.innerWidth, height: window.innerHeight }, props.options.length);
+  const computedStyle = window.getComputedStyle(menuElement);
+  const borderHeight = Number.parseFloat(computedStyle.borderTopWidth || "0") + Number.parseFloat(computedStyle.borderBottomWidth || "0");
+  const naturalMenuHeight = menuElement.scrollHeight + (Number.isFinite(borderHeight) ? borderHeight : 0);
+  const placement = placeAudioDeviceMenu(rect, { width: window.innerWidth, height: window.innerHeight }, naturalMenuHeight);
 
   menuStyle.value = {
     top: `${placement.top}px`,

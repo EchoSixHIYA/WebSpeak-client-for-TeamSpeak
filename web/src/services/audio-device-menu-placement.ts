@@ -14,19 +14,17 @@ export interface AudioDeviceMenuPlacement {
 
 const VIEWPORT_INSET = 8;
 const MENU_GAP = 4;
-const OPTION_HEIGHT = 32;
-const MENU_PADDING = 8;
 const MAX_MENU_HEIGHT = 240;
 
 export function placeAudioDeviceMenu(
   anchor: AudioDeviceMenuAnchor,
   viewport: { width: number; height: number },
-  optionCount: number,
+  naturalMenuHeight: number,
 ): AudioDeviceMenuPlacement {
   const insetX = Math.min(VIEWPORT_INSET, Math.max(0, viewport.width / 2));
   const width = Math.min(Math.max(0, anchor.width), Math.max(0, viewport.width - insetX * 2));
   const left = Math.max(insetX, Math.min(anchor.left, viewport.width - insetX - width));
-  const fullHeight = Math.min(MAX_MENU_HEIGHT, Math.max(0, optionCount) * OPTION_HEIGHT + MENU_PADDING);
+  const fullHeight = Math.min(MAX_MENU_HEIGHT, Number.isFinite(naturalMenuHeight) ? Math.max(0, naturalMenuHeight) : 0);
   const below = Math.max(0, viewport.height - VIEWPORT_INSET - anchor.bottom - MENU_GAP);
   const above = Math.max(0, anchor.top - VIEWPORT_INSET - MENU_GAP);
   const opensAbove = below < fullHeight && above > below;
