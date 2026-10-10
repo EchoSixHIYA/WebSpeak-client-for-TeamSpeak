@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.31");
+  assert.equal(skin.version, "3.1.32");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -568,8 +568,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\.ws-voice-member-move \{ transition: transform \.28s/);
   assert.match(skin.css, /\.ws-voice-member-enter-from,[\s\S]*?\.ws-voice-member-leave-to \{ opacity: 0; transform: translateY\(10px\) scale\(\.975\); \}/);
   assert.match(skin.css, /data-ws-part="voice\.member\.mic-status"[\s\S]*?color: #c8c9ce;[\s\S]*?background: #111216d9;/);
-  assert.match(skin.css, /aria-expanded="true"\]\) \[data-ws-plugin-part="kaak-workspace\.member-cards"\] \.voice-card > strong \{ display: none; \}/);
-  assert.match(skin.css, /aria-expanded="true"\]\) \[data-ws-plugin-part="kaak-workspace\.member-cards"\] \.voice-card:hover > strong \{ display: block; \}/);
+  assert.match(skin.css, /aria-expanded="true"\]\)[\s\S]*?\.voice-card > strong \{[\s\S]*?opacity: 0;[\s\S]*?visibility: hidden;[\s\S]*?transition: opacity \.14s ease, transform \.14s ease, visibility 0s linear \.14s;/);
+  assert.match(skin.css, /aria-expanded="true"\]\)[\s\S]*?\.voice-card:hover > strong \{[\s\S]*?opacity: 1;[\s\S]*?visibility: visible;[\s\S]*?transition-delay: 0s;/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?grid-template-columns:[^;]*0;/);
   assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-stage[\s\S]*?grid-column: 3 \/ 5;/);
