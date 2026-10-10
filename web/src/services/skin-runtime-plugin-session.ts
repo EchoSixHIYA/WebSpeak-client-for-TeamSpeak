@@ -1,5 +1,5 @@
 import type { SkinRuntimePlugin } from "../../../src/shared/skin-runtime-plugins.js";
-import { parseSkinExtensionUiActionRequest } from "../../../src/shared/skin-extension-ui.js";
+import { parseSkinExtensionUiActionRequest, parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
 import type { SkinExtensionUiInput, SkinExtensionUiEventInput } from "../../../src/shared/skin-extension-ui-input.js";
 import type { SkinPluginActionDefinition, SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import {
@@ -38,6 +38,7 @@ export function createSkinRuntimePluginSession(options: SkinRuntimePluginSession
   let output: string | null = null;
   const loop = createSkinExtensionWasmUiLoopPrototype({
     createRun: options.createRun,
+    parseOutput: (source) => parseSkinExtensionUiOutput(source, { permissions: options.plugin.permissions }),
     onOutput: async (nextOutput, document, input) => {
       if (document.components.some((component) => component.page !== options.plugin.page)) {
         throw new SkinRuntimePluginSessionError("SKIN_RUNTIME_PLUGIN_PAGE_MISMATCH", "Generated UI must stay on the page declared by its plugin.");

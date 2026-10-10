@@ -47,12 +47,16 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.chat-panel",
   "voice.audio-controls",
   "voice.screen-share-player",
+  "voice.screen-share-start",
   "voice.whisper-controls",
   "voice.performance-panel",
   "voice.connection-controls",
   "voice.disconnect-control",
 ] as const);
 export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
+export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, SkinPluginPermission>> = Object.freeze({
+  "voice.screen-share-start": "voice.screenShare.control",
+});
 export type SkinPluginEvent =
   | "click" | "dblclick" | "change" | "input" | "submit" | "keydown"
   | "keyup" | "contextmenu" | "focus" | "blur" | "pointerdown" | "pointerup"
@@ -361,6 +365,8 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (rawNode.widget !== undefined) {
         if (typeof rawNode.widget !== "string" || !HOST_WIDGETS.has(rawNode.widget)) fail("SKIN_PLUGIN_WIDGET_INVALID", "The component requests an unsupported host widget.");
         if (page === "demo") fail("SKIN_PLUGIN_WIDGET_INVALID", "Host widgets are available only on the home and voice client pages.");
+        const requiredPermission = SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[rawNode.widget as SkinPluginHostWidget];
+        if (requiredPermission && !permissions.includes(requiredPermission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The ${rawNode.widget} widget requires ${requiredPermission}.`);
         const widgetOnlyKeys = new Set(["widget", "part", "className", "when"]);
         onlyKeys(rawNode, widgetOnlyKeys, "Host widget node");
         node.widget = rawNode.widget as SkinPluginHostWidget;

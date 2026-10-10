@@ -35,6 +35,22 @@ const joinPlugin = parseSkinRuntimePluginDocument({
   }],
 }).plugins[0];
 
+const screenSharePlugin = parseSkinRuntimePluginDocument({
+  schemaVersion: 1,
+  plugins: [{
+    id: "voice-screen-share",
+    name: "Voice screen share",
+    version: "1.0.0",
+    apiVersion: 1,
+    runtime: "wasm",
+    page: "voice",
+    mode: "surface",
+    entry: "plugins/voice-screen-share/index.wasm",
+    assets: [],
+    permissions: ["ui.surface.replace", "voice.screenShare.control"],
+  }],
+}).plugins[0];
+
 function output(page = "voice", count = 1): string {
   return JSON.stringify({
     schemaVersion: 5,
@@ -64,6 +80,19 @@ function joinOutput(request = false, eventName: "dblclick" | "input" = "dblclick
   });
 }
 
+function screenShareOutput(): string {
+  return JSON.stringify({
+    schemaVersion: 4,
+    components: [{
+      id: "voice-ui",
+      name: "Voice UI",
+      page: "voice",
+      accessibleName: "Voice workspace",
+      root: { tag: "main", children: [{ widget: "voice.screen-share-start" }] },
+    }],
+  });
+}
+
 function sessionWithOutput(value: string, onError: (error: Error) => void = () => undefined) {
   return createSkinRuntimePluginSession({
     plugin,
@@ -79,6 +108,27 @@ test("runtime plugin session accepts one generated root for its declared surface
   assert.equal(session.closed, false);
   session.close();
   assert.equal(session.closed, true);
+});
+
+test("runtime plugin session validates generated host widgets against manifest permissions", async () => {
+  const allowed = createSkinRuntimePluginSession({
+    plugin: screenSharePlugin,
+    createRun: () => ({ result: Promise.resolve({ uiOutput: screenShareOutput() }), close: () => undefined }),
+  });
+  assert.equal(await allowed.start(), true);
+  assert.equal(allowed.output, screenShareOutput());
+  allowed.close();
+
+  const errors: Error[] = [];
+  const denied = createSkinRuntimePluginSession({
+    plugin,
+    createRun: () => ({ result: Promise.resolve({ uiOutput: screenShareOutput() }), close: () => undefined }),
+    onError: (error) => errors.push(error),
+  });
+  assert.equal(await denied.start(), false);
+  assert.equal((errors[0] as { code?: string } | undefined)?.code, "SKIN_EXTENSION_UI_PERMISSION_MISSING");
+  assert.equal(denied.output, null);
+  denied.close();
 });
 
 test("runtime plugin session rejects output targeting a different page", async () => {

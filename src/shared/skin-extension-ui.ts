@@ -1,5 +1,7 @@
 import {
   SKIN_PLUGIN_PERMISSIONS,
+  SKIN_PLUGIN_HOST_WIDGETS,
+  SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS,
   parseSkinPluginRuntimeAction,
   SKIN_PLUGIN_NODE_LIMIT,
   SKIN_PLUGIN_TREE_DEPTH_LIMIT,
@@ -9,6 +11,7 @@ import {
   type SkinPluginComponent,
   type SkinPluginDocument,
   type SkinPluginNode,
+  type SkinPluginHostWidget,
   type SkinPluginPermission,
 } from "./skin-plugin.js";
 import { parseSkinExtensionUiInput, SKIN_EXTENSION_UI_EVENT_NAMES } from "./skin-extension-ui-input.js";
@@ -17,6 +20,7 @@ export const SKIN_EXTENSION_UI_OUTPUT_LIMIT_BYTES = 16 * 1024;
 
 const LOCAL_UI_ACTIONS = new Set<SkinPluginAction>(["ui.setState", "ui.toggleState"]);
 const GENERATED_COMPONENT_LIMIT = 64;
+const GENERATED_RUNTIME_HOST_WIDGETS = new Set<SkinPluginHostWidget>(["voice.screen-share-start"]);
 const GENERATED_CHILD_LIMIT = 256;
 const GENERATED_ATTRIBUTE_LIMIT = 64;
 const GENERATED_BLOCKED_ELEMENTS = new Set([
@@ -82,17 +86,51 @@ function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], co
   if (Object.keys(value).some((key) => !allowed.includes(key))) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", `${context} has an unsupported field.`);
 }
 
-function generatedNode(input: unknown, depth: number, count: { value: number }, allowEvents: boolean): SkinPluginNode {
+function generatedNode(
+  input: unknown,
+  depth: number,
+  count: { value: number },
+  allowEvents: boolean,
+  page: "home" | "voice",
+  permissions: readonly SkinPluginPermission[],
+): SkinPluginNode {
   count.value += 1;
   if (count.value > SKIN_PLUGIN_NODE_LIMIT || depth > SKIN_PLUGIN_TREE_DEPTH_LIMIT || !isRecord(input)) {
     fail("SKIN_EXTENSION_UI_COMPLEXITY_LIMIT", "The generated UI tree exceeds its node or depth limit.");
   }
-  onlyKeys(input, ["tag", "text", "part", "className", "attributes", "asset", "children", ...(allowEvents ? ["events"] : [])], "A generated UI node");
+  onlyKeys(input, ["widget", "tag", "text", "part", "className", "attributes", "asset", "children", ...(allowEvents ? ["events"] : [])], "A generated UI node");
+  const hasWidget = input.widget !== undefined;
   const hasTag = input.tag !== undefined;
   const hasText = input.text !== undefined;
-  if (Number(hasTag) + Number(hasText) !== 1) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated node must contain either a tag or text.");
+  if (Number(hasWidget) + Number(hasTag) + Number(hasText) !== 1) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated node must contain exactly one widget, tag, or text.");
 
   const node: SkinPluginNode = {};
+  if (hasWidget) {
+    if (typeof input.widget !== "string" || !SKIN_PLUGIN_HOST_WIDGETS.includes(input.widget as SkinPluginHostWidget)
+      || !GENERATED_RUNTIME_HOST_WIDGETS.has(input.widget as SkinPluginHostWidget)) {
+      fail("SKIN_EXTENSION_UI_WIDGET_UNSUPPORTED", "The generated UI requested a host widget that is not available to runtime plugins.");
+    }
+    if (page !== "voice") fail("SKIN_EXTENSION_UI_WIDGET_UNSUPPORTED", "The screen-share host widget is available only on the voice page.");
+    const widget = input.widget as SkinPluginHostWidget;
+    const requiredPermission = SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[widget];
+    if (requiredPermission && !permissions.includes(requiredPermission)) {
+      fail("SKIN_EXTENSION_UI_PERMISSION_MISSING", `The ${widget} widget requires ${requiredPermission}.`);
+    }
+    onlyKeys(input, ["widget", "part", "className"], "A generated host widget node");
+    node.widget = widget;
+    if (input.part !== undefined) {
+      const part = boundedText(input.part, 64, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "node.part");
+      if (!/^[a-z][a-z0-9-]*$/.test(part)) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated part uses an invalid name.");
+      node.part = part;
+    }
+    if (input.className !== undefined) {
+      if (typeof input.className !== "string" || input.className.length > 512 || /[<>\u0000-\u001f]/.test(input.className)) {
+        fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated class names must be bounded plain text.");
+      }
+      node.className = input.className;
+    }
+    return node;
+  }
   if (hasText) {
     if (typeof input.text !== "string" || input.text.length > 8_192) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated text exceeds its limit.");
     node.text = input.text;
@@ -175,12 +213,17 @@ function generatedNode(input: unknown, depth: number, count: { value: number }, 
     if (node.tag && GENERATED_VOID_ELEMENTS.has(node.tag) && input.children.length > 0) {
       fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Void generated elements cannot contain children.");
     }
-    node.children = input.children.map((child) => generatedNode(child, depth + 1, count, allowEvents));
+    node.children = input.children.map((child) => generatedNode(child, depth + 1, count, allowEvents, page, permissions));
   }
   return node;
 }
 
-function parseGeneratedDocument(input: Record<string, unknown>, allowEvents: boolean, allowRequest = false): SkinPluginDocument {
+function parseGeneratedDocument(
+  input: Record<string, unknown>,
+  allowEvents: boolean,
+  allowRequest = false,
+  permissions: readonly SkinPluginPermission[] = [],
+): SkinPluginDocument {
   onlyKeys(input, ["schemaVersion", "components", ...(allowRequest ? ["request"] : [])], "Generated UI document");
   if (!Array.isArray(input.components) || input.components.length < 1 || input.components.length > GENERATED_COMPONENT_LIMIT) {
     fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "The generated document has an unsupported component count.");
@@ -195,7 +238,7 @@ function parseGeneratedDocument(input: Record<string, unknown>, allowEvents: boo
     const name = boundedText(raw.name, 80, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "component.name");
     const accessibleName = boundedText(raw.accessibleName, 120, "SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "component.accessibleName");
     if (raw.page !== "home" && raw.page !== "voice") fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "Generated components may target only the public home or voice page.");
-    const root = generatedNode(raw.root, 1, { value: 0 }, allowEvents);
+    const root = generatedNode(raw.root, 1, { value: 0 }, allowEvents, raw.page, permissions);
     if (!root.tag) fail("SKIN_EXTENSION_UI_OUTPUT_SCHEMA", "A generated component root must be an element.");
     const state = allowEvents
       ? parseSkinExtensionUiInput({ schemaVersion: 1, state: raw.state ?? {}, event: null }).state
@@ -235,12 +278,16 @@ export function parseSkinExtensionUiActionRequest(
 }
 
 /** Parses bounded Wasm output. Schema 5 adds trusted callbacks; schema 6 adds one permission-checked host action effect. */
-export function parseSkinExtensionUiOutput(source: string): SkinPluginDocument {
+export function parseSkinExtensionUiOutput(
+  source: string,
+  options: { permissions?: readonly SkinPluginPermission[] } = {},
+): SkinPluginDocument {
   const input = parseOutputInput(source);
-  if (input.schemaVersion === 4) return parseGeneratedDocument(input, false);
-  if (input.schemaVersion === 5) return parseGeneratedDocument(input, true);
+  const permissions = options.permissions ?? [];
+  if (input.schemaVersion === 4) return parseGeneratedDocument(input, false, false, permissions);
+  if (input.schemaVersion === 5) return parseGeneratedDocument(input, true, false, permissions);
   if (input.schemaVersion === 6) {
-    const document = parseGeneratedDocument(input, true, true);
+    const document = parseGeneratedDocument(input, true, true, permissions);
     if (input.request !== undefined) {
       try { parseSkinPluginRuntimeAction(input.request, Object.keys(SKIN_PLUGIN_PERMISSIONS) as SkinPluginPermission[]); }
       catch { fail("SKIN_EXTENSION_UI_ACTION_INVALID", "The generated host action request is malformed."); }

@@ -81,6 +81,33 @@ test("generated UI supports broad safe markup, ARIA/data attributes, and inert c
   assert.equal(document.components[0].root.children?.[1].tag, "button");
 });
 
+test("generated screen-share host widget requires permission and renders as an interactive host control", async () => {
+  const source = generatedOutput("share-control", {
+    tag: "section",
+    children: [{ widget: "voice.screen-share-start", part: "start-share" }],
+  });
+  expectOutputError(source, "SKIN_EXTENSION_UI_PERMISSION_MISSING");
+
+  const permissions = ["voice.screenShare.control"] as const;
+  const document = parseSkinExtensionUiOutput(source, { permissions });
+  assert.equal(document.components[0].root.children?.[0].widget, "voice.screen-share-start");
+  const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.test",
+    skinVersion: "1.0.0",
+    document: { schemaVersion: 3, components: [] },
+    extensionOutput: source,
+    extensionPermissions: permissions,
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+    widgets: { "voice.screen-share-start": () => "Start screen share" },
+  }));
+  assert.match(html, /data-ws-plugin-widget="voice\.screen-share-start"/);
+  assert.match(html, /data-ws-part="skin\.voice\.share-control\.control-part-start-share"/);
+  assert.match(html, /Start screen share/);
+});
+
 test("generated UI schema 5 carries bounded state and named callbacks for a trusted host event loop", () => {
   const source = JSON.stringify({
     schemaVersion: 5,

@@ -35,6 +35,7 @@
       :page="showVoiceShell ? 'voice' : 'home'"
       :context="skinPluginContext"
       :actions="skinPluginActions"
+      :widgets="skinPluginWidgets"
       :read-session-status="readSkinRuntimeSessionStatus"
       @surface-change="skinRuntimePluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"
@@ -1618,6 +1619,15 @@ const skinPluginActions = {
 };
 
 const skinPluginWidgets = {
+  "voice.screen-share-start": () => h("button", {
+    type: "button",
+    class: "skin-runtime-screen-share-start",
+    disabled: !voiceState.connected || screenShareActive.value || screenShareStarting.value,
+    "aria-label": t("startScreenShare"),
+    onClick: () => {
+      if (voiceState.connected && !screenShareActive.value && !screenShareStarting.value) void startScreenShare();
+    },
+  }, [h(Icon, { name: "share", size: 16 }), h("span", null, t("startScreenShare"))]),
   "home.connection-form": () => h(JoinForm, {
     autofocusNickname: !isMobileViewport.value,
     serverHost: serverHost.value,

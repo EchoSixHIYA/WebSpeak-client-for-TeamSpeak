@@ -16,6 +16,8 @@ export interface SkinExtensionWasmUiLoopRunHandle {
 export interface SkinExtensionWasmUiLoopOptions {
   /** Creates one bounded, disposable Wasm job for the supplied UI input. */
   createRun(input: SkinExtensionUiInput): SkinExtensionWasmUiLoopRunHandle;
+  /** Supplies manifest permissions when generated output may embed a privileged host widget. */
+  parseOutput?(output: string): SkinPluginDocument;
   onOutput?(output: string, document: SkinPluginDocument, input: SkinExtensionUiInput): void | Promise<void>;
   onError?(error: Error): void;
 }
@@ -74,7 +76,7 @@ export function createSkinExtensionWasmUiLoopPrototype(options: SkinExtensionWas
       if (closed || activeRun !== run) return false;
       lastState = { ...input.state };
       if (result.uiOutput !== null) {
-        const nextDocument = parseSkinExtensionUiOutput(result.uiOutput);
+        const nextDocument = options.parseOutput?.(result.uiOutput) ?? parseSkinExtensionUiOutput(result.uiOutput);
         output = result.uiOutput;
         document = nextDocument;
         await options.onOutput?.(output, nextDocument, input);

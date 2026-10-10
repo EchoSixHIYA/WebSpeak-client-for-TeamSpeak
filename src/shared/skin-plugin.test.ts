@@ -132,6 +132,18 @@ test("host widget references stay allowlisted and cannot be used on the demo pag
   errorCode(() => parseSkinPluginDocument(demoWidget), "SKIN_PLUGIN_WIDGET_INVALID");
 });
 
+test("starting screen share from a skin host widget requires its own permission", () => {
+  const document = validDocument();
+  document.schemaVersion = 2;
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.screen-share-start" }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["voice.screenShare.control"];
+  document.components[0].actions = {};
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].root.children?.[0].widget, "voice.screen-share-start");
+});
+
 test("KAAK v3 example splits validated channel and member data by component", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);

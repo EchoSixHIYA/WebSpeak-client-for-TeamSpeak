@@ -3,7 +3,7 @@ import type { SkinExtensionSessionStatus } from "../../../src/shared/skin-extens
 import { computeSkinRuntimePluginDigest, createSkinRuntimePluginApproval, isSkinRuntimePluginApproved, type SkinRuntimePluginApproval } from "../../../src/shared/skin-runtime-plugin-approval.js";
 import type { SkinRuntimePlugin, SkinRuntimePluginDocument, SkinRuntimePluginPage } from "../../../src/shared/skin-runtime-plugins.js";
 import { parseSkinExtensionUiInput, type SkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
-import { SKIN_PLUGIN_ACTION_PERMISSIONS, skinPluginActionPermission, type SkinPluginAction, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { SKIN_PLUGIN_ACTION_PERMISSIONS, skinPluginActionPermission, type SkinPluginAction, type SkinPluginDocument, type SkinPluginHostWidget } from "../../../src/shared/skin-plugin.js";
 import { SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import SkinPluginOutlet from "./SkinPluginOutlet.js";
 import { approveSkinRuntimePlugin, getSkinRuntimePluginApproval, revokeSkinRuntimePluginApprovals } from "../services/skin-runtime-plugin-approval.js";
@@ -91,6 +91,7 @@ export default defineComponent({
     page: { type: String as PropType<SkinRuntimePluginPage>, required: true },
     context: { type: Object as PropType<Record<string, unknown>>, default: () => ({}) },
     actions: { type: Object as PropType<Partial<Record<SkinPluginAction, HostActionHandler>>>, default: () => ({}) },
+    widgets: { type: Object as PropType<Partial<Record<SkinPluginHostWidget, () => VNodeChild>>>, default: () => ({}) },
     readSessionStatus: { type: Function as PropType<(signal: AbortSignal) => SkinExtensionSessionStatus | Promise<SkinExtensionSessionStatus>>, required: true },
   },
   emits: {
@@ -351,6 +352,8 @@ export default defineComponent({
           data: {},
           assets: pluginAssets,
           actions: {},
+          extensionPermissions: plugin.permissions,
+          widgets: props.widgets,
           onExtensionEvent: (event: unknown) => dispatch(plugin.id, event),
           onSurfaceChange: (active: boolean) => surfaceChanged(plugin.id, active),
           onRestoreSkin: () => emit("restore-skin"),

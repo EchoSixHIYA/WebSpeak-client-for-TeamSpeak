@@ -11,6 +11,7 @@ import {
   type SkinPluginDocument,
   type SkinPluginHostWidget,
   type SkinPluginNode,
+  type SkinPluginPermission,
 } from "../../../src/shared/skin-plugin.js";
 import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-ui.js";
 import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
@@ -35,6 +36,7 @@ export default defineComponent({
     document: { type: Object as PropType<SkinPluginDocument>, required: true },
     extensionOutput: { type: String as PropType<string | null>, default: null },
     extensionMode: { type: String as PropType<SkinPluginComponentMode | undefined>, default: undefined },
+    extensionPermissions: { type: Array as PropType<readonly SkinPluginPermission[]>, default: () => [] },
     componentNamespace: { type: String, default: "" },
     manageSurfaceRecovery: { type: Boolean, default: true },
     page: { type: String as PropType<"home" | "voice" | "demo">, required: true },
@@ -57,11 +59,21 @@ export default defineComponent({
     const objectUrls = new Map<string, string>();
     const validatedDocument = computed(() => {
       let document: SkinPluginDocument;
-      try { document = parseSkinPluginDocument(props.document); }
+      const emptyRuntimeBase = Boolean(props.extensionOutput)
+        && props.document.schemaVersion === 3
+        && Array.isArray(props.document.components)
+        && props.document.components.length === 0;
+      try {
+        // Runtime plugins use an empty v3 base document so their validated generated output
+        // can flow through the same approval, layout, and rendering path as packaged components.
+        document = emptyRuntimeBase
+          ? { schemaVersion: 3, components: [] }
+          : parseSkinPluginDocument(props.document);
+      }
       catch { return { schemaVersion: 2 as const, components: [] }; }
       if (!props.extensionOutput || document.schemaVersion !== 3) return document;
       try {
-        const parsedExtensionDocument = parseSkinExtensionUiOutput(props.extensionOutput);
+        const parsedExtensionDocument = parseSkinExtensionUiOutput(props.extensionOutput, { permissions: props.extensionPermissions });
         const extensionDocument = props.extensionMode
           ? { ...parsedExtensionDocument, components: parsedExtensionDocument.components.map((component) => ({ ...component, mode: props.extensionMode })) }
           : parsedExtensionDocument;
@@ -192,6 +204,7 @@ export default defineComponent({
 
     function layoutPart(component: SkinPluginComponent, node: SkinPluginNode, nodePath: string): string {
       const interactive = ["a", "button", "input", "select", "summary", "textarea"].includes(node.tag ?? "")
+        || node.widget === "voice.screen-share-start"
         || node.attributes?.role === "button"
         || ["click", "dblclick", "contextmenu", "keydown", "keyup", "pointerdown", "pointerup", "drop"]
           .some((eventName) => Boolean(node.events?.[eventName as keyof typeof node.events]));

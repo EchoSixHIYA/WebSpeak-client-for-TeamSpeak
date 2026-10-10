@@ -46,6 +46,25 @@
   min-height: 0;
 }
 
+.ws-plugin-host-widget[data-ws-plugin-widget="voice.screen-share-start"] { min-height: 44px; }
+.skin-runtime-screen-share-start {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.skin-runtime-screen-share-start:disabled { cursor: not-allowed; opacity: .55; }
+.skin-runtime-screen-share-start:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
+
 .ws-plugin-surface-recovery,
 .ws-plugin-surface-reset {
   position: fixed;
