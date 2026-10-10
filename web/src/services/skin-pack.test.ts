@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.8");
+  assert.equal(skin.version, "3.1.9");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -498,8 +498,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(channelRow?.events?.dblclick, "join-channel");
   assert.equal(findPart(voice?.root, "text-channel-group-toggle"), undefined);
   assert.equal(findPart(voice?.root, "text-channel-list"), undefined);
-  assert.equal(findPart(voice?.root, "voice-channel-group-toggle"), undefined);
-  assert.equal(findPart(voice?.root, "voice-channel-list")?.when, undefined);
+  const voiceGroupToggle = findPart(voice?.root, "voice-channel-group-toggle");
+  assert.equal(voiceGroupToggle?.events?.click, "toggle-voice-group");
+  assert.equal(voiceGroupToggle?.attributes?.["aria-expanded"], "{{state.voicegroupopen}}");
+  assert.deepEqual(findPart(voice?.root, "voice-channel-list")?.when, { path: "state.voicegroupopen", equals: true });
+  assert.equal(voice?.root.attributes?.["data-voice-group-open"], "{{state.voicegroupopen}}");
   const chatToggle = findPart(voice?.root, "chat-panel-toggle");
   assert.equal(chatToggle?.events?.click, "toggle-chat-panel");
   assert.equal(chatToggle?.attributes?.["aria-expanded"], "{{state.chatopen}}");
@@ -521,6 +524,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "screen-share-start")?.widget, "voice.screen-share-start");
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.channel-row"]'));
+  assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
   assert.match(skin.css, /data-chat-open="false"[\s\S]*?grid-template-columns:[^;]*52px;/);
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
