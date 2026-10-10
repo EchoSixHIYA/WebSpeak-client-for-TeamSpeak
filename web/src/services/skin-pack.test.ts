@@ -375,7 +375,11 @@ test("schema version 3 accepts a schema v2 full-page surface with host widgets",
 });
 
 test("schema version 4 validates and caches isolated plugin package files without executing them", async () => {
-  const skin = await importSkinPack(makeSkinV4());
+  const defaultLayout = {
+    schemaVersion: 1,
+    pages: { voice: { desktop: { "skin.voice.runtime_plugin_root_voice-toolbar": { order: 2, visible: true } } } },
+  };
+  const skin = await importSkinPack(makeSkinV4(undefined, { layout: defaultLayout }));
   const entry = "plugins/voice-toolbar/index.js";
   const style = "plugins/voice-toolbar/style.css";
   const icon = "plugins/voice-toolbar/assets/icon.png";
@@ -389,6 +393,7 @@ test("schema version 4 validates and caches isolated plugin package files withou
   assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /data-ws-runtime-plugin="voice-toolbar".*?\.toolbar/s);
   assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /color: teal/);
   assert.match(skin.css, /position: fixed/);
+  assert.deepEqual(skin.layoutData?.pages.voice?.desktop?.["skin.voice.runtime_plugin_root_voice-toolbar"], { order: 2, visible: true });
 
   await assert.rejects(
     importSkinPack(makeSkinV4(undefined, { includeEntry: false })),
@@ -526,6 +531,11 @@ test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspac
   assert.ok(voiceSurface?.permissions.includes("session.channel.join"));
   assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
   assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  assert.ok(voiceSurface?.permissions.includes("chat.channel.read"));
+  assert.ok(voiceSurface?.permissions.includes("chat.channel.send"));
+  assert.ok(voiceSurface?.permissions.includes("audio.microphone.control"));
+  assert.ok(voiceSurface?.permissions.includes("audio.output.control"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.control"));
   function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
     if (!node) return undefined;
     if (node.part === part) return node;
@@ -536,11 +546,34 @@ test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspac
     return undefined;
   }
   const channelRow = findPart(voiceSurface?.root, "channel-row");
+  assert.equal(channelRow?.events?.click, "select-channel", "single-click only selects a channel in this skin");
   assert.equal(channelRow?.events?.dblclick, "join-channel", "channel switching follows TeamSpeak's double-click join behavior");
+  assert.equal(channelRow?.attributes?.["data-depth"], "{{channel.depth}}", "the channel hierarchy is represented without a new host API");
+  assert.equal(findPart(channelRow, "selected-channel-indicator")?.when?.equals, "{{channel.id}}");
+  const identityEntry = findPart(voiceSurface?.root, "identity-entry");
+  assert.equal(identityEntry?.attributes?.role, "group");
+  assert.equal(identityEntry?.when?.path, "session.status.userName");
+  assert.equal(findPart(identityEntry, "identity-name")?.children?.[0]?.text, "{{session.status.userName}}");
   const channelVoiceMembers = findPart(voiceSurface?.root, "channel-voice-members");
   assert.equal(channelVoiceMembers?.when?.path, "channel.current");
   assert.equal(findPart(channelVoiceMembers, "channel-voice-member")?.repeat?.path, "channel.members");
+  assert.equal(findPart(channelVoiceMembers, "channel-member-muted")?.when?.path, "voicemember.status");
+  assert.equal(findPart(voiceSurface?.root, "member-away-state")?.when?.path, "member.status");
+  const voiceDockActions = findPart(voiceSurface?.root, "voice-dock-actions");
+  assert.equal(findPart(voiceDockActions, "screen-share-start")?.widget, "voice.screen-share-start");
+  assert.equal(findPart(voiceDockActions, "audio-controls")?.widget, "voice.audio-controls");
+  assert.equal(findPart(voiceDockActions, "disconnect-control")?.events?.click, "disconnect");
+  const chat = findPart(voiceSurface?.root, "chat");
+  assert.equal(findPart(chat, "chat-message")?.repeat?.path, "chat.messages");
+  assert.equal(findPart(chat, "chat-composer")?.events?.submit, "send-message");
+  assert.equal(findPart(chat, "chat-input")?.bindValue, "message");
+  assert.equal(findPart(chat, "chat-empty")?.when?.empty, true);
+  assert.equal(findPart(voiceSurface?.root, "whisper-start")?.events?.click, "whisper-on");
   assert.ok(skin.css.includes("@media (max-width: 820px)"));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="1"]'));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="harbor-workspace.identity-entry"]'));
+  assert.ok(skin.css.includes('data-ws-plugin-part="harbor-workspace.screen-share-start"'), "the host screen-share control uses the stable plugin part hook");
+  assert.ok(skin.css.includes(".accompaniment-toggle { display: none; }"));
   assert.ok(!skin.css.includes("https://"), "the skin uses no remote artwork or font resources");
 });
 
@@ -588,12 +621,13 @@ function makeSkinV4(
       permissions: ["session.channels.read"],
     }],
   },
-  options: { includeEntry?: boolean; entryBytes?: Uint8Array; entryPath?: string; extra?: Record<string, Uint8Array> } = {},
+  options: { includeEntry?: boolean; entryBytes?: Uint8Array; entryPath?: string; layout?: unknown; extra?: Record<string, Uint8Array> } = {},
 ): File {
   const packageFiles: Record<string, Uint8Array> = {
-    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", plugins: "plugins.json" })),
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", plugins: "plugins.json", ...(options.layout ? { layout: "layout.json" } : {}) })),
     "skin.css": strToU8('[data-ws-part="app"] { position: fixed; color: teal; }'),
     "plugins.json": strToU8(JSON.stringify(pluginDocument)),
+    ...(options.layout ? { "layout.json": strToU8(JSON.stringify(options.layout)) } : {}),
     "plugins/voice-toolbar/style.css": strToU8(".toolbar { color: teal; }"),
     "plugins/voice-toolbar/assets/icon.png": new Uint8Array([1, 2, 3, 4]),
     ...options.extra,

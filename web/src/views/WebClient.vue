@@ -12,10 +12,10 @@
     :data-ws-page="showVoiceShell ? 'voice' : 'home'"
   >
     <SkinPluginOutlet
-      v-if="activeSkin?.pluginData"
+      v-if="activeSkin"
       :skin-id="activeSkin.id"
       :skin-version="activeSkin.version"
-      :document="activeSkin.pluginData"
+      :document="skinPluginDocument"
       :page="showVoiceShell ? 'voice' : 'home'"
       :data="skinPluginContext"
       :assets="activeSkin.assets"
@@ -23,6 +23,15 @@
       :widgets="skinPluginWidgets"
       @surface-change="skinPluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"
+    />
+    <SkinPluginEditor
+      v-if="activeSkin"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :base-document="activeSkin.pluginData"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :lang="language"
+      @updated="skinPluginDocumentRevision += 1"
     />
     <SkinRuntimePluginHost
       v-if="activeSkin?.runtimePlugins"
@@ -966,6 +975,7 @@ import { observeMobileViewport } from "../services/mobile-viewport.js";
 import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
+import SkinPluginEditor from "../components/SkinPluginEditor.vue";
 import SkinRuntimePluginHost from "../components/SkinRuntimePluginHost.js";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
@@ -1009,6 +1019,8 @@ import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
 import { createSkinPluginQuickServerProjection } from "../services/skin-plugin-context.js";
+import { loadSkinPluginAuthoringDocument } from "../services/skin-plugin-authoring.js";
+import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
@@ -1133,6 +1145,14 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const language = ref<Language>(getInitialLanguage());
 const activeSkin = shallowRef<InstalledSkin | null>(null);
+const skinPluginDocumentRevision = ref(0);
+const emptySkinPluginDocument: SkinPluginDocument = { schemaVersion: 3, components: [] };
+const skinPluginDocument = computed<SkinPluginDocument>(() => {
+  skinPluginDocumentRevision.value;
+  const skin = activeSkin.value;
+  if (!skin) return emptySkinPluginDocument;
+  return loadSkinPluginAuthoringDocument(skin.id, skin.version) ?? skin.pluginData ?? emptySkinPluginDocument;
+});
 const skinPluginSurfaceActive = ref(false);
 const skinRuntimePluginSurfaceActive = ref(false);
 watch(activeSkin, () => {
@@ -1614,8 +1634,11 @@ const skinPluginActions = {
   "voice.toggleMicrophone": () => { if (voiceState.connected) toggleMicrophone(); },
   "voice.toggleOutputMute": () => { if (voiceState.connected) toggleOutputMute(); },
   "voice.setOutputVolume": (args: Record<string, string | number | boolean>) => {
-    if (!voiceState.connected || typeof args.volume !== "number" || !Number.isFinite(args.volume)) return;
-    setOutputVolume(Math.max(0, Math.min(1, args.volume)));
+    if (!voiceState.connected) return;
+    const volume = typeof args.volume === "number" ? args.volume
+      : typeof args.volume === "string" && args.volume.trim() ? Number(args.volume) : Number.NaN;
+    if (!Number.isFinite(volume)) return;
+    setOutputVolume(Math.max(0, Math.min(1, volume)));
   },
   "voice.disconnect": () => { if (voiceState.connected || voiceState.connecting) doDisconnect(); },
   "voice.setAway": (args: Record<string, string | number | boolean>) => {

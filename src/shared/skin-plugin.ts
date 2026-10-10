@@ -55,9 +55,23 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.disconnect-control",
 ] as const);
 export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
-export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, SkinPluginPermission>> = Object.freeze({
-  "voice.screen-share-start": "voice.screenShare.control",
+const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
+export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
+  "voice.audio-controls": widgetPermissions("audio.status.read", "audio.microphone.control", "audio.output.control"),
+  "voice.chat-panel": widgetPermissions("chat.channel.read", "chat.channel.send"),
+  "voice.connection-controls": widgetPermissions("voice.disconnect"),
+  "voice.disconnect-control": widgetPermissions("voice.disconnect"),
+  "voice.member-cards": widgetPermissions("session.members.read", "voice.screenShare.read", "voice.screenShare.control"),
+  "voice.screen-share-player": widgetPermissions("voice.screenShare.read", "voice.screenShare.control"),
+  "voice.screen-share-start": widgetPermissions("voice.screenShare.control"),
+  "voice.whisper-controls": widgetPermissions("voice.whisper.status.read", "voice.whisper.control"),
 });
+export function missingSkinPluginWidgetPermission(
+  widget: SkinPluginHostWidget,
+  permissions: readonly SkinPluginPermission[],
+): SkinPluginPermission | undefined {
+  return SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[widget]?.find((permission) => !permissions.includes(permission));
+}
 export type SkinPluginEvent =
   | "click" | "dblclick" | "change" | "input" | "submit" | "keydown"
   | "keyup" | "contextmenu" | "focus" | "blur" | "pointerdown" | "pointerup"
@@ -84,7 +98,7 @@ export interface SkinPluginNode {
   asset?: string;
   bindValue?: string;
   repeat?: { path: string; as: string };
-  when?: { path: string; equals?: string | number | boolean };
+  when?: { path: string; equals?: string | number | boolean; empty?: boolean };
   events?: Partial<Record<SkinPluginEvent, string>>;
   children?: SkinPluginNode[];
 }
@@ -130,7 +144,7 @@ const ELEMENTS = new Set([
 const VOID_ELEMENTS = new Set(["br", "circle", "hr", "img", "input", "line", "path", "polyline", "rect", "wbr"]);
 const ATTRIBUTES = new Set([
   "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",
-  "minlength", "multiple", "name", "open", "placeholder", "required", "role", "rows", "rowspan", "stroke", "stroke-linecap", "stroke-linejoin",
+  "minlength", "multiple", "name", "open", "placeholder", "required", "role", "rows", "rowspan", "step", "stroke", "stroke-linecap", "stroke-linejoin",
   "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
 ]);
 const EVENTS = new Set<string>([
@@ -274,7 +288,8 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
   if (!isRecord(input)) fail("SKIN_PLUGIN_DOCUMENT_INVALID", "components.json must contain an object.");
   onlyKeys(input, new Set(["schemaVersion", "components"]), "components.json");
   if (!SKIN_PLUGIN_SUPPORTED_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3) || !Array.isArray(input.components)
-    || !input.components.length || input.components.length > (input.schemaVersion === 3 ? SKIN_PLUGIN_COMPONENT_LIMIT : 32)) {
+    || (input.schemaVersion !== 3 && !input.components.length)
+    || input.components.length > (input.schemaVersion === 3 ? SKIN_PLUGIN_COMPONENT_LIMIT : 32)) {
     fail("SKIN_PLUGIN_DOCUMENT_INVALID", "components.json uses an unsupported schema or component count.");
   }
   const ids = new Set<string>();
@@ -366,8 +381,12 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (rawNode.widget !== undefined) {
         if (typeof rawNode.widget !== "string" || !HOST_WIDGETS.has(rawNode.widget)) fail("SKIN_PLUGIN_WIDGET_INVALID", "The component requests an unsupported host widget.");
         if (page === "demo") fail("SKIN_PLUGIN_WIDGET_INVALID", "Host widgets are available only on the home and voice client pages.");
-        const requiredPermission = SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[rawNode.widget as SkinPluginHostWidget];
-        if (requiredPermission && !permissions.includes(requiredPermission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The ${rawNode.widget} widget requires ${requiredPermission}.`);
+        // Preserve existing schema v2 packages; newly authored v3 widgets must declare every
+        // permission needed by the trusted host UI they embed. Screen-share start was already gated.
+        const requiredPermission = inputSchemaVersion >= 3 || rawNode.widget === "voice.screen-share-start"
+          ? missingSkinPluginWidgetPermission(rawNode.widget as SkinPluginHostWidget, permissions)
+          : undefined;
+        if (requiredPermission) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The ${rawNode.widget} widget requires ${requiredPermission}.`);
         const widgetOnlyKeys = new Set(["widget", "part", "className", "when"]);
         onlyKeys(rawNode, widgetOnlyKeys, "Host widget node");
         node.widget = rawNode.widget as SkinPluginHostWidget;
@@ -436,14 +455,25 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       }
       if (rawNode.when !== undefined) {
         if (!isRecord(rawNode.when)) fail("SKIN_PLUGIN_CONDITION_INVALID", "A condition must be an object.");
-        onlyKeys(rawNode.when, new Set(["path", "equals"]), "Component condition");
+        onlyKeys(rawNode.when, new Set(inputSchemaVersion >= 3 ? ["path", "equals", "empty"] : ["path", "equals"]), "Component condition");
         const path = boundedText(rawNode.when.path, "condition.path", 120);
         for (const permission of bindingPermissions(`{{${path}}}`, aliases, stateKeys)) {
           if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The condition data requires ${permission}.`);
         }
         const equals = rawNode.when.equals;
         if (equals !== undefined && typeof equals !== "string" && typeof equals !== "number" && typeof equals !== "boolean") fail("SKIN_PLUGIN_CONDITION_INVALID", "A condition comparison must be scalar.");
-        node.when = { path, ...(equals === undefined ? {} : { equals }) };
+        const empty = rawNode.when.empty;
+        if (empty !== undefined && (inputSchemaVersion < 3 || typeof empty !== "boolean" || equals !== undefined)) fail("SKIN_PLUGIN_CONDITION_INVALID", "An empty-collection condition must be a schema v3 boolean and cannot also compare a scalar.");
+        if (typeof equals === "string") {
+          if (inputSchemaVersion < 3 && equals.includes("{{")) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Data-bound condition comparisons require schema v3.");
+          for (const permission of bindingPermissions(equals, aliases, stateKeys)) {
+            if (!permissions.includes(permission)) fail("SKIN_PLUGIN_PERMISSION_MISSING", `The condition comparison data requires ${permission}.`);
+          }
+        }
+        if (empty !== undefined && !["chat.messages", "session.channels", "session.members", "favorites.items", "servers.quickList", "screenShare.streams"].includes(path)) {
+          fail("SKIN_PLUGIN_CONDITION_INVALID", "An empty condition must reference a registered public collection.");
+        }
+        node.when = { path, ...(equals === undefined ? {} : { equals }), ...(empty === undefined ? {} : { empty }) };
       }
       if (rawNode.events !== undefined) {
         if (!isRecord(rawNode.events) || Object.keys(rawNode.events).length > (inputSchemaVersion >= 3 ? 18 : 6)) fail("SKIN_PLUGIN_EVENT_INVALID", "Component events must be a small object.");
@@ -451,7 +481,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         for (const [event, actionIdValue] of Object.entries(rawNode.events)) {
           if (!EVENTS.has(event) || (inputSchemaVersion < 3 && V3_EVENTS.has(event)) || typeof actionIdValue !== "string" || !actions[actionIdValue]) fail("SKIN_PLUGIN_EVENT_INVALID", "Each component event must refer to a declared host action supported by this schema.");
           const action = actions[actionIdValue];
-          if (action.type !== "ui.setState" && (event === "input" || event === "change")) fail("SKIN_PLUGIN_EVENT_INVALID", "Host actions cannot run while a form value is being typed or changed.");
+          if (action.type !== "ui.setState" && event === "input") fail("SKIN_PLUGIN_EVENT_INVALID", "Host actions cannot run while a form value is being typed; use a committed change or submit event.");
           if (action.type !== "ui.setState" && action.type !== "ui.toggleState" && PASSIVE_EVENTS.has(event)) {
             fail("SKIN_PLUGIN_EVENT_INVALID", "Voice and host actions require an explicit user activation event.");
           }

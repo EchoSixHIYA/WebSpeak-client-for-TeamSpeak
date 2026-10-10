@@ -6,7 +6,7 @@
 
 完整目标中，皮肤作者可以用自己的插件组件、DOM、CSS 和本地逻辑排列、替换、隐藏或重做公开客户端界面中的任何视觉元素，也可以重建首页和完整语音工作区。连接、频道、聊天、音频、收藏/历史、共享等基础能力始终由 WebSpeak/TeamSpeak 宿主保留；皮肤能替换其展示和交互入口，但不能删除或篡改底层业务能力。宿主恢复入口、权限管理和安全提示位于皮肤之外，任何插件失效、拒绝授权或撤销后都能回到原生可用界面。
 
-当前 v1/v2/v3 只能达到该目标的一部分：v3 组件依赖有限标签、属性、数据和动作白名单；v4 Wasm 已接入授权生命周期、宿主渲染、受限 UI 事件回路、按读取权限筛选的数据投影、首版 TeamSpeak 动作桥，以及插件布局根、组件根与节点的本地布局覆盖。插件整体和内部节点均可在 Flex/Grid 父容器中分别排序；widget 可声明公开页面挂载槽位，surface 可直接重做公开页面。尚待实现的是插件默认布局分发、专用安装/管理界面与作者工具；跨浏览器验证和独立安全审查也未完成。本规格区分已实现行为与后续工作，不以当前限制重新定义完成态。
+当前 v1/v2/v3 只能达到该目标的一部分：v3 组件依赖有限标签、属性、数据和动作白名单；v4 Wasm 已接入授权生命周期、宿主渲染、受限 UI 事件回路、按读取权限筛选的数据投影、首版 TeamSpeak 动作桥，以及插件布局根、组件根与节点的布局覆盖。插件整体和内部节点均可在 Flex/Grid 父容器中分别排序；widget 可声明公开页面挂载槽位，surface 可直接重做公开页面。v3/v4 包可以通过可选 `layout.json` 提供作者默认布局，用户本地覆盖单独保存；v4 专用插件安装/管理界面、Wasm 作者工具和跨浏览器验证仍未完成，独立安全审查也尚未进行。本规格区分已实现行为与后续工作，不以当前限制重新定义完成态。
 
 适用页面为连接首页、语音工作区和公开演示页。管理员面板及其数据、管理 API 明确排除，不读取皮肤包。语音服务的运营、广告、陪玩、活动和商店等页面不属于语音客户端皮肤范围。
 
@@ -16,7 +16,7 @@
 
 v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。宿主仍解析固定元素/属性白名单、固定数据集合、简单绑定与有限动作，再由 Vue 创建节点。每个自定义组件根和每个有 DOM 的节点都会作为独立本地布局项，可移动、调整尺寸、改变外观或隐藏。节点指定 `part` 后使用该标识；未指定时使用树路径，树结构调整后旧的本地覆盖可能要重新设置。可操作节点保留至少 44 px 的触控目标。作者不必使用固定宿主控件目录，但 v3 仍不足以表达任意自定义 UI 逻辑和完整插件生命周期。管理员面板和演示页不能被 surface 替换。
 
-宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。`voice.screen-share-start` 仅限语音页，并要求插件声明 `voice.screenShare.control`；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
+宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。schema v3 的受保护控件会在导入时验证完整权限集合：音频控件要求 `audio.status.read`、`audio.microphone.control` 与 `audio.output.control`；聊天控件要求 `chat.channel.read` 与 `chat.channel.send`；成员卡片要求 `session.members.read` 及 `voice.screenShare.read`、`voice.screenShare.control`；屏幕共享播放器要求后两者；悄悄话控件要求 `voice.whisper.status.read` 与 `voice.whisper.control`；连接/断开控件要求 `voice.disconnect`。既有 schema v2 包仍按此前规则校验，`voice.screen-share-start` 则保留原有 `voice.screenShare.control` 要求。该控件仅限语音页；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
 
 v1-v3 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAssembly、远程脚本、任意 URL、表单导航、浏览器存储访问或网络调用。v4 可携带本地 JS/Wasm/CSS；JS 仍只校验和缓存，Wasm 在生产构建中经本地摘要授权后运行一次性有界任务，并经宿主解析、渲染动态 UI。运行时支持 `ui.surface.replace`、限定的公开只读数据权限和首版宿主动作效果；投影前由宿主按插件清单过滤字段，总快照最多 48 KiB，`ui_input_read` 输入最多 64 KiB。动作效果限于可信 UI 事件触发的同一轮调用、单个动作，并复用现有动作权限与参数校验。所有版本都拒绝未知协议字段、权限、动作和数据路径；v1-v3 拒绝未知节点/属性，v4 Wasm 输出则对标签名做语法验证、拒绝具备脚本/导航/嵌入能力的标签与属性，并将自定义标签惰性渲染为普通 `div`。
 
@@ -24,7 +24,7 @@ v1-v3 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAsse
 
 已实现的 v4 包描述为 `plugins.json` schema v1：每包 1–64 个插件，每个插件指定唯一小写 ID、语义版本、API 版本 1、`home`/`voice` 页面、`widget`/`surface` 模式、`plugins/<id>/` 下入口 JS 或 Wasm/可选 CSS、该目录中的图片/woff2 素材和现有权限表中的权限。入口扩展名决定默认运行时，也可显式写 `runtime: "javascript"` 或 `runtime: "wasm"`，且必须匹配扩展名。每页至多一个 v4 surface，且必须申请 `ui.surface.replace`；导入器也拒绝与同页 v3 surface 冲突。清单最多 256 KiB、插件入口最多 256 KiB、插件样式最多 512 KiB、每插件最多 32 个素材；引用文件必须存在且路径不重复。客户端与服务端复用同一解析器；客户端还对 Wasm 入口做固定 ABI 预检。SHA-256 摘要覆盖描述字段和入口、样式、全部素材；本机授权按皮肤、插件 ID 保存并绑定皮肤/插件版本、API 版本、文件摘要及权限策略版本。该摘要仅用于检测本机授权后包内容是否变化，不是发布者签名或来源证明。WebClient 已有逐页授权、Wasm 生命周期、schema 校验后的安全 UI 渲染和插件 CSS 装载；Wasm 只会在用户明确批准后运行，且生产执行受全局 worker 上限控制。动态 UI 可使用经过 manifest 权限校验的 `voice.screen-share-start` 宿主按钮；异步 Wasm 动作桥本身不承载屏幕采集所需的瞬时用户激活。
 
-descriptor 通过可选 `mount` 字段定义 widget 的语义挂载位置；未设置时挂在页面级插件宿主。descriptor 尚未定义默认显隐、布局位置/尺寸和同级顺序。每个运行时插件有独立布局根；用户可用通用布局编辑器本地覆盖插件整体、插件组件根和其节点的位置、尺寸、显隐、安全外观及 Flex/Grid 同级顺序。顺序只改视觉排列，不改变 DOM 与键盘焦点顺序。这些用户数据与作者文件分开存储。后续可为作者提供包内默认布局值，但必须保证沙箱内代码不能改动其他插件的宿主容器或恢复控件。
+descriptor 通过可选 `mount` 字段定义 widget 的语义挂载位置；未设置时挂在页面级插件宿主。默认显隐、位置/尺寸和同级顺序不放进插件 descriptor，而由包级可选 `layout.json` 按 `skin.<page>.runtime_plugin_root_<plugin-id>` 等动态布局 ID 声明。通用布局编辑器可本地覆盖插件整体、插件组件根和其节点的位置、尺寸、显隐、安全外观及 Flex/Grid 同级顺序；用户本地覆盖优先于作者默认值。顺序只改视觉排列，不改变 DOM 与键盘焦点顺序。沙箱内代码不能改动其他插件的宿主容器或恢复控件。
 
 v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构建插件 UI；插件可在受限输出协议内构建自定义 HTML/SVG 树、隔离 CSS 和本地交互，并把公开客户端页面替换或拆成可排序、显隐、独立授权和可回退的插件。危险的浏览器能力仍由标签/属性拒绝规则、字段限额与宿主权限桥约束；这不是不受限制的原始 DOM/JavaScript 环境。现有宿主控件只是可选的原生能力组件；连接/频道/聊天/音频等基础业务能力仍由 WebSpeak 保留、可由插件重新呈现，且始终能通过宿主恢复界面回到可信基础 UI。旧 v1/v2/v3 包继续按原验证与能力运行，不获得追溯性代码权限。
 

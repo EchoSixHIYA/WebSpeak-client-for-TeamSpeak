@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createRenderer, createSSRApp, nextTick } from "vue";
 import { renderToString } from "@vue/server-renderer";
-import type { SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
+import { parseSkinPluginDocument, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
 import { approveSkinPluginComponents } from "./skin-plugin-approval.js";
 import {
   parseSkinExtensionUiActionRequest,
@@ -555,4 +555,34 @@ test("skin-authored DOM nodes expose independent layout parts and retain touch b
   assert.match(html, /data-ws-part="skin\.voice\.voice-toolbar\.node-root"/);
   assert.match(html, /data-ws-part="skin\.voice\.voice-toolbar\.control-part-disconnect"/);
   assert.match(html, /data-ws-part="skin\.voice\.voice-toolbar\.part-caption"/);
+});
+
+test("skin nodes cannot impersonate WebSpeak page and layout hooks", async () => {
+  const document = parseSkinPluginDocument({
+    schemaVersion: 3,
+    components: [{
+      id: "hook-test",
+      name: "Hook test",
+      page: "voice",
+      accessibleName: "Hook test",
+      permissions: [],
+      actions: {},
+      root: {
+        tag: "section",
+        children: [{ tag: "div", attributes: { "data-ws-page": "admin", "data-ws-layout-hidden": true, "data-testid": "safe" } }],
+      },
+    }],
+  });
+  const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.test",
+    skinVersion: "1.0.0",
+    document,
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+  }));
+  assert.match(html, /data-testid="safe"/);
+  assert.doesNotMatch(html, /data-ws-page="admin"/);
+  assert.doesNotMatch(html, /data-ws-layout-hidden=/);
 });

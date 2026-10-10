@@ -144,6 +144,25 @@ test("starting screen share from a skin host widget requires its own permission"
   assert.equal(parsed.components[0].root.children?.[0].widget, "voice.screen-share-start");
 });
 
+test("schema v3 host audio controls require read and control permissions while v2 remains compatible", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.audio-controls" }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["audio.status.read", "audio.microphone.control"];
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["audio.status.read", "audio.microphone.control", "audio.output.control"];
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.audio-controls");
+
+  const legacyDocument = structuredClone(document);
+  legacyDocument.schemaVersion = 2;
+  legacyDocument.components[0].permissions = [];
+  assert.equal(parseSkinPluginDocument(legacyDocument).components[0].root.children?.[0].widget, "voice.audio-controls");
+});
+
 test("KAAK v3 example splits validated channel and member data by component", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
@@ -229,10 +248,52 @@ test("skin plugins can repeat channel members only under a channel alias and wit
   errorCode(() => parseSkinPluginDocument(outsideChannel), "SKIN_PLUGIN_REPEAT_INVALID");
 });
 
-test("skin plugin never dispatches host actions from typing or selection changes", () => {
+test("skin plugins keep live typing local but can run host actions on committed changes", () => {
   const document = validDocument();
-  document.components[0].root.children![0].events = { change: "join" };
+  const input = document.components[0].root.children![0];
+  input.events = { input: "join" };
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_EVENT_INVALID");
+
+  input.events = { change: "join" };
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].events?.change, "join");
+});
+
+test("skin conditions can compare public repeated data with local component state", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].state = { selectedchannel: "" };
+  document.components[0].root.children![0].when = {
+    path: "state.selectedchannel",
+    equals: "{{channel.id}}",
+  };
+  const parsed = parseSkinPluginDocument(document);
+  assert.deepEqual(parsed.components[0].root.children?.[0].when, {
+    path: "state.selectedchannel",
+    equals: "{{channel.id}}",
+  });
+
+  const legacyDocument = structuredClone(document);
+  legacyDocument.schemaVersion = 2;
+  errorCode(() => parseSkinPluginDocument(legacyDocument), "SKIN_PLUGIN_SCHEMA_UNSUPPORTED");
+
+  document.components[0].root.children![0].when!.equals = "{{channel.address}}";
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_BINDING_INVALID");
+});
+
+test("schema v3 can render empty states only for permissioned public collections", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].permissions.push("chat.channel.read");
+  document.components[0].root.children = [{
+    tag: "p",
+    when: { path: "chat.messages", empty: true },
+    children: [{ text: "No messages yet" }],
+  }];
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].when?.empty, true);
+
+  document.components[0].permissions.push("session.status.read");
+  document.components[0].root.children[0].when!.path = "session.status.serverLabel";
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_CONDITION_INVALID");
 });
 
 test("component schema v3 exposes composable interaction patterns and permission-gated voice actions", () => {

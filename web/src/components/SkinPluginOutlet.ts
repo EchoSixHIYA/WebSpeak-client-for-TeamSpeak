@@ -230,7 +230,10 @@ export default defineComponent({
       if (node.widget) {
         if (node.when) {
           const value = resolvePath(node.when.path, context, state);
-          if (node.when.equals !== undefined ? value !== node.when.equals : !value) return null;
+          const expected = typeof node.when.equals === "string" ? interpolate(node.when.equals, context, state) : node.when.equals;
+          if (node.when.empty !== undefined) {
+            if (!Array.isArray(value) || (value.length === 0) !== node.when.empty) return null;
+          } else if (expected !== undefined ? value !== expected : !value) return null;
         }
         const widget = props.widgets[node.widget];
         if (!widget) return null;
@@ -258,10 +261,16 @@ export default defineComponent({
       }
       if (node.when) {
         const value = resolvePath(node.when.path, context, state);
-        if (node.when.equals !== undefined ? value !== node.when.equals : !value) return null;
+        const expected = typeof node.when.equals === "string" ? interpolate(node.when.equals, context, state) : node.when.equals;
+        if (node.when.empty !== undefined) {
+          if (!Array.isArray(value) || (value.length === 0) !== node.when.empty) return null;
+        } else if (expected !== undefined ? value !== expected : !value) return null;
       }
       const attrs: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(node.attributes ?? {})) {
+        // data-ws-* belongs to host layout, page, and recovery machinery. Older
+        // packages remain loadable, but their nodes cannot impersonate host hooks.
+        if (key.startsWith("data-ws-")) continue;
         attrs[svgAttributeNames[key] ?? key] = typeof value === "string" ? interpolate(value, context, state) : value;
       }
       if (node.asset) {

@@ -216,6 +216,39 @@
   line-height: 1;
 }
 
+[data-ws-plugin-part="harbor-workspace.identity-entry"] {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: auto;
+  padding: 9px 1px 1px;
+  border-top: 1px solid var(--skin-harbor-border);
+}
+
+[data-ws-plugin-part="harbor-workspace.identity-monogram"] {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #ffffff18;
+  border-radius: 50%;
+  color: var(--skin-harbor-text);
+  background: linear-gradient(145deg, #4a4c53, #292a30);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+[data-ws-plugin-part="harbor-workspace.identity-name"] {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--skin-harbor-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 [data-ws-plugin-part="harbor-workspace.channel-panel"] {
   z-index: 1;
   grid-column: 2;
@@ -266,6 +299,7 @@
 [data-ws-plugin-part="harbor-workspace.section-label"] { margin: 0 8px 7px; }
 
 [data-ws-plugin-part="harbor-workspace.channel-row"] {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -280,6 +314,14 @@
   cursor: pointer;
 }
 
+[data-ws-plugin-part="harbor-workspace.selected-channel-indicator"] {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--skin-harbor-accent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
 [data-ws-plugin-part="harbor-workspace.channel-row"]:hover,
 [data-ws-plugin-part="harbor-workspace.channel-row"][aria-current="true"] {
   color: var(--skin-harbor-text);
@@ -289,6 +331,15 @@
 [data-ws-plugin-part="harbor-workspace.channel-row"][aria-current="true"] {
   box-shadow: inset 2px 0 var(--skin-harbor-accent);
 }
+
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="1"] { padding-inline-start: 19px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="2"] { padding-inline-start: 29px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="3"] { padding-inline-start: 39px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="4"] { padding-inline-start: 49px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="5"] { padding-inline-start: 59px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="6"] { padding-inline-start: 69px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="7"] { padding-inline-start: 79px; }
+[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="8"] { padding-inline-start: 89px; }
 
 [data-ws-plugin-part="harbor-workspace.channel-glyph"] {
   display: grid;
@@ -356,6 +407,19 @@
   font-weight: 800;
 }
 
+[data-ws-plugin-part="harbor-workspace.channel-member-muted"],
+[data-ws-plugin-part="harbor-workspace.member-muted-state"] {
+  color: var(--skin-harbor-danger);
+  font-size: 8px;
+  font-weight: 800;
+}
+[data-ws-plugin-part="harbor-workspace.channel-member-away"],
+[data-ws-plugin-part="harbor-workspace.member-away-state"] {
+  color: var(--skin-harbor-dim);
+  font-size: 8px;
+  font-weight: 800;
+}
+
 [data-ws-plugin-part="harbor-workspace.conversation"] {
   grid-column: 3;
   grid-row: 2;
@@ -404,6 +468,71 @@
   color: var(--skin-harbor-text);
   background: transparent;
   border-color: transparent;
+}
+
+[data-ws-plugin-part="harbor-workspace.chat"] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--skin-harbor-text);
+}
+
+[data-ws-plugin-part="harbor-workspace.chat-message-list"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 4px 16px;
+}
+
+[data-ws-plugin-part="harbor-workspace.chat-empty"] {
+  align-self: center;
+  margin: auto;
+  color: var(--skin-harbor-muted);
+  font-size: 13px;
+}
+
+[data-ws-plugin-part="harbor-workspace.chat-message"] { min-width: 0; }
+[data-ws-plugin-part="harbor-workspace.chat-message-heading"] { display: flex; align-items: baseline; gap: 8px; }
+[data-ws-plugin-part="harbor-workspace.chat-message-author"] { color: var(--skin-harbor-text); font-size: 12px; }
+[data-ws-plugin-part="harbor-workspace.chat-message-time"] { color: var(--skin-harbor-dim); font-size: 10px; }
+[data-ws-plugin-part="harbor-workspace.chat-message-text"] { margin: 3px 0 0; color: var(--skin-harbor-muted); font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+[data-ws-plugin-part="harbor-workspace.chat-composer"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--skin-harbor-border);
+  border-radius: 9px;
+  background: var(--skin-harbor-panel);
+}
+
+[data-ws-plugin-part="harbor-workspace.chat-input"] {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  outline: 0;
+  color: var(--skin-harbor-text);
+  background: transparent;
+}
+
+[data-ws-plugin-part="harbor-workspace.chat-send"] {
+  min-width: 54px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  color: #111;
+  background: var(--skin-harbor-accent);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 [data-ws-plugin-part="harbor-workspace"] .chat-panel { min-height: 0; background: transparent; }
@@ -484,13 +613,17 @@
   letter-spacing: .05em;
 }
 
+[data-ws-plugin-part="harbor-workspace.member-muted-state"],
+[data-ws-plugin-part="harbor-workspace.member-away-state"],
+[data-ws-plugin-part="harbor-workspace.speaking-indicator"] { grid-column: 2 / -1; }
+
 [data-ws-plugin-part="harbor-workspace.voice-dock"] {
   z-index: 4;
   grid-column: 2;
   grid-row: 2;
   align-self: end;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px 8px;
   min-width: 0;
   padding: 9px;
@@ -506,6 +639,15 @@
   grid-template-columns: 10px minmax(0, 1fr);
   align-items: center;
   gap: 2px 7px;
+}
+
+[data-ws-plugin-part="harbor-workspace.voice-dock-actions"] {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
 }
 
 [data-ws-plugin-part="harbor-workspace.connection-indicator"] {
@@ -528,7 +670,55 @@
   letter-spacing: .05em;
 }
 
-[data-ws-plugin-part="harbor-workspace"] [data-ws-part="voice.audio-controls"] { min-width: 0; }
+[data-ws-plugin-part="harbor-workspace.audio-controls"] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+[data-ws-plugin-part="harbor-workspace.microphone-control"],
+[data-ws-plugin-part="harbor-workspace.output-control"],
+[data-ws-plugin-part="harbor-workspace.disconnect-control"],
+[data-ws-plugin-part="harbor-workspace.whisper-start"],
+[data-ws-plugin-part="harbor-workspace.whisper-stop"] {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--skin-harbor-border);
+  border-radius: 7px;
+  color: var(--skin-harbor-muted);
+  background: var(--skin-harbor-raised);
+  cursor: pointer;
+}
+[data-ws-plugin-part="harbor-workspace.microphone-control"][aria-pressed="true"],
+[data-ws-plugin-part="harbor-workspace.output-control"][aria-pressed="true"] { color: var(--skin-harbor-danger); }
+[data-ws-plugin-part="harbor-workspace.disconnect-control"] { color: var(--skin-harbor-danger); }
+[data-ws-plugin-part="harbor-workspace.output-volume"] { width: 72px; accent-color: var(--skin-harbor-accent); }
+[data-ws-plugin-part="harbor-workspace.whisper-controls"] { display: flex; gap: 6px; margin-top: 12px; }
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] { flex: 0 0 auto; }
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--skin-harbor-border);
+  border-radius: 7px;
+  color: var(--skin-harbor-muted);
+  background: var(--skin-harbor-raised);
+  cursor: pointer;
+}
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] button:hover:not(:disabled),
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] button:focus-visible { color: var(--skin-harbor-accent); }
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] button:disabled { opacity: .45; cursor: not-allowed; }
+[data-ws-plugin-part="harbor-workspace.screen-share-start"] button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 [data-ws-plugin-part="harbor-workspace"] .desktop-audio-dock {
   min-width: 0;
   margin: 0;
@@ -543,6 +733,7 @@
 [data-ws-plugin-part="harbor-workspace"] .dock-audio-button { width: 34px; height: 34px; color: var(--skin-harbor-muted); }
 [data-ws-plugin-part="harbor-workspace"] .dock-audio-button:hover,
 [data-ws-plugin-part="harbor-workspace"] .dock-audio-button:focus-visible { color: var(--skin-harbor-accent); background: var(--skin-harbor-raised); border-color: var(--skin-harbor-border); }
+[data-ws-plugin-part="harbor-workspace.audio-controls"] .accompaniment-toggle { display: none; }
 
 [data-ws-plugin-part="harbor-workspace.disconnect-control"] {
   display: grid;
@@ -591,6 +782,7 @@
   [data-ws-plugin-part="harbor-workspace.server-rail"] { grid-column: 1; grid-row: 2 / 6; padding: 8px 3px; }
   [data-ws-plugin-part="harbor-workspace.quick-server"] { width: 48px; min-height: 48px; }
   [data-ws-plugin-part="harbor-workspace.server-monogram"] { width: 36px; height: 36px; }
+  [data-ws-plugin-part="harbor-workspace.identity-monogram"] { width: 34px; height: 34px; }
 
   [data-ws-plugin-part="harbor-workspace.channel-panel"] {
     grid-column: 2;
@@ -625,6 +817,7 @@
   }
   [data-ws-plugin-part="harbor-workspace.channel-item"] { flex: 0 0 auto; }
   [data-ws-plugin-part="harbor-workspace.channel-row"] { width: max-content; min-width: 116px; min-height: 42px; margin: 0; }
+  [data-ws-plugin-part="harbor-workspace.channel-row"][data-depth] { padding-inline-start: 9px; }
   [data-ws-plugin-part="harbor-workspace.channel-voice-members"] { display: none; }
 
   [data-ws-plugin-part="harbor-workspace.conversation"] {
@@ -660,6 +853,8 @@
   [data-ws-plugin-part="harbor-workspace.member-row"] { flex: 0 0 auto; grid-template-columns: 28px auto; min-height: 38px; padding: 2px 4px; }
   [data-ws-plugin-part="harbor-workspace.member-avatar"] { width: 26px; height: 26px; }
   [data-ws-plugin-part="harbor-workspace.speaking-indicator"] { display: none; }
+  [data-ws-plugin-part="harbor-workspace.member-muted-state"],
+  [data-ws-plugin-part="harbor-workspace.member-away-state"] { display: none; }
 
   [data-ws-plugin-part="harbor-workspace.voice-dock"] {
     grid-column: 2;
@@ -675,17 +870,23 @@
     border-bottom: 0;
   }
   [data-ws-plugin-part="harbor-workspace.voice-dock-heading"] { grid-column: auto; grid-row: auto; }
+  [data-ws-plugin-part="harbor-workspace.voice-dock-actions"] { grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 3px; }
   [data-ws-plugin-part="harbor-workspace.voice-dock-caption"] { display: none; }
   [data-ws-plugin-part="harbor-workspace.disconnect-control"] { grid-column: 2; grid-row: 1; }
-  [data-ws-plugin-part="harbor-workspace"] .mobile-voice-controls { gap: 5px; min-width: 0; }
-  [data-ws-plugin-part="harbor-workspace"] .mobile-voice-toggle { min-width: 44px; min-height: 44px; color: var(--skin-harbor-text); background: var(--skin-harbor-raised); }
-  [data-ws-plugin-part="harbor-workspace"] .ws-plugin-disconnect-control { width: 42px; height: 44px; }
+  [data-ws-plugin-part="harbor-workspace.audio-controls"] .mobile-voice-controls { display: flex; gap: 4px; }
+  [data-ws-plugin-part="harbor-workspace.audio-controls"] .mobile-voice-toggle { min-width: 44px; min-height: 44px; border-radius: 7px; color: var(--skin-harbor-muted); background: var(--skin-harbor-raised); }
+  [data-ws-plugin-part="harbor-workspace.microphone-control"],
+  [data-ws-plugin-part="harbor-workspace.output-control"],
+  [data-ws-plugin-part="harbor-workspace.disconnect-control"] { min-width: 42px; min-height: 44px; }
+  [data-ws-plugin-part="harbor-workspace.output-volume"] { width: 58px; }
+  [data-ws-plugin-part="harbor-workspace.screen-share-start"] button { width: 42px; height: 44px; }
 }
 
 @media (max-width: 460px) {
   [data-ws-plugin-part="harbor-workspace"] { grid-template-columns: 50px minmax(0, 1fr); }
   [data-ws-plugin-part="harbor-workspace.server-rail"] { padding-inline: 1px; }
   [data-ws-plugin-part="harbor-workspace.quick-server"] { width: 44px; }
+  [data-ws-plugin-part="harbor-workspace.identity-name"] { max-width: 43px; }
   [data-ws-plugin-part="harbor-workspace.topbar"] { padding-inline: 5px; }
   [data-ws-plugin-part="harbor-workspace.brand-name"] { display: none; }
   [data-ws-plugin-part="harbor-workspace.server-title"] { max-width: 100px; }

@@ -463,7 +463,7 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version) || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(minAppVersion)) throw new SkinRegistryError("Skin and minimum app versions must use semantic version format.", "SKIN_MANIFEST_INVALID");
   const entry = read("entry", 120);
   const readOptional = (key: string, max: number): string | undefined => value[key] == null ? undefined : read(key, max);
-  const layout = schemaVersion === 2 ? read("layout", 120) : schemaVersion === 3 && value.layout != null ? read("layout", 120) : undefined;
+  const layout = schemaVersion === 2 ? read("layout", 120) : schemaVersion >= 3 ? readOptional("layout", 120) : undefined;
   const content = readOptional("content", 120);
   const components = schemaVersion >= 3 && value.components != null ? read("components", 120) : undefined;
   const plugins = schemaVersion === 4 ? read("plugins", 120) : undefined;

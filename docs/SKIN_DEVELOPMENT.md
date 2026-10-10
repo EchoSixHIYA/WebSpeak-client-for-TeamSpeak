@@ -6,7 +6,7 @@ KOOK 语音界面参考仅覆盖用户授权的语音频道，语音区结构记
 
 可导入的 KOOK 风格完整语音工作区测试包见[Harbor Voice Workspace](./examples/harbor-voice/README.zh-CN.md)；它只复用 WebSpeak 的可信宿主控件和公开会话数据，不包含站点素材、运营页或后台。
 
-v3 的 HTML 标签、属性、可绑定数据集合和宿主动作仍是固定白名单；作者自定义 UI 逻辑由 v4 的有界 Wasm 路径提供。生产构建中的 v4 Wasm 运行时已接入本地摘要授权、页面生命周期、动态 HTML/SVG 节点渲染、插件 CSS、权限化只读数据投影、宿主动作桥、语义挂载槽位和全局 worker 资源治理；目前支持 `session.status.read`、频道/成员/聊天、收藏/最近列表和音频/共享状态读取权限，以及 `ui.surface.replace`、`ui.input.read`。每份公开数据投影最多 48 KiB，只传清单准许的字段；Wasm 可生成自定义节点树、有限本地状态并响应命名 UI 事件。宿主动作只接受可信 UI 事件触发的同一轮输出中的单个请求，并重新检查插件权限、参数和当前会话；`dblclick` 可绑定到加入频道等已授权宿主动作。JavaScript 仍只校验和缓存，不执行。每个 v4 插件有独立布局根，用户可调整插件整体、组件根和 DOM 节点的位置、尺寸、显隐、安全外观及 Flex/Grid 同级显示顺序；`plugins.json` 可将 widget 放到公开页面的注册槽位，也可通过 surface 重做整页。这个边界能承载完整自定义客户端界面，但不等于已完成插件商城和作者管理平台；跨浏览器测试与独立安全审查尚未完成。
+v3 保留安全的标准元素和属性白名单；组件可通过完整页面 surface 自己构建界面，不需要把聊天、音频或成员 UI 锁在固定宿主面板里。条件可比较权限化公开数据、重复项和皮肤本地状态，也可判断已登记公开集合是否为空。表单输入先留在宿主渲染的本地状态；宿主动作不能在逐字输入时触发，可在已提交的 `change`、表单提交或显式点击上触发。作者自定义代码逻辑由 v4 有界 Wasm 路径提供。生产构建中的 v4 Wasm 运行时已接入本地摘要授权、页面生命周期、动态 HTML/SVG 节点渲染、插件 CSS、权限化只读数据投影、宿主动作桥、语义挂载槽位和全局 worker 资源治理；目前支持 `session.status.read`、频道/成员/聊天、收藏/最近列表和音频/共享状态读取权限，以及 `ui.surface.replace`、`ui.input.read`。每份公开数据投影最多 48 KiB，只传清单准许的字段；Wasm 可生成自定义节点树、有限本地状态并响应命名 UI 事件。宿主动作只接受可信 UI 事件触发的同一轮输出中的单个请求，并重新检查插件权限、参数和当前会话；`dblclick` 可绑定到加入频道等已授权宿主动作。JavaScript 仍只校验和缓存，不执行。每个 v4 插件有独立布局根，用户可调整插件整体、组件根和 DOM 节点的位置、尺寸、显隐、安全外观及 Flex/Grid 同级显示顺序；`plugins.json` 可将 widget 放到公开页面的注册槽位，也可通过 surface 重做整页。这个边界能承载完整自定义客户端界面，但不等于已完成插件商城和作者管理平台；跨浏览器测试与独立安全审查尚未完成。
 
 `.wskin` 包可为公开页面定制艺术表现。v1 提供 CSS 与美术资源；v2 另外携带受校验的布局 JSON；v3 可自由安排公开组件，并用 components.json 声明由宿主渲染的安全组件。所有版本均由 WebSpeak 保留基础组件的业务逻辑和 TeamSpeak 行为。
 
@@ -39,7 +39,7 @@ plugins/<plugin-id>/style.css # v4 可选：插件样式，目前只校验和缓
 plugins/<plugin-id>/assets/   # v4 插件专属的本地图片或字体素材
 ```
 
-所有资源路径使用 `/`，区分大小写，并相对于包根目录。CSS 的 `url()` 使用同样的包根相对路径，例如 `url("assets/background.webp")`。不得使用机器本地路径、站点绝对路径或远程 URL。
+所有资源路径使用 `/`，区分大小写，并相对于包根目录。CSS 的 `url()` 使用同样的包根相对路径，例如 `url("assets/background.webp")`。不得使用机器本地路径、站点绝对路径或远程 URL。说明文档放在源码目录旁边，不能打进 `.wskin`；导入器会拒绝 `README.md` 等未声明文件。
 
 ### `manifest.json`
 
@@ -117,11 +117,11 @@ v1 和 v2 都只支持公开页面。`/admin/**` 不加载布局、用户覆盖�
 
 ### schemaVersion 3：开放皮肤和完整声明式页面
 
-v3 清单的 packageType 固定为 open-skin，entry 指向 CSS，components 指向 components.json；不含 v2 的 layout 或 permissions 字段。组件文件可以省略。仅 v3 开放公开页面的 CSS 排版能力，v1/v2 仍按旧 CSS 规则校验。客户端导入和服务端登记使用同一共享组件 schema 与权限白名单。
+v3 清单的 packageType 固定为 open-skin，entry 指向 CSS，components 可选指向 components.json；与 v2 不同，v3 不声明 permissions，但可以可选声明 layout 指向作者默认布局 `layout.json`。组件文件可以省略。仅 v3 开放公开页面的 CSS 排版能力，v1/v2 仍按旧 CSS 规则校验。客户端导入和服务端登记使用同一共享组件 schema 与权限白名单。
 
 components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。schema v1 维持旧兼容；schema v2 引入 `mode: "widget"`（默认）或 `mode: "surface"`，并提供可选宿主控件节点；schema v3 保持这些能力，扩大声明式 UI 的节点/状态/动作边界，并增加用户操作事件和语音功能动作。v3 仍使用固定元素/属性、公开数据集合和宿主动作白名单，不是任意 HTML 或任意脚本。每个组件需声明 id、name、page、accessibleName、permissions、actions 和 root，可选 state。page 接受 home、voice、demo；surface 仅可用于 home 和 voice，并且必须请求 `ui.surface.replace`。用户批准前不会显示 surface，撤销后宿主立即恢复普通页面。所有皮肤组件根节点及其中的每个可见元素都以动态布局项加入本地布局编辑器，可独立移动、缩放、改尺寸、改外观或隐藏。按钮、输入框及显式用户操作节点保留 44 px 最小触控区域。为让用户覆盖在树结构调整后仍能指向同一元素，请给重要节点设置稳定的 `part` 名称；未设置时按组件树位置生成标识。v4 包和插件运行时见[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)；Wasm 生产运行已开启，作者 JavaScript 仍关闭。
 
-普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。重复列表可使用注册的公开集合；频道重复项仅能再重复其 `channel.members`，并且需要额外批准 `session.members.read`。宿主每个组件的实际渲染节点最多 8192 个，防止嵌套集合放大界面。schema v2 另允许固定宿主控件节点，例如：
+普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。重复列表可使用注册的公开集合；频道重复项仅能再重复其 `channel.members`，并且需要额外批准 `session.members.read`。宿主每个组件的实际渲染节点最多 8192 个，防止嵌套集合放大界面。v3/v4 的作者默认布局使用与 v2 相同的有界 layout schema；可通过 `skin.<page>.<component-id>` 指定声明式自定义组件，通过 `skin.<page>.runtime_plugin_root_<plugin-id>` 指定 v4 插件根。用户的本地布局覆盖优先于包默认值。schema v2 另允许固定宿主控件节点，例如：
 
 ```json
 {
@@ -148,7 +148,7 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 }
 ```
 
-当前可选宿主控件 ID：`home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls`、`voice.disconnect-control`。未知控件和同页重复控件会被拒绝；每个控件的状态和业务动作仍由 WebSpeak 内部处理。`voice.screen-share-start` 仅能放在语音页，并要求 `voice.screenShare.control`；宿主按钮在可信点击处理器内直接启动屏幕采集，避免异步 Wasm 回调丢失浏览器瞬时用户激活。自定义 UI 可以完全用普通声明式节点搭建，不需要采用这些控件。只显示收藏时可用 `favorites.items` 和 `favorites.switch`；若要将收藏与最近连接放在同一自定义栏，可用 `servers.quickList` 数据与 `quickServers.switch` 动作。服务器目标始终使用本机生成的不透明令牌，不把地址、密码或身份材料交给组件。频道行也可把 `voice.joinChannel` 绑定到双击事件，切房继续走 TeamSpeak 原有权限和密码流程。v3 还提供经独立权限保护的麦克风/扬声器、输出音量、离开状态、悄悄话、断开连接和屏幕共享动作；它们只调用 WebSpeak 已有操作，屏幕采集仍由浏览器或操作系统询问用户。
+当前可选宿主控件 ID：`home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls`、`voice.disconnect-control`。未知控件和同页重复控件会被拒绝；每个控件的状态和业务动作仍由 WebSpeak 内部处理。schema v3 会检查受保护控件所需权限：音频控件需 `audio.status.read`、`audio.microphone.control` 和 `audio.output.control`；聊天需 `chat.channel.read` 与 `chat.channel.send`；成员卡片需 `session.members.read` 及屏幕共享读取/控制权限；屏幕共享播放器需 `voice.screenShare.read` 与 `voice.screenShare.control`；悄悄话控件需对应状态读取和控制权限；断开/连接控件需 `voice.disconnect`。既有 v2 包维持旧校验行为，`voice.screen-share-start` 仍像此前一样要求 `voice.screenShare.control`。该控件仅能放在语音页；宿主按钮在可信点击处理器内直接启动屏幕采集，避免异步 Wasm 回调丢失浏览器瞬时用户激活。自定义 UI 可以完全用普通声明式节点搭建，不需要采用这些控件。只显示收藏时可用 `favorites.items` 和 `favorites.switch`；若要将收藏与最近连接放在同一自定义栏，可用 `servers.quickList` 数据与 `quickServers.switch` 动作。服务器目标始终使用本机生成的不透明令牌，不把地址、密码或身份材料交给组件。频道行也可把 `voice.joinChannel` 绑定到双击事件，切房继续走 TeamSpeak 原有权限和密码流程。v3 还提供经独立权限保护的麦克风/扬声器、输出音量、离开状态、悄悄话、断开连接和屏幕共享动作；它们只调用 WebSpeak 已有操作，屏幕采集仍由浏览器或操作系统询问用户。
 
 示例包见 [KAAK voice 示例](./examples/KAAK-VOICE.md)，其 components.json 展示了公开频道列表和在线成员侧栏；[Open Voice Surface](./examples/OPEN-VOICE-SURFACE.md) 展示了完整首页和语音工作区 surface，是格式验证脚手架。KAAK 的语音视觉参考来自用户授权进入的前两个语音房间；只记录布局，不保留服务器/房间标识、成员名或聊天内容。当前数据权限和宿主动作以[开放皮肤规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)中的清单为准。组件按本地用户授权后才渲染；权限对每个皮肤版本、页面和组件分别保存，可在宿主权限入口撤销。页面替换时，宿主会额外显示“返回标准界面”和“恢复内置皮肤”入口；拒绝授权或离开 surface 后，普通页面可立即恢复。
 
@@ -158,9 +158,20 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 注意：v3 CSS 和 surface 可以隐藏或遮挡普通语音控件。权限和返回标准界面提示由宿主在皮肤根之外绘制；其他界面控件仍受皮肤排版影响。测试时务必确保麦克风、设置、退出语音、屏幕共享操作和移动端导航仍有可达路径。组件演示页 /demo 使用合成数据，加入频道和聊天动作只更新演示状态；它不支持宿主控件或整页替换。
 
+### 本地组件结构编辑器
+
+公开客户端页可打开“组件结构”编辑器，直接管理当前皮肤版本的声明式组件树。它支持创建、复制、删除组件和节点、添加子节点或同级节点、调整顺序、编辑组件元数据与节点 JSON、撤销/重做，以及导入/导出 components.json。该编辑器不属于管理员面板，不加载到 /admin/**。
+
+编辑器只保存本地 authoring 覆盖，键按皮肤 ID 和版本隔离；原始皮肤包不会被改写。导入及每次提交都会走 parseSkinPluginDocument 的同一 schema 和权限校验，运行时也再次验证从本地存储读出的文档。不能通过编辑器新增任意脚本、事件处理器属性、外部资源、未知数据路径、宿主保留的 data-ws-* 属性、未授权宿主动作或未登记的宿主控件。旧 v2 组件首次升级到 v3 时，编辑器会为受保护的内置宿主控件补齐对应权限声明；这不会自动批准权限，控件继续等待宿主授权 UI 明确确认。
+
+旧 schema v1/v2 皮肤可以保持原样使用，第一次结构编辑时会把已验证的数据规范化为 schema v3；旧包自身不被升级或覆盖。schema v3 允许 components 为空：删除最后一个皮肤组件会恢复基础 WebSpeak 页面，宿主授权与恢复控件始终在皮肤内容之外。节点不能脱离组件根单独删除；重要节点应设置稳定 part 名称，避免树顺序变化后基于路径生成的布局覆盖指向其他节点。
+
+系统开发顺序由用户明确指定：先完成并验证通用组件 CRUD、权限和数据边界、持久化及回退流程，并保存稳定检查点；之后才开始 KOOK 语音客户端皮肤。参考皮肤阶段只为具体兼容问题对框架做小修，不反复采集参考或重构框架。
+
 ### schemaVersion 4：插件包描述与有界 Wasm 运行时
 
 v4 在 open-skin 包中增加必需的 `plugins` 路径。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。客户端还会对 Wasm 入口执行固定导入/导出 ABI 预检。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。WebClient 有本地授权对话框和 Wasm 运行生命周期；目前支持安全 UI 输出、可信 UI 事件回调、插件专属 CSS、按清单权限过滤的公开数据投影（单份最多 48 KiB）和首版单动作宿主桥。支持的数据读取权限包括 `session.status.read`、`session.channels.read`、`session.members.read`、`chat.channel.read`、`favorites.read`、`servers.quickList.read`、`audio.status.read`、`voice.whisper.status.read`、`voice.screenShare.status.read` 和 `voice.screenShare.read`，另支持 `ui.surface.replace`。`ui.input.read` 单独控制插件是否能收到用户在插件自有输入框中输入或被浏览器自动填入的值；未获授权时仍可收到事件类型，但不会收到文本或勾选值。密码、文件和隐藏输入始终拒绝。宿主动作仅可由可信 UI 事件触发，按清单权限、动作参数和会话状态再次校验；生产构建也有全局 worker 上限。跨浏览器验证和独立安全审查仍待完成。
+v4 在 open-skin 包中增加必需的 `plugins` 路径，并允许沿用可选 `layout` 路径提供插件根和节点的作者默认布局。服务端登记和客户端导入共用 `plugins.json` schema v1 校验器；校验插件 ID、页面、模式、权限、文件归属、路径唯一性和包内文件大小，并将插件文件与普通皮肤素材分别缓存。客户端还会对 Wasm 入口执行固定导入/导出 ABI 预检。SHA-256 授权基础会绑定插件描述、入口、样式和全部素材；本机授权记录还会绑定皮肤/插件版本、API 版本和权限策略版本。摘要只能发现已授权内容被替换，不能证明发布者身份。WebClient 有本地授权对话框和 Wasm 运行生命周期；目前支持安全 UI 输出、可信 UI 事件回调、插件专属 CSS、按清单权限过滤的公开数据投影（单份最多 48 KiB）和首版单动作宿主桥。支持的数据读取权限包括 `session.status.read`、`session.channels.read`、`session.members.read`、`chat.channel.read`、`favorites.read`、`servers.quickList.read`、`audio.status.read`、`voice.whisper.status.read`、`voice.screenShare.status.read` 和 `voice.screenShare.read`，另支持 `ui.surface.replace`。`ui.input.read` 单独控制插件是否能收到用户在插件自有输入框中输入或被浏览器自动填入的值；未获授权时仍可收到事件类型，但不会收到文本或勾选值。密码、文件和隐藏输入始终拒绝。宿主动作仅可由可信 UI 事件触发，按清单权限、动作参数和会话状态再次校验；生产构建也有全局 worker 上限。跨浏览器验证和独立安全审查仍待完成。
 
 ```json
 {

@@ -1,7 +1,7 @@
 import {
   SKIN_PLUGIN_PERMISSIONS,
   SKIN_PLUGIN_HOST_WIDGETS,
-  SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS,
+  missingSkinPluginWidgetPermission,
   parseSkinPluginRuntimeAction,
   SKIN_PLUGIN_NODE_LIMIT,
   SKIN_PLUGIN_TREE_DEPTH_LIMIT,
@@ -52,6 +52,12 @@ function assertLocalUiNode(node: SkinPluginNode): void {
   node.children?.forEach(assertLocalUiNode);
 }
 
+function rejectExtensionHostWidgets(node: unknown): void {
+  if (!isRecord(node)) return;
+  if (node.widget !== undefined) fail("SKIN_EXTENSION_UI_WIDGET_UNSUPPORTED", "Extension UI output cannot embed privileged host widgets.");
+  if (Array.isArray(node.children)) node.children.forEach(rejectExtensionHostWidgets);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -95,8 +101,8 @@ function generatedNode(
     }
     if (page !== "voice") fail("SKIN_EXTENSION_UI_WIDGET_UNSUPPORTED", "The screen-share host widget is available only on the voice page.");
     const widget = input.widget as SkinPluginHostWidget;
-    const requiredPermission = SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS[widget];
-    if (requiredPermission && !permissions.includes(requiredPermission)) {
+    const requiredPermission = missingSkinPluginWidgetPermission(widget, permissions);
+    if (requiredPermission) {
       fail("SKIN_EXTENSION_UI_PERMISSION_MISSING", `The ${widget} widget requires ${requiredPermission}.`);
     }
     onlyKeys(input, ["widget", "part", "className"], "A generated host widget node");
@@ -273,6 +279,12 @@ export function parseSkinExtensionUiOutput(
       catch { fail("SKIN_EXTENSION_UI_ACTION_INVALID", "The generated host action request is malformed."); }
     }
     return document;
+  }
+
+  if (input.schemaVersion === 3 && Array.isArray(input.components)) {
+    for (const rawComponent of input.components) {
+      if (isRecord(rawComponent)) rejectExtensionHostWidgets(rawComponent.root);
+    }
   }
 
   let document: SkinPluginDocument;

@@ -229,6 +229,34 @@ test("server validates v4 plugin manifests and package files without executing a
   assert.equal(saved.id, "sample-skin");
   assert.deepEqual(await registry.readArchive("sample-skin"), archive);
 
+  const layout = {
+    schemaVersion: 1,
+    pages: { voice: { desktop: { "skin.voice.runtime_plugin_root_voice-toolbar": { order: 2, visible: true } } } },
+  };
+  const archiveWithLayout = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifestV4, layout: "layout.json" }))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { position: fixed; }')],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+    ["plugins/voice-toolbar/index.js", Buffer.from("export const render = () => document.createElement('button');")],
+    ["plugins/voice-toolbar/style.css", Buffer.from(".toolbar { color: teal; }")],
+    ["plugins/voice-toolbar/assets/icon.png", Buffer.from([1, 2, 3, 4])],
+    ["layout.json", Buffer.from(JSON.stringify(layout))],
+  ]);
+  const layoutSaved = await registry.save(archiveWithLayout, "sample-skin");
+  assert.equal(layoutSaved.id, "sample-skin");
+  assert.deepEqual(await registry.readArchive("sample-skin"), archiveWithLayout);
+
+  const invalidLayoutArchive = createZip([
+    ["manifest.json", Buffer.from(JSON.stringify({ ...manifestV4, layout: "layout.json" }))],
+    ["skin.css", Buffer.from('[data-ws-part="app"] { position: fixed; }')],
+    ["plugins.json", Buffer.from(JSON.stringify(plugins))],
+    ["plugins/voice-toolbar/index.js", Buffer.from("export {}; ")],
+    ["plugins/voice-toolbar/style.css", Buffer.from(".toolbar { color: teal; }")],
+    ["plugins/voice-toolbar/assets/icon.png", Buffer.from([1, 2, 3, 4])],
+    ["layout.json", Buffer.from(JSON.stringify({ schemaVersion: 1, pages: { voice: { desktop: { "voice.not-registered": { order: 2 } } } } }))],
+  ]);
+  await assert.rejects(registry.save(invalidLayoutArchive, "sample-skin"), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_LAYOUT_INVALID");
+
   const wasmPlugins = {
     schemaVersion: 1,
     plugins: [{

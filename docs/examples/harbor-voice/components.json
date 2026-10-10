@@ -54,18 +54,40 @@
         "session.members.read",
         "session.channel.join",
         "servers.quickList.read",
-        "servers.quickList.switch"
+        "servers.quickList.switch",
+        "chat.channel.read",
+        "chat.channel.send",
+        "audio.status.read",
+        "audio.microphone.control",
+        "audio.output.control",
+        "voice.whisper.status.read",
+        "voice.whisper.control",
+        "voice.disconnect",
+        "voice.screenShare.read",
+        "voice.screenShare.control"
       ],
       "actions": {
         "switch-server": {
           "type": "quickServers.switch",
           "args": { "quickServerId": "{{server.id}}" }
         },
+        "select-channel": {
+          "type": "ui.setState",
+          "args": { "key": "selectedchannel", "value": "{{channel.id}}" }
+        },
         "join-channel": {
           "type": "voice.joinChannel",
           "args": { "channelId": "{{channel.id}}" }
-        }
+        },
+        "send-message": {
+          "type": "chat.sendMessage",
+          "args": { "text": "{{state.message}}" }
+        },
+        "disconnect": { "type": "voice.disconnect", "args": {} },
+        "whisper-on": { "type": "voice.setWhisperActive", "args": { "active": true } },
+        "whisper-off": { "type": "voice.setWhisperActive", "args": { "active": false } }
       },
+      "state": { "selectedchannel": "", "message": "" },
       "root": {
         "tag": "main",
         "part": "workspace",
@@ -150,13 +172,20 @@
                         "attributes": {
                           "type": "button",
                           "aria-current": "{{channel.current}}",
-                          "aria-label": "Join {{channel.name}}"
+                          "aria-label": "Double-click to join {{channel.name}}",
+                          "data-depth": "{{channel.depth}}"
                         },
-                        "events": { "dblclick": "join-channel" },
+                        "events": { "click": "select-channel", "dblclick": "join-channel" },
                         "children": [
                           { "tag": "span", "part": "channel-glyph", "children": [{ "text": "◉" }] },
                           { "tag": "span", "part": "channel-name", "children": [{ "text": "{{channel.name}}" }] },
-                          { "tag": "small", "part": "channel-count", "children": [{ "text": "{{channel.memberCount}}" }] }
+                          { "tag": "small", "part": "channel-count", "children": [{ "text": "{{channel.memberCount}}" }] },
+                          {
+                            "tag": "span",
+                            "part": "selected-channel-indicator",
+                            "when": { "path": "state.selectedchannel", "equals": "{{channel.id}}" },
+                            "attributes": { "aria-label": "Selected" }
+                          }
                         ]
                       },
                       {
@@ -172,6 +201,20 @@
                             "children": [
                               { "tag": "span", "part": "channel-member-avatar", "children": [{ "text": "{{voicemember.name}}" }] },
                               { "tag": "span", "part": "channel-member-name", "children": [{ "text": "{{voicemember.name}}" }] },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-muted",
+                                "when": { "path": "voicemember.status", "equals": "muted" },
+                                "attributes": { "aria-label": "Microphone muted" },
+                                "children": [{ "text": "MIC OFF" }]
+                              },
+                              {
+                                "tag": "span",
+                                "part": "channel-member-away",
+                                "when": { "path": "voicemember.status", "equals": "away" },
+                                "attributes": { "aria-label": "Away" },
+                                "children": [{ "text": "AWAY" }]
+                              },
                               {
                                 "tag": "span",
                                 "part": "channel-member-state",
@@ -214,7 +257,66 @@
                   }
                 ]
               },
-              { "widget": "voice.chat-panel", "part": "chat" },
+              {
+                "tag": "div",
+                "part": "chat",
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "chat-message-list",
+                    "attributes": { "aria-label": "Current channel messages", "role": "log", "aria-live": "polite" },
+                    "children": [
+                      {
+                        "tag": "p",
+                        "part": "chat-empty",
+                        "when": { "path": "chat.messages", "empty": true },
+                        "children": [{ "text": "No messages yet. Say hello to the channel." }]
+                      },
+                      {
+                        "tag": "article",
+                        "part": "chat-message",
+                        "repeat": { "path": "chat.messages", "as": "message" },
+                        "children": [
+                          {
+                            "tag": "header",
+                            "part": "chat-message-heading",
+                            "children": [
+                              { "tag": "strong", "part": "chat-message-author", "children": [{ "text": "{{message.author}}" }] },
+                              { "tag": "time", "part": "chat-message-time", "children": [{ "text": "{{message.time}}" }] }
+                            ]
+                          },
+                          { "tag": "p", "part": "chat-message-text", "children": [{ "text": "{{message.text}}" }] }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "form",
+                    "part": "chat-composer",
+                    "events": { "submit": "send-message" },
+                    "children": [
+                      {
+                        "tag": "input",
+                        "part": "chat-input",
+                        "bindValue": "message",
+                        "attributes": {
+                          "type": "text",
+                          "maxlength": 1000,
+                          "autocomplete": "off",
+                          "placeholder": "Message this channel",
+                          "aria-label": "Message this channel"
+                        }
+                      },
+                      {
+                        "tag": "button",
+                        "part": "chat-send",
+                        "attributes": { "type": "submit", "aria-label": "Send message" },
+                        "children": [{ "text": "Send" }]
+                      }
+                    ]
+                  }
+                ]
+              },
               { "widget": "voice.screen-share-player", "part": "screen-player" }
             ]
           },
@@ -247,12 +349,47 @@
                         "when": { "path": "member.speaking", "equals": true },
                         "attributes": { "aria-label": "Speaking" },
                         "children": [{ "text": "SPEAKING" }]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "member-muted-state",
+                        "when": { "path": "member.status", "equals": "muted" },
+                        "attributes": { "aria-label": "Microphone muted" },
+                        "children": [{ "text": "MIC OFF" }]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "member-away-state",
+                        "when": { "path": "member.status", "equals": "away" },
+                        "attributes": { "aria-label": "Away" },
+                        "children": [{ "text": "AWAY" }]
                       }
                     ]
                   }
                 ]
               },
-              { "widget": "voice.whisper-controls", "part": "whisper-controls" }
+              {
+                "tag": "div",
+                "part": "whisper-controls",
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "whisper-start",
+                    "when": { "path": "whisper.status.active", "equals": false },
+                    "attributes": { "type": "button", "aria-label": "Start whisper" },
+                    "events": { "click": "whisper-on" },
+                    "children": [{ "text": "Whisper" }]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "whisper-stop",
+                    "when": { "path": "whisper.status.active", "equals": true },
+                    "attributes": { "type": "button", "aria-label": "Stop whisper" },
+                    "events": { "click": "whisper-off" },
+                    "children": [{ "text": "Whisper on" }]
+                  }
+                ]
+              }
             ]
           },
           {
@@ -269,8 +406,31 @@
                   { "tag": "span", "part": "voice-dock-caption", "children": [{ "text": "VOICE CONNECTED" }] }
                 ]
               },
-              { "widget": "voice.audio-controls", "part": "audio-controls" },
-              { "widget": "voice.disconnect-control", "part": "disconnect-control" }
+              {
+                "tag": "div",
+                "part": "voice-dock-actions",
+                "children": [
+                  { "widget": "voice.screen-share-start", "part": "screen-share-start" },
+                  { "widget": "voice.audio-controls", "part": "audio-controls" },
+                  {
+                    "tag": "button",
+                    "part": "disconnect-control",
+                    "attributes": { "type": "button", "aria-label": "Disconnect voice" },
+                    "events": { "click": "disconnect" },
+                    "children": [{ "text": "Leave" }]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "part": "identity-entry",
+            "when": { "path": "session.status.userName" },
+            "attributes": { "role": "group", "aria-label": "Current TeamSpeak identity" },
+            "children": [
+              { "tag": "span", "part": "identity-monogram", "children": [{ "text": "TS" }] },
+              { "tag": "span", "part": "identity-name", "children": [{ "text": "{{session.status.userName}}" }] }
             ]
           }
         ]
