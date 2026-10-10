@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.45");
+  assert.equal(skin.version, "3.1.46");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -567,8 +567,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #25262a/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
   assert.match(skin.css, /settings-header h2 \{\s*color: #f2f3f5;\s*font-size: 32px;\s*font-weight: 600;/);
-  assert.match(skin.css, /settings-section h3 \{\s*color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
-  assert.match(skin.css, /voice\.audio-settings"] \.settings-label \{\s*font-weight: 400;/);
+  assert.match(skin.css, /settings-section h3 \{[\s\S]*?color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
+  assert.match(skin.css, /settings-audio-card \{\s*width: min\(660px, 100%\);[\s\S]*?background: #25262a;[\s\S]*?border-radius: 16px;/);
+  assert.match(skin.css, /settings-form-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 268fr\) minmax\(0, 320fr\);[\s\S]*?min-height: 72px;[\s\S]*?padding: 16px 24px;/);
+  assert.match(skin.css, /@media \(max-width: 680px\) \{[\s\S]*?settings-form-row \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-label \{\s*margin: 0;\s*font-weight: 400;/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-select \{[\s\S]*?border-radius: 12px;/);
   assert.match(skin.css, /settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-select-menu \{[\s\S]*?padding: 8px;[\s\S]*?border-radius: 12px;[\s\S]*?background: #25262a;[\s\S]*?box-shadow: 0 2px 8px rgba\(0, 0, 0, \.32\);/);

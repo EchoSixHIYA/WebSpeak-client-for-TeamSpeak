@@ -3,7 +3,7 @@
   "packageType": "open-skin",
   "id": "community.kaak-voice",
   "name": "KAAK",
-  "version": "3.1.45",
+  "version": "3.1.46",
   "author": "WebSpeak Project",
   "license": "AGPL-3.0-only",
   "description": "A KOOK-inspired voice workspace with collapsible voice groups and current voice-channel chat, TeamSpeak profile cards, and animated speaker states.",

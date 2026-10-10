@@ -24,6 +24,7 @@
               name="close"
               :size="19" /></button></header
         ><div class="settings-content">
+          <div class="settings-audio-card">
           <section class="settings-section"
             ><h3
               ><Icon
@@ -31,18 +32,20 @@
                 :size="20"
               />
               {{ t("inputDevice") }}</h3
-            ><label
-              class="settings-label"
-              for="input-device"
-              >{{ t("microphone") }}</label
-            ><AudioDeviceSelect
-              id="input-device"
-              :model-value="selectedInputDeviceId"
-              :options="inputDeviceOptions"
-              :label="t('microphone')"
-              :disabled="!inputDevices.length"
-              @change="onInputDeviceChange"
-            /><p
+            ><div class="settings-form-row"
+              ><label
+                class="settings-label"
+                for="input-device"
+                >{{ t("microphone") }}</label
+              ><AudioDeviceSelect
+                id="input-device"
+                :model-value="selectedInputDeviceId"
+                :options="inputDeviceOptions"
+                :label="t('microphone')"
+                :disabled="!inputDevices.length"
+                @change="onInputDeviceChange"
+              /></div
+            ><p
               v-if="audioSettingsError"
               class="settings-error"
               >{{ localizedMessage(audioSettingsError) }}</p
@@ -84,29 +87,39 @@
                 :checked="noiseSuppressionEnabled"
                 :aria-label="t('noiseSuppression')"
                 @change="onNoiseSuppressionToggle" /></label
-            ><div class="settings-range-row"
+              ><div class="settings-form-row settings-range-form-row"
                 ><label class="settings-label">{{ t("inputVolume") }}</label
-                ><strong>{{ Math.round(inputVolume * 100) }}%</strong></div
-              ><input
-                class="settings-range"
-                type="range"
-                min="0"
-                max="100"
-                :value="inputVolume * 100"
-                :style="rangeStyle(inputVolume, 1)"
-                :aria-label="t('inputVolume')"
-                @input="onInputVolume" /><div class="settings-range-row"
+                ><div class="settings-form-control"
+                  ><div class="settings-range-row"
+                    ><strong>{{ Math.round(inputVolume * 100) }}%</strong></div
+                  ><input
+                    class="settings-range"
+                    type="range"
+                    min="0"
+                    max="100"
+                    :value="inputVolume * 100"
+                    :style="rangeStyle(inputVolume, 1)"
+                    :aria-label="t('inputVolume')"
+                    @input="onInputVolume"
+                  /></div
+              ></div
+            ><div class="settings-form-row settings-range-form-row"
               ><label class="settings-label">{{ t("voxThreshold") }}</label
-              ><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div
-            ><input
-              class="settings-range"
-              type="range"
-              min="1"
-              max="80"
-              :value="voxThreshold * 1000"
-              :style="rangeStyle(voxThreshold, 0.08)"
-              :aria-label="t('voxThreshold')"
-              @input="onVoxThreshold" /><div class="audio-level-row"
+              ><div class="settings-form-control"
+                ><div class="settings-range-row"
+                  ><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div
+                ><input
+                  class="settings-range"
+                  type="range"
+                  min="1"
+                  max="80"
+                  :value="voxThreshold * 1000"
+                  :style="rangeStyle(voxThreshold, 0.08)"
+                  :aria-label="t('voxThreshold')"
+                  @input="onVoxThreshold"
+                /></div
+            ></div
+            ><div class="audio-level-row"
               ><span>{{ t("micLevel") }}</span
               ><strong>{{ Math.round(micLevel * 100) }}%</strong></div
             ><div class="audio-level-track"
@@ -147,50 +160,61 @@
                 :size="20"
               />
               {{ t("outputVolume") }}</h3
-            ><label
+              ><div
               v-if="outputDeviceSupported"
-              class="settings-label"
-              for="output-device"
-              >{{ t("outputDevice") }}</label
-            ><AudioDeviceSelect
-              v-if="outputDeviceSupported"
-              id="output-device"
-              :model-value="selectedOutputDeviceId"
-              :options="outputDeviceOptions"
-              :label="t('outputDevice')"
-              :disabled="!outputDevices.length"
-              @change="onOutputDeviceChange"
-            /><p
+              class="settings-form-row"
+              ><label
+                class="settings-label"
+                for="output-device"
+                >{{ t("outputDevice") }}</label
+              ><AudioDeviceSelect
+                id="output-device"
+                :model-value="selectedOutputDeviceId"
+                :options="outputDeviceOptions"
+                :label="t('outputDevice')"
+                :disabled="!outputDevices.length"
+                @change="onOutputDeviceChange"
+              /></div
+            ><p
               v-else
               class="mode-note"
               ><Icon
                 name="info"
                 :size="16"
               /><span>{{ t("outputDeviceUnsupported") }}</span></p
-            ><div class="settings-range-row"
-                ><label class="settings-label">{{ t("speakers") }}</label
-                ><strong>{{ Math.round(outputVolume * 100) }}%</strong></div
+            ><div class="settings-form-row settings-range-form-row"
+              ><label class="settings-label">{{ t("speakers") }}</label
+              ><div class="settings-form-control"
+                ><div class="settings-range-row"
+                  ><strong>{{ Math.round(outputVolume * 100) }}%</strong></div
+                ><input
+                  class="settings-range"
+                  type="range"
+                  min="0"
+                  max="100"
+                  :value="outputVolume * 100"
+                  :style="rangeStyle(outputVolume, 1)"
+                  :aria-label="t('outputVolume')"
+                  @input="onOutputVolume"
+                /></div
+            ></div
+          ><div class="settings-form-row settings-range-form-row"
+            ><label class="settings-label">{{ t("notificationVolume") }}</label
+            ><div class="settings-form-control"
+              ><div class="settings-range-row"
+                ><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div
               ><input
                 class="settings-range"
                 type="range"
                 min="0"
                 max="100"
-                :value="outputVolume * 100"
-                :style="rangeStyle(outputVolume, 1)"
-                :aria-label="t('outputVolume')"
-                @input="onOutputVolume" /><div class="settings-range-row"
-              ><label class="settings-label">{{ t("notificationVolume") }}</label
-              ><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div
-            ><input
-              class="settings-range"
-              type="range"
-              min="0"
-              max="100"
-              :value="notificationVolume * 100"
-              :style="rangeStyle(notificationVolume, 1)"
-              :aria-label="t('notificationVolume')"
-              @input="onNotificationVolume"
-            /><div class="audio-diagnostic"
+                :value="notificationVolume * 100"
+                :style="rangeStyle(notificationVolume, 1)"
+                :aria-label="t('notificationVolume')"
+                @input="onNotificationVolume"
+              /></div
+          ></div
+            ><div class="audio-diagnostic"
               ><span>{{ t("audioStatus") }}</span
               ><strong>{{
                 audioContextState === "running"
@@ -211,7 +235,8 @@
                 :size="16"
               /><span>{{ t("audioPrivacy") }}</span></div
             ></section
-          > </div
+          ></div
+        ></div
         ><footer class="settings-footer"
           ><button
             class="primary-button save-button"
