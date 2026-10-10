@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.46");
+  assert.equal(skin.version, "3.1.47");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -570,6 +570,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /settings-section h3 \{[\s\S]*?color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
   assert.match(skin.css, /settings-audio-card \{\s*width: min\(660px, 100%\);[\s\S]*?background: #25262a;[\s\S]*?border-radius: 16px;/);
   assert.match(skin.css, /settings-form-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 268fr\) minmax\(0, 320fr\);[\s\S]*?min-height: 72px;[\s\S]*?padding: 16px 24px;/);
+  assert.match(skin.css, /noise-suppression-toggle \{\s*grid-template-columns: minmax\(0, 1fr\) 34px;[\s\S]*?padding: 16px 24px;/);
   assert.match(skin.css, /@media \(max-width: 680px\) \{[\s\S]*?settings-form-row \{\s*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-label \{\s*margin: 0;\s*font-weight: 400;/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-select \{[\s\S]*?border-radius: 12px;/);

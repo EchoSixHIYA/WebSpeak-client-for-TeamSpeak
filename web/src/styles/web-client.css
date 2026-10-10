@@ -6705,7 +6705,7 @@
 }
 
 :deep(.dock-switch-row),
-:deep(.mobile-noise-toggle) {
+:deep(.noise-suppression-toggle) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6714,18 +6714,18 @@
 }
 
 :deep(.dock-switch-row > span),
-:deep(.mobile-noise-toggle > span) {
+:deep(.noise-suppression-toggle > span) {
   min-width: 0;
 }
 
 :deep(.dock-switch-row strong),
-:deep(.mobile-noise-toggle strong) {
+:deep(.noise-suppression-toggle strong) {
   display: block;
   color: var(--text-primary);
   font-size: 11px;
 }
 
-:deep(.mobile-noise-toggle) {
+:deep(.noise-suppression-toggle) {
   margin-bottom: 18px;
   padding: 12px;
   background: var(--surface-2);
@@ -6733,7 +6733,7 @@
   border-radius: 11px;
 }
 
-:deep(.mobile-noise-toggle small) {
+:deep(.noise-suppression-toggle small) {
   display: block;
   margin-top: 3px;
   color: var(--text-muted);
@@ -6742,7 +6742,7 @@
 }
 
 :deep(.dock-switch-row input),
-:deep(.mobile-noise-toggle input) {
+:deep(.noise-suppression-toggle input) {
   position: relative;
   width: 34px;
   height: 20px;
@@ -6759,7 +6759,7 @@
 }
 
 :deep(.dock-switch-row input::before),
-:deep(.mobile-noise-toggle input::before) {
+:deep(.noise-suppression-toggle input::before) {
   content: "";
   position: absolute;
   top: 2px;
@@ -6772,19 +6772,19 @@
 }
 
 :deep(.dock-switch-row input:checked),
-:deep(.mobile-noise-toggle input:checked) {
+:deep(.noise-suppression-toggle input:checked) {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 72%, var(--surface-2));
 }
 
 :deep(.dock-switch-row input:checked::before),
-:deep(.mobile-noise-toggle input:checked::before) {
+:deep(.noise-suppression-toggle input:checked::before) {
   background: var(--surface-1);
   transform: translateX(14px);
 }
 
 :deep(.dock-switch-row input:focus-visible),
-:deep(.mobile-noise-toggle input:focus-visible) {
+:deep(.noise-suppression-toggle input:focus-visible) {
   outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
   outline-offset: 2px;
 }
@@ -6817,7 +6817,7 @@
 @media (prefers-reduced-motion: reduce) {
   :deep(.dock-hover-panel),
   :deep(.dock-switch-row input),
-  :deep(.mobile-noise-toggle input) {
+  :deep(.noise-suppression-toggle input) {
     transition-duration: .01ms;
   }
 }

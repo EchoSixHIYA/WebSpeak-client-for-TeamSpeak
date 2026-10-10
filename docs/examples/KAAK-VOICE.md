@@ -14,6 +14,8 @@ The device picker now follows the public KOOK style geometry: a 40px trigger wit
 
 The audio settings surface now follows the observed KOOK form proportions: a 660px dark card, 16px corners, 72px field rows, and a two-column label/control layout. Device and volume controls keep their WebSpeak behavior; only their shared form grouping and KAAK skin presentation changed. The layout stacks fields on narrow screens. KOOK's settings typography remains PingFang SC-first, with a 32px/600 title, 16px/600 section headings, and 14px/400 field labels.
 
+The existing WebSpeak noise-suppression switch is available in the audio settings on desktop and mobile, matching its placement in KOOK's voice settings. It remains the browser's current noise-suppression control; KAAK does not claim to reproduce KOOK's branded processing modes.
+
 ## Reference access note
 
 The owner authorized inspection of the first two voice rooms in the KOOK server. Both rooms were entered and viewed; the microphone remained off and no message was sent. The in-room view confirmed a single large participant tile in the center, a separate right-side panel for the active voice channel's text chat, a narrow server rail, grouped voice channels, and a compact voice-control dock near the lower left. The chat was empty, so no message contents were recorded. Server/room identifiers and member names were not recorded.

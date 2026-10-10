@@ -948,7 +948,6 @@
       :model="audioSettingsState"
       :controls="audioControls"
       :microphone-error="voiceState.microphoneError"
-      :is-mobile-viewport="isMobileViewport"
       :t="t"
       :localized-message="localizedMessage"
       :range-style="rangeStyle"

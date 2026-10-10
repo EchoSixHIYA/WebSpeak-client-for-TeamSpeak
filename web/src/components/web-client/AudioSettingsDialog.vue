@@ -77,8 +77,7 @@
                 {{ microphoneMuted ? t("unmuteMic") : t("muteMic") }}</button
               ></div
             ><label
-              v-if="isMobileViewport"
-              class="mobile-noise-toggle"
+              class="noise-suppression-toggle settings-form-row"
               ><span
                 ><strong>{{ t("noiseSuppression") }}</strong
                 ><small>{{ t("noiseSuppressionHint") }}</small></span
@@ -293,7 +292,6 @@ const props = defineProps<{
   model: AudioSettingsState;
   controls: AudioSettingsControls;
   microphoneError: string;
-  isMobileViewport: boolean;
   t: (key: string, variables?: Record<string, string | number>) => string;
   localizedMessage: (message: string) => string;
   rangeStyle: (value: number, max: number) => CSSProperties;
