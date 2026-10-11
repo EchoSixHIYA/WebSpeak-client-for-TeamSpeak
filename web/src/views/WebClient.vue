@@ -1742,6 +1742,7 @@ const skinPluginWidgets = {
   "voice.member-cards": (options?: SkinPluginWidgetOptions) => h(VoiceMemberCards, {
     currentMembers: currentMembers.value,
     isMobileViewport: isMobileViewport.value,
+    showMemberActions: options?.memberActions === true,
     showScreenShare: options?.screenShare !== false,
     sharing: options?.screenShare === false ? undefined : memberSharingState,
     controls: options?.screenShare === false ? undefined : screenShareControls,

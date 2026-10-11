@@ -59,6 +59,8 @@ export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
 export interface SkinPluginWidgetOptions {
   /** Hide screen-share UI and its stream details for widgets that support it. */
   screenShare?: boolean;
+  /** Show the trusted member actions trigger on desktop member cards. */
+  memberActions?: boolean;
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
@@ -425,13 +427,21 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         // permission needed by the trusted host UI they embed. Screen-share start was already gated.
         let options: SkinPluginWidgetOptions | undefined;
         if (rawNode.options !== undefined) {
+          const supportedOptions = rawNode.widget === "voice.member-cards"
+            ? new Set(["screenShare", "memberActions"])
+            : rawNode.widget === "voice.performance-panel"
+              ? new Set(["screenShare"])
+              : new Set<string>();
           if (!isRecord(rawNode.options)
-            || (rawNode.widget !== "voice.member-cards" && rawNode.widget !== "voice.performance-panel")
-            || Object.keys(rawNode.options).some((key) => key !== "screenShare")
-            || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")) {
+            || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
+            || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")
+            || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")) {
             fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "This host widget uses unsupported options.");
           }
-          options = { ...(rawNode.options.screenShare !== undefined ? { screenShare: rawNode.options.screenShare } : {}) };
+          options = {
+            ...(rawNode.options.screenShare !== undefined ? { screenShare: rawNode.options.screenShare } : {}),
+            ...(rawNode.options.memberActions !== undefined ? { memberActions: rawNode.options.memberActions } : {}),
+          };
         }
         const requiredPermission = inputSchemaVersion >= 3 || rawNode.widget === "voice.screen-share-start"
           ? missingSkinPluginWidgetPermission(rawNode.widget as SkinPluginHostWidget, permissions, options)

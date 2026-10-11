@@ -87,10 +87,19 @@ export function useWebClientMembers({
     };
   }
 
-  function openMemberActions(member: ChannelMember): void {
+  function openMemberActions(member: ChannelMember, event?: Event): void {
     if (member.isSelf) return;
     memberMoveMenuOpen.value = false;
-    memberMenu.value = { member, x: 0, y: 0 };
+    const target = event?.currentTarget;
+    const targetBounds = target instanceof HTMLElement ? target.getBoundingClientRect() : undefined;
+    const usePointerPosition = event instanceof MouseEvent && event.detail > 0;
+    const x = usePointerPosition ? event.clientX : targetBounds?.left ?? 20;
+    const y = usePointerPosition ? event.clientY : targetBounds?.bottom ?? 20;
+    memberMenu.value = {
+      member,
+      x: Math.min(x, Math.max(12, window.innerWidth - 210)),
+      y: Math.min(y, Math.max(12, window.innerHeight - 170)),
+    };
   }
 
   function toggleMemberMoveMenu(): void {

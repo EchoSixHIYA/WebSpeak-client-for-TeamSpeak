@@ -176,7 +176,7 @@
               type="button"
               class="member-action-button"
               :aria-label="t('moreMemberOptions')"
-              @click.stop="openMemberActions(member)"
+              @click.stop="openMemberActions(member, $event)"
               ><Icon
                 name="more"
                 :size="18"

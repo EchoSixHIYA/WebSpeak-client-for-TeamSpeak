@@ -890,7 +890,8 @@
                 "widget": "voice.member-cards",
                 "part": "member-cards",
                 "options": {
-                  "screenShare": false
+                  "screenShare": false,
+                  "memberActions": true
                 }
               },
               {

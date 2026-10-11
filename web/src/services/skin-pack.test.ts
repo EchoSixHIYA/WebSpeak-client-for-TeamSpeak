@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.50");
+  assert.equal(skin.version, "3.1.51");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -534,7 +534,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "channel-member-avatar")?.children?.[0]?.text, "{{voicemember.avatarInitial}}");
   assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "语音房间 / Voice room");
   assert.equal(findPart(voice?.root, "member-cards")?.widget, "voice.member-cards");
-  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: false });
+  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: false, memberActions: true });
   assert.equal(findPart(voice?.root, "member-list"), undefined);
   assert.equal(findPart(voice?.root, "screen-player"), undefined);
   assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
@@ -553,6 +553,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-channel-join-hint/);
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
+  assert.match(skin.css, /voice\.member\.action-trigger[\s\S]*?width: 44px;/);
   assert.match(skin.css, /--skin-kaak-accent-hover: #7ac51a;/);
   assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] > span \{\s*color: var\(--skin-kaak-accent\);\s*\}/);
   assert.doesNotMatch(skin.css, /#b2a8ff/i);

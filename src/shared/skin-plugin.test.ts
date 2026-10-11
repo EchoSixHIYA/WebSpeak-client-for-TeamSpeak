@@ -204,8 +204,8 @@ test("schema v3 trusted widgets can omit screen-share UI and request only the pe
   document.schemaVersion = 3;
   document.components[0].actions = {};
   document.components[0].permissions = ["session.members.read", "session.memberAvatars.read"];
-  document.components[0].root = { tag: "main", children: [{ widget: "voice.member-cards", options: { screenShare: false } }] };
-  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[0]?.options, { screenShare: false });
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.member-cards", options: { screenShare: false, memberActions: true } }] };
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[0]?.options, { screenShare: false, memberActions: true });
 
   const memberCardsDefault = structuredClone(document);
   memberCardsDefault.components[0].root.children![0] = { widget: "voice.member-cards" };
@@ -225,6 +225,14 @@ test("schema v3 trusted widgets can omit screen-share UI and request only the pe
   const invalidOption = structuredClone(document);
   invalidOption.components[0].root.children![0] = { widget: "voice.member-cards", options: { screenShare: "false" } as never };
   errorCode(() => parseSkinPluginDocument(invalidOption), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+
+  const memberActionsOnWrongWidget = structuredClone(document);
+  memberActionsOnWrongWidget.components[0].root.children![0] = { widget: "voice.performance-panel", options: { memberActions: true } };
+  errorCode(() => parseSkinPluginDocument(memberActionsOnWrongWidget), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+
+  const invalidMemberActions = structuredClone(document);
+  invalidMemberActions.components[0].root.children![0] = { widget: "voice.member-cards", options: { memberActions: "yes" } as never };
+  errorCode(() => parseSkinPluginDocument(invalidMemberActions), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 
   const legacyOption = structuredClone(document);
   legacyOption.schemaVersion = 2;

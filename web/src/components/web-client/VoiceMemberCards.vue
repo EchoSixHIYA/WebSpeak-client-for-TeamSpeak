@@ -18,11 +18,14 @@
       :data-ws-self="member.isSelf ? 'true' : 'false'"
     >
       <button
-        v-if="isMobileViewport && !member.isSelf"
+        v-if="!member.isSelf && (isMobileViewport || showMemberActions)"
         type="button"
         class="voice-member-action"
+        data-ws-part="voice.member.action-trigger"
+        :data-ws-member-actions="showMemberActions ? 'enabled' : undefined"
         :aria-label="t('moreMemberOptions')"
-        @click.stop="emit('memberActions', member)"
+        :title="t('moreMemberOptions')"
+        @click.stop="emit('memberActions', member, $event)"
         ><Icon
           name="more"
           :size="17"
@@ -160,7 +163,7 @@ import { computed } from "vue";
 import type { ChannelMember, useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
 const props = defineProps<{
-  currentMembers: ChannelMember[]; isMobileViewport: boolean;
+  currentMembers: ChannelMember[]; isMobileViewport: boolean; showMemberActions?: boolean;
   showScreenShare?: boolean;
   sharing?: Pick<ReturnType<typeof useVoiceWebSocket>, "screenShareActive" | "screenShareStarting" | "screenShareViewingStreamId"> & Pick<ReturnType<typeof useWebClientScreenShare>, "settingsOpen">;
   controls?: Pick<ReturnType<typeof useWebClientScreenShare>, "streamForMember" | "toggleForMember" | "startWithSettings">;
@@ -180,7 +183,7 @@ function toggleScreenShareSettings() {
   if (!shareEnabled.value || !props.sharing) return;
   props.sharing.settingsOpen.value = !props.sharing.settingsOpen.value;
 }
-const emit = defineEmits<{ memberActions: [member: ChannelMember]; stopShare: [] }>();
+const emit = defineEmits<{ memberActions: [member: ChannelMember, event: MouseEvent]; stopShare: [] }>();
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
 </script>
 
