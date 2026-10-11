@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.68");
+  assert.equal(skin.version, "3.1.69");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -589,6 +589,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /mobile-noise-suppression \{ grid-column: 2; grid-row: 2; \}/);
   assert.match(skin.css, /mobile-microphone-toggle \{ grid-column: 3; grid-row: 2; \}/);
   assert.match(skin.css, /voice\.member\.action-trigger[\s\S]*?width: 44px;/);
+  assert.match(skin.css, /\.ws-skin-root\[data-ws-skin="community\.kaak-voice"\] \[data-ws-part="voice\.context-menu"\]\s*\{[^}]*background: #303136;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] \.menu-volume\s*\{[^}]*border-bottom: 1px solid #48494f;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] > button:hover[\s\S]*?background: #414248;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] \.member-menu-submenu\s*\{[^}]*border-top: 1px solid #48494f;/);
   assert.match(skin.css, /--skin-kaak-accent-hover: #7ac51a;/);
   assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] > span \{\s*color: var\(--skin-kaak-accent\);\s*\}/);
   assert.doesNotMatch(skin.css, /#b2a8ff/i);

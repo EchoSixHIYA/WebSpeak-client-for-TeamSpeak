@@ -1006,6 +1006,106 @@
   background: #303136;
 }
 
+/* Match KOOK's compact dark context-menu treatment while keeping WebSpeak actions. */
+[data-ws-part="voice.context-menu"] {
+  color: var(--skin-kaak-text);
+  border-color: #48494f;
+  background: #303136;
+  box-shadow: 0 14px 32px #0008;
+  font-family: var(--skin-kaak-font);
+}
+[data-ws-part="voice.context-menu"] .member-menu-header {
+  padding: 2px 4px 8px;
+  border-bottom: 1px solid #48494f;
+}
+[data-ws-part="voice.context-menu"] .member-menu-header strong {
+  padding: 0;
+  color: #f0f1f3;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+[data-ws-part="voice.context-menu"] .member-menu-close {
+  color: #b8bac1;
+  background: #3b3c42;
+}
+[data-ws-part="voice.context-menu"] .menu-volume {
+  gap: 8px;
+  padding: 8px 4px 11px;
+  border-bottom: 1px solid #48494f;
+  color: #c1c2c8;
+  font-size: 11px;
+}
+[data-ws-part="voice.context-menu"] .menu-volume input {
+  accent-color: var(--skin-kaak-accent);
+}
+[data-ws-part="voice.context-menu"] .menu-volume input::-webkit-slider-thumb {
+  border-color: var(--skin-kaak-accent);
+  box-shadow: 0 0 0 2px #303136;
+}
+[data-ws-part="voice.context-menu"] .menu-volume input::-moz-range-thumb {
+  border-color: var(--skin-kaak-accent);
+  box-shadow: 0 0 0 2px #303136;
+}
+[data-ws-part="voice.context-menu"] > button,
+[data-ws-part="voice.context-menu"] .member-menu-submenu-trigger {
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: #d5d6db;
+  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  transition: color .14s ease, background-color .14s ease;
+}
+[data-ws-part="voice.context-menu"] > button:hover,
+[data-ws-part="voice.context-menu"] .member-menu-submenu-trigger:hover {
+  color: #f0f1f3;
+  background: #414248;
+}
+[data-ws-part="voice.context-menu"] > button:focus-visible,
+[data-ws-part="voice.context-menu"] .member-menu-submenu-trigger:focus-visible {
+  outline: 2px solid var(--skin-kaak-accent);
+  outline-offset: 1px;
+}
+[data-ws-part="voice.context-menu"] .member-menu-submenu {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid #48494f;
+}
+[data-ws-part="voice.context-menu"] .member-menu-submenu-arrow,
+[data-ws-part="voice.context-menu"] .member-submenu-panel button small,
+[data-ws-part="voice.context-menu"] .member-submenu-empty {
+  color: #a0a2a8;
+}
+[data-ws-part="voice.context-menu"] .member-submenu-panel {
+  color: var(--skin-kaak-text);
+  border-color: #48494f;
+  background: #303136;
+  box-shadow: 0 14px 32px #0008;
+}
+[data-ws-part="voice.context-menu"] .member-submenu-panel button {
+  color: #d5d6db;
+  background: transparent;
+}
+[data-ws-part="voice.context-menu"] .member-submenu-panel button:hover {
+  color: #f0f1f3;
+  background: #414248;
+}
+
+@media (min-width: 821px) {
+  [data-ws-part="voice.context-menu"] {
+    min-width: 236px;
+    gap: 3px;
+    padding: 8px;
+    border-radius: 11px;
+  }
+  [data-ws-part="voice.context-menu"] > button,
+  [data-ws-part="voice.context-menu"] .member-menu-submenu-trigger {
+    min-height: 34px;
+  }
+}
+
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty { display: grid; min-height: 160px; place-content: center; justify-items: center; gap: 8px; color: var(--skin-kaak-muted); text-align: center; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty strong { color: var(--skin-kaak-text); font-size: 14px; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-empty > span:last-child { font-size: 11px; }
