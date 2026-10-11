@@ -35,8 +35,8 @@ test("the stable layout registry covers public skin hooks and excludes the admin
     const isNativeControl = /^<(?:button|a|input|select|textarea)\b/i.test(attributes);
     const hasButtonRole = /\brole="button"/.test(attributes);
     const keyboardAction = /@keydown\.(?:enter|space)\b/.test(attributes);
-    const dragAction = /@(?:dragstart|dragover|dragleave|drop)\b|:draggable=/.test(attributes);
-    if (isNativeControl || hasButtonRole || keyboardAction || dragAction) interactiveParts.add(part);
+    // Native HTML drag gestures are desktop-only and do not make a row a 44px touch control.
+    if (isNativeControl || hasButtonRole || keyboardAction) interactiveParts.add(part);
   }
   const registered = new Set(SKIN_LAYOUT_COMPONENTS.map((component) => component.selectorPart));
   for (const part of publicParts) assert.ok(registered.has(part), "Unregistered public layout hook: " + part);

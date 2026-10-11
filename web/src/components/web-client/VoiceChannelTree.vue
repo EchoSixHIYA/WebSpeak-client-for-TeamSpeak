@@ -20,11 +20,19 @@
       :avatar-initial="avatarInitial"
       :is-speaking="isSpeaking"
       :show-member-actions="showMemberActions"
+      :member-drag-drop="memberDragDrop"
+      :dragged-member-id="draggedMemberId"
+      :drag-over-channel-id="dragOverChannelId"
       :t="t"
       @toggle="toggleExpanded"
       @select="selectedChannelId = $event"
       @join="joinChannel"
       @member-context-menu="emit('memberContextMenu', $event)"
+      @member-drag-start="emit('memberDragStart', $event)"
+      @member-drag-end="emit('memberDragEnd')"
+      @channel-drag-over="emit('channelDragOver', $event)"
+      @channel-drag-leave="emit('channelDragLeave', $event)"
+      @channel-drop="emit('channelDrop', $event)"
     />
   </ul>
   <div
@@ -51,6 +59,9 @@ const props = defineProps<{
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
   showMemberActions?: boolean;
+  memberDragDrop?: boolean;
+  draggedMemberId?: number | null;
+  dragOverChannelId?: string;
   t: (key: string) => string;
 }>();
 
@@ -106,6 +117,11 @@ function joinChannel(channel: TreeChannel): void {
 const emit = defineEmits<{
   join: [channel: TreeChannel];
   memberContextMenu: [payload: { member: ChannelMember; event: MouseEvent }];
+  memberDragStart: [payload: { member: ChannelMember; event: DragEvent }];
+  memberDragEnd: [];
+  channelDragOver: [payload: { channel: TreeChannel; event: DragEvent }];
+  channelDragLeave: [payload: { channel: TreeChannel; event: DragEvent }];
+  channelDrop: [payload: { channel: TreeChannel; event: DragEvent }];
 }>();
 
 </script>

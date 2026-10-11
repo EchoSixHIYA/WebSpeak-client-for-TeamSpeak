@@ -65,6 +65,8 @@ export interface SkinPluginWidgetOptions {
   screenShare?: boolean;
   /** Enable host member actions on member cards and a right-click menu on channel-tree rows. */
   memberActions?: boolean;
+  /** Enable trusted host member drag-and-drop between channel-tree rows. */
+  memberDragDrop?: boolean;
   /** Select a supported host presentation for audio controls or a channel tree. */
   layout?: "default" | "room-panel" | "server-sidebar";
 }
@@ -440,7 +442,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
           const supportedOptions = rawNode.widget === "voice.member-cards"
             ? new Set(["screenShare", "memberActions"])
             : rawNode.widget === "voice.channel-tree"
-              ? new Set(["layout", "memberActions"])
+              ? new Set(["layout", "memberActions", "memberDragDrop"])
             : rawNode.widget === "voice.performance-panel"
               ? new Set(["screenShare"])
               : rawNode.widget === "voice.audio-controls"
@@ -450,6 +452,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
             || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")
             || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")
+            || (rawNode.options.memberDragDrop !== undefined && typeof rawNode.options.memberDragDrop !== "boolean")
             || (rawNode.options.layout !== undefined
               && rawNode.options.layout !== "default"
               && rawNode.options.layout !== "room-panel"
@@ -459,6 +462,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
           options = {
             ...(rawNode.options.screenShare !== undefined ? { screenShare: rawNode.options.screenShare } : {}),
             ...(rawNode.options.memberActions !== undefined ? { memberActions: rawNode.options.memberActions } : {}),
+            ...(rawNode.options.memberDragDrop !== undefined ? { memberDragDrop: rawNode.options.memberDragDrop } : {}),
             ...(rawNode.options.layout !== undefined ? { layout: rawNode.options.layout } : {}),
           };
         }

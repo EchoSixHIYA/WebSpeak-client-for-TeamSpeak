@@ -382,7 +382,8 @@
                             "part": "voice-channel-tree",
                             "options": {
                               "layout": "server-sidebar",
-                              "memberActions": true
+                              "memberActions": true,
+                              "memberDragDrop": true
                             }
                           }
                         ]

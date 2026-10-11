@@ -24,10 +24,14 @@
         type="button"
         class="ws-voice-channel-row"
         data-ws-part="voice.channel-tree.row"
+        :data-drag-over="memberDragDrop && dragOverChannelId === node.channel.id ? 'true' : undefined"
         :title="`双击或按 Enter 加入 ${node.channel.name} / Double-click or press Enter to join`"
         @click="emit('select', node.channel.id)"
         @dblclick.stop.prevent="join"
         @keydown.enter.prevent.stop="join"
+        @dragover="handleChannelDragOver($event)"
+        @dragleave="handleChannelDragLeave($event)"
+        @drop="handleChannelDrop($event)"
       >
         <Icon class="ws-voice-channel-type" data-ws-part="voice.channel-tree.icon" name="volume" :size="14" />
         <span class="ws-voice-channel-name" data-ws-part="voice.channel-tree.name">{{ node.channel.name }}</span>
@@ -49,6 +53,10 @@
           :aria-level="depth + 2"
           :aria-label="`${member.nickname}${member.isSelf ? `, ${t('you')}` : ''}${member.inputMuted ? `, ${t('inputMuted')}` : ''}`"
           :data-self="member.isSelf ? 'true' : 'false'"
+          :draggable="memberDragDrop && !member.isSelf"
+          :data-dragging="memberDragDrop && draggedMemberId === member.id ? 'true' : undefined"
+          @dragstart="handleMemberDragStart(member, $event)"
+          @dragend="emit('memberDragEnd')"
           @contextmenu="handleMemberContextMenu(member, $event)"
         >
           <span
@@ -96,11 +104,19 @@
             :avatar-initial="avatarInitial"
             :is-speaking="isSpeaking"
             :show-member-actions="showMemberActions"
+            :member-drag-drop="memberDragDrop"
+            :dragged-member-id="draggedMemberId"
+            :drag-over-channel-id="dragOverChannelId"
             :t="t"
             @toggle="emit('toggle', $event)"
             @select="emit('select', $event)"
             @join="emit('join', $event)"
             @member-context-menu="emit('memberContextMenu', $event)"
+            @member-drag-start="emit('memberDragStart', $event)"
+            @member-drag-end="emit('memberDragEnd')"
+            @channel-drag-over="emit('channelDragOver', $event)"
+            @channel-drag-leave="emit('channelDragLeave', $event)"
+            @channel-drop="emit('channelDrop', $event)"
           />
         </ul>
       </div>
@@ -122,6 +138,10 @@
           :aria-label="`${member.nickname}${member.isSelf ? `, ${t('you')}` : ''}${member.inputMuted ? `, ${t('inputMuted')}` : ''}${member.away ? ', away' : ''}`"
           :data-speaking="isSpeaking(member) ? 'true' : 'false'"
           :data-away="member.away ? 'true' : 'false'"
+          :draggable="memberDragDrop && !member.isSelf"
+          :data-dragging="memberDragDrop && draggedMemberId === member.id ? 'true' : undefined"
+          @dragstart="handleMemberDragStart(member, $event)"
+          @dragend="emit('memberDragEnd')"
           @contextmenu="handleMemberContextMenu(member, $event)"
         >
           <span
@@ -163,11 +183,19 @@
           :avatar-initial="avatarInitial"
           :is-speaking="isSpeaking"
           :show-member-actions="showMemberActions"
+          :member-drag-drop="memberDragDrop"
+          :dragged-member-id="draggedMemberId"
+          :drag-over-channel-id="dragOverChannelId"
           :t="t"
           @toggle="emit('toggle', $event)"
           @select="emit('select', $event)"
           @join="emit('join', $event)"
           @member-context-menu="emit('memberContextMenu', $event)"
+          @member-drag-start="emit('memberDragStart', $event)"
+          @member-drag-end="emit('memberDragEnd')"
+          @channel-drag-over="emit('channelDragOver', $event)"
+          @channel-drag-leave="emit('channelDragLeave', $event)"
+          @channel-drop="emit('channelDrop', $event)"
         />
       </ul>
     </div>
@@ -194,6 +222,9 @@ const props = defineProps<{
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
   showMemberActions?: boolean;
+  memberDragDrop?: boolean;
+  draggedMemberId?: number | null;
+  dragOverChannelId?: string;
   t: (key: string) => string;
 }>();
 
@@ -202,6 +233,11 @@ const emit = defineEmits<{
   select: [channelId: string];
   join: [channel: TreeChannel];
   memberContextMenu: [payload: { member: ChannelMember; event: MouseEvent }];
+  memberDragStart: [payload: { member: ChannelMember; event: DragEvent }];
+  memberDragEnd: [];
+  channelDragOver: [payload: { channel: TreeChannel; event: DragEvent }];
+  channelDragLeave: [payload: { channel: TreeChannel; event: DragEvent }];
+  channelDrop: [payload: { channel: TreeChannel; event: DragEvent }];
 }>();
 
 const expanded = computed(() => props.expandedIds.has(props.node.channel.id));
@@ -221,5 +257,21 @@ function handleMemberContextMenu(member: ChannelMember, event: MouseEvent): void
   event.preventDefault();
   event.stopPropagation();
   emit("memberContextMenu", { member, event });
+}
+
+function handleMemberDragStart(member: ChannelMember, event: DragEvent): void {
+  if (props.memberDragDrop) emit("memberDragStart", { member, event });
+}
+
+function handleChannelDragOver(event: DragEvent): void {
+  if (props.memberDragDrop) emit("channelDragOver", { channel: props.node.channel, event });
+}
+
+function handleChannelDragLeave(event: DragEvent): void {
+  if (props.memberDragDrop) emit("channelDragLeave", { channel: props.node.channel, event });
+}
+
+function handleChannelDrop(event: DragEvent): void {
+  if (props.memberDragDrop) emit("channelDrop", { channel: props.node.channel, event });
 }
 </script>

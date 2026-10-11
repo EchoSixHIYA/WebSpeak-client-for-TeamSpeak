@@ -301,7 +301,7 @@ test("trusted channel tree and server switcher widgets require scoped read and c
     children: [
       { widget: "voice.server-switcher", part: "server-switcher" },
       { widget: "voice.server-header", part: "server-header" },
-      { widget: "voice.channel-tree", part: "channel-tree", options: { layout: "server-sidebar", memberActions: true } },
+      { widget: "voice.channel-tree", part: "channel-tree", options: { layout: "server-sidebar", memberActions: true, memberDragDrop: true } },
     ],
   };
   assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.map(({ widget }) => widget), [
@@ -309,7 +309,15 @@ test("trusted channel tree and server switcher widgets require scoped read and c
     "voice.server-header",
     "voice.channel-tree",
   ]);
-  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[2]?.options, { layout: "server-sidebar", memberActions: true });
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[2]?.options, { layout: "server-sidebar", memberActions: true, memberDragDrop: true });
+
+  const invalidMemberDragDrop = structuredClone(document);
+  invalidMemberDragDrop.components[0].root.children![2] = { widget: "voice.channel-tree", options: { memberDragDrop: "yes" } as never };
+  errorCode(() => parseSkinPluginDocument(invalidMemberDragDrop), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+
+  const memberDragDropOnWrongWidget = structuredClone(document);
+  memberDragDropOnWrongWidget.components[0].root.children![2] = { widget: "voice.performance-panel", options: { memberDragDrop: true } };
+  errorCode(() => parseSkinPluginDocument(memberDragDropOnWrongWidget), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 
   for (const missingPermission of [
     "session.status.read",
