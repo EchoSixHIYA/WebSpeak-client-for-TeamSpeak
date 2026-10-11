@@ -2897,3 +2897,65 @@
   [data-ws-plugin-part="kaak-workspace.server-summary"] .ws-voice-server-divider { margin-top: 8px; }
   [data-ws-plugin-part="kaak-workspace.voice-dock"] { padding-top: 10px; padding-bottom: 8px; }
 }
+
+/* Real TeamSpeak host banner and welcome message; omitted when both are unset. */
+[data-ws-plugin-part="kaak-workspace.server-banner"] {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 15px 16px 13px;
+  overflow: hidden;
+  border: 1px solid #3b3e45;
+  border-radius: 11px;
+  color: #eff0f3;
+  background: #202124;
+  font-family: var(--skin-kaak-font);
+}
+[data-ws-plugin-part="kaak-workspace.server-banner"] .ws-voice-server-banner-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.95 / 1;
+  object-fit: cover;
+  background: #292b30;
+}
+[data-ws-plugin-part="kaak-workspace.server-banner"] .ws-voice-server-banner-welcome {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr);
+  gap: 9px;
+  min-width: 0;
+  padding: 12px 12px 13px;
+  border-top: 1px solid #ffffff0b;
+  background: #252628;
+}
+[data-ws-plugin-part="kaak-workspace.server-banner"] .ws-voice-server-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 19px;
+  margin-top: 1px;
+  color: #72c800;
+}
+[data-ws-plugin-part="kaak-workspace.server-banner"] .ws-voice-server-banner-copy { min-width: 0; }
+[data-ws-plugin-part="kaak-workspace.server-banner"] [data-ws-part="voice.server-banner.title"] {
+  display: block;
+  overflow: hidden;
+  color: #eff0f3;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 17px;
+  text-overflow: ellipsis;
+}
+[data-ws-plugin-part="kaak-workspace.server-banner"] [data-ws-part="voice.server-banner.body"] {
+  margin: 4px 0 0;
+  color: #a5aab4;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 820px) {
+  [data-ws-plugin-part="kaak-workspace.server-banner"] { margin: 10px 8px 10px; border-radius: 9px; }
+  [data-ws-plugin-part="kaak-workspace.server-banner"] .ws-voice-server-banner-welcome { gap: 8px; padding: 9px 10px 10px; }
+  [data-ws-plugin-part="kaak-workspace.server-banner"] [data-ws-part="voice.server-banner.title"] { font-size: 11px; line-height: 15px; }
+  [data-ws-plugin-part="kaak-workspace.server-banner"] [data-ws-part="voice.server-banner.body"] { margin-top: 3px; font-size: 10px; line-height: 14px; }
+}

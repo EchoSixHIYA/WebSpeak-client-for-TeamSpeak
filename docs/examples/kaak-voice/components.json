@@ -324,6 +324,10 @@
                 "part": "server-summary"
               },
               {
+                "widget": "voice.server-banner",
+                "part": "server-banner"
+              },
+              {
                 "tag": "nav",
                 "part": "channel-list",
                 "attributes": {

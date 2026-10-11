@@ -44,6 +44,7 @@ test("the stable layout registry covers public skin hooks and excludes the admin
   assert.equal(micStatus?.category, "core");
   assert.equal(micStatus?.editable, true);
   assert.ok(micStatus?.layoutModes.includes("visibility"));
+  assert.equal(getSkinLayoutComponent("voice.server-banner", "voice")?.editable, true);
   for (const part of interactiveParts) {
     const component = SKIN_LAYOUT_COMPONENTS.find((entry) => entry.id === part);
     assert.ok(component, "Interactive public hook must have its own component metadata: " + part);

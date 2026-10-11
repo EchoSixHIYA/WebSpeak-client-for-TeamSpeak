@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.67");
+  assert.equal(skin.version, "3.1.68");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -499,6 +499,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     return undefined;
   }
   assert.equal(findPart(voice?.root, "server-summary")?.widget, "voice.server-header");
+  assert.equal(findPart(voice?.root, "server-banner")?.widget, "voice.server-banner");
   assert.equal(findPart(voice?.root, "record-placeholder"), undefined, "the KAAK voice dock has no recording control");
   assert.equal(findPart(voice?.root, "voice-channel-tree")?.widget, "voice.channel-tree");
   assert.deepEqual(findPart(voice?.root, "voice-channel-tree")?.options, { layout: "server-sidebar" });
@@ -555,6 +556,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "audio-controls")?.widget, "voice.audio-controls");
   assert.deepEqual(findPart(voice?.root, "audio-controls")?.options, { layout: "room-panel" });
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.server-summary"]'));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.server-banner"]'));
+  assert.match(skin.css, /ws-voice-server-banner-image[\s\S]*?aspect-ratio: 1\.95 \/ 1;[\s\S]*?object-fit: cover;/);
+  assert.match(skin.css, /voice\.server-banner\.body[\s\S]*?white-space: pre-wrap;/);
   assert.ok(skin.css.includes(".ws-voice-server-search-toggle"));
   assert.ok(skin.css.includes(".ws-voice-server-switcher-menu"));
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-row'));

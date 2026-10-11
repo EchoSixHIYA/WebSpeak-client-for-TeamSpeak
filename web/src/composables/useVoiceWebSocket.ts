@@ -46,6 +46,8 @@ export interface VoiceState {
 export interface VoiceServerInfo {
   name: string;
   icon?: string | null;
+  bannerUrl?: string | null;
+  welcomeMessage?: string;
 }
 
 export interface AudioInputDevice {
@@ -1044,7 +1046,12 @@ export function useVoiceWebSocket() {
     if (!msg || screenShare.handleMessage(msg) || sessionState.receive(msg)) return;
     switch (msg.type) {
       case "serverInfo":
-        serverInfo.value = { name: msg.name, icon: msg.icon ?? null };
+        serverInfo.value = {
+          name: msg.name,
+          icon: msg.icon ?? null,
+          bannerUrl: msg.bannerUrl ?? null,
+          welcomeMessage: msg.welcomeMessage ?? "",
+        };
         break;
       case "connected":
         const wasReconnecting = state.reconnecting;

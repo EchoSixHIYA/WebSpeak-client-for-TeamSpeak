@@ -49,11 +49,18 @@ export interface TSClientServerInfo {
   iconId: number | null;
 }
 
+export interface TSClientServerPresentation {
+  bannerUrl: string | null;
+  welcomeMessage: string;
+}
+
 // Keep enough room for avatars produced by the native client. The previous
 // 120 KiB limit rejected the 134 KiB PNG used by the Shanghai test account,
 // so every avatar silently fell back to its initial letter.
 const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
 const MAX_SERVER_ICON_BYTES = 128 * 1024;
+const MAX_SERVER_BANNER_URL_LENGTH = 2_048;
+const MAX_SERVER_WELCOME_MESSAGE_LENGTH = 4_096;
 
 export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity>;
 export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
@@ -289,6 +296,29 @@ export class TSClient extends EventEmitter {
       throw new Error("TeamSpeak session changed while reading server information");
     }
     return client.serverInfo ?? { name: "", iconId: null };
+  }
+
+  /** Read only the public banner and welcome message from the active virtual server. */
+  async getServerPresentation(): Promise<TSClientServerPresentation> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const generation = this.connectionGeneration;
+    const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
+    const empty: TSClientServerPresentation = { bannerUrl: null, welcomeMessage: "" };
+    try {
+      const rows = await client.execCommandWithResponse("serverinfo", 5_000);
+      if (!isCurrent()) throw new Error("TeamSpeak session changed while reading server presentation");
+      const row = rows[0] ?? {};
+      return {
+        bannerUrl: normalizeTeamSpeakBannerUrl(row.virtualserver_hostbanner_gfx_url),
+        welcomeMessage: normalizeTeamSpeakWelcomeMessage(row.virtualserver_welcomemessage),
+      };
+    } catch (error: unknown) {
+      if (!isCurrent()) throw error;
+      // Some servers restrict serverinfo. Keep the voice connection usable and
+      // omit the optional presentation when the fields cannot be read.
+      return empty;
+    }
   }
 
   /** Download the public virtual-server icon using TeamSpeak's normal file-transfer port. */
@@ -567,6 +597,24 @@ export class TSClient extends EventEmitter {
       this.clientId = 0;
     }
   }
+}
+
+function normalizeTeamSpeakBannerUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const candidate = value.trim();
+  if (!candidate || candidate.length > MAX_SERVER_BANNER_URL_LENGTH) return null;
+  try {
+    const url = new URL(candidate);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTeamSpeakWelcomeMessage(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\0/g, "").replace(/\r\n?/g, "\n").slice(0, MAX_SERVER_WELCOME_MESSAGE_LENGTH).trim();
 }
 
 function escapeTeamSpeakValue(value: string): string {

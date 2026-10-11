@@ -199,6 +199,7 @@ export const webClientTranslations: Record<string, Record<string, string>> = {
     encrypted: "加密连接",
     voiceActivity: "语音活动",
     voiceSettings: "语音设置",
+    serverWelcome: "服务器欢迎语",
     speakingNow: "正在语音中",
     onlineShort: "{{count}} 在线",
     you: "你",
@@ -608,6 +609,7 @@ export const webClientTranslations: Record<string, Record<string, string>> = {
     encrypted: "Encrypted connection",
     voiceActivity: "VOICE ACTIVITY",
     voiceSettings: "Voice settings",
+    serverWelcome: "Server welcome",
     speakingNow: "Speaking now",
     onlineShort: "{{count}} online",
     you: "You",
@@ -1011,6 +1013,7 @@ webClientTranslations.de = {
   encrypted: "Verschlüsselte Verbindung",
   voiceActivity: "SPRACHAKTIVITÄT",
   voiceSettings: "Spracheinstellungen",
+  serverWelcome: "Server-Willkommen",
   speakingNow: "Spricht gerade",
   onlineShort: "{{count}} online",
   you: "Du",
@@ -1225,6 +1228,7 @@ webClientTranslations.de = {
 
 webClientTranslations.ru = {
   ...webClientTranslations.en,
+  serverWelcome: "Приветствие сервера",
   chatSending: "Ожидание подтверждения сервера…",
   chatSendFailed: "Отправка не подтверждена; черновик сохранён. При тайм-ауте сообщение могло дойти. Проверьте перед повторной отправкой.",
   chatNotConnected: "Отправка будет доступна после восстановления соединения. Черновик сохранён.",
@@ -1422,6 +1426,7 @@ webClientTranslations.ru = {
 
 webClientTranslations.ja = {
   ...webClientTranslations.en,
+  serverWelcome: "サーバーからのメッセージ",
   chatSending: "サーバーの確認を待っています…",
   chatSendFailed: "送信を確認できませんでした。下書きは保持されています。タイムアウトしても届いている場合があるため、再送前に確認してください。",
   chatNotConnected: "接続が復旧すると送信できます。下書きは保持されています。",

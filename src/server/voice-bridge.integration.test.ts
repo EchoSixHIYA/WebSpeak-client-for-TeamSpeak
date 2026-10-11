@@ -23,12 +23,17 @@ class TeamSpeakStub extends EventEmitter {
   emitDirectorySnapshotOnConnect = true;
   connectCalls = 0;
   serverInfoCalls = 0;
+  serverPresentationCalls = 0;
   async connect() { this.connectCalls++; this.disconnected = false; if (this.emitDirectorySnapshotOnConnect) this.emit("directorySnapshot", this.directory); }
   async disconnect() { this.disconnected = true; }
   getClientId() { return 1; }
   getChannelId() { return 1n; }
   isConnected() { return !this.disconnected; }
   async getServerInfo() { this.serverInfoCalls++; return { name: "兄弟们的teamspeak", iconId: null }; }
+  async getServerPresentation() {
+    this.serverPresentationCalls++;
+    return { bannerUrl: "https://assets.example.invalid/teamspeak/banner.png", welcomeMessage: "欢迎来到服务器！\n请遵守频道规则。" };
+  }
   async getServerIcon() { return null; }
   async sendProtocolCommand() {}
   async setAccompanimentActive() {}
@@ -98,15 +103,27 @@ test("server identity lookup waits until the directory sync publishes the connec
     f.socket.on("message", (data, binary) => {
       if (binary) return;
       const message = JSON.parse(data.toString()) as Record<string, unknown>;
-      if (message.type === "serverInfo") resolve(message);
+      if (message.type === "serverInfo" && message.bannerUrl === null) resolve(message);
+    });
+  });
+  const serverPresentation = new Promise<Record<string, unknown>>(resolve => {
+    f.socket.on("message", (data, binary) => {
+      if (binary) return;
+      const message = JSON.parse(data.toString()) as Record<string, unknown>;
+      if (message.type === "serverInfo" && message.bannerUrl === "https://assets.example.invalid/teamspeak/banner.png") resolve(message);
     });
   });
   f.sdk.emit("directorySnapshot", f.sdk.directory);
-  assert.deepEqual(await serverInfo, { type: "serverInfo", name: "兄弟们的teamspeak", icon: null });
+  assert.deepEqual(await serverInfo, { type: "serverInfo", name: "兄弟们的teamspeak", icon: null, bannerUrl: null, welcomeMessage: "" });
+  assert.deepEqual(await serverPresentation, {
+    type: "serverInfo", name: "兄弟们的teamspeak", icon: null,
+    bannerUrl: "https://assets.example.invalid/teamspeak/banner.png", welcomeMessage: "欢迎来到服务器！\n请遵守频道规则。",
+  });
   const publishedTypes = f.messages.filter(message => !message.binary).map(message => (JSON.parse(message.data.toString()) as { type: string }).type);
   assert.ok(publishedTypes.indexOf("connected") >= 0);
   assert.ok(publishedTypes.indexOf("serverInfo") > publishedTypes.indexOf("connected"));
   assert.equal(f.sdk.serverInfoCalls, 1);
+  assert.equal(f.sdk.serverPresentationCalls, 1);
   assert.ok(f.bridge.getActiveCount() > 0);
 });
 

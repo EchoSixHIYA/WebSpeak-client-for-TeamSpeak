@@ -163,6 +163,18 @@ test("starting screen share from a skin host widget requires its own permission"
   assert.equal(parsed.components[0].root.children?.[0].widget, "voice.screen-share-start");
 });
 
+test("server banner host widget only exposes public session status fields", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ widget: "voice.server-banner" }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["session.status.read"];
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].root.children?.[0].widget, "voice.server-banner");
+});
+
 test("schema v3 host audio controls require read and control permissions while v2 remains compatible", () => {
   const document = validDocument();
   document.schemaVersion = 3;

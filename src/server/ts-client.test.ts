@@ -19,6 +19,7 @@ class SdkStub extends EventEmitter {
   inputCommands: string[] = [];
   fileTransfers: Array<{ channelId: bigint; path: string; password: string }> = [];
   serverInfo: { name: string; iconId: number | null } | null = { name: "兄弟们的teamspeak", iconId: 123456 };
+  serverPresentationRows: Array<Record<string, string>> = [];
   inputUpdate = async (_command: string): Promise<void> => {};
   async execCommand(command: string) { this.inputCommands.push(command); await this.inputUpdate(command); }
   initialized = 0;
@@ -26,7 +27,10 @@ class SdkStub extends EventEmitter {
   metadata = async () => rows;
   transfer = async () => transfer;
   download = async (destination: Writable) => { destination.write(Buffer.from("GIF89a")); };
-  execCommandWithResponse(command = "") { this.inputCommands.push(command); return this.metadata(); }
+  execCommandWithResponse(command = "") {
+    this.inputCommands.push(command);
+    return command === "serverinfo" ? Promise.resolve(this.serverPresentationRows) : this.metadata();
+  }
   async fileTransferInitDownload(channelId: bigint, path: string, password: string) {
     this.initialized++;
     this.fileTransfers.push({ channelId, path, password });
@@ -65,6 +69,27 @@ test("server info uses the name and icon id captured by the SDK handshake", asyn
   assert.deepEqual(f.sdk.inputCommands, [], "server identity does not issue a ServerQuery-only command over the client session");
   f.sdk.serverInfo = { name: "No icon", iconId: null };
   assert.deepEqual(await f.client.getServerInfo(), { name: "No icon", iconId: null });
+});
+
+test("server presentation reads bounded public banner and welcome fields", async () => {
+  const f = fixture();
+  f.sdk.serverPresentationRows = [{
+    virtualserver_hostbanner_gfx_url: "https://assets.example.invalid/teamspeak/banner.png",
+    virtualserver_welcomemessage: "欢迎来到服务器！\n请遵守频道规则。",
+  }];
+  assert.deepEqual(await f.client.getServerPresentation(), {
+    bannerUrl: "https://assets.example.invalid/teamspeak/banner.png",
+    welcomeMessage: "欢迎来到服务器！\n请遵守频道规则。",
+  });
+  assert.deepEqual(f.sdk.inputCommands, ["serverinfo"]);
+
+  f.sdk.serverPresentationRows = [{
+    virtualserver_hostbanner_gfx_url: "javascript:alert(1)",
+    virtualserver_welcomemessage: "x".repeat(5_000),
+  }];
+  const sanitized = await f.client.getServerPresentation();
+  assert.equal(sanitized.bannerUrl, null);
+  assert.equal(sanitized.welcomeMessage.length, 4_096);
 });
 
 test("server icons use the TeamSpeak file transfer path and enforce the download limit", async () => {

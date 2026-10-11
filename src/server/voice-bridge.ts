@@ -310,12 +310,20 @@ export class VoiceBridge {
           const info = await tsClient.getServerInfo();
           if (!isCurrent()) return;
           const name = info.name.trim().slice(0, 256);
-          sendJson({ type: "serverInfo", name, icon: null });
-          if (!info.iconId) return;
-          const icon = await tsClient.getServerIcon(info.iconId);
-          if (!icon || !isCurrent()) return;
-          const dataUrl = avatarDataUrl(icon);
-          if (dataUrl) sendJson({ type: "serverInfo", name, icon: dataUrl });
+          const publicInfo = { name, icon: null as string | null, bannerUrl: null as string | null, welcomeMessage: "" };
+          sendJson({ type: "serverInfo", ...publicInfo });
+          const [presentation, icon] = await Promise.all([
+            tsClient.getServerPresentation().catch((error: unknown) => {
+              if (isCurrent()) this.logger.debug({ entryId, err: error instanceof Error ? error.message : String(error) }, "TeamSpeak server presentation unavailable");
+              return { bannerUrl: null, welcomeMessage: "" };
+            }),
+            info.iconId ? tsClient.getServerIcon(info.iconId).catch(() => null) : Promise.resolve(null),
+          ]);
+          if (!isCurrent()) return;
+          publicInfo.bannerUrl = presentation.bannerUrl;
+          publicInfo.welcomeMessage = presentation.welcomeMessage;
+          publicInfo.icon = icon ? avatarDataUrl(icon) : null;
+          sendJson({ type: "serverInfo", ...publicInfo });
         } catch (error: unknown) {
           if (isCurrent()) this.logger.debug({ entryId, err: error instanceof Error ? error.message : String(error) }, "TeamSpeak server icon unavailable");
         }

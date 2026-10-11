@@ -982,6 +982,7 @@ import VoicePerformancePanel from "../components/web-client/VoicePerformancePane
 import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
 import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
 import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
+import VoiceServerBanner from "../components/web-client/VoiceServerBanner.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
 import ScreenSharePlayer from "../components/web-client/ScreenSharePlayer.vue";
 import AudioDock from "../components/web-client/AudioDock.vue";
@@ -1787,6 +1788,11 @@ const skinPluginWidgets = {
     servers: skinPluginQuickList.value,
     onSwitchServer: switchQuickServerByOpaqueId,
     "onUpdate:query": (value: string) => { channelTreeSearchQuery.value = value; },
+  }),
+  "voice.server-banner": () => h(VoiceServerBanner, {
+    bannerUrl: voiceServerInfo.value?.bannerUrl ?? null,
+    welcomeMessage: voiceServerInfo.value?.welcomeMessage ?? "",
+    t,
   }),
   "voice.channel-tree": (options?: SkinPluginWidgetOptions) => h(VoiceChannelTree, {
     channels: channelTree.value,

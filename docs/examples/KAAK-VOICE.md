@@ -2,6 +2,10 @@
 
 The participant stage uses larger profile portraits (104px on desktop, reduced for narrow layouts). A live speaking state adds a pulsing accent ring and a visible waveform marker, including when participant names are hidden while chat is open. The ring and speaking status use KAAK's shared green accent.
 
+The server sidebar can show the connected TeamSpeak virtual server's configured host-banner image and welcome message between the server header and channel tree. Both fields come from live server information; the card disappears when neither is configured, and a missing or failed banner image does not hide the welcome text. Welcome content is rendered as plain text.
+
+The server sidebar can show the connected TeamSpeak virtual server's configured host-banner image and welcome message between the server header and channel tree. Both fields come from live server information; the card disappears when neither is configured, and a missing or failed banner image does not hide the welcome text. Welcome content is rendered as plain text.
+
 The voice-channel sidebar follows KOOK's observed typography: 16px/700 server title, 12px/700 group title, 14px/700 channel title, and 12px/400 low-contrast member count.
 
 Chat visibility is kept separately for each active TeamSpeak channel, so collapsing one room does not collapse the next room. TeamSpeak does not expose KOOK's music-channel category; a new channel therefore starts expanded until the user changes its chat visibility.
