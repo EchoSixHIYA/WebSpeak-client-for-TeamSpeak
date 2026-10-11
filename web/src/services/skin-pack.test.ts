@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.55");
+  assert.equal(skin.version, "3.1.56");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -556,6 +556,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-channel-join-hint/);
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
+  assert.match(skin.css, /voice-dock"\] \{[\s\S]*?width: min\(264px, 100%\);[\s\S]*?border-radius: 17px;/);
+  assert.match(skin.css, /voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 37px 37px;[\s\S]*?grid-template-rows: 28px 23px;/);
+  assert.match(skin.css, /desktop-audio-dock-room-panel \{[\s\S]*?grid-template-columns: subgrid;[\s\S]*?grid-template-rows: subgrid;/);
+  assert.match(skin.css, /kaak-workspace\.voice-dock-share[\s\S]*?skin-runtime-screen-share-start \{[\s\S]*?height: 28px;[\s\S]*?background: #6cbf00;/);
   assert.match(skin.css, /voice\.member\.action-trigger[\s\S]*?width: 44px;/);
   assert.match(skin.css, /--skin-kaak-accent-hover: #7ac51a;/);
   assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] > span \{\s*color: var\(--skin-kaak-accent\);\s*\}/);
