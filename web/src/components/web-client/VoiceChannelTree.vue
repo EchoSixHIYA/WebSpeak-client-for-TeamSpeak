@@ -19,10 +19,12 @@
       :avatar-style="avatarStyle"
       :avatar-initial="avatarInitial"
       :is-speaking="isSpeaking"
+      :show-member-actions="showMemberActions"
       :t="t"
       @toggle="toggleExpanded"
       @select="selectedChannelId = $event"
       @join="joinChannel"
+      @member-context-menu="emit('memberContextMenu', $event)"
     />
   </ul>
   <div
@@ -48,6 +50,7 @@ const props = defineProps<{
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => CSSProperties;
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
+  showMemberActions?: boolean;
   t: (key: string) => string;
 }>();
 
@@ -102,6 +105,7 @@ function joinChannel(channel: TreeChannel): void {
 
 const emit = defineEmits<{
   join: [channel: TreeChannel];
+  memberContextMenu: [payload: { member: ChannelMember; event: MouseEvent }];
 }>();
 
 </script>

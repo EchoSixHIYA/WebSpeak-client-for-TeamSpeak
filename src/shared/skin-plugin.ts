@@ -63,7 +63,7 @@ export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
 export interface SkinPluginWidgetOptions {
   /** Hide screen-share UI and its stream details for widgets that support it. */
   screenShare?: boolean;
-  /** Show the trusted member actions trigger on desktop member cards. */
+  /** Enable host member actions on member cards and a right-click menu on channel-tree rows. */
   memberActions?: boolean;
   /** Select a supported host presentation for audio controls or a channel tree. */
   layout?: "default" | "room-panel" | "server-sidebar";
@@ -439,9 +439,11 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (rawNode.options !== undefined) {
           const supportedOptions = rawNode.widget === "voice.member-cards"
             ? new Set(["screenShare", "memberActions"])
+            : rawNode.widget === "voice.channel-tree"
+              ? new Set(["layout", "memberActions"])
             : rawNode.widget === "voice.performance-panel"
               ? new Set(["screenShare"])
-              : rawNode.widget === "voice.audio-controls" || rawNode.widget === "voice.channel-tree"
+              : rawNode.widget === "voice.audio-controls"
                 ? new Set(["layout"])
               : new Set<string>();
           if (!isRecord(rawNode.options)

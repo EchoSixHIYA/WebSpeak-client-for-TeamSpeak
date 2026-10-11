@@ -49,6 +49,7 @@
           :aria-level="depth + 2"
           :aria-label="`${member.nickname}${member.isSelf ? `, ${t('you')}` : ''}${member.inputMuted ? `, ${t('inputMuted')}` : ''}`"
           :data-self="member.isSelf ? 'true' : 'false'"
+          @contextmenu="handleMemberContextMenu(member, $event)"
         >
           <span
             class="ws-voice-channel-member-avatar"
@@ -94,10 +95,12 @@
             :avatar-style="avatarStyle"
             :avatar-initial="avatarInitial"
             :is-speaking="isSpeaking"
+            :show-member-actions="showMemberActions"
             :t="t"
             @toggle="emit('toggle', $event)"
             @select="emit('select', $event)"
             @join="emit('join', $event)"
+            @member-context-menu="emit('memberContextMenu', $event)"
           />
         </ul>
       </div>
@@ -119,6 +122,7 @@
           :aria-label="`${member.nickname}${member.isSelf ? `, ${t('you')}` : ''}${member.inputMuted ? `, ${t('inputMuted')}` : ''}${member.away ? ', away' : ''}`"
           :data-speaking="isSpeaking(member) ? 'true' : 'false'"
           :data-away="member.away ? 'true' : 'false'"
+          @contextmenu="handleMemberContextMenu(member, $event)"
         >
           <span
             class="ws-voice-channel-member-avatar"
@@ -158,10 +162,12 @@
           :avatar-style="avatarStyle"
           :avatar-initial="avatarInitial"
           :is-speaking="isSpeaking"
+          :show-member-actions="showMemberActions"
           :t="t"
           @toggle="emit('toggle', $event)"
           @select="emit('select', $event)"
           @join="emit('join', $event)"
+          @member-context-menu="emit('memberContextMenu', $event)"
         />
       </ul>
     </div>
@@ -187,6 +193,7 @@ const props = defineProps<{
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => CSSProperties;
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
+  showMemberActions?: boolean;
   t: (key: string) => string;
 }>();
 
@@ -194,6 +201,7 @@ const emit = defineEmits<{
   toggle: [channelId: string];
   select: [channelId: string];
   join: [channel: TreeChannel];
+  memberContextMenu: [payload: { member: ChannelMember; event: MouseEvent }];
 }>();
 
 const expanded = computed(() => props.expandedIds.has(props.node.channel.id));
@@ -206,5 +214,12 @@ const memberCount = computed(() => String(props.node.channel.members.length).pad
 
 function join(): void {
   if (props.node.channel.id !== props.currentChannelId) emit("join", props.node.channel);
+}
+
+function handleMemberContextMenu(member: ChannelMember, event: MouseEvent): void {
+  if (!props.showMemberActions) return;
+  event.preventDefault();
+  event.stopPropagation();
+  emit("memberContextMenu", { member, event });
 }
 </script>

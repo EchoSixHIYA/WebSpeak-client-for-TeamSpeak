@@ -1371,7 +1371,7 @@ const memberControls = useWebClientMembers({
   showToast,
   t,
 });
-const { away, memberMenu, clearWhisperTargets, isSpeaking, openMemberActions, setAutomaticAway } = memberControls;
+const { away, memberMenu, clearWhisperTargets, isSpeaking, openMemberMenu, openMemberActions, setAutomaticAway } = memberControls;
 const chat = useWebClientChat({
   messages: chatMessages,
   members,
@@ -1802,8 +1802,10 @@ const skinPluginWidgets = {
     avatarStyle,
     avatarInitial,
     isSpeaking,
+    showMemberActions: options?.memberActions === true,
     t,
     onJoin: selectChannel,
+    onMemberContextMenu: ({ member, event }: { member: ChannelMember; event: MouseEvent }) => openMemberMenu(member, event),
   }),
   "voice.member-cards": (options?: SkinPluginWidgetOptions) => h(VoiceMemberCards, {
     currentMembers: currentMembers.value,

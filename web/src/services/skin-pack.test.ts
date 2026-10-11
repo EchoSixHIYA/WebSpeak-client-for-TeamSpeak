@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.69");
+  assert.equal(skin.version, "3.1.70");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -502,7 +502,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voice?.root, "server-banner")?.widget, "voice.server-banner");
   assert.equal(findPart(voice?.root, "record-placeholder"), undefined, "the KAAK voice dock has no recording control");
   assert.equal(findPart(voice?.root, "voice-channel-tree")?.widget, "voice.channel-tree");
-  assert.deepEqual(findPart(voice?.root, "voice-channel-tree")?.options, { layout: "server-sidebar" });
+  assert.deepEqual(findPart(voice?.root, "voice-channel-tree")?.options, { layout: "server-sidebar", memberActions: true });
   assert.equal(findPart(voice?.root, "channel-row"), undefined, "channels render in the trusted nested tree widget");
   assert.equal(voice?.actions["select-channel"], undefined);
   assert.equal(voice?.actions["join-channel"], undefined);

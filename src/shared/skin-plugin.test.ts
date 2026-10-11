@@ -301,7 +301,7 @@ test("trusted channel tree and server switcher widgets require scoped read and c
     children: [
       { widget: "voice.server-switcher", part: "server-switcher" },
       { widget: "voice.server-header", part: "server-header" },
-      { widget: "voice.channel-tree", part: "channel-tree" },
+      { widget: "voice.channel-tree", part: "channel-tree", options: { layout: "server-sidebar", memberActions: true } },
     ],
   };
   assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.map(({ widget }) => widget), [
@@ -309,6 +309,7 @@ test("trusted channel tree and server switcher widgets require scoped read and c
     "voice.server-header",
     "voice.channel-tree",
   ]);
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.[2]?.options, { layout: "server-sidebar", memberActions: true });
 
   for (const missingPermission of [
     "session.status.read",

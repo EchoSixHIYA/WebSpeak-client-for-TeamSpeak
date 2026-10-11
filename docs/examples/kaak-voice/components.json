@@ -381,7 +381,8 @@
                             "widget": "voice.channel-tree",
                             "part": "voice-channel-tree",
                             "options": {
-                              "layout": "server-sidebar"
+                              "layout": "server-sidebar",
+                              "memberActions": true
                             }
                           }
                         ]
