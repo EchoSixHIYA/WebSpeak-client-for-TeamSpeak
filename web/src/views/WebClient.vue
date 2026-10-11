@@ -981,6 +981,7 @@ import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
 import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
 import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
+import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
 import ScreenSharePlayer from "../components/web-client/ScreenSharePlayer.vue";
 import AudioDock from "../components/web-client/AudioDock.vue";
@@ -1122,6 +1123,7 @@ const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") 
 const accelerationRelayId = ref("");
 const browserError = ref("");
 const memberQuery = ref("");
+const channelTreeSearchQuery = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
 const favoriteServerDialogOpen = ref(false);
@@ -1779,9 +1781,18 @@ const skinPluginWidgets = {
     servers: skinPluginQuickList.value,
     onSwitchServer: switchQuickServerByOpaqueId,
   }),
-  "voice.channel-tree": () => h(VoiceChannelTree, {
+  "voice.server-header": () => h(VoiceServerHeader, {
+    serverLabel: currentServerDisplayName.value,
+    connectionState: voiceState.connected ? "connected" : voiceState.connecting || voiceState.reconnecting ? "connecting" : "disconnected",
+    servers: skinPluginQuickList.value,
+    onSwitchServer: switchQuickServerByOpaqueId,
+    "onUpdate:query": (value: string) => { channelTreeSearchQuery.value = value; },
+  }),
+  "voice.channel-tree": (options?: SkinPluginWidgetOptions) => h(VoiceChannelTree, {
     channels: channelTree.value,
     currentChannelId: currentChannel.value?.id,
+    query: channelTreeSearchQuery.value,
+    layout: options?.layout === "server-sidebar" ? "server-sidebar" : "default",
     avatarStyle,
     avatarInitial,
     isSpeaking,
@@ -1860,7 +1871,7 @@ const skinPluginWidgets = {
     : h(AudioDock, {
       model: audioDockState,
       controls: audioControls,
-      layout: options?.layout,
+      layout: options?.layout === "room-panel" ? "room-panel" : "default",
       t,
       rangeStyle,
       onSettings: () => { settingsOpen.value = true; },

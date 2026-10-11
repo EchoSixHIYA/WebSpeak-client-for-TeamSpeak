@@ -320,90 +320,8 @@
             },
             "children": [
               {
-                "tag": "header",
-                "part": "server-summary",
-                "children": [
-                  {
-                    "tag": "div",
-                    "part": "server-summary-heading",
-                    "children": [
-                      {
-                        "tag": "strong",
-                        "part": "server-name",
-                        "children": [
-                          {
-                            "text": "{{session.status.serverLabel}}"
-                          }
-                        ]
-                      },
-                      {
-                        "widget": "voice.server-switcher",
-                        "part": "server-switcher"
-                      }
-                    ]
-                  },
-                  {
-                    "tag": "div",
-                    "part": "server-connection-state",
-                    "children": [
-                      {
-                        "tag": "span",
-                        "part": "server-connection-dot",
-                        "when": {
-                          "path": "session.status.connectionState",
-                          "equals": "connected"
-                        },
-                        "attributes": {
-                          "aria-hidden": true
-                        },
-                        "children": [
-                          {
-                            "text": "●"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "small",
-                        "part": "server-subtitle",
-                        "when": {
-                          "path": "session.status.connectionState",
-                          "equals": "connected"
-                        },
-                        "children": [
-                          {
-                            "text": "已连接 · {{session.status.userName}}"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "small",
-                        "part": "server-subtitle",
-                        "when": {
-                          "path": "session.status.connectionState",
-                          "equals": "connecting"
-                        },
-                        "children": [
-                          {
-                            "text": "正在连接 / Connecting"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "small",
-                        "part": "server-subtitle",
-                        "when": {
-                          "path": "session.status.connectionState",
-                          "equals": "disconnected"
-                        },
-                        "children": [
-                          {
-                            "text": "未连接 / Disconnected"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
+                "widget": "voice.server-header",
+                "part": "server-summary"
               },
               {
                 "tag": "nav",
@@ -457,7 +375,10 @@
                         "children": [
                           {
                             "widget": "voice.channel-tree",
-                            "part": "voice-channel-tree"
+                            "part": "voice-channel-tree",
+                            "options": {
+                              "layout": "server-sidebar"
+                            }
                           }
                         ]
                       }
@@ -921,6 +842,38 @@
                         "children": [
                           {
                             "text": "停止屏幕共享"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "record-placeholder",
+                    "attributes": {
+                      "type": "button",
+                      "disabled": true,
+                      "aria-label": "录制 / Recording unavailable"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "recording-dot",
+                        "attributes": {
+                          "aria-hidden": true
+                        },
+                        "children": [
+                          {
+                            "text": "●"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "recording-label",
+                        "children": [
+                          {
+                            "text": "REC"
                           }
                         ]
                       }

@@ -35,3 +35,18 @@ export function buildVoiceChannelTree<T extends VoiceChannelTreeSource>(
 
   return roots;
 }
+
+/** Filters visible channel names while retaining ancestors of matching nested channels. */
+export function filterVoiceChannelTree<T extends VoiceChannelTreeSource & { name: string }>(
+  nodes: readonly VoiceChannelTreeNode<T>[],
+  query: string,
+): VoiceChannelTreeNode<T>[] {
+  const needle = query.trim().toLocaleLowerCase();
+  if (!needle) return [...nodes];
+  return nodes.flatMap((node) => {
+    const children = filterVoiceChannelTree(node.children, needle);
+    return node.channel.name.toLocaleLowerCase().includes(needle) || children.length
+      ? [{ ...node, children }]
+      : [];
+  });
+}

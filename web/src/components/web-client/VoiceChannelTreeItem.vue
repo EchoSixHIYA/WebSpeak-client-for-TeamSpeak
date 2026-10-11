@@ -4,15 +4,15 @@
     data-ws-part="voice.channel-tree.node"
     role="treeitem"
     :aria-level="depth + 1"
-    :aria-expanded="hasContents ? expanded : undefined"
+    :aria-expanded="isExpandable ? expanded : undefined"
     :aria-selected="selected"
     :aria-current="current ? 'location' : undefined"
     :data-current="current ? 'true' : 'false'"
     :data-selected="selected ? 'true' : 'false'"
   >
-    <div class="ws-voice-channel-line" data-ws-part="voice.channel-tree.line">
+    <div class="ws-voice-channel-line" data-ws-part="voice.channel-tree.line" :style="{ '--channel-depth': depth }">
       <button
-        v-if="hasContents"
+        v-if="isExpandable"
         type="button"
         class="ws-voice-channel-expander"
         data-ws-part="voice.channel-tree.expander"
@@ -20,7 +20,6 @@
         :aria-expanded="expanded"
         @click.stop="emit('toggle', node.channel.id)"
       ><Icon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" /></button>
-      <span v-else class="ws-voice-channel-expander-placeholder" aria-hidden="true"></span>
       <button
         type="button"
         class="ws-voice-channel-row"
@@ -39,8 +38,72 @@
       </button>
     </div>
 
+    <template v-if="layout === 'server-sidebar'">
+      <ul v-if="node.channel.members.length" class="ws-voice-channel-member-list" role="group" :style="{ '--channel-depth': depth }">
+        <li
+          v-for="member in node.channel.members"
+          :key="member.id"
+          class="ws-voice-channel-member"
+          data-ws-part="voice.channel-tree.member"
+          role="treeitem"
+          :aria-level="depth + 2"
+          :aria-label="`${member.nickname}${member.isSelf ? `, ${t('you')}` : ''}${member.inputMuted ? `, ${t('inputMuted')}` : ''}`"
+          :data-self="member.isSelf ? 'true' : 'false'"
+        >
+          <span
+            class="ws-voice-channel-member-avatar"
+            data-ws-part="voice.channel-tree.avatar"
+            :style="avatarStyle(member.nickname, member.isSelf, member.avatar)"
+            aria-hidden="true"
+          >{{ member.avatar ? '' : avatarInitial(member.nickname) }}</span>
+          <span class="ws-voice-channel-member-name" data-ws-part="voice.channel-tree.member-name">{{ member.nickname }}</span>
+          <span v-if="member.isSelf" class="ws-voice-channel-member-self">你</span>
+          <Icon
+            v-if="member.inputMuted"
+            class="ws-voice-channel-member-muted"
+            data-ws-part="voice.channel-tree.member-muted"
+            name="mic-off"
+            :size="13"
+            :title="t('inputMuted')"
+          />
+          <Icon
+            v-else
+            class="ws-voice-channel-member-mic"
+            name="mic"
+            :size="13"
+            :title="t('microphoneActive')"
+          />
+        </li>
+      </ul>
+      <div
+        v-if="hasChildren"
+        class="ws-voice-channel-branch"
+        data-ws-part="voice.channel-tree.branch"
+        :data-expanded="expanded ? 'true' : 'false'"
+      >
+        <ul class="ws-voice-channel-branch-content" role="group">
+          <VoiceChannelTreeItem
+            v-for="child in node.children"
+            :key="child.channel.id"
+            :node="child"
+            :depth="depth + 1"
+            :layout="layout"
+            :current-channel-id="currentChannelId"
+            :selected-channel-id="selectedChannelId"
+            :expanded-ids="expandedIds"
+            :avatar-style="avatarStyle"
+            :avatar-initial="avatarInitial"
+            :is-speaking="isSpeaking"
+            :t="t"
+            @toggle="emit('toggle', $event)"
+            @select="emit('select', $event)"
+            @join="emit('join', $event)"
+          />
+        </ul>
+      </div>
+    </template>
     <div
-      v-if="hasContents"
+      v-else-if="hasContents"
       class="ws-voice-channel-branch"
       data-ws-part="voice.channel-tree.branch"
       :data-expanded="expanded ? 'true' : 'false'"
@@ -88,6 +151,7 @@
           :key="child.channel.id"
           :node="child"
           :depth="depth + 1"
+          :layout="layout"
           :current-channel-id="currentChannelId"
           :selected-channel-id="selectedChannelId"
           :expanded-ids="expandedIds"
@@ -116,6 +180,7 @@ defineOptions({ name: "VoiceChannelTreeItem" });
 const props = defineProps<{
   node: VoiceChannelTreeNode<TreeChannel>;
   depth: number;
+  layout: "default" | "server-sidebar";
   currentChannelId?: string;
   selectedChannelId: string;
   expandedIds: ReadonlySet<string>;
@@ -132,7 +197,9 @@ const emit = defineEmits<{
 }>();
 
 const expanded = computed(() => props.expandedIds.has(props.node.channel.id));
-const hasContents = computed(() => props.node.children.length > 0 || props.node.channel.members.length > 0);
+const hasChildren = computed(() => props.node.children.length > 0);
+const hasContents = computed(() => hasChildren.value || props.node.channel.members.length > 0);
+const isExpandable = computed(() => props.layout === "server-sidebar" ? hasChildren.value : hasContents.value);
 const current = computed(() => props.node.channel.id === props.currentChannelId);
 const selected = computed(() => props.node.channel.id === props.selectedChannelId);
 const memberCount = computed(() => String(props.node.channel.members.length).padStart(2, "0"));

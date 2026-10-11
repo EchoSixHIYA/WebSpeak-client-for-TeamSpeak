@@ -45,6 +45,7 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "app.skin-switcher",
   "app.language-switcher",
   "voice.server-switcher",
+  "voice.server-header",
   "voice.channel-tree",
   "voice.channel-panel",
   "voice.member-cards",
@@ -63,13 +64,14 @@ export interface SkinPluginWidgetOptions {
   screenShare?: boolean;
   /** Show the trusted member actions trigger on desktop member cards. */
   memberActions?: boolean;
-  /** Select a supported host presentation for audio controls. */
-  layout?: "default" | "room-panel";
+  /** Select a supported host presentation for audio controls or a channel tree. */
+  layout?: "default" | "room-panel" | "server-sidebar";
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
   "voice.channel-tree": widgetPermissions("session.channels.read", "session.members.read", "session.memberAvatars.read", "session.channel.join"),
   "voice.server-switcher": widgetPermissions("servers.quickList.read", "servers.quickList.switch"),
+  "voice.server-header": widgetPermissions("session.status.read", "servers.quickList.read", "servers.quickList.switch"),
   "voice.audio-controls": widgetPermissions("audio.status.read", "audio.microphone.control", "audio.output.control"),
   "voice.chat-panel": widgetPermissions("chat.channel.read", "chat.channel.send"),
   "voice.connection-controls": widgetPermissions("voice.disconnect"),
@@ -437,14 +439,17 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             ? new Set(["screenShare", "memberActions"])
             : rawNode.widget === "voice.performance-panel"
               ? new Set(["screenShare"])
-              : rawNode.widget === "voice.audio-controls"
+              : rawNode.widget === "voice.audio-controls" || rawNode.widget === "voice.channel-tree"
                 ? new Set(["layout"])
               : new Set<string>();
           if (!isRecord(rawNode.options)
             || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
             || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")
             || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")
-            || (rawNode.options.layout !== undefined && rawNode.options.layout !== "default" && rawNode.options.layout !== "room-panel")) {
+            || (rawNode.options.layout !== undefined
+              && rawNode.options.layout !== "default"
+              && rawNode.options.layout !== "room-panel"
+              && !(rawNode.widget === "voice.channel-tree" && rawNode.options.layout === "server-sidebar"))) {
             fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "This host widget uses unsupported options.");
           }
           options = {

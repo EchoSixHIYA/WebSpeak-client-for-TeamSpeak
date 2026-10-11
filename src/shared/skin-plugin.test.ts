@@ -276,6 +276,7 @@ test("trusted channel tree and server switcher widgets require scoped read and c
   document.schemaVersion = 3;
   document.components[0].actions = {};
   document.components[0].permissions = [
+    "session.status.read",
     "session.channels.read",
     "session.members.read",
     "session.memberAvatars.read",
@@ -287,15 +288,18 @@ test("trusted channel tree and server switcher widgets require scoped read and c
     tag: "header",
     children: [
       { widget: "voice.server-switcher", part: "server-switcher" },
+      { widget: "voice.server-header", part: "server-header" },
       { widget: "voice.channel-tree", part: "channel-tree" },
     ],
   };
   assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.map(({ widget }) => widget), [
     "voice.server-switcher",
+    "voice.server-header",
     "voice.channel-tree",
   ]);
 
   for (const missingPermission of [
+    "session.status.read",
     "session.channels.read",
     "session.members.read",
     "session.memberAvatars.read",
@@ -324,6 +328,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.equal(workspace.page, "voice");
   assert.equal(workspace.mode, "surface");
   assert.ok(workspace.permissions.includes("session.channels.read"));
+  assert.ok(workspace.permissions.includes("session.status.read"));
   assert.ok(workspace.permissions.includes("session.members.read"));
   assert.ok(workspace.permissions.includes("session.memberAvatars.read"));
   assert.ok(workspace.permissions.includes("session.channel.join"));
@@ -347,8 +352,9 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
   assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls" && node.options?.layout === "room-panel"));
-  assert.ok(nodes.some((node) => node.widget === "voice.server-switcher"), "the server header exposes trusted quick switching");
-  assert.ok(nodes.some((node) => node.widget === "voice.channel-tree"), "channels and avatars render in the trusted nested tree");
+  assert.ok(nodes.some((node) => node.widget === "voice.server-header"), "the server header exposes trusted search and quick switching");
+  assert.ok(nodes.some((node) => node.widget === "voice.channel-tree" && node.options?.layout === "server-sidebar"), "the KAAK channel tree opts into its isolated sidebar layout");
+  assert.equal(nodes.find((node) => node.part === "record-placeholder")?.attributes?.disabled, true, "recording remains a visual-only disabled placeholder");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"), "the voice dock exposes WebSpeak screen sharing");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-player"), "the voice stage keeps WebSpeak's screen-share player");
   assert.equal(nodes.find((node) => node.part === "screen-share-stop")?.events?.click, "stop-screen-share");
