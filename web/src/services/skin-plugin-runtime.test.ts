@@ -101,3 +101,18 @@ test("skin quick-server projection uses the TeamSpeak name and public icon while
   assert.equal(server.icon, icon);
   assert.equal(JSON.stringify(server).includes("shanghai.example"), false);
 });
+
+test("skin quick-server projection does not expose a network target used as the TeamSpeak name", () => {
+  const projection = createSkinPluginQuickServerProjection(() => "opaque-target-name");
+  const [server] = projection.project([{
+    id: "current.example:9987",
+    address: "current.example:9987",
+    label: "current.example:9987",
+    serverName: "server.example.invalid:9987",
+    isFavorite: true,
+  }], () => true);
+
+  assert.equal(server.label, "Favorite 1");
+  assert.equal(server.monogram, "F");
+  assert.equal(JSON.stringify(server).includes("server.example.invalid"), false);
+});

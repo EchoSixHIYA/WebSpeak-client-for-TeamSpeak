@@ -40,7 +40,7 @@ interface ContextProjection {
 }
 
 const CONTEXTS: readonly ContextProjection[] = Object.freeze([
-  { path: ["session", "status"], permission: "session.status.read", fields: new Set(["connected", "connecting", "channelId", "channelName", "userName"]) },
+  { path: ["session", "status"], permission: "session.status.read", fields: new Set(["connected", "connecting", "connectionState", "channelId", "channelName", "userName", "serverLabel"]) },
   { path: ["audio", "status"], permission: "audio.status.read", fields: new Set(["microphoneMuted", "outputMuted"]) },
   { path: ["whisper", "status"], permission: "voice.whisper.status.read", fields: new Set(["active", "targetCount"]) },
   { path: ["screenShare", "status"], permission: "voice.screenShare.status.read", fields: new Set(["active", "starting", "viewing"]) },
@@ -57,9 +57,11 @@ const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   label: 160,
   channelName: 160,
   userName: 160,
+  serverLabel: 160,
   ownerNickname: 160,
   author: 160,
   status: 48,
+  connectionState: 16,
   source: 48,
   kind: 48,
   time: 48,
@@ -102,6 +104,7 @@ function projectRecord(value: unknown, fields: ReadonlySet<string>): Record<stri
   for (const field of fields) {
     if (!Object.hasOwn(value, field)) continue;
     const safe = boundedValue(field, value[field]);
+    if (field === "serverLabel" && typeof safe === "string" && CONNECTION_TARGET_PATTERN.test(safe)) continue;
     if (safe !== undefined) projected[field] = safe;
   }
   return projected;

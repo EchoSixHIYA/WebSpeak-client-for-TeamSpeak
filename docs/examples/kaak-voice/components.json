@@ -131,19 +131,6 @@
             "quickServerId": "{{server.id}}"
           }
         },
-        "select-channel": {
-          "type": "ui.setState",
-          "args": {
-            "key": "selectedchannel",
-            "value": "{{channel.id}}"
-          }
-        },
-        "join-channel": {
-          "type": "voice.joinChannel",
-          "args": {
-            "channelId": "{{channel.id}}"
-          }
-        },
         "send-message": {
           "type": "chat.sendMessage",
           "args": {
@@ -184,7 +171,6 @@
         }
       },
       "state": {
-        "selectedchannel": "",
         "message": "",
         "chatopen": true,
         "voicegroupopen": true
@@ -338,20 +324,82 @@
                 "part": "server-summary",
                 "children": [
                   {
-                    "tag": "strong",
-                    "part": "server-name",
+                    "tag": "div",
+                    "part": "server-summary-heading",
                     "children": [
                       {
-                        "text": "{{session.status.serverLabel}}"
+                        "tag": "strong",
+                        "part": "server-name",
+                        "children": [
+                          {
+                            "text": "{{session.status.serverLabel}}"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "voice.server-switcher",
+                        "part": "server-switcher"
                       }
                     ]
                   },
                   {
-                    "tag": "small",
-                    "part": "server-subtitle",
+                    "tag": "div",
+                    "part": "server-connection-state",
                     "children": [
                       {
-                        "text": "VOICE CHANNELS / 语音频道"
+                        "tag": "span",
+                        "part": "server-connection-dot",
+                        "when": {
+                          "path": "session.status.connectionState",
+                          "equals": "connected"
+                        },
+                        "attributes": {
+                          "aria-hidden": true
+                        },
+                        "children": [
+                          {
+                            "text": "●"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "small",
+                        "part": "server-subtitle",
+                        "when": {
+                          "path": "session.status.connectionState",
+                          "equals": "connected"
+                        },
+                        "children": [
+                          {
+                            "text": "已连接 · {{session.status.userName}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "small",
+                        "part": "server-subtitle",
+                        "when": {
+                          "path": "session.status.connectionState",
+                          "equals": "connecting"
+                        },
+                        "children": [
+                          {
+                            "text": "正在连接 / Connecting"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "small",
+                        "part": "server-subtitle",
+                        "when": {
+                          "path": "session.status.connectionState",
+                          "equals": "disconnected"
+                        },
+                        "children": [
+                          {
+                            "text": "未连接 / Disconnected"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -408,196 +456,8 @@
                         "part": "voice-channel-items",
                         "children": [
                           {
-                            "tag": "div",
-                            "part": "channel-item",
-                            "repeat": {
-                              "path": "session.channels",
-                              "as": "channel"
-                            },
-                            "children": [
-                              {
-                                "tag": "button",
-                                "part": "channel-row",
-                                "attributes": {
-                                  "type": "button",
-                                  "aria-current": "{{channel.current}}",
-                                  "aria-label": "双击加入 {{channel.name}}",
-                                  "data-depth": "{{channel.depth}}"
-                                },
-                                "events": {
-                                  "click": "select-channel",
-                                  "dblclick": "join-channel"
-                                },
-                                "children": [
-                                  {
-                                    "tag": "span",
-                                    "part": "channel-glyph",
-                                    "children": [
-                                      {
-                                        "text": "◉"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "tag": "span",
-                                    "part": "channel-name",
-                                    "children": [
-                                      {
-                                        "text": "{{channel.name}}"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "tag": "small",
-                                    "part": "channel-join-hint",
-                                    "when": {
-                                      "path": "state.selectedchannel",
-                                      "equals": "{{channel.id}}"
-                                    },
-                                    "children": [
-                                      {
-                                        "text": "双击加入"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "tag": "small",
-                                    "part": "channel-count",
-                                    "children": [
-                                      {
-                                        "text": "{{channel.memberCountLabel}}"
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-capacity",
-                                        "when": {
-                                          "path": "channel.maxClientsLimited",
-                                          "equals": true
-                                        },
-                                        "children": [
-                                          {
-                                            "text": "/{{channel.maxClients}}"
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "tag": "span",
-                                    "part": "selected-channel-indicator",
-                                    "when": {
-                                      "path": "state.selectedchannel",
-                                      "equals": "{{channel.id}}"
-                                    },
-                                    "attributes": {
-                                      "aria-label": "当前频道"
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "tag": "ul",
-                                "part": "channel-voice-members",
-                                "when": {
-                                  "path": "channel.members",
-                                  "empty": false
-                                },
-                                "attributes": {
-                                  "aria-label": "此频道中的语音成员 / Voice members in this channel"
-                                },
-                                "children": [
-                                  {
-                                    "tag": "li",
-                                    "part": "channel-voice-member",
-                                    "repeat": {
-                                      "path": "channel.members",
-                                      "as": "voicemember"
-                                    },
-                                    "children": [
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-avatar",
-                                        "children": [
-                                          {
-                                            "text": "{{voicemember.avatarInitial}}"
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-name",
-                                        "children": [
-                                          {
-                                            "text": "{{voicemember.name}}"
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-muted",
-                                        "when": {
-                                          "path": "voicemember.status",
-                                          "equals": "muted"
-                                        },
-                                        "attributes": {
-                                          "aria-label": "麦克风已静音"
-                                        },
-                                        "children": [
-                                          {
-                                            "text": "已静音"
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-away",
-                                        "when": {
-                                          "path": "voicemember.status",
-                                          "equals": "away"
-                                        },
-                                        "attributes": {
-                                          "aria-label": "离开"
-                                        },
-                                        "children": [
-                                          {
-                                            "text": "离开中"
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-state",
-                                        "when": {
-                                          "path": "voicemember.self",
-                                          "equals": true
-                                        },
-                                        "children": [
-                                          {
-                                            "text": "你"
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "tag": "span",
-                                        "part": "channel-member-state",
-                                        "when": {
-                                          "path": "voicemember.speaking",
-                                          "equals": true
-                                        },
-                                        "attributes": {
-                                          "aria-label": "正在讲话"
-                                        },
-                                        "children": [
-                                          {
-                                            "text": "●"
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
+                            "widget": "voice.channel-tree",
+                            "part": "voice-channel-tree"
                           }
                         ]
                       }

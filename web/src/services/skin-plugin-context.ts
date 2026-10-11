@@ -22,11 +22,20 @@ function safeLabelTone(label: string): number {
   return (hash >>> 0) % 7;
 }
 
+const CONNECTION_TARGET_PATTERN = /(?:\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b|\[[0-9a-f:]+\](?::\d{1,5})?|\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?\b|\b(?:[0-9a-f]{0,4}:){2,}[0-9a-f:]{1,}\b)/i;
+
 function containsConnectionTarget(label: string, address: string): boolean {
   const candidates = new Set([address.trim()]);
   try { candidates.add(splitTeamSpeakTarget(address).address.trim()); } catch { /* Persisted targets are validated on write. */ }
   const normalizedLabel = label.toLocaleLowerCase();
-  return [...candidates].some((candidate) => candidate.length >= 3 && normalizedLabel.includes(candidate.toLocaleLowerCase()));
+  return CONNECTION_TARGET_PATTERN.test(normalizedLabel)
+    || [...candidates].some((candidate) => candidate.length >= 3 && normalizedLabel.includes(candidate.toLocaleLowerCase()));
+}
+
+/** Returns a displayable TeamSpeak server name without exposing connection targets. */
+export function safeSkinServerDisplayName(name: string, address: string): string {
+  const bounded = name.trim().replace(/\u0000/g, "").slice(0, 160);
+  return bounded && !containsConnectionTarget(bounded, address) ? bounded : "";
 }
 
 /** Projects local favorite/recent entries without exposing their connection targets. */
@@ -48,7 +57,7 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
         }
         targetByOpaqueId.set(opaqueId, server);
         const label = server.label.trim();
-        const serverName = server.serverName?.trim() ?? "";
+        const serverName = safeSkinServerDisplayName(server.serverName ?? "", server.address);
         const safeLabel = !label || containsConnectionTarget(label, server.address)
           ? serverName && !containsConnectionTarget(serverName, server.address)
             ? serverName

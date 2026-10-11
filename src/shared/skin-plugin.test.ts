@@ -271,6 +271,44 @@ test("schema v3 trusted widgets can omit screen-share UI and request only the pe
   errorCode(() => parseSkinPluginDocument(misplacedOption), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 });
 
+test("trusted channel tree and server switcher widgets require scoped read and control permissions", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].permissions = [
+    "session.channels.read",
+    "session.members.read",
+    "session.memberAvatars.read",
+    "session.channel.join",
+    "servers.quickList.read",
+    "servers.quickList.switch",
+  ];
+  document.components[0].root = {
+    tag: "header",
+    children: [
+      { widget: "voice.server-switcher", part: "server-switcher" },
+      { widget: "voice.channel-tree", part: "channel-tree" },
+    ],
+  };
+  assert.deepEqual(parseSkinPluginDocument(document).components[0].root.children?.map(({ widget }) => widget), [
+    "voice.server-switcher",
+    "voice.channel-tree",
+  ]);
+
+  for (const missingPermission of [
+    "session.channels.read",
+    "session.members.read",
+    "session.memberAvatars.read",
+    "session.channel.join",
+    "servers.quickList.read",
+    "servers.quickList.switch",
+  ] as const) {
+    const missing = structuredClone(document);
+    missing.components[0].permissions = missing.components[0].permissions.filter((permission) => permission !== missingPermission);
+    errorCode(() => parseSkinPluginDocument(missing), "SKIN_PLUGIN_PERMISSION_MISSING");
+  }
+});
+
 test("KAAK v3 example declares the connection home and complete voice workspace", async () => {
   const source = await readFile(new URL("../../docs/examples/kaak-voice/components.json", import.meta.url), "utf8");
   const parsed = parseSkinPluginJson(source);
@@ -288,13 +326,16 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(workspace.permissions.includes("session.channels.read"));
   assert.ok(workspace.permissions.includes("session.members.read"));
   assert.ok(workspace.permissions.includes("session.memberAvatars.read"));
+  assert.ok(workspace.permissions.includes("session.channel.join"));
+  assert.ok(workspace.permissions.includes("servers.quickList.read"));
+  assert.ok(workspace.permissions.includes("servers.quickList.switch"));
   assert.ok(workspace.permissions.includes("chat.channel.send"));
   assert.ok(workspace.permissions.includes("audio.microphone.control"));
   assert.ok(workspace.permissions.includes("voice.screenShare.control"));
   assert.ok(workspace.permissions.includes("voice.screenShare.read"));
   assert.ok(workspace.permissions.includes("voice.screenShare.status.read"));
   assert.equal(workspace.actions["stop-screen-share"].type, "voice.stopScreenShare");
-  assert.equal(workspace.actions["join-channel"].type, "voice.joinChannel");
+  assert.equal(workspace.actions["join-channel"], undefined, "channel joining is handled by the trusted tree widget");
   assert.equal(workspace.actions["send-message"].type, "chat.sendMessage");
 
   const nodes: SkinPluginNode[] = [];
@@ -306,10 +347,11 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
   assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls" && node.options?.layout === "room-panel"));
+  assert.ok(nodes.some((node) => node.widget === "voice.server-switcher"), "the server header exposes trusted quick switching");
+  assert.ok(nodes.some((node) => node.widget === "voice.channel-tree"), "channels and avatars render in the trusted nested tree");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"), "the voice dock exposes WebSpeak screen sharing");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-player"), "the voice stage keeps WebSpeak's screen-share player");
   assert.equal(nodes.find((node) => node.part === "screen-share-stop")?.events?.click, "stop-screen-share");
-  assert.ok(nodes.some((node) => node.repeat?.path === "session.channels" && node.children?.[0].events?.dblclick === "join-channel"));
   assert.ok(!nodes.some((node) => node.repeat?.path === "session.members"), "member imagery stays inside the trusted host widget");
   assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));
 });

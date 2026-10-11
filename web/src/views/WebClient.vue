@@ -979,6 +979,8 @@ import SkinRuntimePluginHost from "../components/SkinRuntimePluginHost.js";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
+import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
+import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
 import ScreenSharePlayer from "../components/web-client/ScreenSharePlayer.vue";
 import AudioDock from "../components/web-client/AudioDock.vue";
@@ -1018,7 +1020,7 @@ import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
-import { createSkinPluginQuickServerProjection } from "../services/skin-plugin-context.js";
+import { createSkinPluginQuickServerProjection, safeSkinServerDisplayName } from "../services/skin-plugin-context.js";
 import { loadSkinPluginAuthoringDocument } from "../services/skin-plugin-authoring.js";
 import type { SkinPluginDocument, SkinPluginWidgetOptions } from "../../../src/shared/skin-plugin.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -1544,6 +1546,14 @@ const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
 const skinPluginQuickServers = createSkinPluginQuickServerProjection();
 const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickServersForDisplay.value, isQuickServerTarget));
+const currentServerDisplayName = computed(() => {
+  const target = currentServerTarget();
+  const liveName = safeSkinServerDisplayName(voiceServerInfo.value?.name ?? "", target);
+  if (liveName) return liveName;
+  const savedCurrent = quickServers.value.find(isQuickServerTarget);
+  const savedName = savedCurrent ? safeSkinServerDisplayName(savedCurrent.serverName ?? "", savedCurrent.address) : "";
+  return savedName || skinPluginQuickList.value.find((server) => server.current)?.label || "TeamSpeak";
+});
 const skinPluginFavorites = computed(() => skinPluginQuickList.value
   .filter((server) => server.favorite)
   .map(({ favorite: _favorite, ...server }) => server));
@@ -1562,9 +1572,11 @@ const skinPluginContext = computed(() => ({
     status: {
       connected: voiceState.connected,
       connecting: voiceState.connecting,
+      connectionState: voiceState.connected ? "connected" : voiceState.connecting || voiceState.reconnecting ? "connecting" : "disconnected",
       channelId: currentChannel.value?.id ?? "",
       channelName: currentChannelName.value,
       userName: nickname.value,
+      serverLabel: currentServerDisplayName.value,
     },
     channels: channelTree.value.map((item) => {
       const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
@@ -1632,6 +1644,12 @@ const readSkinRuntimeSessionStatus = (_signal: AbortSignal) => ({
   memberCount: skinPluginMembers.value.length,
 });
 
+function switchQuickServerByOpaqueId(quickServerId: string): void {
+  if (accessMode.value !== "open") return;
+  const target = skinPluginQuickServers.resolve(quickServerId);
+  if (target && quickServers.value.some((server) => server.id === target.id)) connectQuickServer(target);
+}
+
 const skinPluginActions = {
   "voice.joinChannel": (args: Record<string, string | number | boolean>) => {
     if (!voiceState.connected || typeof args.channelId !== "string") return;
@@ -1644,9 +1662,8 @@ const skinPluginActions = {
     if (target?.isFavorite && quickServers.value.some((server) => server.id === target.id && server.isFavorite)) connectQuickServer(target);
   },
   "quickServers.switch": (args: Record<string, string | number | boolean>) => {
-    if (accessMode.value !== "open" || typeof args.quickServerId !== "string") return;
-    const target = skinPluginQuickServers.resolve(args.quickServerId);
-    if (target && quickServers.value.some((server) => server.id === target.id)) connectQuickServer(target);
+    if (typeof args.quickServerId !== "string") return;
+    switchQuickServerByOpaqueId(args.quickServerId);
   },
   "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
     if (!voiceState.connected || typeof args.text !== "string" || !currentChannel.value?.id) return;
@@ -1757,6 +1774,19 @@ const skinPluginWidgets = {
     t,
     onSelectChannel: selectChannel,
     onVolumeInput: onVolInput,
+  }),
+  "voice.server-switcher": () => h(VoiceServerSwitcher, {
+    servers: skinPluginQuickList.value,
+    onSwitchServer: switchQuickServerByOpaqueId,
+  }),
+  "voice.channel-tree": () => h(VoiceChannelTree, {
+    channels: channelTree.value,
+    currentChannelId: currentChannel.value?.id,
+    avatarStyle,
+    avatarInitial,
+    isSpeaking,
+    t,
+    onJoin: selectChannel,
   }),
   "voice.member-cards": (options?: SkinPluginWidgetOptions) => h(VoiceMemberCards, {
     currentMembers: currentMembers.value,

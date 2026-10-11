@@ -67,6 +67,7 @@
     <path v-else-if="name === 'copy'" d="M8 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M6 8h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" />
     <path v-else-if="name === 'close'" d="m6 6 12 12M18 6 6 18" />
     <path v-else-if="name === 'more'" d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3" />
+    <path v-else-if="name === 'menu'" d="M4 6h16M4 12h16M4 18h16" />
     <path v-else-if="name === 'refresh'" d="M20 11a8 8 0 0 0-14-4L4 9m0-4v4h4M4 13a8 8 0 0 0 14 4l2-2m0 4v-4h-4" />
     <path v-else-if="name === 'lock'" d="M6 10h12v10H6zM8 10V7a4 4 0 0 1 8 0v3" />
     <path v-else-if="name === 'users'" d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6-7a4 4 0 0 1 0 7m2 5h1a4 4 0 0 1 4 4v1" />

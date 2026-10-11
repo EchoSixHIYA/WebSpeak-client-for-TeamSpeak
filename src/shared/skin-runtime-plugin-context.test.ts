@@ -24,30 +24,37 @@ test("runtime context exposes only fields covered by declared read permissions",
   assert.equal(JSON.stringify(projected).includes("secret.example"), false);
 });
 
-test("runtime context redacts connection targets from quick-list labels and drops server labels", () => {
+test("runtime context keeps safe server names and redacts connection targets from all public labels", () => {
   const projected = projectSkinRuntimePluginContext(
     ["session.status.read", "favorites.read", "servers.quickList.read"],
     {
-      session: { status: { connected: true, serverLabel: "192.0.2.55:9987", channelName: "Lobby" } },
+      session: { status: { connected: true, connecting: false, connectionState: "connected", serverLabel: "server.example.invalid:9987", channelName: "Lobby" } },
       favorites: { items: [{ id: "opaque-favorite", label: "Saved voice.internal.example:9987", kind: "favorite" }] },
       servers: { quickList: [
         { id: "opaque-favorite", label: "Saved [2001:db8::1]:9987", favorite: true, kind: "favorite" },
-        { id: "opaque-recent", label: "Quick connect 192.0.2.55", favorite: false, kind: "recent" },
+        { id: "opaque-recent", label: "Quick connect server.example.invalid", favorite: false, kind: "recent" },
       ] },
     },
   );
 
   assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
-    session: { status: { connected: true, channelName: "Lobby" } },
+    session: { status: { connected: true, connecting: false, connectionState: "connected", channelName: "Lobby" } },
     favorites: { items: [{ id: "opaque-favorite", label: "Favorite 1", kind: "favorite" }] },
     servers: { quickList: [
       { id: "opaque-favorite", label: "Favorite 1", favorite: true, kind: "favorite" },
       { id: "opaque-recent", label: "Recent 2", favorite: false, kind: "recent" },
     ] },
   });
-  assert.equal(JSON.stringify(projected).includes("192.0.2.55"), false);
+  assert.equal(JSON.stringify(projected).includes("server.example.invalid"), false);
   assert.equal(JSON.stringify(projected).includes("internal.example"), false);
   assert.equal(JSON.stringify(projected).includes("2001:db8::1"), false);
+
+  const safeServerName = projectSkinRuntimePluginContext(["session.status.read"], {
+    session: { status: { connected: true, connectionState: "connected", serverLabel: "兄弟们的teamspeak" } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(safeServerName)), {
+    session: { status: { connected: true, connectionState: "connected", serverLabel: "兄弟们的teamspeak" } },
+  });
 });
 
 test("runtime channel limits are bounded public metadata and do not admit neighboring fields", () => {

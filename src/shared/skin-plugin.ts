@@ -17,7 +17,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "session.status.read": Object.freeze({ policyVersion: 1, description: "Read the current connection and channel summary." }),
   "session.channels.read": Object.freeze({ policyVersion: 1, description: "Read the public TeamSpeak channel tree; the demo page uses synthetic sample data." }),
   "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names, initials derived from those names, and speaking states; the demo page uses synthetic sample data." }),
-  "session.memberAvatars.read": Object.freeze({ policyVersion: 1, description: "Display cached TeamSpeak profile pictures for visible members inside the trusted host member-card widget. Images are not exposed to skin markup or plugin runtimes." }),
+  "session.memberAvatars.read": Object.freeze({ policyVersion: 1, description: "Display cached TeamSpeak profile pictures for visible members inside trusted host member-card or channel-tree widgets. Images are not exposed to skin markup or plugin runtimes." }),
   "chat.channel.read": Object.freeze({ policyVersion: 1, description: "Read the current public text channel; the demo page uses synthetic sample data." }),
   "chat.channel.send": Object.freeze({ policyVersion: 1, description: "Send to the current public text channel; the demo page only simulates this action." }),
   "favorites.read": Object.freeze({ policyVersion: 1, description: "Read favorite labels and opaque local identifiers, without server addresses or credentials." }),
@@ -44,6 +44,8 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "home.connection-form",
   "app.skin-switcher",
   "app.language-switcher",
+  "voice.server-switcher",
+  "voice.channel-tree",
   "voice.channel-panel",
   "voice.member-cards",
   "voice.chat-panel",
@@ -66,6 +68,8 @@ export interface SkinPluginWidgetOptions {
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
+  "voice.channel-tree": widgetPermissions("session.channels.read", "session.members.read", "session.memberAvatars.read", "session.channel.join"),
+  "voice.server-switcher": widgetPermissions("servers.quickList.read", "servers.quickList.switch"),
   "voice.audio-controls": widgetPermissions("audio.status.read", "audio.microphone.control", "audio.output.control"),
   "voice.chat-panel": widgetPermissions("chat.channel.read", "chat.channel.send"),
   "voice.connection-controls": widgetPermissions("voice.disconnect"),
@@ -244,7 +248,7 @@ const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "chat.messages": new Set(["id", "author", "text", "time", "kind", "channelId"]),
   "screenShare.streams": new Set(["streamId", "source", "ownerClientId", "ownerNickname", "name", "audio", "viewerCount"]),
 };
-const SESSION_STATUS_FIELDS = new Set(["connected", "connecting", "serverLabel", "channelId", "channelName", "userName"]);
+const SESSION_STATUS_FIELDS = new Set(["connected", "connecting", "connectionState", "serverLabel", "channelId", "channelName", "userName"]);
 const CONTEXT_FIELDS: Record<string, ReadonlySet<string>> = {
   "audio.status": new Set(["microphoneMuted", "outputMuted"]),
   "screenShare.status": new Set(["active", "starting", "viewing"]),
