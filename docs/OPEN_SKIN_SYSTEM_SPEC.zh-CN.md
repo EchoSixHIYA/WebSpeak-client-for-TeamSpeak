@@ -20,6 +20,8 @@ v3 自定义组件不是脚本插件。components.json schema v1 是既有格式
 
 v1-v3 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAssembly、远程脚本、任意 URL、表单导航、浏览器存储访问或网络调用。v4 可携带本地 JS/Wasm/CSS；JS 仍只校验和缓存，Wasm 在生产构建中经本地摘要授权后运行一次性有界任务，并经宿主解析、渲染动态 UI。运行时支持 `ui.surface.replace`、限定的公开只读数据权限和首版宿主动作效果；投影前由宿主按插件清单过滤字段，总快照最多 48 KiB，`ui_input_read` 输入最多 64 KiB。动作效果限于可信 UI 事件触发的同一轮调用、单个动作，并复用现有动作权限与参数校验。所有版本都拒绝未知协议字段、权限、动作和数据路径；v1-v3 拒绝未知节点/属性，v4 Wasm 输出则对标签名做语法验证、拒绝具备脚本/导航/嵌入能力的标签与属性，并将自定义标签惰性渲染为普通 `div`。
 
+自绘成员列表也可以按成员读取 `screenSharing` 和 `screenShareStreamId` 字段（需 `voice.screenShare.read`）；`voice.joinScreenShare` 还需 `voice.screenShare.control`。完整页面替换后是否呈现共享标记/观看入口由皮肤组件树决定，宿主只会提供状态与受权限保护的观看动作。
+
 ### 2.1 插件协议（v4 包格式及有界 Wasm 生产运行路径已接入）
 
 已实现的 v4 包描述为 `plugins.json` schema v1：每包 1–64 个插件，每个插件指定唯一小写 ID、语义版本、API 版本 1、`home`/`voice` 页面、`widget`/`surface` 模式、`plugins/<id>/` 下入口 JS 或 Wasm/可选 CSS、该目录中的图片/woff2 素材和现有权限表中的权限。入口扩展名决定默认运行时，也可显式写 `runtime: "javascript"` 或 `runtime: "wasm"`，且必须匹配扩展名。每页至多一个 v4 surface，且必须申请 `ui.surface.replace`；导入器也拒绝与同页 v3 surface 冲突。清单最多 256 KiB、插件入口最多 256 KiB、插件样式最多 512 KiB、每插件最多 32 个素材；引用文件必须存在且路径不重复。客户端与服务端复用同一解析器；客户端还对 Wasm 入口做固定 ABI 预检。SHA-256 摘要覆盖描述字段和入口、样式、全部素材；本机授权按皮肤、插件 ID 保存并绑定皮肤/插件版本、API 版本、文件摘要及权限策略版本。该摘要仅用于检测本机授权后包内容是否变化，不是发布者签名或来源证明。WebClient 已有逐页授权、Wasm 生命周期、schema 校验后的安全 UI 渲染和插件 CSS 装载；Wasm 只会在用户明确批准后运行，且生产执行受全局 worker 上限控制。动态 UI 可使用经过 manifest 权限校验的 `voice.screen-share-start` 宿主按钮；`voice.startScreenShare` 异步动作请求会被拒绝，屏幕采集必须由可信宿主按钮直接发起，以保留浏览器瞬时用户激活。

@@ -732,12 +732,12 @@ test("v4 skin packages validate Wasm entry ABI and cache it as application/wasm"
   );
 });
 
-test("the full voice surface example packages home, voice, and host-owned controls", async () => {
+test("the full voice surface example packages share-aware members and host-owned controls", async () => {
   const archive = await readFile(new URL("../../../docs/examples/open-voice-surface.wskin", import.meta.url));
   const file = new File([archive], "open-voice-surface.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.open-voice-surface");
-  assert.equal(skin.pluginData?.schemaVersion, 2);
+  assert.equal(skin.pluginData?.schemaVersion, 3);
   assert.deepEqual(skin.pluginData?.components.map((component) => [component.page, component.mode]), [
     ["home", "surface"], ["voice", "surface"],
   ]);
@@ -747,6 +747,11 @@ test("the full voice surface example packages home, voice, and host-owned contro
   assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
   assert.ok(voiceSurface?.permissions.includes("session.channels.read"));
   assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.read"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.control"));
+  const openMemberWatchAction = voiceSurface?.actions["watch-screen-share"];
+  assert.equal(openMemberWatchAction?.type, "voice.joinScreenShare");
+  assert.equal(openMemberWatchAction?.args.streamId, "{{member.screenShareStreamId}}");
   assert.ok(skin.css.includes("@media (max-width: 800px)"));
 });
 
@@ -768,6 +773,7 @@ test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspac
   assert.ok(voiceSurface?.permissions.includes("audio.microphone.control"));
   assert.ok(voiceSurface?.permissions.includes("audio.output.control"));
   assert.ok(voiceSurface?.permissions.includes("voice.screenShare.control"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.read"));
   function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
     if (!node) return undefined;
     if (node.part === part) return node;
@@ -791,6 +797,9 @@ test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspac
   assert.equal(findPart(channelVoiceMembers, "channel-voice-member")?.repeat?.path, "channel.members");
   assert.equal(findPart(channelVoiceMembers, "channel-member-muted")?.when?.path, "voicemember.status");
   assert.equal(findPart(voiceSurface?.root, "member-away-state")?.when?.path, "member.status");
+  assert.equal(findPart(voiceSurface?.root, "member-screen-share")?.when?.path, "member.screenSharing");
+  assert.equal(voiceSurface?.actions["watch-screen-share"]?.type, "voice.joinScreenShare");
+  assert.equal(voiceSurface?.actions["watch-channel-member-screen-share"]?.type, "voice.joinScreenShare");
   const voiceDockActions = findPart(voiceSurface?.root, "voice-dock-actions");
   assert.equal(findPart(voiceDockActions, "screen-share-start")?.widget, "voice.screen-share-start");
   assert.equal(findPart(voiceDockActions, "audio-controls")?.widget, "voice.audio-controls");

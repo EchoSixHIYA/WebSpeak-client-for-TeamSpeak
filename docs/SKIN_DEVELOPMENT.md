@@ -398,6 +398,8 @@ CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删�
 
 当前自动化回归涵盖 ZIP/清单验证、资源路径、CSS 隔离与拒绝规则、文案结构和服务端皮肤目录读写。视觉排版、内容遮挡和浏览器间表现仍须人工预览。
 
+自绘成员列表时，`session.members` 可读取 `screenSharing` 与 `screenShareStreamId`；这两个成员字段和 `screenShare.streams` 一样要求 `voice.screenShare.read`。用 `member.screenSharing` 显示共享标记，再将 `member.screenShareStreamId` 绑定到 `voice.joinScreenShare`（还需 `voice.screenShare.control`）即可让用户观看。未声明/未获共享读取权限的皮肤不会收到这两个字段；整页替换皮肤仍须在自己的成员列表中绘制标记或观看入口。
+
 ## 本轮实现问题记录
 
 - 整页替换必须是用户明确批准的能力；仅安装皮肤不能隐藏普通首页或语音页。schema v2 surface 应声明 `ui.surface.replace`，并验证拒绝授权和撤销后普通界面会恢复。

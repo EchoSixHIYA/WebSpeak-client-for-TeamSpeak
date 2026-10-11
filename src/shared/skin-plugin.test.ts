@@ -238,6 +238,38 @@ test("schema v3 scopes local UI state only to approved public scalar context fie
   errorCode(() => parseSkinPluginDocument(legacy), "SKIN_PLUGIN_SCHEMA_UNSUPPORTED");
 });
 
+test("custom member screen-share fields require read permission and can bind a watch action", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {
+    watch: { type: "voice.joinScreenShare", args: { streamId: "{{member.screenShareStreamId}}" } },
+  };
+  document.components[0].permissions = ["session.members.read", "voice.screenShare.read", "voice.screenShare.control"];
+  document.components[0].root = {
+    tag: "ul",
+    children: [{
+      tag: "li",
+      repeat: { path: "session.members", as: "member" },
+      children: [{
+        tag: "button",
+        when: { path: "member.screenSharing", equals: true },
+        events: { click: "watch" },
+      }],
+    }],
+  };
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].root.children?.[0].children?.[0].when?.path, "member.screenSharing");
+  assert.equal(parsed.components[0].actions.watch.args.streamId, "{{member.screenShareStreamId}}");
+
+  const missingRead = structuredClone(document);
+  missingRead.components[0].permissions = missingRead.components[0].permissions.filter((permission) => permission !== "voice.screenShare.read");
+  errorCode(() => parseSkinPluginDocument(missingRead), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const missingControl = structuredClone(document);
+  missingControl.components[0].permissions = missingControl.components[0].permissions.filter((permission) => permission !== "voice.screenShare.control");
+  errorCode(() => parseSkinPluginDocument(missingControl), "SKIN_PLUGIN_PERMISSION_MISSING");
+});
+
 test("schema v3 trusted widgets can omit screen-share UI and request only the permissions they use", () => {
   const document = validDocument();
   document.schemaVersion = 3;

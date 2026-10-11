@@ -24,6 +24,36 @@ test("runtime context exposes only fields covered by declared read permissions",
   assert.equal(JSON.stringify(projected).includes("secret.example"), false);
 });
 
+test("runtime member screen-share status is separately permission-gated", () => {
+  const context = {
+    session: {
+      members: [{
+        id: "42",
+        name: "Sharing member",
+        channelId: "channel-1",
+        status: "online",
+        speaking: false,
+        self: false,
+        screenSharing: true,
+        screenShareStreamId: "share-opaque-id",
+      }],
+    },
+  };
+
+  const memberOnly = projectSkinRuntimePluginContext(["session.members.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(memberOnly)), {
+    session: { members: [{ id: "42", name: "Sharing member", channelId: "channel-1", status: "online", speaking: false, self: false }] },
+  });
+
+  const withShareRead = projectSkinRuntimePluginContext(["session.members.read", "voice.screenShare.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(withShareRead)), {
+    session: { members: [{
+      id: "42", name: "Sharing member", channelId: "channel-1", status: "online", speaking: false, self: false,
+      screenSharing: true, screenShareStreamId: "share-opaque-id",
+    }] },
+  });
+});
+
 test("runtime context keeps safe server names and redacts connection targets from all public labels", () => {
   const projected = projectSkinRuntimePluginContext(
     ["session.status.read", "favorites.read", "servers.quickList.read"],

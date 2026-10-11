@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "components": [
     {
       "id": "open-voice-home",
@@ -54,7 +54,17 @@
         "servers.quickList.switch",
         "session.channels.read",
         "session.members.read",
-        "session.channel.join"
+        "session.channel.join",
+        "chat.channel.read",
+        "chat.channel.send",
+        "audio.status.read",
+        "audio.microphone.control",
+        "audio.output.control",
+        "voice.whisper.status.read",
+        "voice.whisper.control",
+        "voice.disconnect",
+        "voice.screenShare.read",
+        "voice.screenShare.control"
       ],
       "actions": {
         "switch-server": {
@@ -64,6 +74,10 @@
         "join-channel": {
           "type": "voice.joinChannel",
           "args": { "channelId": "{{channel.id}}" }
+        },
+        "watch-screen-share": {
+          "type": "voice.joinScreenShare",
+          "args": { "streamId": "{{member.screenShareStreamId}}" }
         }
       },
       "root": {
@@ -187,6 +201,27 @@
                         "when": { "path": "member.speaking", "equals": true },
                         "attributes": { "aria-label": "Speaking" },
                         "children": [{ "text": "Speaking" }]
+                      },
+                      {
+                        "tag": "div",
+                        "part": "member-screen-share",
+                        "when": { "path": "member.screenSharing", "equals": true },
+                        "children": [
+                          {
+                            "tag": "span",
+                            "part": "member-screen-share-live",
+                            "attributes": { "role": "status" },
+                            "children": [{ "text": "Sharing screen" }]
+                          },
+                          {
+                            "tag": "button",
+                            "part": "member-screen-share-watch",
+                            "when": { "path": "member.self", "equals": false },
+                            "attributes": { "type": "button", "aria-label": "Watch {{member.name}}'s screen" },
+                            "events": { "click": "watch-screen-share" },
+                            "children": [{ "text": "Watch" }]
+                          }
+                        ]
                       }
                     ]
                   }

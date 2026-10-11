@@ -528,3 +528,11 @@
 - 修改范围：给降噪按钮增加仅表示关闭状态的皮肤钩子，在 KAAK 语音坞内复用麦克风/扬声器的红色斜杠样式；同时覆盖 KAAK 移动端按钮。音频处理逻辑、默认皮肤和其他皮肤均不变。
 - 验证：KAAK 示例包和内置包已从同一源码重建；完整 `npm run verify` 通过（682/682 测试、服务端 TypeScript 构建、前端类型检查和 Vite 生产构建），`git diff --check` 通过。
 - 当前状态：实现与自动验证完成并已在本地提交；向 GitHub 推送时 HTTPS 连接被重置，SSH 方式没有已配置的密钥，网络恢复后需重试推送。3040 当前可提供新构建，活动浏览器标签尚未刷新。
+
+## 本轮修复节点（2026-10-11，整页替换皮肤显示屏幕共享状态）
+
+- 用户反馈：除 KAAK 外，其他皮肤看不到正在共享屏幕的成员。
+- 根因：共享状态由 WebSpeak/TeamSpeak 共用链路检测；KAAK 使用带共享状态的宿主成员卡片，其他整页替换示例则自行绘制成员行，而公开成员数据没有共享标记，导致传输层已发现的共享无法映射到自绘成员列表。
+- 修改范围：给 `session.members` 增加 `screenSharing` 与 `screenShareStreamId`，两字段单独要求 `voice.screenShare.read`；自绘皮肤用 `voice.joinScreenShare` 观看时还需 `voice.screenShare.control`。按原有限定权限投影到 Wasm，未将 TeamSpeak SDK 对象或连接信息暴露给皮肤。
+- 示例皮肤：Open Voice Surface 与 Harbor 的成员列表现可显示共享标记并提供观看按钮；KAAK 的宿主成员卡片和屏幕共享逻辑不变。
+- 验证：Open Voice Surface 与 Harbor `.wskin` 已从各自组件源码重建；共享字段权限与运行时投影专项测试通过，包含屏幕共享 UI/皮肤包测试的完整套件 684/684 通过；`npm run build`、`npm run web:build` 与 `git diff --check` 通过。没有真实共享中的频道可用于端到端观看验收。

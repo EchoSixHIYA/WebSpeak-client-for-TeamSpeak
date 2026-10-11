@@ -3,7 +3,7 @@
   "packageType": "open-skin",
   "id": "community.open-voice-surface",
   "name": "Open Voice Surface",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "WebSpeak Project",
   "license": "AGPL-3.0-only",
   "description": "A complete, script-free public voice client surface scaffold.",

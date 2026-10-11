@@ -1560,15 +1560,20 @@ const currentServerDisplayName = computed(() => {
 const skinPluginFavorites = computed(() => skinPluginQuickList.value
   .filter((server) => server.favorite)
   .map(({ favorite: _favorite, ...server }) => server));
-const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => item.members.map((member) => ({
-  id: String(member.id),
-  name: member.nickname,
-  avatarInitial: Array.from(member.nickname.trim())[0] ?? "?",
-  channelId: item.id,
-  status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
-  speaking: speakingIds.has(member.id),
-  self: member.id === voiceState.tsClientId,
-}))));
+const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => item.members.map((member) => {
+  const screenShare = screenShareControls.streamForMember(member);
+  return {
+    id: String(member.id),
+    name: member.nickname,
+    avatarInitial: Array.from(member.nickname.trim())[0] ?? "?",
+    channelId: item.id,
+    status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
+    speaking: speakingIds.has(member.id),
+    self: member.id === voiceState.tsClientId,
+    screenSharing: Boolean(screenShare),
+    ...(screenShare ? { screenShareStreamId: screenShare.streamId } : {}),
+  };
+})));
 
 const skinPluginContext = computed(() => ({
   session: {

@@ -231,6 +231,25 @@
 
 [data-ws-plugin-part="open-voice-workspace.speaking-indicator"] { color: var(--skin-voice-live); font-size: 10px; }
 
+[data-ws-plugin-part="open-voice-workspace.member-screen-share"] {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--skin-voice-live);
+  font-size: 10px;
+}
+
+[data-ws-plugin-part="open-voice-workspace.member-screen-share-watch"] {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--skin-voice-live) 50%, transparent);
+  border-radius: 7px;
+  color: var(--skin-voice-text);
+  background: var(--skin-voice-raised);
+  cursor: pointer;
+}
+
 [data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.chat"],
 [data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.audio-controls"],
 [data-ws-plugin-part="open-voice-workspace"] [data-ws-part="voice.connection-controls"],

@@ -85,7 +85,15 @@
         },
         "disconnect": { "type": "voice.disconnect", "args": {} },
         "whisper-on": { "type": "voice.setWhisperActive", "args": { "active": true } },
-        "whisper-off": { "type": "voice.setWhisperActive", "args": { "active": false } }
+        "whisper-off": { "type": "voice.setWhisperActive", "args": { "active": false } },
+        "watch-screen-share": {
+          "type": "voice.joinScreenShare",
+          "args": { "streamId": "{{member.screenShareStreamId}}" }
+        },
+        "watch-channel-member-screen-share": {
+          "type": "voice.joinScreenShare",
+          "args": { "streamId": "{{voicemember.screenShareStreamId}}" }
+        }
       },
       "state": { "selectedchannel": "", "message": "" },
       "root": {
@@ -227,6 +235,22 @@
                                 "when": { "path": "voicemember.speaking", "equals": true },
                                 "attributes": { "aria-label": "Speaking" },
                                 "children": [{ "text": "●" }]
+                              },
+                              {
+                                "tag": "div",
+                                "part": "channel-member-screen-share",
+                                "when": { "path": "voicemember.screenSharing", "equals": true },
+                                "children": [
+                                  { "tag": "span", "part": "channel-member-screen-share-live", "children": [{ "text": "SHARING" }] },
+                                  {
+                                    "tag": "button",
+                                    "part": "channel-member-screen-share-watch",
+                                    "when": { "path": "voicemember.self", "equals": false },
+                                    "attributes": { "type": "button", "aria-label": "Watch {{voicemember.name}}'s screen" },
+                                    "events": { "click": "watch-channel-member-screen-share" },
+                                    "children": [{ "text": "WATCH" }]
+                                  }
+                                ]
                               }
                             ]
                           }
@@ -363,6 +387,22 @@
                         "when": { "path": "member.status", "equals": "away" },
                         "attributes": { "aria-label": "Away" },
                         "children": [{ "text": "AWAY" }]
+                      },
+                      {
+                        "tag": "div",
+                        "part": "member-screen-share",
+                        "when": { "path": "member.screenSharing", "equals": true },
+                        "children": [
+                          { "tag": "span", "part": "member-screen-share-live", "children": [{ "text": "SHARING" }] },
+                          {
+                            "tag": "button",
+                            "part": "member-screen-share-watch",
+                            "when": { "path": "member.self", "equals": false },
+                            "attributes": { "type": "button", "aria-label": "Watch {{member.name}}'s screen" },
+                            "events": { "click": "watch-screen-share" },
+                            "children": [{ "text": "WATCH" }]
+                          }
+                        ]
                       }
                     ]
                   }

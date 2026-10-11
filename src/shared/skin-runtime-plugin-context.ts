@@ -20,13 +20,20 @@ interface CollectionProjection {
   path: readonly string[];
   permission: SkinPluginPermission;
   fields: ReadonlySet<string>;
+  fieldPermissions?: Readonly<Record<string, SkinPluginPermission>>;
   maxItems: number;
   keepNewest?: boolean;
 }
 
 const COLLECTIONS: readonly CollectionProjection[] = Object.freeze([
   { path: ["session", "channels"], permission: "session.channels.read", fields: new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]), maxItems: 128 },
-  { path: ["session", "members"], permission: "session.members.read", fields: new Set(["id", "name", "channelId", "status", "speaking", "self"]), maxItems: 256 },
+  {
+    path: ["session", "members"],
+    permission: "session.members.read",
+    fields: new Set(["id", "name", "channelId", "status", "speaking", "self", "screenSharing", "screenShareStreamId"]),
+    fieldPermissions: { screenSharing: "voice.screenShare.read", screenShareStreamId: "voice.screenShare.read" },
+    maxItems: 256,
+  },
   { path: ["favorites", "items"], permission: "favorites.read", fields: new Set(["id", "label", "current", "kind"]), maxItems: 100 },
   { path: ["servers", "quickList"], permission: "servers.quickList.read", fields: new Set(["id", "label", "current", "kind", "favorite"]), maxItems: 100 },
   { path: ["chat", "messages"], permission: "chat.channel.read", fields: new Set(["id", "author", "text", "time", "kind", "channelId"]), maxItems: 50, keepNewest: true },
@@ -46,11 +53,12 @@ const CONTEXTS: readonly ContextProjection[] = Object.freeze([
   { path: ["screenShare", "status"], permission: "voice.screenShare.status.read", fields: new Set(["active", "starting", "viewing"]) },
 ]);
 
-const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "audio", "microphoneMuted", "outputMuted", "active", "starting", "viewing", "maxClientsLimited"]);
+const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "screenSharing", "audio", "microphoneMuted", "outputMuted", "active", "starting", "viewing", "maxClientsLimited"]);
 const NUMBER_FIELDS = new Set(["depth", "memberCount", "targetCount", "ownerClientId", "viewerCount", "maxClients"]);
 const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   id: 128,
   streamId: 128,
+  screenShareStreamId: 128,
   channelId: 128,
   parentId: 128,
   name: 160,
@@ -161,9 +169,13 @@ export function projectSkinRuntimePluginContext(
     const raw = readPath(context, definition.path);
     if (!Array.isArray(raw)) continue;
     const selected = definition.keepNewest ? raw.slice(-definition.maxItems) : raw.slice(0, definition.maxItems);
-    const items = selected.map((item, index) => projectCollectionItem(definition, item, index)).filter((item): item is Record<string, unknown> => Boolean(item));
+    const fields = definition.fieldPermissions
+      ? new Set([...definition.fields].filter((field) => !definition.fieldPermissions?.[field] || allowed.has(definition.fieldPermissions[field])))
+      : definition.fields;
+    const visibleDefinition = fields === definition.fields ? definition : { ...definition, fields };
+    const items = selected.map((item, index) => projectCollectionItem(visibleDefinition, item, index)).filter((item): item is Record<string, unknown> => Boolean(item));
     writePath(projected, definition.path, items);
-    projectedCollections.push({ definition, items });
+    projectedCollections.push({ definition: visibleDefinition, items });
   }
 
   // Keep the snapshot within the independent context budget even when a server is unusually large.

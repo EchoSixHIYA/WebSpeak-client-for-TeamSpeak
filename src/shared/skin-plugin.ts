@@ -248,11 +248,17 @@ const COLLECTION_PERMISSION: Record<string, SkinPluginPermission> = {
 };
 const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]),
-  "session.members": new Set(["id", "name", "avatarInitial", "channelId", "status", "speaking", "self"]),
+  "session.members": new Set(["id", "name", "avatarInitial", "channelId", "status", "speaking", "self", "screenSharing", "screenShareStreamId"]),
   "favorites.items": new Set(["id", "label", "current", "kind"]),
   "servers.quickList": new Set(["id", "label", "monogram", "icon", "tone", "current", "kind", "favorite"]),
   "chat.messages": new Set(["id", "author", "text", "time", "kind", "channelId"]),
   "screenShare.streams": new Set(["streamId", "source", "ownerClientId", "ownerNickname", "name", "audio", "viewerCount"]),
+};
+const COLLECTION_FIELD_PERMISSIONS: Record<string, Partial<Record<string, SkinPluginPermission>>> = {
+  "session.members": {
+    screenSharing: "voice.screenShare.read",
+    screenShareStreamId: "voice.screenShare.read",
+  },
 };
 const SESSION_STATUS_FIELDS = new Set(["connected", "connecting", "connectionState", "serverLabel", "channelId", "channelName", "userName"]);
 const CONTEXT_FIELDS: Record<string, ReadonlySet<string>> = {
@@ -302,6 +308,8 @@ function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>,
     const aliasCollection = aliases.get(path[0]);
     if (aliasCollection) {
       if (path.length !== 2 || !COLLECTION_FIELDS[aliasCollection]?.has(path[1])) fail("SKIN_PLUGIN_BINDING_INVALID", "A repeated item binding references an unsupported public field.");
+      const fieldPermission = COLLECTION_FIELD_PERMISSIONS[aliasCollection]?.[path[1]];
+      if (fieldPermission) found.add(fieldPermission);
       continue;
     }
     if (path[0] === "session" && path.length === 3 && path[1] === "status" && SESSION_STATUS_FIELDS.has(path[2])) {
