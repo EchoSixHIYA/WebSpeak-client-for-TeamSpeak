@@ -55,7 +55,7 @@
           ><Icon name="mic-off" :size="14" /></span
         >
         <span
-          v-if="shareEnabled && screenShareStreamForMember(member)"
+          v-if="screenShareStreamForMember(member)"
           class="screen-share-live-indicator"
           data-ws-part="voice.member.live-indicator"
           ><span
@@ -69,7 +69,7 @@
           ><span>{{ t("sharingScreen") }}</span></span
         >
         <button
-          v-if="shareEnabled && member.isSelf && (screenShareActive || screenShareStarting)"
+          v-if="screenShareStatusEnabled && member.isSelf && (screenShareActive || screenShareStarting)"
           type="button"
           class="screen-share-stop-button"
           data-ws-part="voice.member.stop-share"
@@ -88,7 +88,7 @@
         isSpeaking(member) ? t("speaking") : member.isSelf ? t("connectedYou") : t("connected")
       }}</span>
       <div
-        v-if="shareEnabled && (member.isSelf || screenShareStreamForMember(member))"
+        v-if="screenShareStreamForMember(member) || (member.isSelf && screenShareStatusEnabled)"
         class="screen-share-card-actions"
         data-ws-part="voice.member.share-actions"
       >
@@ -163,7 +163,7 @@ import Icon from "../Icon.vue";
 import { computed } from "vue";
 import type { ChannelMember, useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   currentMembers: ChannelMember[]; isMobileViewport: boolean; showMemberActions?: boolean;
   showScreenShare?: boolean;
   sharing?: Pick<ReturnType<typeof useVoiceWebSocket>, "screenShareActive" | "screenShareStarting" | "screenShareViewingStreamId"> & Pick<ReturnType<typeof useWebClientScreenShare>, "settingsOpen">;
@@ -171,17 +171,18 @@ const props = defineProps<{
   isSpeaking: (member: ChannelMember) => boolean;
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => Record<string, string>;
   avatarInitial: (name: string) => string; t: (key: string) => string;
-}>();
-const shareEnabled = computed(() => props.showScreenShare !== false && Boolean(props.sharing && props.controls));
-const screenShareActive = computed(() => shareEnabled.value && Boolean(props.sharing?.screenShareActive.value));
-const screenShareStarting = computed(() => shareEnabled.value && Boolean(props.sharing?.screenShareStarting.value));
-const screenShareViewingStreamId = computed(() => shareEnabled.value ? props.sharing?.screenShareViewingStreamId.value ?? null : null);
-const screenShareSettingsOpen = computed(() => shareEnabled.value && Boolean(props.sharing?.settingsOpen.value));
-const screenShareStreamForMember = (member: ChannelMember) => shareEnabled.value ? props.controls?.streamForMember(member) ?? null : null;
-const toggleScreenShareForMember = (member: ChannelMember) => { if (shareEnabled.value) props.controls?.toggleForMember(member); };
-const startScreenShareWithSettings = () => { if (shareEnabled.value) void props.controls?.startWithSettings(); };
+}>(), { showScreenShare: true });
+const screenShareControlsEnabled = computed(() => props.showScreenShare !== false && Boolean(props.controls));
+const screenShareStatusEnabled = computed(() => screenShareControlsEnabled.value && Boolean(props.sharing));
+const screenShareActive = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.screenShareActive.value));
+const screenShareStarting = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.screenShareStarting.value));
+const screenShareViewingStreamId = computed(() => screenShareStatusEnabled.value ? props.sharing?.screenShareViewingStreamId.value ?? null : null);
+const screenShareSettingsOpen = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.settingsOpen.value));
+const screenShareStreamForMember = (member: ChannelMember) => screenShareControlsEnabled.value ? props.controls?.streamForMember(member) ?? null : null;
+const toggleScreenShareForMember = (member: ChannelMember) => { if (screenShareControlsEnabled.value) props.controls?.toggleForMember(member); };
+const startScreenShareWithSettings = () => { if (screenShareStatusEnabled.value) void props.controls?.startWithSettings(); };
 function toggleScreenShareSettings() {
-  if (!shareEnabled.value || !props.sharing) return;
+  if (!screenShareStatusEnabled.value || !props.sharing) return;
   props.sharing.settingsOpen.value = !props.sharing.settingsOpen.value;
 }
 const emit = defineEmits<{ memberActions: [member: ChannelMember, event: MouseEvent]; stopShare: [] }>();

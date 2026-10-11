@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
-import { createRenderer, nextTick, shallowRef, markRaw } from "vue";
-let vite, useWebClientScreenShare;
+import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
+import { renderToString } from "@vue/server-renderer";
+let vite, useWebClientScreenShare, VoiceMemberCards;
 const renderer = createRenderer({ createComment: text => ({ text }), createText: text => ({ text }), createElement: () => ({}), insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {}, parentNode: () => null, nextSibling: () => null });
 before(async () => {
-  vite = await createServer({ configFile: false, root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
+  vite = await createServer({ configFile: false, plugins: [vue()], root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
   ({ useWebClientScreenShare } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
+  ({ default: VoiceMemberCards } = await vite.ssrLoadModule("/src/components/web-client/VoiceMemberCards.vue"));
 });
 after(async () => { await vite?.close(); });
 function mount(t, initialStream = null) {
@@ -71,6 +74,49 @@ test("known screen owner IDs cannot fall back to another member with the same ni
     f.streams[0] = { streamId: "legacy", ownerPeerId: "unknown", ownerNickname: "Same", source: "browser" };
     assert.equal(f.ui.streamForMember({ id: 8, nickname: "Same" }).streamId, "legacy");
   } finally { f.app.unmount(); }
+});
+
+test("member cards detect and expose a remote share without depending on local share status", async () => {
+  let lookupCount = 0;
+  const html = await renderToString(createSSRApp(VoiceMemberCards, {
+    currentMembers: [
+      { id: 7, nickname: "Remote sharer", isSelf: false, inputMuted: false },
+      { id: 8, nickname: "Local viewer", isSelf: true, inputMuted: false },
+    ],
+    isMobileViewport: false,
+    controls: {
+      streamForMember: member => { lookupCount++; return member.id === 7 ? { streamId: "active-share" } : null; },
+      toggleForMember() {},
+      startWithSettings() {},
+    },
+    isSpeaking: () => false,
+    avatarStyle: () => ({}),
+    avatarInitial: nickname => nickname[0],
+    t: key => key,
+  }));
+
+  assert.ok(lookupCount > 0, "member cards query the available share controls");
+  assert.match(html, /screen-share-live-indicator/);
+  assert.match(html, /sharingScreen/);
+  assert.match(html, /screen-share-card-button/);
+  assert.match(html, /watchScreenShare/);
+  assert.equal((html.match(/screen-share-card-actions/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /startScreenShare/);
+});
+
+test("a skin can explicitly opt the member-card widget out of screen-share UI", async () => {
+  const html = await renderToString(createSSRApp(VoiceMemberCards, {
+    currentMembers: [{ id: 7, nickname: "Remote sharer", isSelf: false, inputMuted: false }],
+    isMobileViewport: false,
+    showScreenShare: false,
+    controls: { streamForMember: () => ({ streamId: "active-share" }), toggleForMember() {}, startWithSettings() {} },
+    isSpeaking: () => false,
+    avatarStyle: () => ({}),
+    avatarInitial: nickname => nickname[0],
+    t: key => key,
+  }));
+
+  assert.doesNotMatch(html, /screen-share-live-indicator|screen-share-card-button/);
 });
 
 test("share settings submit the selected resolution and frame rate", async t => {

@@ -677,6 +677,7 @@
               <VoiceMemberCards
                 :current-members="currentMembers"
                 :is-mobile-viewport="isMobileViewport"
+                :show-screen-share="true"
                 :sharing="memberSharingState"
                 :controls="screenShareControls"
                 :is-speaking="isSpeaking"
