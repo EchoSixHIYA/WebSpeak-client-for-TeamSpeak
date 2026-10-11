@@ -19,6 +19,8 @@ import { parseSkinExtensionUiOutput } from "../../../src/shared/skin-extension-u
 import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
 import { createSkinPluginAssetUrlCache } from "../services/skin-plugin-asset-urls.js";
+import { PROMPT_FOR_SKIN_PERMISSIONS } from "../services/skin-permission-policy.js";
+import { useSkinEditorMode } from "../services/skin-editor-mode.js";
 
 type Scalar = string | number | boolean;
 const LOCAL_STATE_SCOPE_LIMIT = 128;
@@ -65,6 +67,7 @@ export default defineComponent({
     "extension-event": (_payload: unknown) => true,
   },
   setup(props, { emit }) {
+    const editorMode = useSkinEditorMode();
     const denied = ref(false);
     const surfaceSuppressed = ref(false);
     const manageOpen = ref(false);
@@ -117,6 +120,13 @@ export default defineComponent({
     const renderedComponents = computed(() => activeComponents.value.filter((component) =>
       component.mode !== "surface" || component !== surfaceCandidate.value || !surfaceSuppressed.value));
 
+    watch(pendingApproval, (components) => {
+      if (PROMPT_FOR_SKIN_PERMISSIONS || !components.length) return;
+      approveSkinPluginComponents(props.skinId, props.skinVersion, components);
+      refresh.value += 1;
+    }, { immediate: true });
+    watch(editorMode.isEnabled, (enabled) => { if (!enabled) manageOpen.value = false; });
+
     watch(() => [props.skinId, props.skinVersion, props.document, props.extensionOutput, props.extensionMode, props.componentNamespace, props.page], () => {
       denied.value = false;
       surfaceSuppressed.value = false;
@@ -133,7 +143,7 @@ export default defineComponent({
     watch(activeSurface, (surface) => emit("surface-change", Boolean(surface)), { immediate: true, flush: "sync" });
 
     function componentStateKey(component: SkinPluginComponent): string {
-      return JSON.stringify([props.skinId, props.skinVersion, props.componentNamespace, component.id, component.stateScope ?? ""]);
+      return JSON.stringify([props.skinId, props.skinVersion, props.componentNamespace, component.id, component.stateScope ?? "", [...component.permissions].sort()]);
     }
 
     function localState(component: SkinPluginComponent, context: SafeContext): Record<string, Scalar> {
@@ -394,20 +404,20 @@ export default defineComponent({
         "aria-label": component.accessibleName,
       }, [renderNode(component, component.root, props.data, localState(component, props.data), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
       const hasPermissions = matchingComponents.value.some((component) => component.permissions.length > 0);
-      const showConsent = pendingApproval.value.length > 0 || manageOpen.value;
-      const accessToggle = hasPermissions ? h(Teleport, { to: "body" }, [h("button", {
+      const showConsent = (PROMPT_FOR_SKIN_PERMISSIONS && pendingApproval.value.length > 0) || manageOpen.value;
+      const accessToggle = hasPermissions && editorMode.isEnabled.value ? h(Teleport, { to: "body" }, [h("button", {
         type: "button",
         class: "ws-plugin-access-toggle",
         "aria-label": "管理皮肤组件权限 / Manage skin component access",
         onClick: openAccessManager,
       }, "权限 / Access")]) : null;
-      const surfaceRecovery = activeSurface.value && props.manageSurfaceRecovery ? h(Teleport, { to: "body" }, [h("button", {
+      const surfaceRecovery = activeSurface.value && props.manageSurfaceRecovery && editorMode.isEnabled.value ? h(Teleport, { to: "body" }, [h("button", {
         type: "button",
         class: "ws-plugin-surface-recovery",
         "aria-label": "返回 WebSpeak 标准界面 / Return to the built-in interface",
         onClick: () => { surfaceSuppressed.value = true; },
       }, "标准界面 / Built-in UI")]) : null;
-      const skinRecovery = activeSurface.value && props.manageSurfaceRecovery ? h(Teleport, { to: "body" }, [h("button", {
+      const skinRecovery = activeSurface.value && props.manageSurfaceRecovery && editorMode.isEnabled.value ? h(Teleport, { to: "body" }, [h("button", {
         type: "button",
         class: "ws-plugin-surface-reset",
         "aria-label": "恢复内置皮肤 / Restore the built-in skin",
@@ -420,7 +430,7 @@ export default defineComponent({
       if (!showConsent) return h(Fragment, null, [...nodes, ...(accessToggle ? [accessToggle] : []), ...recoveryControls]);
 
       const requested = accessComponents.value;
-      const hasMissing = pendingApproval.value.length > 0;
+      const hasMissing = PROMPT_FOR_SKIN_PERMISSIONS && pendingApproval.value.length > 0;
       const consent = h(Teleport, { to: "body" }, [h("div", { class: "ws-plugin-consent-backdrop", "data-ws-plugin-consent": "true" }, [
         h("section", { class: "ws-plugin-consent", role: "dialog", "aria-modal": "true", "aria-labelledby": "ws-plugin-consent-title" }, [
           h("h2", { id: "ws-plugin-consent-title" }, "皮肤组件权限 / Skin component access"),

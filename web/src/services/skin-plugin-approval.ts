@@ -8,9 +8,14 @@ import {
 
 const STORAGE_KEY = "webspeak:skin-plugin-approvals";
 interface ApprovalStore { schemaVersion: 1; grants: Record<string, SkinPluginApproval> }
+const inMemoryGrants = new Set<string>();
 
 function approvalKey(skinId: string, skinVersion: string, component: SkinPluginComponent): string {
   return `${skinId}@${skinVersion}/${component.page}/${component.id}`;
+}
+
+function permissionKey(componentKey: string, permission: string): string {
+  return `${componentKey}\u0000${permission}`;
 }
 
 function readStore(): ApprovalStore {
@@ -32,15 +37,19 @@ function writeStore(store: ApprovalStore): void {
 
 export function getMissingSkinPluginApprovals(skinId: string, skinVersion: string, document: SkinPluginDocument): SkinPluginComponent[] {
   const grants = readStore().grants;
-  return document.components.filter((component) => component.permissions.some((permission) =>
-    !isSkinPluginPermissionApproved(grants[approvalKey(skinId, skinVersion, component)], approvalKey(skinId, skinVersion, component), permission)));
+  return document.components.filter((component) => {
+    const key = approvalKey(skinId, skinVersion, component);
+    return component.permissions.some((permission) => !inMemoryGrants.has(permissionKey(key, permission))
+      && !isSkinPluginPermissionApproved(grants[key], key, permission));
+  });
 }
 
 export function isSkinPluginComponentApproved(skinId: string, skinVersion: string, component: SkinPluginComponent): boolean {
   if (!component.permissions.length) return true;
   const pluginId = approvalKey(skinId, skinVersion, component);
   const grant = readStore().grants[pluginId];
-  return component.permissions.every((permission) => isSkinPluginPermissionApproved(grant, pluginId, permission));
+  return component.permissions.every((permission) => inMemoryGrants.has(permissionKey(pluginId, permission))
+    || isSkinPluginPermissionApproved(grant, pluginId, permission));
 }
 
 export function approveSkinPluginComponents(skinId: string, skinVersion: string, components: readonly SkinPluginComponent[]): void {
@@ -48,6 +57,7 @@ export function approveSkinPluginComponents(skinId: string, skinVersion: string,
   for (const component of components) {
     const pluginId = approvalKey(skinId, skinVersion, component);
     store.grants[pluginId] = createSkinPluginApproval(pluginId, component.permissions);
+    component.permissions.forEach((permission) => inMemoryGrants.add(permissionKey(pluginId, permission)));
   }
   writeStore(store);
 }
@@ -55,5 +65,6 @@ export function approveSkinPluginComponents(skinId: string, skinVersion: string,
 export function revokeSkinPluginApprovals(skinId: string): void {
   const store = readStore();
   for (const key of Object.keys(store.grants)) if (key.startsWith(`${skinId}@`)) delete store.grants[key];
+  for (const key of inMemoryGrants) if (key.startsWith(`${skinId}@`)) inMemoryGrants.delete(key);
   writeStore(store);
 }

@@ -7,6 +7,8 @@ import { SKIN_PLUGIN_ACTION_PERMISSIONS, SKIN_PLUGIN_PERMISSIONS, skinPluginActi
 import { SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-runtime-plugin-context.js";
 import SkinPluginOutlet from "./SkinPluginOutlet.js";
 import { approveSkinRuntimePlugin, getSkinRuntimePluginApproval, revokeSkinRuntimePluginApprovals } from "../services/skin-runtime-plugin-approval.js";
+import { PROMPT_FOR_SKIN_PERMISSIONS } from "../services/skin-permission-policy.js";
+import { useSkinEditorMode } from "../services/skin-editor-mode.js";
 import { createSkinRuntimePluginSession } from "../services/skin-runtime-plugin-session.js";
 import { createSkinRuntimePluginWasmSandbox } from "../services/skin-runtime-plugin-wasm.js";
 import { skinRuntimePluginWasmGovernor } from "../services/skin-runtime-plugin-wasm-governor.js";
@@ -110,6 +112,7 @@ export default defineComponent({
     "restore-skin": () => true,
   },
   setup(props, { emit }) {
+    const editorMode = useSkinEditorMode();
     const digests = ref<Record<string, string>>({});
     const digestErrors = ref<Record<string, string>>({});
     const revision = ref(0);
@@ -332,10 +335,12 @@ export default defineComponent({
       digests.value = nextDigests;
       digestErrors.value = nextErrors;
       revision.value += 1;
-      reconcile();
+      if (PROMPT_FOR_SKIN_PERMISSIONS) reconcile();
+      else approvePending();
     }, { immediate: true });
 
     watch(() => [props.page, digests.value, revision.value], reconcile, { deep: true });
+    watch(editorMode.isEnabled, (enabled) => { if (!enabled) managerOpen.value = false; });
     watch(() => props.context, () => {
       if (disposed) return;
       if (contextRefreshTimer !== undefined) window.clearTimeout(contextRefreshTimer);
@@ -388,7 +393,7 @@ export default defineComponent({
       }
 
       const controls: VNodeChild[] = [];
-      if (currentPlugins.length) {
+      if (currentPlugins.length && editorMode.isEnabled.value) {
         controls.push(h(Teleport, { to: "body" }, [h("button", {
           type: "button",
           class: "ws-plugin-access-toggle",
@@ -397,7 +402,7 @@ export default defineComponent({
         }, "插件权限 / Plugin access")]));
       }
       for (const plugin of currentPlugins) {
-        if (plugin.mode !== "surface" || !outputs.value[plugin.id]) continue;
+        if (!editorMode.isEnabled.value || plugin.mode !== "surface" || !outputs.value[plugin.id]) continue;
         const suppressed = suppressedSurfaces.value.has(plugin.id);
         controls.push(h(Teleport, { to: "body" }, [h("button", {
           type: "button",
@@ -413,10 +418,10 @@ export default defineComponent({
         }, "恢复内置皮肤 / Reset skin")]));
       }
 
-      const showConsent = pending.value.length > 0 || managerOpen.value;
+      const showConsent = (PROMPT_FOR_SKIN_PERMISSIONS && pending.value.length > 0) || managerOpen.value;
       if (!showConsent) return h("div", { class: "ws-runtime-plugin-host" }, [...nodes, ...controls]);
 
-      const showApproval = pending.value.length > 0;
+      const showApproval = PROMPT_FOR_SKIN_PERMISSIONS && pending.value.length > 0;
       const listed = showApproval ? pending.value : currentPlugins;
       const consent = h(Teleport, { to: "body" }, [h("div", { class: "ws-plugin-consent-backdrop", "data-ws-runtime-plugin-consent": "true" }, [
         h("section", { class: "ws-plugin-consent", role: "dialog", "aria-modal": "true", "aria-labelledby": "ws-runtime-plugin-consent-title" }, [

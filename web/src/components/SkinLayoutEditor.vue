@@ -2,6 +2,17 @@
   <Teleport to="body">
     <div v-if="editor.available.value" ref="editorRoot" class="skin-layout-editor" data-ws-layout-editor @keydown.esc.stop.prevent="editor.setOpen(false)">
       <button
+        v-if="editorMode.isAdmin.value"
+        class="skin-editor-mode-trigger"
+        type="button"
+        :aria-pressed="editorMode.isEnabled.value"
+        @click="toggleEditorMode"
+      >
+        <span aria-hidden="true">⚙</span>
+        {{ editorMode.isEnabled.value ? "退出编辑器 / Exit editor" : "编辑器模式 / Editor mode" }}
+      </button>
+      <button
+        v-if="editorMode.isEnabled.value"
         ref="triggerButton"
         class="skin-layout-trigger"
         type="button"
@@ -14,7 +25,7 @@
       </button>
 
       <section
-        v-if="editor.isOpen.value"
+        v-if="editorMode.isEnabled.value && editor.isOpen.value"
         id="skin-layout-panel"
         class="skin-layout-panel"
         role="dialog"
@@ -123,7 +134,7 @@
         <p class="skin-layout-context">{{ editor.context.value?.skinId }} · {{ editor.context.value?.page }} · {{ editor.context.value?.profile }}</p>
       </section>
     </div>
-    <div v-if="editor.focusPreviewEnabled.value" class="skin-layout-focus-overlay" aria-hidden="true">
+    <div v-if="editorMode.isEnabled.value && editor.focusPreviewEnabled.value" class="skin-layout-focus-overlay" aria-hidden="true">
       <span
         v-for="target in editor.focusPreviewTargets.value"
         :key="target.key"
@@ -136,17 +147,48 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useSkinLayoutEditor } from "../composables/useSkinLayoutEditor.js";
 import { promoteHostEditorToTopLayer } from "../services/host-editor-top-layer.js";
+import { useSkinEditorMode } from "../services/skin-editor-mode.js";
+import { useRoute } from "vue-router";
 
 const editor = useSkinLayoutEditor();
+const editorMode = useSkinEditorMode();
+const route = useRoute();
 const editorRoot = ref<HTMLElement | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
 const triggerButton = ref<HTMLButtonElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
+let accessCheckTimer: number | undefined;
+
+function refreshAdminAccess(): void {
+  if (document.visibilityState !== "hidden") void editorMode.refreshAdminAccess();
+}
+
+async function toggleEditorMode(): Promise<void> {
+  const enabled = await editorMode.setEnabled(!editorMode.isEnabled.value);
+  if (!enabled) editor.setOpen(false);
+}
+
+onMounted(() => {
+  refreshAdminAccess();
+  window.addEventListener("focus", refreshAdminAccess);
+  document.addEventListener("visibilitychange", refreshAdminAccess);
+});
+onUnmounted(() => {
+  window.removeEventListener("focus", refreshAdminAccess);
+  document.removeEventListener("visibilitychange", refreshAdminAccess);
+  if (accessCheckTimer !== undefined) window.clearInterval(accessCheckTimer);
+});
 
 watch(editorRoot, promoteHostEditorToTopLayer, { flush: "post" });
+watch(() => route.fullPath, refreshAdminAccess);
+watch(editorMode.isEnabled, (enabled) => {
+  if (accessCheckTimer !== undefined) window.clearInterval(accessCheckTimer);
+  accessCheckTimer = enabled ? window.setInterval(refreshAdminAccess, 60_000) : undefined;
+  if (!enabled) editor.setOpen(false);
+});
 watch(editor.isOpen, async (isOpen) => {
   await nextTick();
   (isOpen ? closeButton.value : triggerButton.value)?.focus();
@@ -200,6 +242,23 @@ async function onImport(event: Event): Promise<void> {
   box-shadow: 0 5px 22px #0f172a55;
   cursor: pointer;
 }
+
+.skin-editor-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-inline-end: 8px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #fff;
+  background: #334155;
+  box-shadow: 0 5px 22px #0f172a55;
+  cursor: pointer;
+}
+.skin-editor-mode-trigger span { font-size: 19px; line-height: 1; }
+.skin-editor-mode-trigger:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
 
 .skin-layout-trigger span { font-size: 19px; line-height: 1; }
 
