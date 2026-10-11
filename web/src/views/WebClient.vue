@@ -1852,7 +1852,7 @@ const skinPluginWidgets = {
         }, [h(Icon, { name: "settings", size: 16 }), h("span", null, t("voiceSettings"))]),
         h("button", {
           type: "button",
-          class: ["mobile-voice-toggle", "mobile-noise-suppression", noiseSuppressionEnabled.value && "active"],
+          class: ["mobile-voice-toggle", "mobile-noise-suppression", noiseSuppressionEnabled.value ? "active" : "inactive"],
           "aria-label": t("noiseSuppression"),
           title: t("noiseSuppression"),
           "aria-pressed": noiseSuppressionEnabled.value,

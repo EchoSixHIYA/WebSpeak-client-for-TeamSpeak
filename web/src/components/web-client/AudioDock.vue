@@ -29,7 +29,7 @@
         v-if="layout === 'room-panel'"
         type="button"
         class="dock-audio-button noise-suppression-toggle"
-        :class="{ active: noiseSuppressionEnabled }"
+        :class="{ active: noiseSuppressionEnabled, inactive: !noiseSuppressionEnabled }"
         :title="t('noiseSuppression')"
         :aria-label="t('noiseSuppression')"
         :aria-pressed="noiseSuppressionEnabled"

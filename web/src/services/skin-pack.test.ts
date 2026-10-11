@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.71");
+  assert.equal(skin.version, "3.1.72");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -580,6 +580,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \.skin-runtime-screen-share-start \{[\s\S]*?background: #69c000;/);
   assert.match(skin.css, /room-panel-audio-settings[\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;/);
   assert.match(skin.css, /noise-suppression-toggle \{ grid-column: 2; grid-row: 2; align-self: center; \}/);
+  assert.match(skin.css, /noise-suppression-toggle\.inactive::after[\s\S]*?background: #e34848;/);
+  assert.match(skin.css, /noise-suppression-toggle\.inactive \{ position: relative; color: #ff4c49; \}/);
+  assert.match(skin.css, /mobile-noise-suppression\.inactive::after[\s\S]*?background: #e34848;/);
   assert.match(skin.css, /voice\.audio-dock\.microphone[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 2;/);
   assert.match(skin.css, /voice\.audio-dock\.output[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 2;/);
   assert.match(skin.css, /accompaniment-toggle \{[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 1;/);

@@ -1367,6 +1367,8 @@
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-toggle span { display: none; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { flex-basis: 48px; width: 48px; min-width: 48px; height: 48px; min-height: 48px; border-radius: 12px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression.active { color: var(--skin-kaak-accent); background: #303c34; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression.inactive { position: relative; color: #ff4c49; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression.inactive::after { position: absolute; width: 21px; height: 1.5px; border-radius: 2px; background: #e34848; content: ""; transform: rotate(-48deg); pointer-events: none; }
   [data-ws-plugin-part="kaak-workspace.microphone-control"],
   [data-ws-plugin-part="kaak-workspace.output-control"],
   [data-ws-plugin-part="kaak-workspace.disconnect-control"] { min-width: 42px; min-height: 44px; }
@@ -1604,7 +1606,8 @@
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .noise-suppression-toggle:focus-visible { border-color: transparent; transform: none; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .dock-audio-button[aria-pressed="true"] { color: #fff; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .dock-audio-button.muted { position: relative; color: #ed6868; }
-[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .dock-audio-button.muted::after {
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .dock-audio-button.muted::after,
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle.inactive::after {
   content: "";
   position: absolute;
   width: 21px;
@@ -1614,6 +1617,7 @@
   transform: rotate(-48deg);
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .noise-suppression-toggle[aria-pressed="false"] { color: #777b82; background: transparent; }
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle.inactive { position: relative; color: #ff4c49; }
 [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .ws-plugin-host-widget,
 [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .skin-runtime-screen-share-start,
 [data-ws-plugin-part="kaak-workspace.voice-dock-share"] [data-ws-plugin-part="kaak-workspace.screen-share-stop"] {
