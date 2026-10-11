@@ -1467,7 +1467,7 @@
   display: grid;
   grid-column: 1;
   grid-row: 2;
-  grid-template-columns: minmax(0, 1fr) 37px 37px;
+  grid-template-columns: minmax(0, 1fr) 37px 37px 37px;
   grid-template-rows: 28px 23px;
   column-gap: 7px;
   row-gap: 23px;
@@ -1486,7 +1486,7 @@
   background: #303236;
   pointer-events: none;
 }
-[data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1; grid-row: 1; min-width: 0; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 4; grid-row: 1; min-width: 0; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] { display: contents; }
 
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel {
@@ -1555,22 +1555,22 @@
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] [data-ws-part="voice.audio-dock.microphone"] {
   display: grid;
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 2;
   place-items: center;
   min-width: 0;
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] [data-ws-part="voice.audio-dock.output"] {
   display: grid;
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 2;
   place-items: center;
   min-width: 0;
 }
-[data-ws-plugin-part="kaak-workspace.audio-controls"] .noise-suppression-toggle { grid-column: 2; grid-row: 1; align-self: center; }
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .noise-suppression-toggle { grid-column: 2; grid-row: 2; align-self: center; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .accompaniment-toggle {
   display: inline-flex;
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1;
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle {
@@ -1702,13 +1702,13 @@
   [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-template-columns: 8px minmax(0, 1fr) 28px 28px; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] {
     grid-row: 2;
-    grid-template-columns: minmax(0, 1fr) 37px 37px;
+    grid-template-columns: minmax(0, 1fr) 37px 37px 37px;
     grid-template-rows: 34px 36px;
     column-gap: 7px;
     row-gap: 12px;
   }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"]::after { top: 39px; }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1; grid-row: 1; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 4; grid-row: 1; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .skin-runtime-screen-share-start,
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] [data-ws-plugin-part="kaak-workspace.screen-share-stop"] {
     min-height: 34px;
@@ -1733,11 +1733,11 @@
     min-height: 36px;
     font-size: 12px;
   }
-  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { grid-column: 2; grid-row: 1; }
-  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-microphone-toggle { grid-column: 2; grid-row: 2; }
-  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-output-toggle { grid-column: 3; grid-row: 2; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { grid-column: 2; grid-row: 2; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-microphone-toggle { grid-column: 3; grid-row: 2; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-output-toggle { grid-column: 4; grid-row: 2; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-accompaniment-toggle {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
     width: 37px;
     min-width: 37px;
