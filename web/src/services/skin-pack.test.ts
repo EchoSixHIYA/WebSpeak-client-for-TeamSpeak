@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.60");
+  assert.equal(skin.version, "3.1.61");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -567,6 +567,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /voice\.audio-dock\.microphone[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 2;/);
   assert.match(skin.css, /voice\.audio-dock\.output[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 2;/);
   assert.match(skin.css, /accompaniment-toggle \{[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 1;/);
+  assert.match(skin.css, /voice-dock-heading"\] \[data-ws-plugin-part="kaak-workspace\.disconnect-control"\]::before \{ content: "⏻";/);
+  assert.match(skin.css, /desktop-audio-dock-room-panel \.noise-suppression-toggle \{[\s\S]*?margin: 0;[\s\S]*?padding: 0;/);
+  assert.match(skin.css, /desktop-audio-dock-room-panel \.accompaniment-toggle \{[\s\S]*?pointer-events: auto;[\s\S]*?cursor: pointer;/);
+  assert.match(skin.css, /accompaniment-toggle\[aria-pressed="true"\] \{ background: #477f00;/);
   assert.match(skin.css, /mobile-voice-controls \{\s*display: contents;\s*\}/);
   assert.match(skin.css, /mobile-noise-suppression \{ grid-column: 2; grid-row: 2; \}/);
   assert.match(skin.css, /mobile-microphone-toggle \{ grid-column: 3; grid-row: 2; \}/);

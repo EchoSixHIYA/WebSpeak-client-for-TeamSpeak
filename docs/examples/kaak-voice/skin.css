@@ -1182,6 +1182,7 @@
 [data-ws-plugin-part="kaak-workspace.disconnect-control"] { color: var(--skin-kaak-danger); }
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"] { grid-column: 4; grid-row: 1; }
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"] { display: grid; place-items: center; width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 50%; color: #ed4541; background: transparent; font-size: 0; cursor: pointer; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"]::before { content: "⏻"; display: block; font-family: "Segoe UI Symbol", system-ui, sans-serif; font-size: 19px; font-weight: 400; line-height: 1; }
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"] .ui-icon { width: 20px; height: 20px; }
 [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] [data-ws-plugin-part="kaak-workspace.disconnect-control"]:hover { color: #ff8498; background: #3a292b; }
 [data-ws-plugin-part="kaak-workspace.output-volume"] { width: 72px; accent-color: var(--skin-kaak-accent); }
@@ -1567,10 +1568,13 @@
   grid-row: 1;
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle {
+  box-sizing: border-box;
   width: 37px;
   min-width: 37px;
   height: 28px;
   min-height: 28px;
+  margin: 0;
+  padding: 0;
   border: 0;
   border-radius: 9px;
   color: #fff;
@@ -1580,6 +1584,11 @@
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle .ui-icon { width: 17px; height: 17px; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .noise-suppression-toggle.active { color: #fff; background: #6cbf00; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .accompaniment-toggle {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  box-sizing: border-box;
   width: 37px;
   min-width: 37px;
   height: 28px;
@@ -1589,6 +1598,8 @@
   color: #fff;
   background: #6cbf00;
 }
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .accompaniment-toggle[aria-pressed="true"] { background: #477f00; box-shadow: inset 0 0 0 1px #9be031; }
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .accompaniment-toggle:focus-visible { outline: 2px solid #c8f17a; outline-offset: 2px; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .accompaniment-toggle .ui-icon { width: 17px; height: 17px; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle:hover,
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .accompaniment-toggle:hover {
@@ -1755,6 +1766,10 @@
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression.active { color: #fff; background: #6cbf00; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression[aria-pressed="false"] { color: #777b82; background: transparent; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression .ui-icon { width: 17px; height: 17px; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { box-sizing: border-box; margin: 0; padding: 0; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-accompaniment-toggle { position: relative; z-index: 1; pointer-events: auto; cursor: pointer; box-sizing: border-box; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-accompaniment-toggle[aria-pressed="true"] { background: #477f00; box-shadow: inset 0 0 0 1px #9be031; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-accompaniment-toggle:focus-visible { outline: 2px solid #c8f17a; outline-offset: 2px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-activity {
     width: 100%;
     justify-content: space-between;
