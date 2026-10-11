@@ -1815,7 +1815,7 @@
 
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .network-performance {
   position: relative;
-  z-index: 24;
+  z-index: 8;
 }
 
 [data-ws-plugin-part="kaak-workspace.performance-panel"] .performance-trigger {
