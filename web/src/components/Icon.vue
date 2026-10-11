@@ -73,6 +73,10 @@
     <path v-else-if="name === 'message'" d="M20 11.5a7.5 7.5 0 0 1-8 7.5 9.4 9.4 0 0 1-3-.5L4 20l1.5-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
     <path v-else-if="name === 'door'" d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5m5 14 5-5-5-5m5 5H9" />
     <path v-else-if="name === 'waveform'" d="M3 12h2l2-6 3 12 3-9 2 6h6" />
+    <template v-else-if="name === 'noise-suppression'">
+      <path d="M2.5 13h2l2-5 2.7 9 2.4-7 1.4 3H15" />
+      <path d="M19 5.5v4m-2-2h4" />
+    </template>
     <path v-else-if="name === 'shield'" d="M12 21s8-3.5 8-10V5l-8-3-8 3v6c0 6.5 8 10 8 10Z" />
     <template v-else-if="name === 'sun'">
       <circle cx="12" cy="12" r="4" />

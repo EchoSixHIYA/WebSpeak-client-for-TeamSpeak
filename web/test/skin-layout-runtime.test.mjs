@@ -55,12 +55,18 @@ after(async () => {
   }
 });
 
-test("registered interactive controls retain their minimum hit target without a layout override", () => {
+test("the layout runtime never overrides host-authored control dimensions", () => {
   const root = new FakeElement();
   root.dataset.wsPage = "home";
   root.dataset.wsSkin = "test.skin";
   const connect = append(root, new FakeElement());
   connect.dataset.wsPart = "home.connect";
+  const range = append(root, new FakeElement());
+  range.dataset.wsPart = "control";
+  range.dataset.wsControlKind = "range";
+  const checkbox = append(root, new FakeElement());
+  checkbox.dataset.wsPart = "control";
+  checkbox.dataset.wsControlKind = "checkbox";
   const trusted = append(root, new FakeElement());
   trusted.dataset.wsPart = "home.security-note";
   const trustedControl = append(trusted, new FakeElement());
@@ -73,7 +79,9 @@ test("registered interactive controls retain their minimum hit target without a 
   setGlobal("window", { matchMedia: () => ({ matches: false }) });
   runtime.refreshSkinLayout();
 
-  assert.equal(connect.dataset.wsLayoutTouchTarget, "44", "a visible registered control must retain its 44px hit area by default");
+  assert.equal(connect.dataset.wsLayoutTouchTarget, undefined, "buttons must keep their host-authored dimensions");
+  assert.equal(range.dataset.wsLayoutTouchTarget, undefined, "range controls must keep their authored track dimensions");
+  assert.equal(checkbox.dataset.wsLayoutTouchTarget, undefined, "checkbox controls must keep their authored switch dimensions");
   assert.equal(connect.dataset.wsLayoutActive, undefined, "the default hit-area rule must not create a user layout override");
   assert.equal(trustedControl.dataset.wsLayoutTouchTarget, undefined, "trusted host UI must remain outside the editable layout runtime");
   assert.equal(unknown.dataset.wsLayoutTouchTarget, undefined, "unregistered markup must not inherit layout control styles");
@@ -116,7 +124,7 @@ test("a local order override is applied only to the registered element", () => {
   assert.equal(pluginRoot.style.values.get("--ws-layout-order"), "3");
 });
 
-test("arbitrary component nodes accept local layout edits while interactive nodes keep a 44px target", () => {
+test("arbitrary component nodes accept local layout edits without imposing control dimensions", () => {
   const root = new FakeElement();
   root.dataset.wsPage = "home";
   root.dataset.wsSkin = "test.skin";
@@ -151,5 +159,5 @@ test("arbitrary component nodes accept local layout edits while interactive node
   assert.equal(content.style.values.get("--ws-layout-width"), "280px");
   assert.equal(content.style.values.get("--ws-layout-height"), "96px");
   assert.equal(button.style.values.get("--ws-layout-order"), "5");
-  assert.equal(button.dataset.wsLayoutTouchTarget, "44");
+  assert.equal(button.dataset.wsLayoutTouchTarget, undefined);
 });

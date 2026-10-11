@@ -119,7 +119,10 @@
         "audio.output.control",
         "voice.whisper.status.read",
         "voice.whisper.control",
-        "voice.disconnect"
+        "voice.disconnect",
+        "voice.screenShare.status.read",
+        "voice.screenShare.read",
+        "voice.screenShare.control"
       ],
       "actions": {
         "switch-server": {
@@ -149,6 +152,10 @@
         },
         "disconnect": {
           "type": "voice.disconnect",
+          "args": {}
+        },
+        "stop-screen-share": {
+          "type": "voice.stopScreenShare",
           "args": {}
         },
         "whisper-on": {
@@ -887,10 +894,14 @@
                 ]
               },
               {
+                "widget": "voice.screen-share-player",
+                "part": "screen-share-player"
+              },
+              {
                 "widget": "voice.member-cards",
                 "part": "member-cards",
                 "options": {
-                  "screenShare": false,
+                  "screenShare": true,
                   "memberActions": true
                 }
               },
@@ -1001,8 +1012,45 @@
                 "part": "voice-dock-actions",
                 "children": [
                   {
+                    "tag": "div",
+                    "part": "voice-dock-share",
+                    "children": [
+                      {
+                        "widget": "voice.screen-share-start",
+                        "part": "screen-share-start",
+                        "when": {
+                          "path": "screenShare.status.active",
+                          "equals": false
+                        }
+                      },
+                      {
+                        "tag": "button",
+                        "part": "screen-share-stop",
+                        "when": {
+                          "path": "screenShare.status.active",
+                          "equals": true
+                        },
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "停止屏幕共享"
+                        },
+                        "events": {
+                          "click": "stop-screen-share"
+                        },
+                        "children": [
+                          {
+                            "text": "停止屏幕共享"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
                     "widget": "voice.audio-controls",
-                    "part": "audio-controls"
+                    "part": "audio-controls",
+                    "options": {
+                      "layout": "room-panel"
+                    }
                   }
                 ]
               }

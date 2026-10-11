@@ -20,11 +20,6 @@
   height: var(--ws-layout-height) !important;
 }
 
-.ws-skin-root [data-ws-layout-touch-target="44"] {
-  min-width: 44px !important;
-  min-height: 44px !important;
-}
-
 .ws-skin-root [data-ws-layout-foreground="true"] {
   color: var(--ws-layout-foreground) !important;
 }

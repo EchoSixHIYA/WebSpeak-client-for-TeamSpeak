@@ -174,6 +174,8 @@ test("registered components carry accessibility, responsive, purpose, and data-s
     assert.ok(component.dataSensitivity.length > 0);
   }
   assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "home.connect")?.minTouchTarget, 44);
+  assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "control.range")?.minTouchTarget, 44);
+  assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "control.checkbox")?.minTouchTarget, 44);
   assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "home.feature")?.category, "optional");
   assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "home.security-note")?.category, "trusted-chrome");
   assert.equal(SKIN_LAYOUT_COMPONENTS.find((component) => component.id === "home.identity-import.security")?.dataSensitivity, "identity");

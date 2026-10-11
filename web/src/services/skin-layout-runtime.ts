@@ -131,14 +131,9 @@ function applyRoot(root: HTMLElement): void {
     const placement = placements[id!];
     if (!placement || !Object.keys(placement).length) {
       clearLayoutAttributes(element);
-      // Registered touch controls keep their minimum hit area even before a
-      // user applies a layout override; editing must never be required for safety.
-      if (component.minTouchTarget) element.dataset.wsLayoutTouchTarget = String(component.minTouchTarget);
       continue;
     }
     element.dataset.wsLayoutActive = "true";
-    if (component.minTouchTarget) element.dataset.wsLayoutTouchTarget = String(component.minTouchTarget);
-    else delete element.dataset.wsLayoutTouchTarget;
     if (placement.visible === false) element.dataset.wsLayoutHidden = "true";
     else delete element.dataset.wsLayoutHidden;
     if (placement.x !== undefined) element.style.setProperty("--ws-layout-x", placement.x + "px");

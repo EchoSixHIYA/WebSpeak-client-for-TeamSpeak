@@ -155,11 +155,19 @@ test("schema v3 host audio controls require read and control permissions while v
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
 
   document.components[0].permissions = ["audio.status.read", "audio.microphone.control", "audio.output.control"];
-  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.audio-controls");
+  document.components[0].root.children![0] = { widget: "voice.audio-controls", options: { layout: "room-panel" } };
+  const roomPanel = parseSkinPluginDocument(document).components[0].root.children?.[0];
+  assert.equal(roomPanel?.widget, "voice.audio-controls");
+  assert.deepEqual(roomPanel?.options, { layout: "room-panel" });
+
+  const invalidLayout = structuredClone(document);
+  invalidLayout.components[0].root.children![0] = { widget: "voice.audio-controls", options: { layout: "custom" } as never };
+  errorCode(() => parseSkinPluginDocument(invalidLayout), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 
   const legacyDocument = structuredClone(document);
   legacyDocument.schemaVersion = 2;
   legacyDocument.components[0].permissions = [];
+  legacyDocument.components[0].root.children![0] = { widget: "voice.audio-controls" };
   assert.equal(parseSkinPluginDocument(legacyDocument).components[0].root.children?.[0].widget, "voice.audio-controls");
 });
 
@@ -263,6 +271,10 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(workspace.permissions.includes("session.memberAvatars.read"));
   assert.ok(workspace.permissions.includes("chat.channel.send"));
   assert.ok(workspace.permissions.includes("audio.microphone.control"));
+  assert.ok(workspace.permissions.includes("voice.screenShare.control"));
+  assert.ok(workspace.permissions.includes("voice.screenShare.read"));
+  assert.ok(workspace.permissions.includes("voice.screenShare.status.read"));
+  assert.equal(workspace.actions["stop-screen-share"].type, "voice.stopScreenShare");
   assert.equal(workspace.actions["join-channel"].type, "voice.joinChannel");
   assert.equal(workspace.actions["send-message"].type, "chat.sendMessage");
 
@@ -274,7 +286,10 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   visit(workspace.root);
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
   assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
-  assert.ok(!nodes.some((node) => node.widget === "voice.screen-share-start"), "KOOK clone excludes screen sharing");
+  assert.ok(nodes.some((node) => node.widget === "voice.audio-controls" && node.options?.layout === "room-panel"));
+  assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"), "the voice dock exposes WebSpeak screen sharing");
+  assert.ok(nodes.some((node) => node.widget === "voice.screen-share-player"), "the voice stage keeps WebSpeak's screen-share player");
+  assert.equal(nodes.find((node) => node.part === "screen-share-stop")?.events?.click, "stop-screen-share");
   assert.ok(nodes.some((node) => node.repeat?.path === "session.channels" && node.children?.[0].events?.dblclick === "join-channel"));
   assert.ok(!nodes.some((node) => node.repeat?.path === "session.members"), "member imagery stays inside the trusted host widget");
   assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));

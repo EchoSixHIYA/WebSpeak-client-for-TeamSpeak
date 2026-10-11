@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 interface UseWebClientAudioControlsOptions {
   settingsOpen: Ref<boolean>;
   microphoneMuted: Readonly<Ref<boolean>>;
+  noiseSuppressionEnabled: Readonly<Ref<boolean>>;
   inputVolume: Readonly<Ref<number>>;
   voxThreshold: Readonly<Ref<number>>;
   notificationVolume: Readonly<Ref<number>>;
@@ -33,6 +34,7 @@ interface UseWebClientAudioControlsOptions {
 export function useWebClientAudioControls({
   settingsOpen,
   microphoneMuted,
+  noiseSuppressionEnabled,
   inputVolume,
   voxThreshold,
   notificationVolume,
@@ -92,6 +94,10 @@ export function useWebClientAudioControls({
 
   function onNoiseSuppressionToggle(event: Event): void {
     void setNoiseSuppressionEnabled((event.target as HTMLInputElement).checked);
+  }
+
+  function toggleNoiseSuppression(): void {
+    void setNoiseSuppressionEnabled(!noiseSuppressionEnabled.value);
   }
 
   function onOutputVolume(event: Event): void {
@@ -239,6 +245,7 @@ export function useWebClientAudioControls({
     micMeterBars,
     onInputVolume,
     onNoiseSuppressionToggle,
+    toggleNoiseSuppression,
     onOutputVolume,
     onVoxThreshold,
     onNotificationVolume,

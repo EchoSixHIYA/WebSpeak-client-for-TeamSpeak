@@ -61,6 +61,8 @@ export interface SkinPluginWidgetOptions {
   screenShare?: boolean;
   /** Show the trusted member actions trigger on desktop member cards. */
   memberActions?: boolean;
+  /** Select a supported host presentation for audio controls. */
+  layout?: "default" | "room-panel";
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
@@ -281,7 +283,7 @@ function isNestedChannelMembersPath(path: string, aliases: ReadonlyMap<string, s
 }
 function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>, stateKeys: ReadonlySet<string>): SkinPluginPermission[] {
   const found = new Set<SkinPluginPermission>();
-  for (const match of value.matchAll(/\{\{\s*([a-z][a-z0-9]*(?:\.[a-z][a-zA-Z0-9]*){0,5})\s*\}\}/g)) {
+  for (const match of value.matchAll(/\{\{\s*([a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*){0,5})\s*\}\}/g)) {
     const path = match[1].split(".");
     if (path[0] === "state") {
       if (path.length !== 2 || !stateKeys.has(path[1])) fail("SKIN_PLUGIN_BINDING_INVALID", "A state binding must reference a declared local state key.");
@@ -309,7 +311,7 @@ function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>,
     }
     fail("SKIN_PLUGIN_BINDING_INVALID", `The data path ${match[1]} is not available to skin components.`);
   }
-  if (/\{\{[^}]*\}\}/.test(value.replace(/\{\{\s*[a-z][a-z0-9]*(?:\.[a-z][a-zA-Z0-9]*){0,5}\s*\}\}/g, ""))) {
+  if (/\{\{[^}]*\}\}/.test(value.replace(/\{\{\s*[a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*){0,5}\s*\}\}/g, ""))) {
     fail("SKIN_PLUGIN_BINDING_INVALID", "A component binding must use a simple registered data path.");
   }
   return [...found];
@@ -431,16 +433,20 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             ? new Set(["screenShare", "memberActions"])
             : rawNode.widget === "voice.performance-panel"
               ? new Set(["screenShare"])
+              : rawNode.widget === "voice.audio-controls"
+                ? new Set(["layout"])
               : new Set<string>();
           if (!isRecord(rawNode.options)
             || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
             || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")
-            || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")) {
+            || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")
+            || (rawNode.options.layout !== undefined && rawNode.options.layout !== "default" && rawNode.options.layout !== "room-panel")) {
             fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "This host widget uses unsupported options.");
           }
           options = {
             ...(rawNode.options.screenShare !== undefined ? { screenShare: rawNode.options.screenShare } : {}),
             ...(rawNode.options.memberActions !== undefined ? { memberActions: rawNode.options.memberActions } : {}),
+            ...(rawNode.options.layout !== undefined ? { layout: rawNode.options.layout } : {}),
           };
         }
         const requiredPermission = inputSchemaVersion >= 3 || rawNode.widget === "voice.screen-share-start"
