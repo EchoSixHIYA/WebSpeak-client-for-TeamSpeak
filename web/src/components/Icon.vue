@@ -72,6 +72,7 @@
     <path v-else-if="name === 'users'" d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6-7a4 4 0 0 1 0 7m2 5h1a4 4 0 0 1 4 4v1" />
     <path v-else-if="name === 'message'" d="M20 11.5a7.5 7.5 0 0 1-8 7.5 9.4 9.4 0 0 1-3-.5L4 20l1.5-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
     <path v-else-if="name === 'door'" d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5m5 14 5-5-5-5m5 5H9" />
+    <path v-else-if="name === 'power'" d="M12 2v10m-5.9-5.1a9 9 0 1 0 11.8 0" />
     <path v-else-if="name === 'waveform'" d="M3 12h2l2-6 3 12 3-9 2 6h6" />
     <template v-else-if="name === 'noise-suppression'">
       <path d="M2.5 13h2l2-5 2.7 9 2.4-7 1.4 3H15" />

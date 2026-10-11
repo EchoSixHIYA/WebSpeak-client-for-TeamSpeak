@@ -11,12 +11,12 @@
     <button
       v-if="layout === 'room-panel'"
       type="button"
-      class="room-panel-voice-sensitivity"
-      :aria-label="t('voiceActivity')"
-      :title="t('voiceActivity')"
+      class="room-panel-audio-settings"
+      :aria-label="t('audioSettings')"
+      :title="t('audioSettings')"
       aria-haspopup="dialog"
       @click="emit('settings')"
-      ><Icon name="activity" :size="16" /><span>{{ t("voiceActivity") }}</span></button
+      ><span>{{ t("voiceActivity") }}</span><Icon name="settings" :size="16" /></button
     >
     <div class="desktop-audio-dock-copy"
       ><strong>{{ t("desktopAudioControls") }}</strong

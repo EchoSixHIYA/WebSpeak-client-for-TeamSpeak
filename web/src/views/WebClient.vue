@@ -1773,10 +1773,10 @@ const skinPluginWidgets = {
         h("button", {
           type: "button",
           class: "mobile-voice-activity",
-          "aria-label": t("voiceActivity"),
-          title: t("voiceActivity"),
+          "aria-label": t("audioSettings"),
+          title: t("audioSettings"),
           onClick: () => { settingsOpen.value = true; },
-        }, [h(Icon, { name: "activity", size: 16 }), h("span", null, t("voiceActivity"))]),
+        }, [h("span", null, t("voiceActivity")), h(Icon, { name: "settings", size: 16 })]),
         h("button", {
           type: "button",
           class: ["mobile-voice-toggle", "mobile-noise-suppression", noiseSuppressionEnabled.value && "active"],
@@ -1788,18 +1788,28 @@ const skinPluginWidgets = {
       ] : []),
       h("button", {
         type: "button",
-        class: ["mobile-voice-toggle", microphoneMuted.value && "muted"],
+        class: ["mobile-voice-toggle", "mobile-microphone-toggle", microphoneMuted.value && "muted"],
         "aria-label": t("microphone"),
         "aria-pressed": !microphoneMuted.value,
         onClick: toggleMicrophone,
       }, [h(Icon, { name: microphoneMuted.value ? "mic-off" : "mic", size: 20 }), h("span", null, t("microphone"))]),
       h("button", {
         type: "button",
-        class: ["mobile-voice-toggle", outputMuted.value && "muted"],
+        class: ["mobile-voice-toggle", "mobile-output-toggle", outputMuted.value && "muted"],
         "aria-label": t("speaker"),
         "aria-pressed": !outputMuted.value,
         onClick: toggleOutputMute,
       }, [h(Icon, { name: outputMuted.value ? "volume-off" : "volume", size: 20 }), h("span", null, t("speaker"))]),
+      ...(options?.layout === "room-panel" ? [
+        h("button", {
+          type: "button",
+          class: ["mobile-voice-toggle", "mobile-accompaniment-toggle", accompanimentActive.value && "active"],
+          "aria-label": accompanimentActive.value ? t("stopAccompaniment") : t("startAccompaniment"),
+          title: accompanimentActive.value ? t("stopAccompaniment") : t("startAccompaniment"),
+          "aria-pressed": accompanimentActive.value,
+          onClick: audioControls.toggleAccompaniment,
+        }, [h(Icon, { name: "music", size: 18 })]),
+      ] : []),
     ])
     : h(AudioDock, {
       model: audioDockState,
@@ -1849,7 +1859,7 @@ const skinPluginWidgets = {
     class: "ws-plugin-disconnect-control",
     "aria-label": t("exit"),
     onClick: leaveVoiceWorkspace,
-  }, [h(Icon, { name: "door", size: 18 }), h("span", null, t("exit"))]),
+  }, [h(Icon, { name: "power", size: 18 }), h("span", null, t("exit"))]),
 };
 
 watch(() => pokeNotifications.length, (length, previousLength) => {
