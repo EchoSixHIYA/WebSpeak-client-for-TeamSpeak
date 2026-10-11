@@ -1830,10 +1830,10 @@ const skinPluginWidgets = {
         h("button", {
           type: "button",
           class: "mobile-voice-activity",
-          "aria-label": t("audioSettings"),
-          title: t("audioSettings"),
+          "aria-label": t("voiceSettings"),
+          title: t("voiceSettings"),
           onClick: () => { settingsOpen.value = true; },
-        }, [h("span", null, t("voiceActivity")), h(Icon, { name: "settings", size: 16 })]),
+        }, [h(Icon, { name: "settings", size: 16 }), h("span", null, t("voiceSettings"))]),
         h("button", {
           type: "button",
           class: ["mobile-voice-toggle", "mobile-noise-suppression", noiseSuppressionEnabled.value && "active"],

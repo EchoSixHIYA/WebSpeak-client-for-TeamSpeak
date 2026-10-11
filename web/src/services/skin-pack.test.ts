@@ -464,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.66");
+  assert.equal(skin.version, "3.1.67");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -499,8 +499,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     return undefined;
   }
   assert.equal(findPart(voice?.root, "server-summary")?.widget, "voice.server-header");
-  assert.equal(findPart(voice?.root, "record-placeholder")?.attributes?.disabled, true);
-  assert.equal(findPart(voice?.root, "recording-label")?.children?.[0]?.text, "REC");
+  assert.equal(findPart(voice?.root, "record-placeholder"), undefined, "the KAAK voice dock has no recording control");
   assert.equal(findPart(voice?.root, "voice-channel-tree")?.widget, "voice.channel-tree");
   assert.deepEqual(findPart(voice?.root, "voice-channel-tree")?.options, { layout: "server-sidebar" });
   assert.equal(findPart(voice?.root, "channel-row"), undefined, "channels render in the trusted nested tree widget");
@@ -565,15 +564,15 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?width: min\(282px, calc\(100% - 22px\)\);[\s\S]*?margin-bottom: 11px;[\s\S]*?border-radius: 17px;/);
-  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 36px 36px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
   assert.match(skin.css, /ws-voice-channel-tree\[data-layout="server-sidebar"\] \.ws-voice-channel-line[\s\S]*?min-height: 38px;/);
   assert.match(skin.css, /ws-voice-channel-tree\[data-layout="server-sidebar"\] \.ws-voice-channel-member[\s\S]*?min-height: 29px;/);
-  assert.match(skin.css, /kaak-workspace\.record-placeholder"\][\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;[\s\S]*?background: #69c000;/);
+  assert.doesNotMatch(skin.css, /kaak-workspace\.record-placeholder|kaak-workspace\.recording-label/);
   assert.match(skin.css, /desktop-audio-dock-room-panel \{\s*display: contents;\s*\}/);
   assert.match(skin.css, /desktop-audio-dock-copy \{ display: none; \}/);
-  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \{ grid-column: 1 \/ 3; grid-row: 1;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \{ grid-column: 1 \/ 4; grid-row: 1;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \.skin-runtime-screen-share-start \{[\s\S]*?background: #69c000;/);
-  assert.match(skin.css, /room-panel-audio-settings[\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;/);
+  assert.match(skin.css, /room-panel-audio-settings[\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;/);
   assert.match(skin.css, /noise-suppression-toggle \{ grid-column: 2; grid-row: 2; align-self: center; \}/);
   assert.match(skin.css, /voice\.audio-dock\.microphone[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 2;/);
   assert.match(skin.css, /voice\.audio-dock\.output[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 2;/);

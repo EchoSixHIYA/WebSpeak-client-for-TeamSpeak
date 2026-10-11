@@ -1350,7 +1350,7 @@
   display: grid;
   grid-column: 1;
   grid-row: 2;
-  grid-template-columns: minmax(0, 1fr) 37px 37px 37px;
+  grid-template-columns: minmax(0, 1fr) 28px 28px 36px;
   grid-template-rows: 28px 23px;
   column-gap: 7px;
   row-gap: 23px;
@@ -1369,36 +1369,7 @@
   background: #303236;
   pointer-events: none;
 }
-[data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 3; grid-row: 1; min-width: 0; }
-[data-ws-plugin-part="kaak-workspace.record-placeholder"] {
-  display: flex;
-  grid-column: 3;
-  grid-row: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  box-sizing: border-box;
-  width: 36px;
-  min-width: 36px;
-  height: 29px;
-  min-height: 29px;
-  padding: 1px 0 0;
-  border: 0;
-  border-radius: 9px;
-  color: #fff;
-  background: #69c000;
-  font-family: var(--skin-kaak-font);
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 9px;
-  letter-spacing: .03em;
-  opacity: 1;
-  cursor: default;
-  pointer-events: none;
-}
-[data-ws-plugin-part="kaak-workspace.recording-dot"] { font-size: 13px; line-height: 13px; }
-[data-ws-plugin-part="kaak-workspace.recording-label"] { font-size: 8px; line-height: 9px; }
+[data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 4; grid-row: 1; min-width: 0; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] { display: contents; }
 
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel {
@@ -1408,10 +1379,10 @@
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .room-panel-audio-settings {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   grid-column: 1;
   grid-row: 2;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
   min-height: 23px;
   padding: 0 7px;
@@ -1480,8 +1451,8 @@
 }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel .noise-suppression-toggle {
   box-sizing: border-box;
-  width: 37px;
-  min-width: 37px;
+  width: 28px;
+  min-width: 28px;
   height: 28px;
   min-height: 28px;
   margin: 0;
@@ -1617,14 +1588,13 @@
   [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { grid-template-columns: 8px minmax(0, 1fr) 28px 28px; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] {
     grid-row: 2;
-    grid-template-columns: minmax(0, 1fr) 37px 37px 37px;
+    grid-template-columns: minmax(0, 1fr) 28px 28px 36px;
     grid-template-rows: 34px 36px;
     column-gap: 7px;
     row-gap: 12px;
   }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"]::after { top: 39px; }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 3; grid-row: 1; }
-  [data-ws-plugin-part="kaak-workspace.record-placeholder"] { grid-column: 3; grid-row: 1; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 4; grid-row: 1; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .skin-runtime-screen-share-start,
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] [data-ws-plugin-part="kaak-workspace.screen-share-stop"] {
     min-height: 34px;
@@ -2755,9 +2725,9 @@
   display: grid;
   grid-column: 1;
   grid-row: 2;
-  grid-template-columns: minmax(0, 1fr) 36px 36px 36px;
+  grid-template-columns: minmax(0, 1fr) 28px 28px 36px;
   grid-template-rows: 29px 26px;
-  column-gap: 7px;
+  column-gap: 6px;
   row-gap: 21px;
   align-items: center;
   min-width: 0;
@@ -2773,8 +2743,8 @@
   grid-column: 1;
   grid-row: 2;
   align-items: center;
-  justify-content: space-between;
-  gap: 5px;
+  justify-content: flex-start;
+  gap: 8px;
   min-width: 0;
   min-height: 26px;
   padding: 0 7px;
@@ -2814,8 +2784,8 @@
   grid-row: 2;
   place-items: center;
   box-sizing: border-box;
-  width: 36px;
-  min-width: 36px;
+  width: 28px;
+  min-width: 28px;
   height: 26px;
   min-height: 26px;
   margin: 0;
@@ -2908,15 +2878,18 @@
     border-radius: 17px;
   }
   [data-ws-plugin-part="kaak-workspace.voice-dock-heading"] { min-height: 22px; }
-  [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] { grid-template-rows: 29px 26px; row-gap: 16px; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-actions"] { grid-template-columns: minmax(0, 1fr) 28px 28px 36px; grid-template-rows: 29px 26px; column-gap: 6px; row-gap: 16px; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-actions"]::after { top: 36px; }
+  [data-ws-plugin-part="kaak-workspace.voice-dock-share"] { grid-column: 1 / 4; grid-row: 1; }
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .skin-runtime-screen-share-start,
   [data-ws-plugin-part="kaak-workspace.voice-dock-share"] [data-ws-plugin-part="kaak-workspace.screen-share-stop"] { min-height: 29px; height: 29px; padding-inline: 8px; font-size: 12px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-controls { display: contents; }
-  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-activity { grid-column: 1; grid-row: 2; min-height: 26px; font-size: 12px; }
-  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { grid-column: 2; grid-row: 2; width: 36px; min-width: 36px; height: 26px; min-height: 26px; margin: 0; padding: 0; border-radius: 7px; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-activity { grid-column: 1; grid-row: 2; justify-content: flex-start; gap: 8px; min-height: 26px; padding-inline: 4px; font-size: 12px; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-noise-suppression { grid-column: 2; grid-row: 2; width: 28px; min-width: 28px; height: 26px; min-height: 26px; margin: 0; padding: 0; border-radius: 7px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-microphone-toggle { grid-column: 3; grid-row: 2; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-output-toggle { grid-column: 4; grid-row: 2; }
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-microphone-toggle,
+  [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-output-toggle { width: 28px; min-width: 28px; height: 26px; min-height: 26px; padding: 0; border-radius: 7px; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-accompaniment-toggle { grid-column: 4; grid-row: 1; width: 36px; min-width: 36px; height: 29px; min-height: 29px; border-radius: 9px; }
 }
 @media (max-height: 700px) and (min-width: 821px) {

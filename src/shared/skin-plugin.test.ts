@@ -354,7 +354,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(nodes.some((node) => node.widget === "voice.audio-controls" && node.options?.layout === "room-panel"));
   assert.ok(nodes.some((node) => node.widget === "voice.server-header"), "the server header exposes trusted search and quick switching");
   assert.ok(nodes.some((node) => node.widget === "voice.channel-tree" && node.options?.layout === "server-sidebar"), "the KAAK channel tree opts into its isolated sidebar layout");
-  assert.equal(nodes.find((node) => node.part === "record-placeholder")?.attributes?.disabled, true, "recording remains a visual-only disabled placeholder");
+  assert.equal(nodes.find((node) => node.part === "record-placeholder"), undefined, "the KAAK voice dock does not expose a recording control");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"), "the voice dock exposes WebSpeak screen sharing");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-player"), "the voice stage keeps WebSpeak's screen-share player");
   assert.equal(nodes.find((node) => node.part === "screen-share-stop")?.events?.click, "stop-screen-share");

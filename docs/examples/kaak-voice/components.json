@@ -848,38 +848,6 @@
                     ]
                   },
                   {
-                    "tag": "button",
-                    "part": "record-placeholder",
-                    "attributes": {
-                      "type": "button",
-                      "disabled": true,
-                      "aria-label": "录制 / Recording unavailable"
-                    },
-                    "children": [
-                      {
-                        "tag": "span",
-                        "part": "recording-dot",
-                        "attributes": {
-                          "aria-hidden": true
-                        },
-                        "children": [
-                          {
-                            "text": "●"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "recording-label",
-                        "children": [
-                          {
-                            "text": "REC"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
                     "widget": "voice.audio-controls",
                     "part": "audio-controls",
                     "options": {
