@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@discordjs/opus": "^0.10.0",
-    "@echosixhiya/teamspeak-client": "git+https://github.com/EchoSixHIYA/teamspeak-js.git#56d426d24852c39439f7bfe1d5850b574a1b0811",
+    "@echosixhiya/teamspeak-client": "git+https://github.com/EchoSixHIYA/teamspeak-js.git#2ce968e07a4384cdc873cc368b5b9d25de0b3c52",
     "express": "^5.2.1",
     "pino": "^10.3.1",
     "postcss": "^8.5.29",

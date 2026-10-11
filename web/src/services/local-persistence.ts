@@ -31,6 +31,8 @@ export interface FavoriteServer {
   nickname?: string;
   identityId?: string;
   lastChannelHint?: { id?: string; name?: string };
+  serverName?: string;
+  serverIcon?: string;
 }
 
 export interface RecentServer {
@@ -40,6 +42,8 @@ export interface RecentServer {
   identityId?: string;
   lastConnectedAt: number;
   lastChannelHint?: { id?: string; name?: string };
+  serverName?: string;
+  serverIcon?: string;
 }
 
 export interface LocalPreferences {

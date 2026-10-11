@@ -49,12 +49,15 @@ export function useWebClientServerHistory({
   function recordCurrentServer(): void {
     const address = currentTarget.value;
     if (!address) return;
+    const savedServer = quickServers.value.find((server) => server.id === serverKey(address));
     const recent: RecentServer = {
       id: serverKey(address),
       address,
       ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}),
       ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
       lastConnectedAt: Date.now(),
+      ...(savedServer?.serverName ? { serverName: savedServer.serverName } : {}),
+      ...(savedServer?.serverIcon ? { serverIcon: savedServer.serverIcon } : {}),
       ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}),
     };
     void recordRecentServer(recent).then(() => listRecentServers().then((items) => { recentServers.value = items; }));
@@ -77,12 +80,15 @@ export function useWebClientServerHistory({
     const normalizedAddress = address.trim();
     if (!normalizedAddress) return;
     const id = serverKey(normalizedAddress);
+    const existing = quickServers.value.find((server) => server.id === id);
     const favorite: FavoriteServer = {
       id,
       label: label.trim() || normalizedAddress,
       address: normalizedAddress,
       ...(savedNickname ? { nickname: savedNickname } : {}),
       ...(rememberIdentity.value && identityMaterial.value ? { identityId: "current" } : {}),
+      ...(existing?.serverName ? { serverName: existing.serverName } : {}),
+      ...(existing?.serverIcon ? { serverIcon: existing.serverIcon } : {}),
       ...(channelHint ? { lastChannelHint: { name: channelHint } } : {}),
     };
     await saveFavorite(favorite);
@@ -124,6 +130,37 @@ export function useWebClientServerHistory({
     showToast(t("savedFavoriteToast"));
   }
 
+  async function updateCurrentServerIdentity(serverName: string, serverIcon: string | null): Promise<void> {
+    const address = currentTarget.value;
+    const name = serverName.trim().slice(0, 256);
+    if (!address || !name) return;
+    const id = serverKey(address);
+    const existingRecent = recentServers.value.find((server) => server.id === id);
+    const recent: RecentServer = {
+      ...(existingRecent ?? {}),
+      id,
+      address,
+      lastConnectedAt: existingRecent?.lastConnectedAt ?? Date.now(),
+      serverName: name,
+      ...(nickname.value.trim() ? { nickname: nickname.value.trim() } : {}),
+      ...(channel.value.trim() ? { lastChannelHint: { name: channel.value.trim() } } : {}),
+    };
+    if (serverIcon) recent.serverIcon = serverIcon;
+    else delete recent.serverIcon;
+    recentServers.value = [recent, ...recentServers.value.filter((server) => server.id !== id)]
+      .sort((left, right) => right.lastConnectedAt - left.lastConnectedAt).slice(0, 10);
+    await recordRecentServer(recent);
+
+    const favorite = favoriteServers.value.find((server) => server.id === id);
+    if (favorite) {
+      const updated: FavoriteServer = { ...favorite, serverName: name };
+      if (serverIcon) updated.serverIcon = serverIcon;
+      else delete updated.serverIcon;
+      favoriteServers.value = favoriteServers.value.map((server) => server.id === id ? updated : server);
+      await saveFavorite(updated);
+    }
+  }
+
   function clearServerHistory(): void {
     favoriteServers.value = [];
     recentServers.value = [];
@@ -136,6 +173,7 @@ export function useWebClientServerHistory({
     isFavorite,
     loadSavedServers,
     recordCurrentServer,
+    updateCurrentServerIdentity,
     selectLocalServer,
     saveFavoriteServer,
     removeFavoriteServer,

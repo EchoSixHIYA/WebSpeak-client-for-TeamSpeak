@@ -347,7 +347,7 @@
         <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.before"></div>
         <div class="favorite-server-rail-list" data-ws-part="voice.favorite-servers.rail.list">
           <div
-            v-for="server in quickServers"
+            v-for="server in quickServersForDisplay"
             :key="server.id"
             class="favorite-server-rail-item"
             data-ws-part="voice.favorite-servers.rail.item"
@@ -365,7 +365,7 @@
               :disabled="voiceState.connecting"
               @click.stop="connectQuickServer(server)"
             >
-              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)">{{ avatarInitial(server.label) }}</span>
+              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span>
               <span class="favorite-server-tooltip" data-ws-part="voice.favorite-servers.tooltip"><strong>{{ server.label }}</strong><small>{{ server.address }}</small></span>
             </button>
             <button
@@ -400,7 +400,7 @@
         :aria-label="t('quickServers')"
       >
         <div
-          v-for="server in quickServers"
+          v-for="server in quickServersForDisplay"
           :key="server.id"
           class="favorite-server-strip-item"
           data-ws-part="voice.favorite-servers.strip.item"
@@ -415,7 +415,7 @@
           :aria-pressed="isQuickServerTarget(server)"
           :disabled="voiceState.connecting"
           @click="connectQuickServer(server)"
-        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)">{{ avatarInitial(server.label) }}</span><span>{{ server.label }}</span></button
+        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span><span>{{ server.label }}</span></button
           ><button
             type="button"
             :class="['favorite-server-strip-toggle', { active: server.isFavorite }]"
@@ -1011,7 +1011,7 @@ import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfi
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
-import type { QuickServer } from "../services/quick-servers.js";
+import { isQuickServerAddressLabel, type QuickServer } from "../services/quick-servers.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
@@ -1025,6 +1025,7 @@ import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, 
 
 const {
   state: voiceState,
+  serverInfo: voiceServerInfo,
   sessionEpoch,
   memberConversationKey,
   members,
@@ -1180,6 +1181,7 @@ const {
   isFavorite,
   loadSavedServers,
   recordCurrentServer,
+  updateCurrentServerIdentity,
   selectLocalServer,
   saveFavoriteServer,
   toggleFavorite,
@@ -1444,6 +1446,20 @@ function isQuickServerTarget(server: QuickServer): boolean {
   return server.id === currentServerTarget().toLocaleLowerCase();
 }
 
+const quickServersForDisplay = computed(() => quickServers.value.map((server) => {
+  const liveInfo = isQuickServerTarget(server) ? voiceServerInfo.value : null;
+  const serverName = liveInfo?.name.trim() || server.serverName;
+  const label = serverName && (!server.label.trim() || isQuickServerAddressLabel(server.label, server.address))
+    ? serverName
+    : server.label;
+  return {
+    ...server,
+    label,
+    ...(serverName ? { serverName } : {}),
+    serverIcon: liveInfo ? (liveInfo.icon || undefined) : server.serverIcon,
+  };
+}));
+
 function connectQuickServer(server: QuickServer): void {
   if (accessMode.value !== "open" || voiceState.connecting || (voiceState.connected && isQuickServerTarget(server))) return;
   const target = splitTeamSpeakTarget(server.address);
@@ -1527,7 +1543,7 @@ async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<vo
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
 const skinPluginQuickServers = createSkinPluginQuickServerProjection();
-const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickServers.value, isQuickServerTarget));
+const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickServersForDisplay.value, isQuickServerTarget));
 const skinPluginFavorites = computed(() => skinPluginQuickList.value
   .filter((server) => server.favorite)
   .map(({ favorite: _favorite, ...server }) => server));
@@ -1697,7 +1713,7 @@ const skinPluginWidgets = {
     accessMode: accessMode.value,
     openTargetPrefillBlocked: openTargetPrefillBlocked.value,
     accelerationRelays: accelerationRelays.value,
-    quickServers: quickServers.value,
+    quickServers: quickServersForDisplay.value,
     isFavorite: isFavorite.value,
     identityExportBusy: identityExportBusy.value,
     hasIdentity: Boolean(identityMaterial.value),
@@ -1887,6 +1903,11 @@ watch(() => voiceState.connected, (connected) => {
   favoriteSwitchError.value = "";
   playNotification("connected");
   recordCurrentServer();
+});
+watch(voiceServerInfo, (server) => {
+  if (server && voiceState.connected && server.name.trim()) {
+    void updateCurrentServerIdentity(server.name, server.icon ?? null);
+  }
 });
 watch(() => voiceState.errorCode, (code) => {
   if (!favoriteSwitchPending.value || !code || code === "SERVER_PASSWORD_REQUIRED" || code === "INVALID_SERVER_PASSWORD") return;

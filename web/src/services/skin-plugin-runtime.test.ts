@@ -83,3 +83,21 @@ test("skin quick-server data redacts connection targets and resolves only host-g
   assert.equal(projection.resolve("opaque-1")?.address, "192.0.2.10:9987");
   assert.equal(projection.resolve("192.0.2.10:9987"), undefined);
 });
+
+test("skin quick-server projection uses the TeamSpeak name and public icon while keeping its target private", () => {
+  const icon = "data:image/png;base64,iVBORw0KGgo=";
+  const projection = createSkinPluginQuickServerProjection(() => "opaque-server");
+  const [server] = projection.project([{
+    id: "shanghai.example:9987",
+    address: "shanghai.example:9987",
+    label: "shanghai.example:9987",
+    serverName: "兄弟们的teamspeak",
+    serverIcon: icon,
+    isFavorite: false,
+  }], () => true);
+
+  assert.equal(server.label, "兄弟们的teamspeak");
+  assert.equal(server.monogram, "兄");
+  assert.equal(server.icon, icon);
+  assert.equal(JSON.stringify(server).includes("shanghai.example"), false);
+});

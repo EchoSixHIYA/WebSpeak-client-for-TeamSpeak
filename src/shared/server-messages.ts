@@ -13,6 +13,7 @@ type ChatFields = { invokerId?: number; invokerName?: string; message: string; t
 /** Public JSON messages. Internal sockets, SDK clients and media objects stay out. */
 export type ServerMessage =
   | Message<"connected", { tsClientId: number; members?: ChannelMember[]; serverEventLog?: ServerEvent[]; identity?: string; webrtcAvailable?: boolean; webRtcStunServer?: string; whisperTargetIds?: number[]; whisperActive?: boolean; screenShareIceServers?: ScreenShareIceServer[]; accelerated?: boolean }>
+  | Message<"serverInfo", { name: string; icon?: string | null }>
   | Message<"memberEnter", ChannelMember>
   | Message<"memberLeave", { id: number }>
   | Message<"memberAvatar", { id: number; uid?: string; avatar?: string }>
@@ -115,6 +116,9 @@ const valid: Record<ServerMessage["type"], (message: RecordValue) => boolean> = 
   connected: m => clientId(m.tsClientId) && optional(m.members, v => arrayOf(v, member)) && optional(m.serverEventLog, v => arrayOf(v, event))
     && optional(m.identity, v => text(v) && v.length <= 8192) && optional(m.webrtcAvailable, boolean) && optional(m.webRtcStunServer, v => normalizeVoiceStunServer(v) !== null)
     && optional(m.whisperTargetIds, v => arrayOf(v, clientId)) && optional(m.whisperActive, boolean) && optional(m.accelerated, boolean),
+  serverInfo: m => text(m.name) && m.name.length <= 256
+    && optional(m.icon, v => v === null || (text(v) && v.length <= 180_000
+      && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(v))),
   memberEnter: member,
   memberLeave: m => clientId(m.id),
   memberAvatar: m => clientId(m.id) && optional(m.uid, text) && optional(m.avatar, text),

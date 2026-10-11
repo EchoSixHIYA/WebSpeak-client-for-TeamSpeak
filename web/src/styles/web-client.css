@@ -7900,6 +7900,12 @@
   text-transform: uppercase;
 }
 
+.favorite-server-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .favorite-server-tooltip {
   position: absolute;
   z-index: 45;

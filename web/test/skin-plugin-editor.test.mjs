@@ -1,246 +1,1039 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×uí:-jZ.¶›­–)Ş³V–×÷'B76W'Bg&öÒ&æöFS¦76W'B÷7G&–7B#°Ğ¦–×÷'B²&VDf–ÆU7–æ2Òg&öÒ&æöFS¦g2#°Ğ¦–×÷'B²7&VFU&WV—&RÒg&öÒ&æöFS¦ÖöGVÆR#°Ğ¦–×÷'B²gFW"Â&Vf÷&RÂFW7BÒg&öÒ&æöFS§FW7B#°Ğ¦–×÷'B²f–ÆUU$ÅFõF‚Òg&öÒ&æöFS§W&Â#°Ğ¦–×÷'B¢2gVRg&öÒ'gVR#°Ğ¦–×÷'B²7&VFU&VæFW&W"ÂæW‡EF–6²Â77$6öçFW‡D¶W’Â7&VFU55$Òg&öÒ'gVR#°Ğ¦–×÷'B²&VæFW%Fõ7G&–ærÒg&öÒ$gVR÷6W'fW"×&VæFW&W"#°Ğ¦–×÷'B²7&VFU6W'fW"Òg&öÒ'f—FR#°Ğ¦–×÷'BgVUÇVv–âg&öÒ$f—FV§2÷ÇVv–â×gVR#°Ğ¦–×÷'B²4´”åõÅTt”åôÄÄõtTEôTÄTÔTåE2Òg&öÒ"ââòââ÷7&2÷6†&VB÷6¶–â×ÇVv–âæ§2#°Ğ Ğ¦ÆWBf—FS°Ğ¦ÆWB6¶–åÇVv–äVF—F÷#°Ğ¦ÆWB6¶–åÇVv–ä÷WFÆWC°Ğ¦ÆWBWF†÷&–æs°Ğ¦ÆWB&÷fÇ3°Ğ¦ÆWBfö7W6VDæöFS°Ğ¦ÆWB7W÷'G5÷÷fW$’ÒG'VS°Ğ¦6öç7BÆö6Å7F÷&vTFW67&—F÷"Òö&¦V7BævWD÷vå&÷W'G”FW67&—F÷"†vÆö&ÅF†—2Â&Æö6Å7F÷&vR"“°Ğ Ğ¦6Æ72ÖVÖ÷'•7F÷&vR°Ğ¢fÇVW2ÒæWrÖ‚“°Ğ¢vWD—FVÒ†¶W’’²&WGW&âF†—2çfÇVW2ævWB†¶W’’óòçVÆÃ²ĞĞ¢6WD—FVÒ†¶W’ÂfÇVR’²F†—2çfÇVW2ç6WB†¶W’ÂfÇVR“²ĞĞ¢&VÖ÷fT—FVÒ†¶W’’²F†—2çfÇVW2æFVÆWFR†¶W’“²ĞĞ§ĞĞ Ğ¦6öç7B†÷7DæöFRÒ‡FrÂG—RÒ&VÆVÖVçB"’Óâ°Ğ¢6öç7BæöFRÒ°Ğ¢FrÂG—RÂ&÷3¢·ÒÂFW‡C¢""Â6†–ÆG&Vã¢µÒÂ&VçC¢çVÆÂÂfÇVS¢""ÂÆ—7FVæW'3¢æWrÖ‚’Â÷÷fW$÷Vã¢fÇ6RÀĞ¢fö7W2‚’²fö7W6VDæöFRÒF†—3²ÒÀĞ¢6WDGG&–'WFR†æÖRÂfÇVR’²F†—2ç&÷5¶æÖUÒÒfÇVS²ÒÀĞ¢&VÖ÷fTGG&–'WFR†æÖR’²FVÆWFRF†—2ç&÷5¶æÖUÓ²ÒÀĞ¢FDWfVçDÆ—7FVæW"†æÖRÂÆ—7FVæW"’°Ğ¢6öç7BÆ—7FVæW'2ÒF†—2æÆ—7FVæW'2ævWB†æÖR’óòµÓ°Ğ¢Æ—7FVæW'2çW6‚†Æ—7FVæW"“°Ğ¢F†—2æÆ—7FVæW'2ç6WB†æÖRÂÆ—7FVæW'2“°Ğ¢ÒÀĞ¢&VÖ÷fTWfVçDÆ—7FVæW"†æÖRÂÆ—7FVæW"’°Ğ¢F†—2æÆ—7FVæW'2ç6WB†æÖRÂ‡F†—2æÆ—7FVæW'2ævWB†æÖR’óòµÒ’æf–ÇFW"†6æF–FFRÓâ6æF–FFRÓÒÆ—7FVæW"’“°Ğ¢ÒÀĞ¢F—7F6„WfVçB†WfVçB’²f÷"†6öç7BÆ—7FVæW"öbF†—2æÆ—7FVæW'2ævWB†WfVçBçG—R’óòµÒ’Æ—7FVæW"†WfVçB“²ÒÀĞ¢Ó°Ğ¢–b‡7W÷'G5÷÷fW$’’æöFRç6†÷u÷÷fW"ÒgVæ7F–öâ‚’²F†—2ç÷÷fW$÷VâÒG'VS²Ó°Ğ¢&WGW&âæöFS°Ğ§Ó°Ğ¦6öç7BFVÆW÷'E&ö÷BÒ†÷7DæöFR‚'FVÆW÷'B×&ö÷B"“°Ğ¦gVæ7F–öâ–ç6W'B†6†–ÆBÂ&VçBÂæ6†÷"ÒçVÆÂ’°Ğ¢–b†6†–ÆBç&VçB’°Ğ¢6öç7B&Wf–÷W2Ò6†–ÆBç&VçBæ6†–ÆG&Vâæ–æFW„öb†6†–ÆB“°Ğ¢–b‡&Wf–÷W2ãÒ’6†–ÆBç&VçBæ6†–ÆG&Vâç7Æ–6R‡&Wf–÷W2Â“°Ğ¢ĞĞ¢6öç7B–æFW‚Òæ6†÷"ò&VçBæ6†–ÆG&Vâæ–æFW„öb†æ6†÷"’¢Ó°Ğ¢6†–ÆBç&VçBÒ&VçC°Ğ¢–b†–æFW‚Â’&VçBæ6†–ÆG&VâçW6‚†6†–ÆB“°Ğ¢VÇ6R&VçBæ6†–ÆG&Vâç7Æ–6R†–æFW‚ÂÂ6†–ÆB“°Ğ§ĞĞ Ğ¦6öç7B&VæFW&W"Ò7&VFU&VæFW&W"‡°Ğ¢7&VFTVÆVÖVçC¢FrÓâ†÷7DæöFR‡Fr’ÀĞ¢7&VFUFW‡C¢FW‡BÓâö&¦V7Bæ76–vâ††÷7DæöFR‚"7FW‡B"Â'FW‡B"’Â²FW‡BÒ’ÀĞ¢7&VFT6öÖÖVçC¢FW‡BÓâö&¦V7Bæ76–vâ††÷7DæöFR‚"66öÖÖVçB"Â&6öÖÖVçB"’Â²FW‡BÒ’ÀĞ¢6WEFW‡B†æöFRÂFW‡B’²æöFRçFW‡BÒFW‡C²ÒÀĞ¢6WDVÆVÖVçEFW‡B†æöFRÂFW‡B’²æöFRæ6†–ÆG&Vâæf÷$V6‚†6†–ÆBÓâ²6†–ÆBç&VçBÒçVÆÃ²Ò“²æöFRæ6†–ÆG&VâÒµÓ²æöFRçFW‡BÒFW‡C²ÒÀĞ¢F6…&÷†æöFRÂ¶W’Â÷&Wf–÷W2ÂfÇVR’²æöFRç&÷5¶¶W•ÒÒfÇVS²ÒÀĞ¢–ç6W'BÀĞ¢&VÖ÷fR†æöFR’°Ğ¢–b‚æöFRç&VçB’&WGW&ã°Ğ¢6öç7B–æFW‚ÒæöFRç&VçBæ6†–ÆG&Vâæ–æFW„öb†æöFR“°Ğ¢–b†–æFW‚ãÒ’æöFRç&VçBæ6†–ÆG&Vâç7Æ–6R†–æFW‚Â“°Ğ¢æöFRç&VçBÒçVÆÃ°Ğ¢ÒÀĞ¢&VçDæöFS¢æöFRÓâæöFRç&VçBÀĞ¢VW'•6VÆV7F÷#¢6VÆV7F÷"Óâ6VÆV7F÷"ÓÓÒ&&öG’"òFVÆW÷'E&ö÷B¢çVÆÂÀĞ¢æW‡E6–&Æ–ær†æöFR’°Ğ¢–b‚æöFRç&VçB’&WGW&âçVÆÃ°Ğ¢&WGW&âæöFRç&VçBæ6†–ÆG&Vå¶æöFRç&VçBæ6†–ÆG&Vâæ–æFW„öb†æöFR’²ÒóòçVÆÃ°Ğ¢ÒÀĞ¢–ç6W'E7FF–46öçFVçB†6öçFVçBÂ&VçBÂæ6†÷"’°Ğ¢6öç7BæöFRÒö&¦V7Bæ76–vâ††÷7DæöFR‚"77FF–2"Â'7FF–2"’Â²FW‡C¢6öçFVçBÒ“°Ğ¢–ç6W'B†æöFRÂ&VçBÂæ6†÷"“°Ğ¢&WGW&â¶æöFRÂæöFUÓ°Ğ¢ÒÀĞ§Ò“°Ğ¦6öç7BFW7EgVU'VçF–ÖRÒ°Ğ¢ââågVRÀĞ¢dÖöFVÅFW‡C¢°Ğ¢7&VFVB†VÆVÖVçBÂ&–æF–ærÂfæöFR’°Ğ¢VÆVÖVçBçfÇVRÒ&–æF–ærçfÇVRóò"#°Ğ¢6öç7B76–vâÒfæöFRç&÷3òå²&öåWFFS¦ÖöFVÅfÇVR%Ó°Ğ¢–b†76–vâ’VÆVÖVçBæFDWfVçDÆ—7FVæW"‚&–çWB"ÂWfVçBÓâ76–vâ†WfVçBçF&vWBçfÇVR’“°Ğ¢ÒÀĞ¢&Vf÷&UWFFR†VÆVÖVçBÂ&–æF–ær’²VÆVÖVçBçfÇVRÒ&–æF–ærçfÇVRóò"#²ÒÀĞ¢ÒÀĞ§Ó°Ğ Ğ¦gVæ7F–öâf—6—B‡&ö÷BÂ&VF–6FR’°Ğ¢–b‡&VF–6FR‡&ö÷B’’&WGW&â&ö÷C°Ğ¢f÷"†6öç7B6†–ÆBöb&ö÷Bæ6†–ÆG&Vâ’°Ğ¢6öç7Bf÷VæBÒf—6—B†6†–ÆBÂ&VF–6FR“°Ğ¢–b†f÷VæB’&WGW&âf÷VæC°Ğ¢ĞĞ¢&WGW&âçVÆÃ°Ğ§ĞĞ Ğ¦gVæ7F–öâæöFUFW‡B†æöFR’°Ğ¢&WGW&âæöFRçFW‡B²æöFRæ6†–ÆG&VâæÖ†æöFUFW‡B’æ¦ö–â‚""“°Ğ§ĞĞ Ğ¦gVæ7F–öâ6Æ–6´'WGFöâ‡&ö÷BÂÆ&VÂ’°Ğ¢6öç7B'WGFöâÒf—6—B‡&ö÷BÂæöFRÓâæöFRçFrÓÓÒ&'WGFöâ Ğ¢bb†æöFRç&÷5²&&–ÖÆ&VÂ%ÒÓÓÒÆ&VÂÇÂæöFUFW‡B†æöFR’çG&–Ò‚’ÓÓÒÆ&VÂ’“°Ğ¢76W'Bæö²†'WGFöâÂ'WGFöâG¶Æ&VÇÒW†—7G2–âF†R&VæFW&VBVF—F÷#²&VæFW&VBFW‡C¢G¶æöFUFW‡B‡&ö÷B—Ö“°Ğ¢76W'BæWVÂ‡G—Vöb'WGFöâç&÷2æöä6Æ–6²Â&gVæ7F–öâ"Â'WGFöâG¶Æ&VÇÒ†26Æ–6²†æFÆW&“°Ğ¢'WGFöâç&÷2æöä6Æ–6²‡²G—S¢&6Æ–6²"ÂF&vWC¢'WGFöâÒ“°Ğ§ĞĞ Ğ¦gVæ7F–öâ6†ævU6VÆV7B‡&ö÷BÂ–æFW‚ÂfÇVR’°Ğ¢6öç7B6VÆV7G2ÒµÓ°Ğ¢6öç7B6öÆÆV7BÒæöFRÓâ°Ğ¢–b†æöFRçFrÓÓÒ'6VÆV7B"’6VÆV7G2çW6‚†æöFR“°Ğ¢æöFRæ6†–ÆG&Vâæf÷$V6‚†6öÆÆV7B“°Ğ¢Ó°Ğ¢6öÆÆV7B‡&ö÷B“°Ğ¢6öç7B6VÆV7BÒ6VÆV7G5¶–æFW…Ó°Ğ¢76W'Bæö²‡6VÆV7BÂ6VÆV7BG¶–æFW‡ÒW†—7G2–âF†R&VæFW&VBVF—F÷&“°Ğ¢76W'BæWVÂ‡G—Vöb6VÆV7Bç&÷2æöä6†ævRÂ&gVæ7F–öâ"“°Ğ¢6VÆV7Bç&÷2æöä6†ævR‡²G—S¢&6†ævR"ÂF&vWC¢²fÇVRÒÒ“°Ğ§ĞĞ Ğ¦gVæ7F–öâVF—EFW‡F&V‡&ö÷BÂfÇVR’°Ğ¢6öç7BFW‡F&VÒf—6—B‡&ö÷BÂæöFRÓâæöFRçFrÓÓÒ'FW‡F&V"“°Ğ¢76W'Bæö²‡FW‡F&VÂ$¥4ôâVF—F÷"—2&VæFW&VB"“°Ğ¢FW‡F&VçfÇVRÒfÇVS°Ğ¢FW‡F&VæF—7F6„WfVçB‡²G—S¢&–çWB"ÂF&vWC¢FW‡F&VÒ“°Ğ§ĞĞ Ğ¦&Vf÷&R†7–æ2‚’Óâ°Ğ¢f—FRÒv—B7&VFU6W'fW"‡°Ğ¢6öæf–tf–ÆS¢fÇ6RÀĞ¢&ö÷C¢f–ÆUU$ÅFõF‚†æWrU$Â‚"ââò"Â–×÷'BæÖWFçW&Â’’ÀĞ¢ÇVv–ç3¢·gVUÇVv–â‚•ÒÀĞ¢6W'fW#¢²Ö–FFÆWv&TÖöFS¢G'VRÂ†×#¢fÇ6RÂw3¢fÇ6RÂvF6ƒ¢çVÆÂÒÀĞ¢÷F–Ö—¦TFW3¢²æôF—66÷fW'“¢G'VRÂ–æ6ÇVFS¢µÒÒÀĞ¢G—S¢&7W7FöÒ"ÀĞ¢Ò“°Ğ¢‡²FVfVÇC¢6¶–åÇVv–äVF—F÷"ÒÒv—Bf—FRç77$ÆöDÖöGVÆR‚"÷7&2ö6ö×öæVçG2õ6¶–åÇVv–äVF—F÷"çgVR"’“°Ğ¢‡²FVfVÇC¢6¶–åÇVv–ä÷WFÆWBÒÒv—Bf—FRç77$ÆöDÖöGVÆR‚"÷7&2ö6ö×öæVçG2õ6¶–åÇVv–ä÷WFÆWBçG2"’“°Ğ¢&÷fÇ2Òv—Bf—FRç77$ÆöDÖöGVÆR‚"÷7&2÷6W'f–6W2÷6¶–â×ÇVv–âÖ&÷fÂçG2"“°Ğ¢6öç7B&WV—&RÒ7&VFU&WV—&R†–×÷'BæÖWFçW&Â“°Ğ¢6öç7B²'6RÂ6ö×–ÆU67&—BÂ6ö×–ÆUFV×ÆFRÒÒ&WV—&R‚"ââöæöFUöÖöGVÆW2ôgVRö6ö×–ÆW"×6f2"“°Ğ¢6öç7Bf–ÆVæÖRÒf–ÆUU$ÅFõF‚†æWrU$Â‚"ââ÷7&2ö6ö×öæVçG2õ6¶–åÇVv–äVF—F÷"çgVR"Â–×÷'BæÖWFçW&Â’“°Ğ¢6öç7B6÷W&6RÒ&VDf–ÆU7–æ2†f–ÆVæÖRÂ'WFc‚"“°Ğ¢6öç7B²FW67&—F÷"ÒÒ'6R‡6÷W&6RÂ²f–ÆVæÖRÒ“°Ğ¢6öç7B67&—BÒ6ö×–ÆU67&—B†FW67&—F÷"Â²–C¢'6¶–â×ÇVv–âÖVF—F÷"×FW7B"Ò“°Ğ¢6öç7BFV×ÆFU6÷W&6RÒFW67&—F÷"çFV×ÆFRæ6öçFVçBç&WÆ6TÆÂ‚"‚FWfVçBçF&vWB2…DÔÅ6VÆV7DVÆVÖVçB’çfÇVR"Â"‚FWfVçBçF&vWB’çfÇVR"“°Ğ¢6öç7BFV×ÆFRÒ6ö×–ÆUFV×ÆFR‡²6÷W&6S¢FV×ÆFU6÷W&6RÂf–ÆVæÖRÂ–C¢'6¶–â×ÇVv–âÖVF—F÷"×FW7B"Â6ö×–ÆW$÷F–öç3¢²W‡&W76–öåÇVv–ç3¢²'G—W67&—B%ÒÂ&–æF–ætÖWFFF¢67&—Bæ&–æF–æw2ÒÒ“°Ğ¢76W'BæFVWWVÂ‡FV×ÆFRæW'&÷'2ÂµÒÂ'F†RVF—F÷"FV×ÆFR6ö×–ÆW2f÷"6Æ–VçB&VæFW&–ær"“°Ğ¢6öç7BgVT–×÷'BÒõæ–×÷'BÇ²…µÇ5Å5Ò£ò•ÇÒg&öÒ'gVR%Ç2¢òæW†V2‡FV×ÆFRæ6öFR“°Ğ¢76W'Bæö²‡gVT–×÷'BÂ&6ö×–ÆVBFV×ÆFR–×÷'G2gVR'VçF–ÖR†VÇW'2"“°Ğ¢6öç7BgVT&–æF–æw2ÒgVT–×÷'E³Òç7Æ—B‚"Â"’æÖ†&–æF–ærÓâ&–æF–ærçG&–Ò‚’ç&WÆ6R‚"2"Â#¢"’’æ¦ö–â‚"Â"“°Ğ¢6öç7B6Æ–VçE&VæFW$6öFRÒ6öç7B²G·gVT&–æF–æw7ÒÒÒgVSµÆâG·FV×ÆFRæ6öFRç6Æ–6R‡gVT–×÷'E³ÒæÆVæwF‚’ç&WÆ6R‚&W‡÷'BgVæ7F–öâ&VæFW""Â'&WGW&âgVæ7F–öâ&VæFW""—Ö°Ğ¢6¶–åÇVv–äVF—F÷"ç&VæFW"ÒæWrgVæ7F–öâ‚%gVR"Â6Æ–VçE&VæFW$6öFR’‡FW7EgVU'VçF–ÖR“°Ğ¢WF†÷&–ærÒv—Bf—FRç77$ÆöDÖöGVÆR‚"÷7&2÷6W'f–6W2÷6¶–â×ÇVv–âÖWF†÷&–ærçG2"“°Ğ§Ò“°Ğ Ğ¦gFW"†7–æ2‚’Óâ°Ğ¢v—Bf—FSòæ6Æ÷6R‚“°Ğ¢–b†Æö6Å7F÷&vTFW67&—F÷"’ö&¦V7BæFVf–æU&÷W'G’†vÆö&ÅF†—2Â&Æö6Å7F÷&vR"ÂÆö6Å7F÷&vTFW67&—F÷"“°Ğ¢VÇ6R&VfÆV7BæFVÆWFU&÷W'G’†vÆö&ÅF†—2Â&Æö6Å7F÷&vR"“°Ğ§Ò“°Ğ Ğ§FW7B‚&6ö×öæVçBVF—F÷"7&VFW2Â6†ævW2ÂæBFVÆWFW26¶–â6ö×öæVçBG&VRF‡&÷Vv‚—G2T’"Â7–æ2‚’Óâ°Ğ¢fö7W6VDæöFRÒçVÆÃ°Ğ¢ö&¦V7BæFVf–æU&÷W'G’†vÆö&ÅF†—2Â&Æö6Å7F÷&vR"Â²6öæf–wW&&ÆS¢G'VRÂfÇVS¢æWrÖVÖ÷'•7F÷&vR‚’Ò“°Ğ¢6öç7B&6TFö7VÖVçBÒ°Ğ¢66†VÖfW'6–öã¢2ÀĞ¢6ö×öæVçG3¢·°Ğ¢–C¢&&6R×æVÂ"ÀĞ¢æÖS¢$&6RæVÂ"ÀĞ¢vS¢'fö–6R"ÀĞ¢66W76–&ÆTæÖS¢$&6RæVÂ"ÀĞ¢W&Ö—76–öç3¢µÒÀĞ¢7F–öç3¢·ÒÀĞ¢&ö÷C¢²Fs¢'6V7F–öâ"Â6†–ÆG&Vã¢·²FW‡C¢$&6R"ÕÒÒÀĞ¢ÕÒÀĞ¢Ó°Ğ¢6öç7B&÷2Ò°Ğ¢6¶–ä–C¢&6öÖ×Væ—G’æW†×ÆR"ÀĞ¢6¶–åfW'6–öã¢#ãã"ÀĞ¢&6TFö7VÖVçBÀĞ¢vS¢'fö–6R"ÀĞ¢Ææs¢'¦‚"ÀĞ¢Ó°Ğ¢6öç7B77$6öçFW‡BÒ·Ó°Ğ¢6öç7B‡FÖÂÒv—B&VæFW%Fõ7G&–ær†7&VFU55$…6¶–åÇVv–äVF—F÷"Â&÷2’Â77$6öçFW‡B“°Ğ¢76W'BæFöW4æ÷DÖF6‚†‡FÖÂÂş{¸NK»n{¹>ièBò“°Ğ¢76W'BæÖF6‚‡77$6öçFW‡BçFVÆW÷'G2æ&öG’Âş{¸NK»n{¹>ièBòÀĞ¢'F†RVF—F÷"6öçG&öÇ2&RFVÆW÷'FVB÷WG6–FRF†R6¶–â×&VæFW&VBDôÒG&VR"“°Ğ Ğ¢6öç7B&ö÷BÒ†÷7DæöFR‚'&ö÷B"“°Ğ¢6öç7B†÷7Ef–WrÒgVRæFVf–æT6ö×öæVçB‡°Ğ¢6WGW‚’°Ğ¢&WGW&â‚’ÓâgVRæ‚‚&Ö–â"Â²6Æ73¢'w2×6¶–â×&ö÷B"Â&FF×w2×6¶–â#¢&÷2ç6¶–ä–BÒÂ°Ğ¢gVRæ‚…6¶–åÇVv–äVF—F÷"Â&÷2’ÀĞ¢Ò“°Ğ¢ÒÀĞ¢Ò“°Ğ¢6öç7BÒ&VæFW&W"æ7&VFT††÷7Ef–Wr“°Ğ¢ç&÷f–FR‡77$6öçFW‡D¶W’Â²ÖöGVÆW3¢æWr6WB‚’Ò“°Ğ¢æÖ÷VçB‡&ö÷B“°Ğ Ğ¢G'’°Ğ¢76W'BæWVÂ‡f—6—B‡&ö÷BÂæöFRÓâæöFRç&÷5²&FF×w2×ÇVv–âÖVF—F÷"%ÒÓÒVæFVf–æVB’ÂçVÆÂÀĞ¢'6¶–â5526ææ÷BF&vWBF†R†÷7BÖ÷væVB6ö×öæVçBVF—F÷""“°Ğ¢6öç7BFVÆW÷'FVDVF—F÷"Òf—6—B‡FVÆW÷'E&ö÷BÂæöFRÓâæöFRç&÷5²&FF×w2×ÇVv–âÖVF—F÷"%ÒÓÒVæFVf–æVB“°Ğ¢76W'Bæö²‡FVÆW÷'FVDVF—F÷"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢76W'BæWVÂ‡FVÆW÷'FVDVF—F÷"ç÷÷fW$÷VâÂG'VRÀĞ¢&'&÷w6W'2v—F‚F†R÷÷fW"’¶VWF†R†÷7BVF—F÷"&÷fR6¶–âÖWF†÷&VB7F6¶–ærÆ–W'2"“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.{¸NK»n{¹>ièB"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢76W'BæWVÂ†fö7W6VDæöFSòç&÷5²&&–ÖÆ&VÂ%ÒÂ.X[>™zÒ"Â&÷Væ–ærÖ÷fW2¶W–&ö&Bfö7W2FòF†R6Æ÷6R6öçG&öÂ"“°Ğ¢76W'BæWVÂ‡f—6—B‡FVÆW÷'E&ö÷BÂæöFRÓâæöFRçFrÓÓÒ&'WGFöâ"bbæöFUFW‡B†æöFR’çG&–Ò‚’ÓÓÒ.{¸NK»n{¹>ièB"“òç&÷5²&&–ÖW‡æFVB%ÒÂG'VR“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.ikZ)î{¸NK»b"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6öç7B¶W’ÒWF†÷&–ærævWE6¶–åÇVv–äWF†÷&–æu7F÷&vT¶W’‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢ÆWBVF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG2æÆVæwF‚Â"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òæ–BÂ&7W7FöÒÖ6ö×öæVçBÓ"“°Ğ Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂÂ'&ö÷B"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢76W'BæÖF6‚†æöFUFW‡B‡FVÆW÷'E&ö÷B’Âşˆ¨.x+Zé®K˜’òÂ'F†R&ö÷BæöFR†2F—7F–æ7B6VÆV7F&ÆRVçG'’–âF†RG&VR"“°Ğ¢VF—EFW‡F&V‡FVÆW÷'E&ö÷BÂ¥4ôâç7G&–æv–g’‡²Fs¢&'F–6ÆR"Â6†–ÆG&Vã¢·²FW‡C¢.ik[»®{¸NK»b"ÕÒÒÂçVÆÂÂ"’“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.[©NyJZé®K˜’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷BçFrÂ&'F–6ÆR"ÀĞ¢'6VÆV7F–ærF†R&ö÷BÆWG2WF†÷'2&WÆ6R—BF‡&÷Vv‚F†R÷&F–æ'’æöFRVF—F÷""“°Ğ Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂ"Â&'WGFöâ"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6öç7BæöFUG—T÷F–öç2Òf—6—B‡FVÆW÷'E&ö÷BÂæöFRÓâæöFRçFrÓÓÒ'6VÆV7B"bbæöFRç&÷5²&&–ÖÆ&VÂ%ÒÓÓÒ.ikZ)îˆ¨.x+{¾Yè²"“°Ğ¢76W'Bæö²†æöFUG—T÷F–öç2æ6†–ÆG&Vâç6öÖR†÷F–öâÓâ÷F–öâç&÷2çfÇVRÓÓÒ'7fr"’ÀĞ¢'F†RæöFRG—R–6¶W"W‡÷6W2F†R6†&VB6fRVÆVÖVçB6WBÂ–æ6ÇVF–ær5dr"“°Ğ Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.{¸NK»nKˆ®z{²"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæFVWWVÂ†VF—FVBæ6ö×öæVçG2æÖ†6ö×öæVçBÓâ6ö×öæVçBæ–B’Â²&7W7FöÒÖ6ö×öæVçBÓ"Â&&6R×æVÂ%Ò“°Ğ Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.k{¾XªZÙˆ¨.x+’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&VâæÆVæwF‚Â"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³ÒçFrÂ&'WGFöâ"ÀĞ¢&WF†÷'26âFB6VÆV7FVB6fRVÆVÖVçBF—&V7FÇ’–ç7FVBöb†æB×w&—F–ær—G2æöFR¥4ôâ"“°Ğ¢76W'Bæö²†Æö6Å7F÷&vRævWD—FVÒ†¶W’’“°Ğ Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.ZHŞX‹nˆ¨.x+’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&VâæÆVæwF‚Â2Â'F†RVF—F÷"GWÆ–6FW2F†R6VÆV7FVBæöFR26–&Æ–ær"“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.ˆ¨.x+Kˆ®z{²"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³ÒçFrÂ&'WGFöâ"Â'F†R6VÆV7FVBæöFRÖ÷fW2v—F†–â—G2&VçB"“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.ˆ¨.x+Kˆ¾z{²"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂ"Â'FW‡B"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.k{¾XªYÎ{ª~ˆ¨.x+’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&VâæÆVæwF‚ÂBÂ'F†RVF—F÷"FG26–&Æ–ær&W6–FRF†R6VÆV7FVBæöFR"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³5ÒçFW‡BÂ.ik[»®Xh^Zë’"ÀĞ¢'FW‡BæöFW2&Rf–Æ&ÆRF‡&÷Vv‚F†R6ÖRWF†÷&–ærfÆ÷r"“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.XŠ™šNˆ¨.x+’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&VâæÆVæwF‚Â2Â'F†RVF—F÷"FVÆWFW2F†R6VÆV7FVBæöFRv—F†÷WBFVÆWF–ær—G2&VçB"“°Ğ Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂÂ#"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—EFW‡F&V‡FVÆW÷'E&ö÷BÂ¥4ôâç7G&–æv–g’‡²FW‡C¢$VF—FVB–âF†R6ö×öæVçBVF—F÷""ÒÂçVÆÂÂ"’“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.[©NyJZé®K˜’"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³ÒçFW‡BÂ$VF—FVB–âF†R6ö×öæVçBVF—F÷""“°Ğ Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.i*N™H"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³ÒçFW‡BÂ.ik[»®{¸NK»b"“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.˜xŞX¢"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæWVÂ†VF—FVBæ6ö×öæVçG5³Òç&ö÷Bæ6†–ÆG&Vå³ÒçFW‡BÂ$VF—FVB–âF†R6ö×öæVçBVF—F÷""“°Ğ Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.XŠ™šN{¸NK»b"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæFVWWVÂ†VF—FVBæ6ö×öæVçG2æÖ†6ö×öæVçBÓâ6ö×öæVçBæ–B’Â²&&6R×æVÂ%Ò“°Ğ Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂÂ&&6R×æVÂ"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6Æ–6´'WGFöâ‡FVÆW÷'E&ö÷BÂ.ZHŞX‹n{¸NK»b"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢VF—FVBÒWF†÷&–æræÆöE6¶–åÇVv–äWF†÷&–ætFö7VÖVçB‚&6öÖ×Væ—G’æW†×ÆR"Â#ãã"“°Ğ¢76W'BæFVWWVÂ†VF—FVBæ6ö×öæVçG2æÖ†6ö×öæVçBÓâ6ö×öæVçBæ–B’Â²&&6R×æVÂ"Â&&6R×æVÂÓ"%Ò“°Ğ Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂÂ&&6R×æVÂ"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6†ævU6VÆV7B‡FVÆW÷'E&ö÷BÂÂ#"“°Ğ¢v—BæW‡EF–6²‚“°Ğ¢6Æ–6´'WNy×»h‘éì¶»§q«^wBˆ\[›[İ[
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { after, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
+import * as Vue from "vue";
+import { createRenderer, nextTick, ssrContextKey, createSSRApp } from "vue";
+import { renderToString } from "@vue/server-renderer";
+import { createServer } from "vite";
+import vuePlugin from "@vitejs/plugin-vue";
+import { SKIN_PLUGIN_ALLOWED_ELEMENTS } from "../../src/shared/skin-plugin.js";
 
-NÃBˆCBŸJNÃBƒB\İ
-˜ÛÛ\Û™[Ü™X]K\]K[™[]H[[YYX][HÚ[™ÙHH™[™\™YÚÚ[ˆ™]šY]È‹\Ş[˜È
+let vite;
+let SkinPluginEditor;
+let SkinPluginOutlet;
+let authoring;
+let approvals;
+let focusedNode;
+let supportsPopoverApi = true;
+const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
-HOˆÃBˆØš™Xİ™Yš[™T›Ü\JÛØ˜[\Ë›ØØ[İÜ˜YÙH‹ÈÛÛ™šYİ\˜X›NˆYK˜[YNˆ™]ÈY[[ÜTİÜ˜YÙJ
-HJNÃBˆÛÛœİÚÚ[’YH˜ÛÛ[][š]Kœ™]šY]ÈÃBˆÛÛœİÚÚ[•™\œÚ[ÛˆHŒKŒŒÃBˆÛÛœİ˜\ÙQØİ[Y[HÈØÚ[XU™\œÚ[ÛˆËÛÛ\Û™[Îˆ×HNÃBˆÛÛœİ™]š\Ú[ÛˆHYKœ™YŠ
-NÃBˆÛÛœİ›ÜÈHÈÚÚ[’YÚÚ[•™\œÚ[Û‹˜\ÙQØİ[Y[YÙNˆ›ÚXÙH‹[™ÎˆšˆNÃBˆÛÛœİ™]šY]ÈHYK™Yš[™PÛÛ\Û™[
-ÃBˆÙ]\
+class MemoryStorage {
+  values = new Map();
+  getItem(key) { return this.values.get(key) ?? null; }
+  setItem(key, value) { this.values.set(key, value); }
+  removeItem(key) { this.values.delete(key); }
+}
 
-HÃBˆÛÛœİİ\œ™[Øİ[Y[H
+const hostNode = (tag, type = "element") => {
+  const node = {
+    tag, type, props: {}, text: "", children: [], parent: null, value: "", listeners: new Map(), popoverOpen: false,
+    focus() { focusedNode = this; },
+    setAttribute(name, value) { this.props[name] = value; },
+    removeAttribute(name) { delete this.props[name]; },
+    addEventListener(name, listener) {
+      const listeners = this.listeners.get(name) ?? [];
+      listeners.push(listener);
+      this.listeners.set(name, listeners);
+    },
+    removeEventListener(name, listener) {
+      this.listeners.set(name, (this.listeners.get(name) ?? []).filter(candidate => candidate !== listener));
+    },
+    dispatchEvent(event) { for (const listener of this.listeners.get(event.type) ?? []) listener(event); },
+  };
+  if (supportsPopoverApi) node.showPopover = function () { this.popoverOpen = true; };
+  return node;
+};
+const teleportRoot = hostNode("teleport-root");
+function insert(child, parent, anchor = null) {
+  if (child.parent) {
+    const previous = child.parent.children.indexOf(child);
+    if (previous >= 0) child.parent.children.splice(previous, 1);
+  }
+  const index = anchor ? parent.children.indexOf(anchor) : -1;
+  child.parent = parent;
+  if (index < 0) parent.children.push(child);
+  else parent.children.splice(index, 0, child);
+}
 
-HOˆÃBˆ™]š\Ú[Û‹˜[YNÃBˆ™]\›ˆ]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠHÏÈ˜\ÙQØİ[Y[ÃBˆNÃBˆ™]\›ˆ
+const renderer = createRenderer({
+  createElement: tag => hostNode(tag),
+  createText: text => Object.assign(hostNode("#text", "text"), { text }),
+  createComment: text => Object.assign(hostNode("#comment", "comment"), { text }),
+  setText(node, text) { node.text = text; },
+  setElementText(node, text) { node.children.forEach(child => { child.parent = null; }); node.children = []; node.text = text; },
+  patchProp(node, key, _previous, value) { node.props[key] = value; },
+  insert,
+  remove(node) {
+    if (!node.parent) return;
+    const index = node.parent.children.indexOf(node);
+    if (index >= 0) node.parent.children.splice(index, 1);
+    node.parent = null;
+  },
+  parentNode: node => node.parent,
+  querySelector: selector => selector === "body" ? teleportRoot : null,
+  nextSibling(node) {
+    if (!node.parent) return null;
+    return node.parent.children[node.parent.children.indexOf(node) + 1] ?? null;
+  },
+  insertStaticContent(content, parent, anchor) {
+    const node = Object.assign(hostNode("#static", "static"), { text: content });
+    insert(node, parent, anchor);
+    return [node, node];
+  },
+});
+const testVueRuntime = {
+  ...Vue,
+  vModelText: {
+    created(element, binding, vnode) {
+      element.value = binding.value ?? "";
+      const assign = vnode.props?.["onUpdate:modelValue"];
+      if (assign) element.addEventListener("input", event => assign(event.target.value));
+    },
+    beforeUpdate(element, binding) { element.value = binding.value ?? ""; },
+  },
+};
 
-HOˆYKš
-›XZ[ˆ‹[ÃBˆYKš
-ÚÚ[”YÚ[“İ]]ÃBˆÚÚ[’YBˆÚÚ[•™\œÚ[Û‹BˆØİ[Y[ˆİ\œ™[Øİ[Y[
+function visit(root, predicate) {
+  if (predicate(root)) return root;
+  for (const child of root.children) {
+    const found = visit(child, predicate);
+    if (found) return found;
+  }
+  return null;
+}
 
-KBˆYÙNˆ›ÚXÙH‹Bˆ]NˆßKBˆ\ÜÙ]ÎˆßKBˆXİ[ÛœÎˆßKBˆJKBˆYKš
-ÚÚ[”YÚ[‘Y]Ü‹È‹‹œ›ÜËÛ•\]Yˆ
+function nodeText(node) {
+  return node.text + node.children.map(nodeText).join("");
+}
 
-HOˆÈ™]š\Ú[Û‹˜[YH
-ÏHNÈHJKBˆJNÃBˆKBˆJNÃBˆÛÛœİ›ÛİHÜİ›ÙJœ›ÛİŠNÃBˆÛÛœİ\H™[™\™\‹˜Ü™X]P\
-™]šY]ÊNÃBˆ\œ›İšYJÜÜÛÛ^Ù^KÈ[Ù[\Îˆ™]ÈÙ]
+function clickButton(root, label) {
+  const button = visit(root, node => node.tag === "button"
+    && (node.props["aria-label"] === label || nodeText(node).trim() === label));
+  assert.ok(button, `button ${label} exists in the rendered editor; rendered text: ${nodeText(root)}`);
+  assert.equal(typeof button.props.onClick, "function", `button ${label} has a click handler`);
+  button.props.onClick({ type: "click", target: button });
+}
 
-HJNÃBˆ\›[İ[
-›Ûİ
-NÃBƒBˆHÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹îá9.í¹îäù§¡ŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹¥¬9h§¹îá9.íˆŠNÃBˆ]ØZ]™^XÚÊ
-NÃBƒBˆ]™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\›ÚÊ™[™\™YH™]ÛHÜ™X]YÛÛ\Û™[\È™[™\™Y[ˆHYÙH™]šY]ÈŠNÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-™[™\™Y
-Kù¥¬9nî¹îá9.í‹ÊNÃBƒBˆÚ[™ÙTÙ[Xİ
-[\Ü›ÛİKœ›ÛİŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆY]^\™XJ[\Ü›Ûİ”ÓÓ‹œİš[™ÚYJÈYÎˆ˜\XÛH‹Ú[™[ˆŞÈ^ˆ¹¨.z" ¹à®ymì¹¦í9¥¬ˆWHK[ŠJNÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹n¥9å*9k¦¹.bHŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\™\]X[
-™[™\™Y˜Ú[™[–ÌKYË˜\XÛH‹™Y][™ÈHÙ[XİY›Ûİ™\XÙ\ÈH]™H™]šY]È›ÛİŠNÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-™[™\™Y
-Kù¨.z" ¹à®ymì¹¦í9¥¬ÊNÃBƒBˆÛÛœİØ]™YH]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠNÃBˆÛÛœİ\]YHÃBˆ‹‹œØ]™Y˜ÛÛ\Û™[ÖÌKBˆ˜[YNˆ”™]šY]ÈÛÛ\Û™[‹BˆXØÙ\ÜÚX›S˜[YNˆ”™]šY]ÈÛÛ\Û™[‹Bˆ›ÛİˆÈYÎˆœÙXİ[Ûˆ‹Ú[™[ˆŞÈ^ˆºh¡:)â9mì¹¦í9¥¬ˆKÈYÎˆœÜ[ˆ‹Ú[™[ˆŞÈ^ˆ¹l/º`êˆWHWHKBˆNÃBˆÚ[™ÙTÙ[Xİ
-[\Ü›ÛİKˆŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆY]^\™XJ[\Ü›Ûİ”ÓÓ‹œİš[™ÚYJ\]Y[ŠJNÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹n¥9å*9k¦¹.bHŠNÃBˆ]ØZ]™^XÚÊ
-NÃBƒBˆ™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\›ÚÊ™[™\™Y
-NÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-™[™\™Y
-Kúh¡:)â9mì¹¦í9¥¬Ë˜\Z[™ÈHÛÛ\Û™[Yš[š][Ûˆ\]\ÈH™[™\™Y™]šY]È[[YYX][HŠNÃBƒBˆÚ[™ÙTÙ[Xİ
-[\Ü›ÛİKŒŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİº" ¹à®y."ùéîÈŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]™[Ü™\™YH]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠNÃBˆ\ÜÙ\™Y\\]X[
-™[Ü™\™Y˜ÛÛ\Û™[ÖÌKœ›Ûİ˜Ú[™[‹›X\
-›ÙHOˆ›ÙK^ÏÈ›ÙKYÊKÈœÜ[ˆ‹ºh¡:)â9mì¹¦í9¥¬—JNÃBˆ™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\›ÚÊ›ÙU^
-™[™\™Y
-Kš[™^ÙŠ¹l/º`êŠH›ÙU^
-™[™\™Y
-Kš[™^ÙŠºh¡:)â9mì¹¦í9¥¬ŠKBˆœ™[Ü™\š[™È›Ù\È[ÛÈÚ[™Ù\ÈZ\ˆXİX[™]šY]ÈÜ™\ˆŠNÃBƒBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹¤©:e ŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ™[Ü™\™YH]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠNÃBˆ\ÜÙ\™Y\\]X[
-™[Ü™\™Y˜ÛÛ\Û™[ÖÌKœ›Ûİ˜Ú[™[‹›X\
-›ÙHOˆ›ÙK^ÏÈ›ÙKYÊKÈºh¡:)â9mì¹¦í9¥¬‹œÜ[ˆ—JNÃBˆ™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\›ÚÊ›ÙU^
-™[™\™Y
-Kš[™^ÙŠºh¡:)â9mì¹¦í9¥¬ŠH›ÙU^
-™[™\™Y
-Kš[™^ÙŠ¹l/º`êŠKBˆ[™È™\İÜ™\È›İHØ]™YÛÛ\Û™[™YH[™]È™]šY]ÈŠNÃBƒBˆÛXÚĞ]ÛŠ[\Ü›Ûİºaãy`fˆŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ™[Ü™\™YH]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠNÃBˆ\ÜÙ\™Y\\]X[
-™[Ü™\™Y˜ÛÛ\Û™[ÖÌKœ›Ûİ˜Ú[™[‹›X\
-›ÙHOˆ›ÙK^ÏÈ›ÙKYÊKÈœÜ[ˆ‹ºh¡:)â9mì¹¦í9¥¬—JNÃBˆ™[™\™YHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠNÃBˆ\ÜÙ\›ÚÊ›ÙU^
-™[™\™Y
-Kš[™^ÙŠ¹l/º`êŠH›ÙU^
-™[™\™Y
-Kš[™^ÙŠºh¡:)â9mì¹¦í9¥¬ŠKBˆœ™YÈ™\İÜ™\È›İH™[Ü™\™Y™YH[™]È™]šY]ÈŠNÃBƒBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹b(:fi9îá9.íˆŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOH˜İ\İÛKXÛÛ\Û™[LHŠK[Bˆ™[][™ÈHÛÛ\Û™[™[[İ™\È]œ›ÛHH™[™\™YYÙH™]šY]ÈŠNÃBˆHš[˜[HÃBˆ\[›[İ[
+function changeSelect(root, index, value) {
+  const selects = [];
+  const collect = node => {
+    if (node.tag === "select") selects.push(node);
+    node.children.forEach(collect);
+  };
+  collect(root);
+  const select = selects[index];
+  assert.ok(select, `select ${index} exists in the rendered editor`);
+  assert.equal(typeof select.props.onChange, "function");
+  select.props.onChange({ type: "change", target: { value } });
+}
 
-NÃBˆCBŸJNÃBƒB\İ
-™[][™ÈHš[˜[[XYÙH›ÙH™[X\Ù\È]ÈT“[™İ]]X\™İÛˆ™[X\Ù\È™[XZ[š[™È\ÜÙ]È‹\Ş[˜È
+function editTextarea(root, value) {
+  const textarea = visit(root, node => node.tag === "textarea");
+  assert.ok(textarea, "JSON editor is rendered");
+  textarea.value = value;
+  textarea.dispatchEvent({ type: "input", target: textarea });
+}
 
-HOˆÃBˆÛÛœİÜšYÚ[˜[Ü™X]HHT“˜Ü™X]SØš™XİT“ÃBˆÛÛœİÜšYÚ[˜[™]›ÚÙHHT“œ™]›ÚÙSØš™XİT“ÃBˆÛÛœİÜ™X]YH×NÃBˆÛÛœİ™]›ÚÙYH×NÃBˆT“˜Ü™X]SØš™XİT“H
+before(async () => {
+  vite = await createServer({
+    configFile: false,
+    root: fileURLToPath(new URL("../", import.meta.url)),
+    plugins: [vuePlugin()],
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    optimizeDeps: { noDiscovery: true, include: [] },
+    appType: "custom",
+  });
+  ({ default: SkinPluginEditor } = await vite.ssrLoadModule("/src/components/SkinPluginEditor.vue"));
+  ({ default: SkinPluginOutlet } = await vite.ssrLoadModule("/src/components/SkinPluginOutlet.ts"));
+  approvals = await vite.ssrLoadModule("/src/services/skin-plugin-approval.ts");
+  const require = createRequire(import.meta.url);
+  const { parse, compileScript, compileTemplate } = require("../node_modules/@vue/compiler-sfc");
+  const filename = fileURLToPath(new URL("../src/components/SkinPluginEditor.vue", import.meta.url));
+  const source = readFileSync(filename, "utf8");
+  const { descriptor } = parse(source, { filename });
+  const script = compileScript(descriptor, { id: "skin-plugin-editor-test" });
+  const templateSource = descriptor.template.content.replaceAll("($event.target as HTMLSelectElement).value", "($event.target).value");
+  const template = compileTemplate({ source: templateSource, filename, id: "skin-plugin-editor-test", compilerOptions: { expressionPlugins: ["typescript"], bindingMetadata: script.bindings } });
+  assert.deepEqual(template.errors, [], "the editor template compiles for client rendering");
+  const vueImport = /^import \{([\s\S]*?)\} from "vue"\s*/.exec(template.code);
+  assert.ok(vueImport, "compiled template imports Vue runtime helpers");
+  const vueBindings = vueImport[1].split(",").map(binding => binding.trim().replace(" as ", ": ")).join(", ");
+  const clientRenderCode = `const { ${vueBindings} } = Vue;\n${template.code.slice(vueImport[0].length).replace("export function render", "return function render")}`;
+  SkinPluginEditor.render = new Function("Vue", clientRenderCode)(testVueRuntime);
+  authoring = await vite.ssrLoadModule("/src/services/skin-plugin-authoring.ts");
+});
 
-HOˆÃBˆÛÛœİ\›H›ØœÚÚ[‹[İ]]IØÜ™X]Y›[™İ
-È_XÃBˆÜ™X]Yœ\Ú
-\›
-NÃBˆ™]\›ˆ\›ÃBˆNÃBˆT“œ™]›ÚÙSØš™XİT“H
-\›
-HOˆÈ™]›ÚÙYœ\Ú
-\›
-NÈNÃBƒBˆÛÛœİÚÚ[’YH˜ÛÛ[][š]K˜\ÜÙ]XÛX[\ÃBˆÛÛœİÚÚ[•™\œÚ[ÛˆHŒKŒŒÃBˆÛÛœİ[XYÙHHÃBˆYˆš[XYÙK\[™[‹Bˆ˜[YNˆ’[XYÙH[™[‹BˆYÙNˆ›ÚXÙH‹BˆXØÙ\ÜÚX›S˜[YNˆ’[XYÙH[™[‹Bˆ\›Z\ÜÚ[ÛœÎˆ×KBˆXİ[ÛœÎˆßKBˆ›ÛİˆÈYÎˆœÙXİ[Ûˆ‹Ú[™[ˆŞÈYÎˆš[YÈ‹\ÜÙ]ˆ˜\ÜÙ]ËÚXÛÛ‹œ™ÈˆWHKBˆNÃBˆÛÛœİØİ[Y[HYKœ™YŠÈØÚ[XU™\œÚ[ÛˆËÛÛ\Û™[ÎˆÚ[XYÙWHJNÃBˆÛÛœİ\ÜÙ]ÈHÈ˜\ÜÙ]ËÚXÛÛ‹œ™Èˆ™]È›ØŠÈšXÛÛˆ—JHNÃBˆÛÛœİšY]ÈHYK™Yš[™PÛÛ\Û™[
-ÃBˆÙ]\
+after(async () => {
+  await vite?.close();
+  if (localStorageDescriptor) Object.defineProperty(globalThis, "localStorage", localStorageDescriptor);
+  else Reflect.deleteProperty(globalThis, "localStorage");
+});
 
-HÃBˆ™]\›ˆ
+test("component editor creates, changes, and deletes a skin component tree through its UI", async () => {
+  focusedNode = null;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const baseDocument = {
+    schemaVersion: 3,
+    components: [{
+      id: "base-panel",
+      name: "Base panel",
+      page: "voice",
+      accessibleName: "Base panel",
+      permissions: [],
+      actions: {},
+      root: { tag: "section", children: [{ text: "Base" }] },
+    }],
+  };
+  const props = {
+    skinId: "community.example",
+    skinVersion: "1.0.0",
+    baseDocument,
+    page: "voice",
+    lang: "zh",
+  };
+  const ssrContext = {};
+  const html = await renderToString(createSSRApp(SkinPluginEditor, props), ssrContext);
+  assert.doesNotMatch(html, /ç»„ä»¶ç»“æ„/);
+  assert.match(ssrContext.teleports.body, /ç»„ä»¶ç»“æ„/,
+    "the editor controls are teleported outside the skin-rendered DOM tree");
 
-HOˆYKš
-ÚÚ[”YÚ[“İ]]ÃBˆÚÚ[’YBˆÚÚ[•™\œÚ[Û‹BˆØİ[Y[ˆØİ[Y[˜[YKBˆYÙNˆ›ÚXÙH‹Bˆ]NˆßKBˆ\ÜÙ]ËBˆXİ[ÛœÎˆßKBˆJNÃBˆKBˆJNÃBˆÛÛœİ›ÛİHÜİ›ÙJœ›ÛİŠNÃBˆÛÛœİ\H™[™\™\‹˜Ü™X]P\
-šY]ÊNÃBˆ\œ›İšYJÜÜÛÛ^Ù^KÈ[Ù[\Îˆ™]ÈÙ]
+  const root = hostNode("root");
+  const hostView = Vue.defineComponent({
+    setup() {
+      return () => Vue.h("main", { class: "ws-skin-root", "data-ws-skin": props.skinId }, [
+        Vue.h(SkinPluginEditor, props),
+      ]);
+    },
+  });
+  const app = renderer.createApp(hostView);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
 
-HJNÃBƒBˆHÃBˆ\›[İ[
-›Ûİ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛÛœİš\œİ[XYÙHHš\Ú]
-›Ûİ›ÙHOˆ›ÙKYÈOOHš[YÈŠNÃBˆ\ÜÙ\™\]X[
-š\œİ[XYÙOËœ›ÜËœÜ˜Ë˜›ØœÚÚ[‹[İ]]LHŠNÃBƒBˆØİ[Y[˜[YHHÈØÚ[XU™\œÚ[ÛˆËÛÛ\Û™[ÎˆŞÈ‹‹š[XYÙK›ÛİˆÈYÎˆœÙXİ[ÛˆˆHWHNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\™Y\\]X[
-™]›ÚÙYÈ˜›ØœÚÚ[‹[İ]]LH—KBˆœ™[[İš[™ÈHš[˜[›ÙH™Y™\™[˜ÙH™[X\Ù\ÈH\ÜÙ]T“Ú[HÙY\[™È]ÈÛÛ\Û™[[İ[YŠNÃBˆ\ÜÙ\›ÚÊš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛ\Û™[—HOOHš[XYÙK\[™[ŠJNÃBˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKYÈOOHš[YÈŠK[
-NÃBƒBˆØİ[Y[˜[YHHÈØÚ[XU™\œÚ[ÛˆËÛÛ\Û™[ÎˆÚ[XYÙWHNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKYÈOOHš[YÈŠOËœ›ÜËœÜ˜Ë˜›ØœÚÚ[‹[İ]]Lˆ‹Bˆœ™KXY[™ÈHÛÛ\Û™[™XÙZ]™\ÈHœ™\ÚØš™XİT“ŠNÃBƒBˆ\[›[İ[
+  try {
+    assert.equal(visit(root, node => node.props["data-ws-plugin-editor"] !== undefined), null,
+      "skin CSS cannot target the host-owned component editor");
+    const teleportedEditor = visit(teleportRoot, node => node.props["data-ws-plugin-editor"] !== undefined);
+    assert.ok(teleportedEditor);
+    await nextTick();
+    assert.equal(teleportedEditor.popoverOpen, true,
+      "browsers with the Popover API keep the host editor above skin-authored stacking layers");
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    assert.equal(focusedNode?.props["aria-label"], "å…³é—­", "opening moves keyboard focus to the close control");
+    assert.equal(visit(teleportRoot, node => node.tag === "button" && nodeText(node).trim() === "ç»„ä»¶ç»“æ„")?.props["aria-expanded"], true);
+    clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+    await nextTick();
+    const key = authoring.getSkinPluginAuthoringStorageKey("community.example", "1.0.0");
+    let edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components.length, 2);
+    assert.equal(edited.components[1].id, "custom-component-1");
 
-NÃBˆ\ÜÙ\™Y\\]X[
-™]›ÚÙYÈ˜›ØœÚÚ[‹[İ]]LH‹˜›ØœÚÚ[‹[İ]]Lˆ—KBˆ›İ]]X\™İÛˆ™[X\Ù\È]™\H™[XZ[š[™È\ÜÙ]T“ŠNÃBˆHš[˜[HÃBˆT“˜Ü™X]SØš™XİT“HÜšYÚ[˜[Ü™X]NÃBˆT“œ™]›ÚÙSØš™XİT“HÜšYÚ[˜[™]›ÚÙNÃBˆCBŸJNÃBƒB\İ
-™[][™ÈH\İİ\™˜XÙHÛÛ\Û™[[[YYX][H™\İÜ™\ÈHÜİYÙH‹\Ş[˜È
+    changeSelect(teleportRoot, 1, "root");
+    await nextTick();
+    assert.match(nodeText(teleportRoot), /èŠ‚ç‚¹å®šä¹‰/, "the root node has a distinct selectable entry in the tree");
+    editTextarea(teleportRoot, JSON.stringify({ tag: "article", children: [{ text: "æ–°å»ºç»„ä»¶" }] }, null, 2));
+    await nextTick();
+    clickButton(teleportRoot, "åº”ç”¨å®šä¹‰");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[1].root.tag, "article",
+      "selecting the root lets authors replace it through the ordinary node editor");
 
-HOˆÃBˆØš™Xİ™Yš[™T›Ü\JÛØ˜[\Ë›ØØ[İÜ˜YÙH‹ÈÛÛ™šYİ\˜X›NˆYK˜[YNˆ™]ÈY[[ÜTİÜ˜YÙJ
-HJNÃBˆÛÛœİÚÚ[’YH˜ÛÛ[][š]Kœİ\™˜XÙHÃBˆÛÛœİÚÚ[•™\œÚ[ÛˆHŒKŒŒÃBˆÛÛœİ˜\ÙQØİ[Y[HÃBˆØÚ[XU™\œÚ[ÛˆËBˆÛÛ\Û™[ÎˆŞÃBˆYˆ™[\İ\™˜XÙH‹Bˆ˜[YNˆ‘[İ\™˜XÙH‹BˆYÙNˆ›ÚXÙH‹Bˆ[ÙNˆœİ\™˜XÙH‹BˆXØÙ\ÜÚX›S˜[YNˆ‘[›ÚXÙHYÙH‹Bˆ\›Z\ÜÚ[ÛœÎˆÈZKœİ\™˜XÙKœ™\XÙH—KBˆXİ[ÛœÎˆßKBˆ›ÛİˆÈYÎˆ›XZ[ˆ‹Ú[™[ˆŞÈ^ˆİ\İÛH›ÚXÙHİ\™˜XÙHˆWHKBˆWKBˆNÃBˆ\›İ˜[Ë˜\›İ™TÚÚ[”YÚ[ÛÛ\Û™[ÊÚÚ[’YÚÚ[•™\œÚ[Û‹˜\ÙQØİ[Y[˜ÛÛ\Û™[ÊNÃBˆÛÛœİ™]š\Ú[ÛˆHYKœ™YŠ
-NÃBˆÛÛœİİ\™˜XÙPXİ]™HHYKœ™YŠ˜[ÙJNÃBˆÛÛœİ›ÜÈHÈÚÚ[’YÚÚ[•™\œÚ[Û‹˜\ÙQØİ[Y[YÙNˆ›ÚXÙH‹[™ÎˆšˆNÃBˆÛÛœİ™]šY]ÈHYK™Yš[™PÛÛ\Û™[
-ÃBˆÙ]\
+    changeSelect(teleportRoot, 2, "button");
+    await nextTick();
+    const nodeTypeOptions = visit(teleportRoot, node => node.tag === "select" && node.props["aria-label"] === "æ–°å¢èŠ‚ç‚¹ç±»å‹");
+    assert.ok(nodeTypeOptions.children.some(option => option.props.value === "svg"),
+      "the node type picker exposes the shared safe element set, including SVG");
 
-HÃBˆÛÛœİİ\œ™[Øİ[Y[H
+    clickButton(teleportRoot, "ç»„ä»¶ä¸Šç§»");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.deepEqual(edited.components.map(component => component.id), ["custom-component-1", "base-panel"]);
 
-HOˆÃBˆ™]š\Ú[Û‹˜[YNÃBˆ™]\›ˆ]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠHÏÈ˜\ÙQØİ[Y[ÃBˆNÃBˆ™]\›ˆ
+    clickButton(teleportRoot, "æ·»åŠ å­èŠ‚ç‚¹");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children.length, 2);
+    assert.equal(edited.components[0].root.children[1].tag, "button",
+      "authors can add a selected safe element directly instead of hand-writing its node JSON");
+    assert.ok(localStorage.getItem(key));
 
-HOˆYKš
-›XZ[ˆ‹[ÃBˆİ\™˜XÙPXİ]™K˜[YHÈ[ˆYKš
-œÙXİ[Ûˆ‹È™]K[˜]]™KZÜİˆYHˆK•ÙX”ÜXZÈÜİYÙHŠKBˆYKš
-ÚÚ[”YÚ[“İ]]ÃBˆÚÚ[’YBˆÚÚ[•™\œÚ[Û‹BˆØİ[Y[ˆİ\œ™[Øİ[Y[
+    clickButton(teleportRoot, "å¤åˆ¶èŠ‚ç‚¹");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children.length, 3, "the editor duplicates the selected node as a sibling");
+    clickButton(teleportRoot, "èŠ‚ç‚¹ä¸Šç§»");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children[1].tag, "button", "the selected node moves within its parent");
+    clickButton(teleportRoot, "èŠ‚ç‚¹ä¸‹ç§»");
+    await nextTick();
+    changeSelect(teleportRoot, 2, "text");
+    await nextTick();
+    clickButton(teleportRoot, "æ·»åŠ åŒçº§èŠ‚ç‚¹");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children.length, 4, "the editor adds a sibling beside the selected node");
+    assert.equal(edited.components[0].root.children[3].text, "æ–°å»ºå†…å®¹",
+      "text nodes are available through the same authoring flow");
+    clickButton(teleportRoot, "åˆ é™¤èŠ‚ç‚¹");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children.length, 3, "the editor deletes the selected node without deleting its parent");
 
-KBˆYÙNˆ›ÚXÙH‹Bˆ]NˆßKBˆ\ÜÙ]ÎˆßKBˆXİ[ÛœÎˆßKBˆX[˜YÙTİ\™˜XÙT™XÛİ™\Nˆ˜[ÙKBˆÛ”İ\™˜XÙPÚ[™ÙNˆ
-Xİ]™JHOˆÈİ\™˜XÙPXİ]™K˜[YHHXİ]™NÈKBˆJKBˆYKš
-ÚÚ[”YÚ[‘Y]Ü‹È‹‹œ›ÜËÛ•\]Yˆ
+    changeSelect(teleportRoot, 1, "0");
+    await nextTick();
+    editTextarea(teleportRoot, JSON.stringify({ text: "Edited in the component editor" }, null, 2));
+    await nextTick();
+    clickButton(teleportRoot, "åº”ç”¨å®šä¹‰");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children[0].text, "Edited in the component editor");
 
-HOˆÈ™]š\Ú[Û‹˜[YH
-ÏHNÈHJKBˆJNÃBˆKBˆJNÃBˆÛÛœİ›ÛİHÜİ›ÙJœ›ÛİŠNÃBˆÛÛœİ\H™[™\™\‹˜Ü™X]P\
-™]šY]ÊNÃBˆ\œ›İšYJÜÜÛÛ^Ù^KÈ[Ù[\Îˆ™]ÈÙ]
+    clickButton(teleportRoot, "æ’¤é”€");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children[0].text, "æ–°å»ºç»„ä»¶");
+    clickButton(teleportRoot, "é‡åš");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[0].root.children[0].text, "Edited in the component editor");
 
-HJNÃBˆ\›[İ[
-›Ûİ
-NÃBƒBˆHÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\™\]X[
-İ\™˜XÙPXİ]™K˜[YKYKH\›İ™Yİ\™˜XÙH™\XÙ\ÈHÜİYÙHŠNÃBˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K[˜]]™KZÜİ—HOOHYHŠK[
-NÃBƒBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹îá9.í¹îäù§¡ŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹b(:fi9îá9.íˆŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBƒBˆ\ÜÙ\™\]X[
-İ\™˜XÙPXİ]™K˜[YK˜[ÙK™[][™ÈHİ\™˜XÙHÛX\œÈ]ÈXİ]™Hİ]HŠNÃBˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹\İ\™˜XÙH—HOOH›ÚXÙHŠK[
-NÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-›Ûİ
-KÕÙX”ÜXZÈÜİYÙKËHÜİYÙH\È™\İÜ™YÚ]İ]™\]Z\š[™ÈHÚÚ[ˆ™\Ù]ŠNÃBˆHš[˜[HÃBˆ\[›[İ[
+    clickButton(teleportRoot, "åˆ é™¤ç»„ä»¶");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.deepEqual(edited.components.map(component => component.id), ["base-panel"]);
 
-NÃBˆCBŸJNÃBƒB\İ
-œİ\™˜XÙH\›Z\ÜÚ[ÛœÈ]]ËX\›İ™H[ˆ]™[ÜY[Ú]İ]ÚİÚ[™È›Û\ÈÜˆ™XÛİ™\HÛÛ›ÛÈ‹\Ş[˜È
+    changeSelect(teleportRoot, 0, "base-panel");
+    await nextTick();
+    clickButton(teleportRoot, "å¤åˆ¶ç»„ä»¶");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.deepEqual(edited.components.map(component => component.id), ["base-panel", "base-panel-2"]);
 
-HOˆÂˆØš™Xİ™Yš[™T›Ü\JÛØ˜[\Ë›ØØ[İÜ˜YÙH‹ÈÛÛ™šYİ\˜X›NˆYK˜[YNˆ™]ÈY[[ÜTİÜ˜YÙJ
-HJNÃBˆÛÛœİÚÚ[’YH˜ÛÛ[][š]K˜XØÙ\ÜË[Y™XŞXÛHÃBˆÛÛœİÚÚ[•™\œÚ[ÛˆHŒKŒŒÃBˆÛÛœİİ\™˜XÙHHÃBˆYˆœ›İXİY\İ\™˜XÙH‹Bˆ˜[YNˆ”›İXİYİ\™˜XÙH‹BˆYÙNˆ›ÚXÙH‹Bˆ[ÙNˆœİ\™˜XÙH‹BˆXØÙ\ÜÚX›S˜[YNˆ”›İXİY›ÚXÙHYÙH‹Bˆ\›Z\ÜÚ[ÛœÎˆÈZKœİ\™˜XÙKœ™\XÙH—KBˆXİ[ÛœÎˆÈÙÙÛNˆÈ\NˆZKÙÙÛTİ]H‹\™ÜÎˆÈÙ^Nˆ™[˜X›YˆHHKBˆİ]NˆÈ[˜X›Yˆ˜[ÙHKBˆ›ÛİˆÈYÎˆ›XZ[ˆ‹Ú[™[ˆÃBˆÈ^ˆ”›İXİYİ\İÛHYÙHˆKBˆÈYÎˆ˜]Ûˆ‹]™[ÎˆÈÛXÚÎˆÙÙÛHˆKÚ[™[ˆŞÈ^ˆ•ÙÙÛHİ]HˆWHKBˆÈYÎˆœÜ[ˆ‹Ú[™[ˆŞÈ^ˆŞÜİ]K™[˜X›Y_HˆWHKBˆHKBˆNÃBˆÛÛœİ˜\ÙQØİ[Y[HÈØÚ[XU™\œÚ[ÛˆËÛÛ\Û™[ÎˆÜİ\™˜XÙWHNÃBˆÛÛœİ›ÜÈHÈÚÚ[’YÚÚ[•™\œÚ[Û‹˜\ÙQØİ[Y[YÙNˆ›ÚXÙH‹[™ÎˆšˆNÃBˆÛÛœİÜİšY]ÈHYK™Yš[™PÛÛ\Û™[
-ÃBˆÙ]\
+    changeSelect(teleportRoot, 0, "base-panel");
+    await nextTick();
+    changeSelect(teleportRoot, 1, "0");
+    await nextTick();
+    clickButton(teleportRoot, "åˆ é™¤ç»„ä»¶");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.deepEqual(edited.components.map(component => component.id), ["base-panel-2"]);
 
-HÃBˆÛÛœİİ\™˜XÙPXİ]™HHYKœ™YŠ˜[ÙJNÃBˆÛÛœİ™]š\Ú[ÛˆHYKœ™YŠ
-NÃBˆÛÛœİİ\œ™[Øİ[Y[H
+    clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.equal(edited.components[1].id, "custom-component-1");
+    assert.match(nodeText(teleportRoot), /ç»„ä»¶å®šä¹‰/, "creating after deleting a component from node mode selects the component definition");
+    assert.match(visit(teleportRoot, node => node.tag === "textarea").value, /"id": "custom-component-1"/);
 
-HOˆÃBˆ™]š\Ú[Û‹˜[YNÃBˆ™]\›ˆ]]Üš[™Ë›ØYÚÚ[”YÚ[]]Üš[™ÑØİ[Y[
-ÚÚ[’YÚÚ[•™\œÚ[ÛŠHÏÈ˜\ÙQØİ[Y[ÃBˆNÃBˆ™]\›ˆ
+    changeSelect(teleportRoot, 1, "0");
+    await nextTick();
+    const importInput = visit(teleportRoot, node => node.tag === "input");
+    assert.ok(importInput);
+    const importedDocument = {
+      schemaVersion: 3,
+      components: [{
+        id: "imported-panel", name: "Imported panel", page: "voice", accessibleName: "Imported panel",
+        permissions: [], actions: {}, root: { tag: "section", children: [{ text: "Imported" }] },
+      }],
+    };
+    await importInput.props.onChange({ target: { files: [new File([JSON.stringify(importedDocument)], "components.json")], value: "components.json" } });
+    await nextTick();
+    edited = authoring.loadSkinPluginAuthoringDocument("community.example", "1.0.0");
+    assert.deepEqual(edited.components.map(component => component.id), ["imported-panel"]);
+    assert.match(visit(teleportRoot, node => node.tag === "textarea").value, /"id": "imported-panel"/,
+      "importing from node mode selects the imported component definition");
 
-HOˆYKš
-›XZ[ˆ‹[ÃBˆİ\™˜XÙPXİ]™K˜[YHÈ[ˆYKš
-œÙXİ[Ûˆ‹È™]K[˜]]™KZÜİˆYHˆK•ÙX”ÜXZÈÜİYÙHŠKBˆYKš
-ÚÚ[”YÚ[“İ]]ÃBˆÚÚ[’YBˆÚÚ[•™\œÚ[Û‹BˆØİ[Y[ˆİ\œ™[Øİ[Y[
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const previousCreateObjectURL = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+    const previousRevokeObjectURL = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
+    let exportedBlob;
+    let downloadedUrl;
+    const downloadAnchor = { href: "", download: "", click() { downloadedUrl = this.href; } };
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        document: { createElement: tag => { assert.equal(tag, "a"); return downloadAnchor; } },
+        setTimeout: callback => { callback(); return 0; },
+      },
+    });
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: blob => { exportedBlob = blob; return "blob:skin-export"; } });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: url => { assert.equal(url, "blob:skin-export"); } });
+    try {
+      clickButton(teleportRoot, "å¯¼å‡º components.json");
+      assert.equal(downloadAnchor.download, "community.example-components.json");
+      assert.equal(downloadedUrl, "blob:skin-export", "the editor starts a local file download");
+      assert.ok(exportedBlob instanceof Blob);
+      assert.deepEqual(authoring.importSkinPluginAuthoringDocument(await exportedBlob.text()), edited,
+        "the exported editor file round-trips through the same package validator");
+    } finally {
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+      if (previousCreateObjectURL) Object.defineProperty(URL, "createObjectURL", previousCreateObjectURL);
+      else Reflect.deleteProperty(URL, "createObjectURL");
+      if (previousRevokeObjectURL) Object.defineProperty(URL, "revokeObjectURL", previousRevokeObjectURL);
+      else Reflect.deleteProperty(URL, "revokeObjectURL");
+    }
 
-KBˆYÙNˆ›ÚXÙH‹Bˆ]NˆßKBˆ\ÜÙ]ÎˆßKBˆXİ[ÛœÎˆßKBˆÛ”İ\™˜XÙPÚ[™ÙNˆ
-Xİ]™JHOˆÈİ\™˜XÙPXİ]™K˜[YHHXİ]™NÈKBˆJKBˆYKš
-ÚÚ[”YÚ[‘Y]Ü‹È‹‹œ›ÜËÛ•\]Yˆ
+    const panel = visit(teleportRoot, node => node.tag === "section" && node.props.role === "dialog");
+    assert.ok(panel);
+    assert.equal(panel.props["aria-modal"], "false");
+    panel.props.onKeydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
+    await nextTick();
+    await nextTick();
+    assert.equal(visit(teleportRoot, node => node.tag === "section" && node.props.role === "dialog"), null,
+      "Escape closes the editor dialog");
+    assert.equal(nodeText(focusedNode), "ç»„ä»¶ç»“æ„", "closing returns keyboard focus to the trigger");
+  } finally {
+    app.unmount();
+  }
+});
 
-HOˆÈ™]š\Ú[Û‹˜[YH
-ÏHNÈHJKBˆJNÃBˆKBˆJNÃBˆÛÛœİ›ÛİHÜİ›ÙJœ›ÛİŠNÃBˆÛÛœİ\H™[™\™\‹˜Ü™X]P\
-ÜİšY]ÊNÃBˆ\œ›İšYJÜÜÛÛ^Ù^KÈ[Ù[\Îˆ™]ÈÙ]
+test("the node picker can create and delete every schema-safe element and text node", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.node-picker";
+  const skinVersion = "1.0.0";
+  const baseDocument = { schemaVersion: 3, components: [] };
+  const revision = Vue.ref(0);
+  const editorProps = {
+    skinId,
+    skinVersion,
+    page: "voice",
+    lang: "zh",
+    baseDocument,
+  };
+  const view = Vue.defineComponent({
+    setup() {
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+        }),
+        Vue.h(SkinPluginEditor, { ...editorProps, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(view);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
 
-HJNÃBˆ\›[İ[
-›Ûİ
-NÃBƒBˆHÂˆ]ØZ]™^XÚÊ
-NÂˆ]ØZ]™^XÚÊ
-NÂˆÛÛœİXİ]™Tİ\™˜XÙHHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹\İ\™˜XÙH—HOOH›ÚXÙHŠNÂˆ\ÜÙ\›ÚÊXİ]™Tİ\™˜XÙKH˜[Y]Yİ\™˜XÙH™XÙZ]™\È]ÈXÛ\™YXØÙ\ÜÈ[ˆ]™[ÜY[ŠNÂˆ\ÜÙ\›X]Ú
-›ÙU^
-Xİ]™Tİ\™˜XÙJKÔ›İXİYİ\İÛHYÙKÊNÂˆ\ÜÙ\™\]X[
-š\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K[˜]]™KZÜİ—HOOHYHŠK[
-NÂˆ\ÜÙ\™\]X[
-š\Ú]
-[\Ü›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛœÙ[—HOOHYHŠK[ˆœÚÚ[ˆ\›Z\ÜÚ[ÛœÈÈ›İÜ[ˆHÛÛœÙ[X[ÙÈŠNÂˆ\ÜÙ\™\]X[
-š\Ú]
-[\Ü›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ˜\šXK[X™[—HOOH¹ë¨yä!¹æ«º ©9îá9.í¹§`úfdÈX[˜YÙHÚÚ[ˆÛÛ\Û™[XØÙ\ÜÈŠK[ˆœ\›Z\ÜÚ[ÛˆX[˜YÙ[Y[ÛÛ›ÛÈİ^HY[ˆİ]ÚYHY]Üˆ[ÙHŠNÂˆ\ÜÙ\™\]X[
-š\Ú]
-[\Ü›Ûİ›ÙHOˆ›ÙKœ›ÜË˜Û\ÜÈOOHÜË\YÚ[‹\İ\™˜XÙK\™\Ù]ŠK[ˆœÚÚ[ˆ™\Ù]ÛÛ›ÛÈİ^HY[ˆİ]ÚYHY]Üˆ[ÙHŠNÂˆ]İ]UÙÙÛHHš\Ú]
-Xİ]™Tİ\™˜XÙK›ÙHOˆ›ÙKYÈOOH˜]ÛˆŠNÃBˆİ]UÙÙÛKœ›ÜË›ÛÛXÚÊÈ\Nˆ˜ÛXÚÈ‹\™Ù]ˆİ]UÙÙÛK\Õ\İYˆYHJNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-Xİ]™Tİ\™˜XÙJKİYKË˜\›İ™YRH[\˜Xİ[ÛœÈ\]HÛÛ\Û™[[ØØ[İ]HŠNÃBƒBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹îá9.í¹îäù§¡ŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛÛœİÜšYÚ[˜[H˜\ÙQØİ[Y[˜ÛÛ\Û™[ÖÌNÃBˆÛÛœİ^[™YHÈ‹‹›ÜšYÚ[˜[\›Z\ÜÚ[ÛœÎˆË‹‹›ÜšYÚ[˜[œ\›Z\ÜÚ[ÛœËœÙ\ÜÚ[Û‹œİ]\Ëœ™XY—HNÃBˆÚ[™ÙTÙ[Xİ
-[\Ü›Ûİİ\™˜XÙKšY
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆY]^\™XJ[\Ü›Ûİ”ÓÓ‹œİš[™ÚYJ^[™Y[ŠJNÃBˆ]ØZ]™^XÚÊ
-NÃBˆÛXÚĞ]ÛŠ[\Ü›Ûİ¹n¥9å*9k¦¹.bHŠNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÃBˆ]ØZ]™^XÚÊ
-NÂˆ]ØZ]™^XÚÊ
-NÂˆ\ÜÙ\™\]X[
-\›İ˜[Ëš\ÔÚÚ[”YÚ[ÛÛ\Û™[\›İ™Y
-ÚÚ[’YÚÚ[•™\œÚ[Û‹^[™Y
-KYKˆ˜HÚ[™ÙY\›Z\ÜÚ[ÛˆÙ]\ÈÜ˜[Y]]ÛX]XØ[HY\ˆØÚ[XH˜[Y][ÛˆŠNÂˆ]™X\›İ™Yİ\™˜XÙHHš\Ú]
-›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹\İ\™˜XÙH—HOOH›ÚXÙHŠNÂˆ\ÜÙ\›ÚÊ™X\›İ™Yİ\™˜XÙKH\]Yİ\™˜XÙHXİ]˜]\ÈÚ]İ]H\›Z\ÜÚ[Ûˆ›Û\ŠNÂˆ\ÜÙ\›X]Ú
-›ÙU^
-™X\›İ™Yİ\™˜XÙJKÙ˜[ÙKË˜Ú[™Ú[™È]È\›Z\ÜÚ[ÛˆÙ]ÛX\œÈHÛÛÛ\Û™[İ]HŠNÂˆ\ÜÙ\™\]X[
-š\Ú]
-[\Ü›Ûİ›ÙHOˆ›ÙKœ›ÜÖÈ™]K]ÜË\YÚ[‹XÛÛœÙ[—HOOHYHŠK[
-NÂƒBˆİ]UÙÙÛHHš\Ú]
-™X\›İ™Yİ\™˜XÙK›ÙHOˆ›ÙKYÈOOH˜]ÛˆŠNÃBˆİ]UÙÙÛKœ›ÜË›ÛÛXÚÊÈ\Nˆ˜ÛXÚÈ‹\™Ù]ˆİ]UÙÙÛK\Õ\İYˆYHJNÃBˆ]ØZ]™^XÚÊ
-NÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-™X\›İ™Yİ\™˜XÙJKİYKÊNÃBˆ\ÜÙ\›X]Ú
-›ÙU^
-™X\›İ™Yİ\™˜XÙJKİYKÊNÂˆHš[˜[HÃBˆ\[›[İ[
+  try {
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+    await nextTick();
 
-NÃBˆCBŸJNÃB
+    const picker = visit(teleportRoot, node => node.tag === "select" && node.props["aria-label"] === "æ–°å¢èŠ‚ç‚¹ç±»å‹");
+    assert.ok(picker);
+    const choices = picker.children.filter(option => option.tag === "option").map(option => option.props.value);
+    assert.deepEqual(choices, ["text", ...SKIN_PLUGIN_ALLOWED_ELEMENTS],
+      "the editor picker stays in sync with the single schema allowlist");
+    const renderedComponent = () => visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    const countRendered = (node, predicate) => (predicate(node) ? 1 : 0) + node.children.reduce((count, child) => count + countRendered(child, predicate), 0);
+
+    for (const type of choices) {
+      changeSelect(teleportRoot, 1, "root");
+      await nextTick();
+      changeSelect(teleportRoot, 2, type);
+      await nextTick();
+      const initialComponentView = renderedComponent();
+      assert.ok(initialComponentView);
+      const initialRoot = initialComponentView.children[0];
+      const isNewText = node => node.type === "text" && node.text === "æ–°å»ºå†…å®¹";
+      const isSelectedTag = node => node.tag === type;
+      const initialCount = countRendered(initialRoot, type === "text" ? isNewText : isSelectedTag);
+      clickButton(teleportRoot, "æ·»åŠ å­èŠ‚ç‚¹");
+      await nextTick();
+
+      let edited = authoring.loadSkinPluginAuthoringDocument(skinId, "1.0.0");
+      const added = edited.components[0].root.children.at(-1);
+      if (type === "text") assert.deepEqual(added, { text: "æ–°å»ºå†…å®¹" });
+      else assert.equal(added.tag, type, `the picker creates <${type}>`);
+      if (type === "img") assert.equal(added.attributes.alt, "çš®è‚¤å›¾ç‰‡");
+
+      const componentView = renderedComponent();
+      assert.ok(componentView, "the edited component remains mounted in the page preview");
+      const componentRoot = componentView.children[0];
+      assert.equal(countRendered(componentRoot, type === "text" ? isNewText : isSelectedTag), initialCount + 1,
+        `adding ${type} updates the live preview`);
+      if (type === "text") {
+        assert.ok(visit(componentRoot, isNewText), "the authored text node is visible in the live preview");
+      } else {
+        assert.ok(visit(componentRoot, node => node.tag === type && node.props["data-ws-part"]?.endsWith("node-root-1")),
+          `<${type}> receives a stable host layout target in the live preview`);
+      }
+
+      clickButton(teleportRoot, "åˆ é™¤èŠ‚ç‚¹");
+      await nextTick();
+      edited = authoring.loadSkinPluginAuthoringDocument(skinId, "1.0.0");
+      assert.equal(edited.components[0].root.children.length, 1, `the created ${type} node can be deleted`);
+      const afterDelete = renderedComponent()?.children[0];
+      assert.equal(countRendered(afterDelete, type === "text" ? isNewText : isSelectedTag), initialCount,
+        `deleting ${type} restores the previous live preview`);
+    }
+  } finally {
+    app.unmount();
+  }
+});
+
+test("corrupt local component edits can be cleared from the editor to restore package CRUD", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.corrupt-edits";
+  const skinVersion = "1.0.0";
+  const key = authoring.getSkinPluginAuthoringStorageKey(skinId, skinVersion);
+  localStorage.setItem(key, "{not valid JSON");
+  const props = {
+    skinId,
+    skinVersion,
+    page: "voice",
+    lang: "zh",
+    baseDocument: {
+      schemaVersion: 3,
+      components: [{
+        id: "package-component",
+        name: "Package component",
+        page: "voice",
+        accessibleName: "Package component",
+        permissions: [],
+        actions: {},
+        root: { tag: "section", children: [{ text: "Package content" }] },
+      }],
+    },
+  };
+  const root = hostNode("root");
+  const app = renderer.createApp(SkinPluginEditor, props);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    assert.match(nodeText(teleportRoot), /æœ¬åœ°ä¿®æ”¹æ— æ³•é€šè¿‡æ ¡éªŒ/,
+      "the editor explains that this skin version has invalid saved edits");
+    const resetButton = visit(teleportRoot, node => node.tag === "button" && nodeText(node).trim() === "æ¸…é™¤æœ¬åœ°ä¿®æ”¹");
+    assert.ok(resetButton);
+    assert.equal(resetButton.props.disabled, false, "recovery remains enabled for corrupt saved edits");
+
+    clickButton(teleportRoot, "æ¸…é™¤æœ¬åœ°ä¿®æ”¹");
+    await nextTick();
+    assert.equal(localStorage.getItem(key), null, "recovery clears only this skin version's saved edits");
+    assert.match(nodeText(teleportRoot), /æœ¬åœ°ä¿®æ”¹å·²æ¸…é™¤/);
+
+    clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+    await nextTick();
+    const recovered = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    assert.deepEqual(recovered.components.map(component => component.id), ["package-component", "custom-component-1"],
+      "the package document is restored and normal component editing works again");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("the first edit upgrades legacy v1 and v2 component packages to v3", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+
+  for (const schemaVersion of [1, 2]) {
+    const skinId = `community.legacy-v${schemaVersion}`;
+    const baseDocument = {
+      schemaVersion,
+      components: [{
+        id: `legacy-component-v${schemaVersion}`,
+        name: `Legacy v${schemaVersion} component`,
+        page: "voice",
+        accessibleName: `Legacy v${schemaVersion} component`,
+        permissions: [],
+        actions: {},
+        root: { tag: "section", children: [{ text: `Original schema v${schemaVersion}` }] },
+      }],
+    };
+    const app = renderer.createApp(SkinPluginEditor, {
+      skinId,
+      skinVersion: "1.0.0",
+      page: "voice",
+      baseDocument,
+    });
+    app.provide(ssrContextKey, { modules: new Set() });
+    app.mount(hostNode("root"));
+
+    try {
+      clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+      await nextTick();
+      await nextTick();
+      clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+      await nextTick();
+
+      const saved = authoring.loadSkinPluginAuthoringDocument(skinId, "1.0.0");
+      assert.equal(saved.schemaVersion, 3, `the first v${schemaVersion} edit is persisted as schema v3`);
+      assert.deepEqual(saved.components.map(component => component.id), [
+        `legacy-component-v${schemaVersion}`,
+        "custom-component-1",
+      ]);
+      assert.equal(saved.components[0].root.children[0].text, `Original schema v${schemaVersion}`);
+      assert.equal(baseDocument.schemaVersion, schemaVersion, "the package object stays unchanged while local edits migrate");
+    } finally {
+      app.unmount();
+    }
+  }
+});
+
+test("component editor stays visible in browsers without the Popover API", async () => {
+  const previousSupport = supportsPopoverApi;
+  supportsPopoverApi = false;
+  const root = hostNode("root");
+  const app = renderer.createApp(SkinPluginEditor, {
+    skinId: "community.legacy-browser",
+    skinVersion: "1.0.0",
+    page: "voice",
+    baseDocument: { schemaVersion: 3, components: [] },
+  });
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    await nextTick();
+    const editor = visit(teleportRoot, node => node.props["data-ws-plugin-editor"] !== undefined);
+    assert.ok(editor);
+    assert.equal(editor.props.popover, undefined,
+      "unsupported browsers use the ordinary fixed-position fallback instead of leaving an undisplayed popover");
+  } finally {
+    app.unmount();
+    supportsPopoverApi = previousSupport;
+  }
+});
+
+test("component runtime state is isolated by skin version and reset after deletion or schema changes", async () => {
+  const skinId = "community.runtime-state-isolation";
+  const component = {
+    id: "stateful-panel",
+    name: "Stateful panel",
+    page: "voice",
+    accessibleName: "Stateful panel",
+    permissions: [],
+    actions: { toggle: { type: "ui.toggleState", args: { key: "enabled" } } },
+    state: { enabled: false },
+    root: { tag: "section", children: [
+      { tag: "button", events: { click: "toggle" }, children: [{ text: "Toggle" }] },
+      { tag: "span", children: [{ text: "{{state.enabled}}" }] },
+    ] },
+  };
+  const version = Vue.ref("1.0.0");
+  const document = Vue.ref({ schemaVersion: 3, components: [component] });
+  const hostView = Vue.defineComponent({
+    setup() {
+      return () => Vue.h(SkinPluginOutlet, {
+        skinId,
+        skinVersion: version.value,
+        document: document.value,
+        page: "voice",
+        data: {},
+        assets: {},
+        actions: {},
+      });
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(hostView);
+  app.mount(root);
+
+  const renderedComponent = () => visit(root, node => node.props["data-ws-plugin-component"] === component.id);
+  const toggle = () => {
+    const button = visit(renderedComponent(), node => node.tag === "button");
+    assert.ok(button?.props.onClick, "the component's local toggle action is rendered");
+    button.props.onClick({ type: "click", target: button, isTrusted: true });
+  };
+
+  try {
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /false/);
+    toggle();
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /true/);
+
+    version.value = "2.0.0";
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /false/,
+      "a new skin version starts from its own declared component state");
+
+    toggle();
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /true/);
+    document.value = { schemaVersion: 3, components: [] };
+    await nextTick();
+    assert.equal(renderedComponent(), null, "deleting a component removes it from the active runtime");
+    document.value = { schemaVersion: 3, components: [component] };
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /false/,
+      "re-adding a deleted component does not revive its previous local state");
+
+    document.value = { schemaVersion: 3, components: [{
+      ...component,
+      actions: {},
+      state: { enabled: "closed" },
+      root: { tag: "span", children: [{ text: "{{state.enabled}}" }] },
+    }] };
+    await nextTick();
+    assert.match(nodeText(renderedComponent()), /closed/,
+      "editing a state key's declared type applies the new default in the live preview");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("component create, update, and delete immediately change the rendered skin preview", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.preview";
+  const skinVersion = "1.0.0";
+  const baseDocument = { schemaVersion: 3, components: [] };
+  const revision = Vue.ref(0);
+  const props = { skinId, skinVersion, baseDocument, page: "voice", lang: "zh" };
+  const preview = Vue.defineComponent({
+    setup() {
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+        }),
+        Vue.h(SkinPluginEditor, { ...props, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(preview);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    clickButton(teleportRoot, "æ–°å¢ç»„ä»¶");
+    await nextTick();
+
+    let rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(rendered, "the newly created component is rendered in the page preview");
+    assert.match(nodeText(rendered), /æ–°å»ºç»„ä»¶/);
+
+    changeSelect(teleportRoot, 1, "root");
+    await nextTick();
+    editTextarea(teleportRoot, JSON.stringify({ tag: "article", children: [{ text: "æ ¹èŠ‚ç‚¹å·²æ›´æ–°" }] }, null, 2));
+    await nextTick();
+    clickButton(teleportRoot, "åº”ç”¨å®šä¹‰");
+    await nextTick();
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.equal(rendered.children[0].tag, "article", "editing the selected root replaces the live preview root");
+    assert.match(nodeText(rendered), /æ ¹èŠ‚ç‚¹å·²æ›´æ–°/);
+
+    const saved = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    const updated = {
+      ...saved.components[0],
+      name: "Preview component",
+      accessibleName: "Preview component",
+      root: { tag: "section", children: [{ text: "é¢„è§ˆå·²æ›´æ–°" }, { tag: "span", children: [{ text: "å°¾éƒ¨" }] }] },
+    };
+    changeSelect(teleportRoot, 1, "");
+    await nextTick();
+    editTextarea(teleportRoot, JSON.stringify(updated, null, 2));
+    await nextTick();
+    clickButton(teleportRoot, "åº”ç”¨å®šä¹‰");
+    await nextTick();
+
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(rendered);
+    assert.match(nodeText(rendered), /é¢„è§ˆå·²æ›´æ–°/, "applying a component definition updates the rendered preview immediately");
+
+    changeSelect(teleportRoot, 1, "0");
+    await nextTick();
+    clickButton(teleportRoot, "èŠ‚ç‚¹ä¸‹ç§»");
+    await nextTick();
+    let reordered = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    assert.deepEqual(reordered.components[0].root.children.map(node => node.text ?? node.tag), ["span", "é¢„è§ˆå·²æ›´æ–°"]);
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(nodeText(rendered).indexOf("å°¾éƒ¨") < nodeText(rendered).indexOf("é¢„è§ˆå·²æ›´æ–°"),
+      "reordering nodes also changes their actual preview order");
+
+    clickButton(teleportRoot, "æ’¤é”€");
+    await nextTick();
+    reordered = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    assert.deepEqual(reordered.components[0].root.children.map(node => node.text ?? node.tag), ["é¢„è§ˆå·²æ›´æ–°", "span"]);
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(nodeText(rendered).indexOf("é¢„è§ˆå·²æ›´æ–°") < nodeText(rendered).indexOf("å°¾éƒ¨"),
+      "undo restores both the saved component tree and its preview");
+
+    clickButton(teleportRoot, "é‡åš");
+    await nextTick();
+    reordered = authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion);
+    assert.deepEqual(reordered.components[0].root.children.map(node => node.text ?? node.tag), ["span", "é¢„è§ˆå·²æ›´æ–°"]);
+    rendered = visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1");
+    assert.ok(nodeText(rendered).indexOf("å°¾éƒ¨") < nodeText(rendered).indexOf("é¢„è§ˆå·²æ›´æ–°"),
+      "redo restores both the reordered tree and its preview");
+
+    clickButton(teleportRoot, "åˆ é™¤ç»„ä»¶");
+    await nextTick();
+    assert.equal(visit(root, node => node.props["data-ws-plugin-component"] === "custom-component-1"), null,
+      "deleting the component removes it from the rendered page preview");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("deleting the final image node releases its URL and outlet teardown releases remaining assets", async () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  const created = [];
+  const revoked = [];
+  URL.createObjectURL = () => {
+    const url = `blob:skin-outlet-${created.length + 1}`;
+    created.push(url);
+    return url;
+  };
+  URL.revokeObjectURL = (url) => { revoked.push(url); };
+
+  const skinId = "community.asset-cleanup";
+  const skinVersion = "1.0.0";
+  const image = {
+    id: "image-panel",
+    name: "Image panel",
+    page: "voice",
+    accessibleName: "Image panel",
+    permissions: [],
+    actions: {},
+    root: { tag: "section", children: [{ tag: "img", asset: "assets/icon.png" }] },
+  };
+  const document = Vue.ref({ schemaVersion: 3, components: [image] });
+  const assets = { "assets/icon.png": new Blob(["icon"]) };
+  const view = Vue.defineComponent({
+    setup() {
+      return () => Vue.h(SkinPluginOutlet, {
+        skinId,
+        skinVersion,
+        document: document.value,
+        page: "voice",
+        data: {},
+        assets,
+        actions: {},
+      });
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(view);
+  app.provide(ssrContextKey, { modules: new Set() });
+
+  try {
+    app.mount(root);
+    await nextTick();
+    const firstImage = visit(root, node => node.tag === "img");
+    assert.equal(firstImage?.props.src, "blob:skin-outlet-1");
+
+    document.value = { schemaVersion: 3, components: [{ ...image, root: { tag: "section" } }] };
+    await nextTick();
+    assert.deepEqual(revoked, ["blob:skin-outlet-1"],
+      "removing the final node reference releases the asset URL while keeping its component mounted");
+    assert.ok(visit(root, node => node.props["data-ws-plugin-component"] === "image-panel"));
+    assert.equal(visit(root, node => node.tag === "img"), null);
+
+    document.value = { schemaVersion: 3, components: [image] };
+    await nextTick();
+    assert.equal(visit(root, node => node.tag === "img")?.props.src, "blob:skin-outlet-2",
+      "re-adding the component receives a fresh object URL");
+
+    app.unmount();
+    assert.deepEqual(revoked, ["blob:skin-outlet-1", "blob:skin-outlet-2"],
+      "outlet teardown releases every remaining asset URL");
+  } finally {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+  }
+});
+
+test("deleting the last surface component immediately restores the host page", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.surface";
+  const skinVersion = "1.0.0";
+  const baseDocument = {
+    schemaVersion: 3,
+    components: [{
+      id: "full-surface",
+      name: "Full surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Full voice page",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: { tag: "main", children: [{ text: "Custom voice surface" }] },
+    }],
+  };
+  approvals.approveSkinPluginComponents(skinId, skinVersion, baseDocument.components);
+  const revision = Vue.ref(0);
+  const surfaceActive = Vue.ref(false);
+  const props = { skinId, skinVersion, baseDocument, page: "voice", lang: "zh" };
+  const preview = Vue.defineComponent({
+    setup() {
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        surfaceActive.value ? null : Vue.h("section", { "data-native-host": "true" }, "WebSpeak host page"),
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+          manageSurfaceRecovery: false,
+          onSurfaceChange: (active) => { surfaceActive.value = active; },
+        }),
+        Vue.h(SkinPluginEditor, { ...props, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(preview);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    await nextTick();
+    assert.equal(surfaceActive.value, true, "the approved surface replaces the host page");
+    assert.equal(visit(root, node => node.props["data-native-host"] === "true"), null);
+
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    clickButton(teleportRoot, "åˆ é™¤ç»„ä»¶");
+    await nextTick();
+    await nextTick();
+
+    assert.equal(surfaceActive.value, false, "deleting the surface clears its active state");
+    assert.equal(visit(root, node => node.props["data-ws-plugin-surface"] === "voice"), null);
+    assert.match(nodeText(root), /WebSpeak host page/, "the host page is restored without requiring a skin reset");
+  } finally {
+    app.unmount();
+  }
+});
+
+test("surface permissions auto-approve in development without showing prompts or recovery controls", async () => {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
+  const skinId = "community.access-lifecycle";
+  const skinVersion = "1.0.0";
+  const surface = {
+    id: "protected-surface",
+    name: "Protected surface",
+    page: "voice",
+    mode: "surface",
+    accessibleName: "Protected voice page",
+    permissions: ["ui.surface.replace"],
+    actions: { toggle: { type: "ui.toggleState", args: { key: "enabled" } } },
+    state: { enabled: false },
+    root: { tag: "main", children: [
+      { text: "Protected custom page" },
+      { tag: "button", events: { click: "toggle" }, children: [{ text: "Toggle state" }] },
+      { tag: "span", children: [{ text: "{{state.enabled}}" }] },
+    ] },
+  };
+  const baseDocument = { schemaVersion: 3, components: [surface] };
+  const props = { skinId, skinVersion, baseDocument, page: "voice", lang: "zh" };
+  const hostView = Vue.defineComponent({
+    setup() {
+      const surfaceActive = Vue.ref(false);
+      const revision = Vue.ref(0);
+      const currentDocument = () => {
+        revision.value;
+        return authoring.loadSkinPluginAuthoringDocument(skinId, skinVersion) ?? baseDocument;
+      };
+      return () => Vue.h("main", null, [
+        surfaceActive.value ? null : Vue.h("section", { "data-native-host": "true" }, "WebSpeak host page"),
+        Vue.h(SkinPluginOutlet, {
+          skinId,
+          skinVersion,
+          document: currentDocument(),
+          page: "voice",
+          data: {},
+          assets: {},
+          actions: {},
+          onSurfaceChange: (active) => { surfaceActive.value = active; },
+        }),
+        Vue.h(SkinPluginEditor, { ...props, onUpdated: () => { revision.value += 1; } }),
+      ]);
+    },
+  });
+  const root = hostNode("root");
+  const app = renderer.createApp(hostView);
+  app.provide(ssrContextKey, { modules: new Set() });
+  app.mount(root);
+
+  try {
+    await nextTick();
+    await nextTick();
+    const activeSurface = visit(root, node => node.props["data-ws-plugin-surface"] === "voice");
+    assert.ok(activeSurface, "the validated surface receives its declared access in development");
+    assert.match(nodeText(activeSurface), /Protected custom page/);
+    assert.equal(visit(root, node => node.props["data-native-host"] === "true"), null);
+    assert.equal(visit(teleportRoot, node => node.props["data-ws-plugin-consent"] === "true"), null,
+      "skin permissions do not open a consent dialog");
+    assert.equal(visit(teleportRoot, node => node.props["aria-label"] === "ç®¡ç†çš®è‚¤ç»„ä»¶æƒé™ / Manage skin component access"), null,
+      "permission management controls stay hidden outside editor mode");
+    assert.equal(visit(teleportRoot, node => node.props.class === "ws-plugin-surface-reset"), null,
+      "skin reset controls stay hidden outside editor mode");
+    let stateToggle = visit(activeSurface, node => node.tag === "button");
+    stateToggle.props.onClick({ type: "click", target: stateToggle, isTrusted: true });
+    await nextTick();
+    assert.match(nodeText(activeSurface), /true/, "approved UI interactions update component-local state");
+
+    clickButton(teleportRoot, "ç»„ä»¶ç»“æ„");
+    await nextTick();
+    await nextTick();
+    const original = baseDocument.components[0];
+    const expanded = { ...original, permissions: [...original.permissions, "session.status.read"] };
+    changeSelect(teleportRoot, 0, surface.id);
+    await nextTick();
+    editTextarea(teleportRoot, JSON.stringify(expanded, null, 2));
+    await nextTick();
+    clickButton(teleportRoot, "åº”ç”¨å®šä¹‰");
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    assert.equal(approvals.isSkinPluginComponentApproved(skinId, skinVersion, expanded), true,
+      "a changed permission set is granted automatically after schema validation");
+    let reapprovedSurface = visit(root, node => node.props["data-ws-plugin-surface"] === "voice");
+    assert.ok(reapprovedSurface, "the updated surface activates without a permission prompt");
+    assert.match(nodeText(reapprovedSurface), /false/, "changing its permission set clears the old component state");
+    assert.equal(visit(teleportRoot, node => node.props["data-ws-plugin-consent"] === "true"), null);
+
+    stateToggle = visit(reapprovedSurface, node => node.tag === "button");
+    stateToggle.props.onClick({ type: "click", target: stateToggle, isTrusted: true });
+    await nextTick();
+    assert.match(nodeText(reapprovedSurface), /true/);
+    assert.match(nodeText(reapprovedSurface), /true/);
+  } finally {
+    app.unmount();
+  }
+});

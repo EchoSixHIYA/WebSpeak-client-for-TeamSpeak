@@ -17,6 +17,8 @@ const transfer = { size: 6n };
 
 class SdkStub extends EventEmitter {
   inputCommands: string[] = [];
+  fileTransfers: Array<{ channelId: bigint; path: string; password: string }> = [];
+  serverInfo: { name: string; iconId: number | null } | null = { name: "兄弟们的teamspeak", iconId: 123456 };
   inputUpdate = async (_command: string): Promise<void> => {};
   async execCommand(command: string) { this.inputCommands.push(command); await this.inputUpdate(command); }
   initialized = 0;
@@ -24,8 +26,12 @@ class SdkStub extends EventEmitter {
   metadata = async () => rows;
   transfer = async () => transfer;
   download = async (destination: Writable) => { destination.write(Buffer.from("GIF89a")); };
-  execCommandWithResponse() { return this.metadata(); }
-  async fileTransferInitDownload() { this.initialized++; return this.transfer(); }
+  execCommandWithResponse(command = "") { this.inputCommands.push(command); return this.metadata(); }
+  async fileTransferInitDownload(channelId: bigint, path: string, password: string) {
+    this.initialized++;
+    this.fileTransfers.push({ channelId, path, password });
+    return this.transfer();
+  }
   async downloadFileData(_host: string, _transfer: unknown, destination: Writable) { this.downloaded++; await this.download(destination); }
 }
 
@@ -51,6 +57,25 @@ test("stream commands wait for server acknowledgement and propagate refusals", a
   await pending;
   f.sdk.inputUpdate = async () => { throw new Error("missing required parameter"); };
   await assert.rejects(f.client.sendProtocolCommand("removeclientfromstream id=test"), /missing required parameter/);
+});
+
+test("server info uses the name and icon id captured by the SDK handshake", async () => {
+  const f = fixture();
+  assert.deepEqual(await f.client.getServerInfo(), { name: "兄弟们的teamspeak", iconId: 123456 });
+  assert.deepEqual(f.sdk.inputCommands, [], "server identity does not issue a ServerQuery-only command over the client session");
+  f.sdk.serverInfo = { name: "No icon", iconId: null };
+  assert.deepEqual(await f.client.getServerInfo(), { name: "No icon", iconId: null });
+});
+
+test("server icons use the TeamSpeak file transfer path and enforce the download limit", async () => {
+  const f = fixture();
+  assert.equal((await f.client.getServerIcon(123456))?.toString(), "GIF89a");
+  assert.deepEqual(f.sdk.fileTransfers, [{ channelId: 0n, path: "/icon_123456", password: "" }]);
+  assert.equal(f.sdk.downloaded, 1);
+
+  f.sdk.transfer = async () => ({ size: 128n * 1024n + 1n });
+  assert.equal(await f.client.getServerIcon(123456), null);
+  assert.equal(f.sdk.downloaded, 1);
 });
 
 test("stream cleanup flood retries back off and stop after two retries", async t => {

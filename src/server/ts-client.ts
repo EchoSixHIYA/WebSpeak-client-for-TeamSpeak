@@ -44,10 +44,16 @@ export interface TSClientAvatar {
   data: Buffer;
 }
 
+export interface TSClientServerInfo {
+  name: string;
+  iconId: number | null;
+}
+
 // Keep enough room for avatars produced by the native client. The previous
 // 120 KiB limit rejected the 134 KiB PNG used by the Shanghai test account,
 // so every avatar silently fell back to its initial letter.
 const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
+const MAX_SERVER_ICON_BYTES = 128 * 1024;
 
 export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity>;
 export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
@@ -272,6 +278,43 @@ export class TSClient extends EventEmitter {
     const data = Buffer.concat(chunks);
     if (data.length === 0 || data.length > MAX_CLIENT_AVATAR_BYTES) return null;
     return { cacheKey, data };
+  }
+
+  /** Read the public virtual-server name and icon marker from the active session. */
+  async getServerInfo(): Promise<TSClientServerInfo> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const generation = this.connectionGeneration;
+    if (this.client !== client || !this.connected || this.connectionGeneration !== generation) {
+      throw new Error("TeamSpeak session changed while reading server information");
+    }
+    return client.serverInfo ?? { name: "", iconId: null };
+  }
+
+  /** Download the public virtual-server icon using TeamSpeak's normal file-transfer port. */
+  async getServerIcon(iconId: number): Promise<Buffer | null> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isSafeInteger(iconId) || iconId === 0) return null;
+    const generation = this.connectionGeneration;
+    const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
+    const transfer = await client.fileTransferInitDownload(0n, `/icon_${iconId}`, "");
+    if (!isCurrent()) return null;
+    const size = Number(transfer.size);
+    if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_SERVER_ICON_BYTES) return null;
+
+    const chunks: Buffer[] = [];
+    const destination = new Writable({
+      write(chunk: Buffer | string, _encoding, callback) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        callback();
+      },
+    });
+    await client.downloadFileData(this.options.target.host, transfer, destination);
+    if (!isCurrent()) return null;
+    const data = Buffer.concat(chunks);
+    if (data.length === 0 || data.length > MAX_SERVER_ICON_BYTES) return null;
+    return data;
   }
 
   private attachClientListeners(client: TS3FullClient): void {

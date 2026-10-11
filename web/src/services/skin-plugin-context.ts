@@ -1,10 +1,11 @@
-import type { QuickServer } from "./quick-servers.js";
+import { isSafeQuickServerIcon, type QuickServer } from "./quick-servers.js";
 import { splitTeamSpeakTarget } from "./teamspeak-target.js";
 
 export interface SkinPluginQuickServer {
   id: string;
   label: string;
   monogram: string;
+  icon: string;
   tone: number;
   current: boolean;
   kind: "favorite" | "recent";
@@ -47,13 +48,17 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
         }
         targetByOpaqueId.set(opaqueId, server);
         const label = server.label.trim();
+        const serverName = server.serverName?.trim() ?? "";
         const safeLabel = !label || containsConnectionTarget(label, server.address)
-          ? `${server.isFavorite ? "Favorite" : "Recent"} ${index + 1}`
+          ? serverName && !containsConnectionTarget(serverName, server.address)
+            ? serverName
+            : `${server.isFavorite ? "Favorite" : "Recent"} ${index + 1}`
           : label;
         return {
           id: opaqueId,
           label: safeLabel,
-          monogram: Array.from(safeLabel)[0] ?? "?",
+          monogram: Array.from(serverName || safeLabel)[0] ?? "?",
+          icon: isSafeQuickServerIcon(server.serverIcon) ? server.serverIcon : "",
           tone: safeLabelTone(safeLabel),
           current: isCurrent(server),
           kind: server.isFavorite ? "favorite" : "recent",

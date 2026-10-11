@@ -20,11 +20,16 @@ class TeamSpeakStub extends EventEmitter {
   sent: Buffer[] = [];
   directory: TSDirectorySnapshot = { channels: [], clients: [] };
   avatarRequest: (id: number, uid: string) => Promise<TSClientAvatar | null> = async () => null;
-  async connect() { this.disconnected = false; this.emit("directorySnapshot", this.directory); }
+  emitDirectorySnapshotOnConnect = true;
+  connectCalls = 0;
+  serverInfoCalls = 0;
+  async connect() { this.connectCalls++; this.disconnected = false; if (this.emitDirectorySnapshotOnConnect) this.emit("directorySnapshot", this.directory); }
   async disconnect() { this.disconnected = true; }
   getClientId() { return 1; }
   getChannelId() { return 1n; }
   isConnected() { return !this.disconnected; }
+  async getServerInfo() { this.serverInfoCalls++; return { name: "兄弟们的teamspeak", iconId: null }; }
+  async getServerIcon() { return null; }
   async sendProtocolCommand() {}
   async setAccompanimentActive() {}
   sendVoice(data: Buffer) { this.sent.push(data); this.emit("sent", data); }
@@ -36,6 +41,7 @@ async function fixture(t: TestContext, overrides: {
   createTeamSpeakClient?: () => TSClient;
   createEncoder?: () => Pick<OpusEncoder, "encode" | "dispose">;
   configureSdk?: (sdk: TeamSpeakStub) => void;
+  waitForFirstMessage?: boolean;
 } = {}) {
   const sdk = new TeamSpeakStub();
   overrides.configureSdk?.(sdk);
@@ -65,7 +71,7 @@ async function fixture(t: TestContext, overrides: {
     await bridge.shutdown();
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
-  await first;
+  if (overrides.waitForFirstMessage !== false) await first;
   const entries = (bridge as unknown as { entries: Map<string, {
     id: string; ws: WebSocket; audio: AudioFlowStats; webrtc: WebRtcAudioSession | null;
     isAlive: boolean; avatarCache: Map<string, string | null>;
@@ -80,6 +86,28 @@ test("a TeamSpeak constructor failure releases the admitted gateway slot", { tim
   await nextTurn();
   assert.equal(JSON.parse(f.messages[0]!.data.toString()).code, "TEAM_SPEAK_CLIENT_UNAVAILABLE");
   assert.equal(f.bridge.getActiveCount(), 0);
+});
+
+test("server identity lookup waits until the directory sync publishes the connected state", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, { waitForFirstMessage: false, configureSdk(sdk) { sdk.emitDirectorySnapshotOnConnect = false; } });
+  while (!f.sdk.connectCalls) await nextTurn();
+  await nextTurn();
+  assert.equal(f.sdk.serverInfoCalls, 0);
+
+  const serverInfo = new Promise<Record<string, unknown>>(resolve => {
+    f.socket.on("message", (data, binary) => {
+      if (binary) return;
+      const message = JSON.parse(data.toString()) as Record<string, unknown>;
+      if (message.type === "serverInfo") resolve(message);
+    });
+  });
+  f.sdk.emit("directorySnapshot", f.sdk.directory);
+  assert.deepEqual(await serverInfo, { type: "serverInfo", name: "兄弟们的teamspeak", icon: null });
+  const publishedTypes = f.messages.filter(message => !message.binary).map(message => (JSON.parse(message.data.toString()) as { type: string }).type);
+  assert.ok(publishedTypes.indexOf("connected") >= 0);
+  assert.ok(publishedTypes.indexOf("serverInfo") > publishedTypes.indexOf("connected"));
+  assert.equal(f.sdk.serverInfoCalls, 1);
+  assert.ok(f.bridge.getActiveCount() > 0);
 });
 
 test("a codec disposal failure cannot abandon TeamSpeak or the browser socket", { timeout: 5_000 }, async t => {

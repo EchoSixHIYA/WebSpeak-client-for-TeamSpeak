@@ -1,4 +1,5 @@
 import type { FavoriteServer, RecentServer } from "./local-persistence.js";
+import { splitTeamSpeakTarget } from "./teamspeak-target.js";
 
 export interface QuickServer {
   id: string;
@@ -9,6 +10,20 @@ export interface QuickServer {
   lastChannelHint?: { id?: string; name?: string };
   isFavorite: boolean;
   lastConnectedAt?: number;
+  serverName?: string;
+  serverIcon?: string;
+}
+
+export function isSafeQuickServerIcon(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 180_000
+    && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+}
+
+export function isQuickServerAddressLabel(label: string, address: string): boolean {
+  const normalizedLabel = label.trim().toLocaleLowerCase();
+  const candidates = new Set([address.trim()]);
+  try { candidates.add(splitTeamSpeakTarget(address).address.trim()); } catch { /* Persisted targets are validated on write. */ }
+  return [...candidates].some((candidate) => candidate.length >= 3 && normalizedLabel.includes(candidate.toLocaleLowerCase()));
 }
 
 /**
@@ -33,11 +48,19 @@ export function mergeQuickServers(
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const recent = recentByAddress.get(key);
+    const serverName = recent?.serverName?.trim() || favorite.serverName?.trim() || "";
+    const serverIcon = isSafeQuickServerIcon(recent?.serverIcon) ? recent.serverIcon
+      : isSafeQuickServerIcon(favorite.serverIcon) ? favorite.serverIcon : "";
+    const savedLabel = favorite.label.trim();
     result.push({
       id: key,
       address: favorite.address.trim(),
-      label: favorite.label.trim() || favorite.address.trim(),
+      label: serverName && (!savedLabel || isQuickServerAddressLabel(savedLabel, favorite.address))
+        ? serverName
+        : savedLabel || favorite.address.trim(),
       isFavorite: true,
+      ...(serverName ? { serverName } : {}),
+      ...(serverIcon ? { serverIcon } : {}),
       ...(recent?.nickname || favorite.nickname ? { nickname: recent?.nickname || favorite.nickname } : {}),
       ...(recent?.identityId || favorite.identityId ? { identityId: recent?.identityId || favorite.identityId } : {}),
       ...(recent?.lastChannelHint || favorite.lastChannelHint ? { lastChannelHint: recent?.lastChannelHint ?? favorite.lastChannelHint } : {}),
@@ -52,8 +75,10 @@ export function mergeQuickServers(
     result.push({
       id: key,
       address: recent.address.trim(),
-      label: recent.address.trim(),
+      label: recent.serverName?.trim() || recent.address.trim(),
       isFavorite: false,
+      ...(recent.serverName?.trim() ? { serverName: recent.serverName.trim() } : {}),
+      ...(isSafeQuickServerIcon(recent.serverIcon) ? { serverIcon: recent.serverIcon } : {}),
       ...(recent.nickname ? { nickname: recent.nickname } : {}),
       ...(recent.identityId ? { identityId: recent.identityId } : {}),
       ...(recent.lastChannelHint ? { lastChannelHint: recent.lastChannelHint } : {}),

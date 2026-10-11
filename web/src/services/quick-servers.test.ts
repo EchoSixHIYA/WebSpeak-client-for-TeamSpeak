@@ -46,3 +46,35 @@ test("quick server addresses are trimmed, normalized, and empty targets are skip
   assert.equal(quickServers[0].id, "voice.example:9987");
   assert.equal(quickServers[0].address, "Voice.Example:9987");
 });
+
+test("server-provided name and image replace address placeholders while custom favorite names stay intact", () => {
+  const icon = "data:image/png;base64,iVBORw0KGgo=";
+  const quickServers = mergeQuickServers(
+    [
+      { id: "shanghai", label: "shanghai.example:9987", address: "shanghai.example:9987" },
+      { id: "custom", label: "My room", address: "custom.example:9987" },
+    ],
+    [
+      { id: "recent-shanghai", address: "shanghai.example:9987", serverName: "兄弟们的teamspeak", serverIcon: icon, lastConnectedAt: 2 },
+      { id: "recent-custom", address: "custom.example:9987", serverName: "Original TeamSpeak name", lastConnectedAt: 1 },
+    ],
+  );
+
+  const shanghai = quickServers.find((server) => server.address === "shanghai.example:9987");
+  const custom = quickServers.find((server) => server.address === "custom.example:9987");
+  assert.equal(shanghai?.label, "兄弟们的teamspeak");
+  assert.equal(shanghai?.serverIcon, icon);
+  assert.equal(custom?.label, "My room");
+  assert.equal(custom?.serverName, "Original TeamSpeak name");
+});
+
+test("unsafe or non-image server icon URLs are ignored", () => {
+  const quickServers = mergeQuickServers([], [{
+    id: "recent",
+    address: "voice.example:9987",
+    serverName: "Voice",
+    serverIcon: "https://tracking.example/image.png",
+    lastConnectedAt: 1,
+  }]);
+  assert.equal(quickServers[0].serverIcon, undefined);
+});

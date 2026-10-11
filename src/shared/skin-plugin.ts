@@ -22,7 +22,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "chat.channel.send": Object.freeze({ policyVersion: 1, description: "Send to the current public text channel; the demo page only simulates this action." }),
   "favorites.read": Object.freeze({ policyVersion: 1, description: "Read favorite labels and opaque local identifiers, without server addresses or credentials." }),
   "favorites.switch": Object.freeze({ policyVersion: 1, description: "Select a saved TeamSpeak server using the host's connection flow." }),
-  "servers.quickList.read": Object.freeze({ policyVersion: 1, description: "Read favorite and recent server labels and opaque local identifiers, without server addresses or credentials." }),
+  "servers.quickList.read": Object.freeze({ policyVersion: 1, description: "Read favorite and recent server labels, public server icons, and opaque local identifiers, without server addresses or credentials." }),
   "servers.quickList.switch": Object.freeze({ policyVersion: 1, description: "Switch to a user-selected favorite or recent server through the host connection flow." }),
   "session.channel.join": Object.freeze({ policyVersion: 1, description: "Request joining a visible TeamSpeak channel through the host; the demo page only changes simulated state." }),
   "audio.status.read": Object.freeze({ policyVersion: 1, description: "Read the user's own microphone and speaker mute states." }),
@@ -168,7 +168,7 @@ const VOID_ELEMENTS = new Set(["br", "circle", "hr", "img", "input", "line", "pa
 const ATTRIBUTES = new Set([
   "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",
   "minlength", "multiple", "name", "open", "placeholder", "required", "role", "rows", "rowspan", "step", "stroke", "stroke-linecap", "stroke-linejoin",
-  "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
+  "src", "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
 ]);
 const EVENTS = new Set<string>([
   "click", "dblclick", "change", "input", "submit", "keydown", "keyup", "contextmenu", "focus", "blur", "pointerdown", "pointerup",
@@ -240,7 +240,7 @@ const COLLECTION_FIELDS: Record<string, ReadonlySet<string>> = {
   "session.channels": new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]),
   "session.members": new Set(["id", "name", "avatarInitial", "channelId", "status", "speaking", "self"]),
   "favorites.items": new Set(["id", "label", "current", "kind"]),
-  "servers.quickList": new Set(["id", "label", "monogram", "tone", "current", "kind", "favorite"]),
+  "servers.quickList": new Set(["id", "label", "monogram", "icon", "tone", "current", "kind", "favorite"]),
   "chat.messages": new Set(["id", "author", "text", "time", "kind", "channelId"]),
   "screenShare.streams": new Set(["streamId", "source", "ownerClientId", "ownerNickname", "name", "audio", "viewerCount"]),
 };
@@ -481,6 +481,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
           const isAriaOrData = inputSchemaVersion >= 3 && /^(?:aria|data)-[a-z][a-z0-9-]{0,47}$/.test(lowerKey);
           if ((!ATTRIBUTES.has(lowerKey) && !isAriaOrData) || lowerKey.startsWith("on") || key !== lowerKey) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "The component uses an unsupported or executable attribute.");
           if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "Component attributes must be scalar values.");
+          if (lowerKey === "src" && (node.tag !== "img" || value !== "{{server.icon}}")) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "Image sources may only bind to a TeamSpeak server icon.");
           if (typeof value === "string" && ["fill", "stroke"].includes(lowerKey) && /\burl\s*\(|javascript\s*:/i.test(value)) fail("SKIN_PLUGIN_ATTRIBUTE_INVALID", "SVG paint attributes cannot load external or executable resources.");
           if (typeof value === "string") {
             for (const permission of bindingPermissions(value, aliases, stateKeys)) {

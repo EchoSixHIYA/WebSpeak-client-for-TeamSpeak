@@ -269,7 +269,28 @@
                         },
                         "children": [
                           {
-                            "text": "{{server.monogram}}"
+                            "tag": "img",
+                            "part": "server-icon",
+                            "when": {
+                              "path": "server.icon"
+                            },
+                            "attributes": {
+                              "src": "{{server.icon}}",
+                              "alt": ""
+                            }
+                          },
+                          {
+                            "tag": "span",
+                            "part": "server-monogram-initial",
+                            "when": {
+                              "path": "server.icon",
+                              "equals": ""
+                            },
+                            "children": [
+                              {
+                                "text": "{{server.monogram}}"
+                              }
+                            ]
                           }
                         ]
                       },
@@ -1073,6 +1094,18 @@
                 "children": [
                   {
                     "text": "TS"
+                  },
+                  {
+                    "tag": "span",
+                    "part": "identity-online",
+                    "when": {
+                      "path": "session.status.connected",
+                      "equals": true
+                    },
+                    "attributes": {
+                      "role": "img",
+                      "aria-label": "在线"
+                    }
                   }
                 ]
               },

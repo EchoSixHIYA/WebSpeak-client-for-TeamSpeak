@@ -119,6 +119,25 @@ test("custom surfaces can safely render and switch unified favorite and recent s
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
 });
 
+test("server list skins may display only the host-provided TeamSpeak icon image", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {};
+  document.components[0].permissions = ["servers.quickList.read"];
+  document.components[0].root = {
+    tag: "nav",
+    repeat: { path: "servers.quickList", as: "server" },
+    children: [{ tag: "img", attributes: { src: "{{server.icon}}", alt: "" } }],
+  };
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].attributes?.src, "{{server.icon}}");
+
+  document.components[0].root.children![0].attributes!.src = "https://example.com/icon.png";
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
+  document.components[0].root.children![0].attributes!.src = "{{server.icon}}";
+  document.components[0].root.children![0].tag = "span";
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
+});
+
 test("host widget references stay allowlisted and cannot be used on the demo page", () => {
   const unknownWidget = validDocument();
   unknownWidget.schemaVersion = 2;
