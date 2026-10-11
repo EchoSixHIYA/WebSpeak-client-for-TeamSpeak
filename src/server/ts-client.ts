@@ -295,7 +295,8 @@ export class TSClient extends EventEmitter {
     if (this.client !== client || !this.connected || this.connectionGeneration !== generation) {
       throw new Error("TeamSpeak session changed while reading server information");
     }
-    return client.serverInfo ?? { name: "", iconId: null };
+    const info = client.serverInfo;
+    return info ? { name: info.name, iconId: info.iconId } : { name: "", iconId: null };
   }
 
   /** Read only the public banner and welcome message from the active virtual server. */
@@ -305,20 +306,12 @@ export class TSClient extends EventEmitter {
     const generation = this.connectionGeneration;
     const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
     const empty: TSClientServerPresentation = { bannerUrl: null, welcomeMessage: "" };
-    try {
-      const rows = await client.execCommandWithResponse("serverinfo", 5_000);
-      if (!isCurrent()) throw new Error("TeamSpeak session changed while reading server presentation");
-      const row = rows[0] ?? {};
-      return {
-        bannerUrl: normalizeTeamSpeakBannerUrl(row.virtualserver_hostbanner_gfx_url),
-        welcomeMessage: normalizeTeamSpeakWelcomeMessage(row.virtualserver_welcomemessage),
-      };
-    } catch (error: unknown) {
-      if (!isCurrent()) throw error;
-      // Some servers restrict serverinfo. Keep the voice connection usable and
-      // omit the optional presentation when the fields cannot be read.
-      return empty;
-    }
+    const info = client.serverInfo;
+    if (!isCurrent() || !info) return empty;
+    return {
+      bannerUrl: normalizeTeamSpeakBannerUrl(info.hostBannerGfxUrl),
+      welcomeMessage: normalizeTeamSpeakWelcomeMessage(info.welcomeMessage),
+    };
   }
 
   /** Download the public virtual-server icon using TeamSpeak's normal file-transfer port. */
