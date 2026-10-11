@@ -46,7 +46,7 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
     id: BUILTIN_KAAK_SKIN_ID,
     name: "KAAK",
-    version: "3.1.54",
+    version: "3.1.55",
     author: "WebSpeak Project",
     license: "AGPL-3.0-only",
     description: "A KOOK-inspired voice-room workspace with collapsible voice groups, channel chat, TeamSpeak profile cards, accessible host-owned member controls, and WebSpeak screen sharing.",

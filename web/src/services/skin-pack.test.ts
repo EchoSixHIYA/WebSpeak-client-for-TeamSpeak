@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 15100)
-Total output lines: 814
-
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
@@ -391,7 +388,12 @@ test("schema version 4 validates and caches isolated plugin package files withou
   const entry = "plugins/voice-toolbar/index.js";
   const style = "plugins/voice-toolbar/style.css";
   const icon = "plugins/voice-toolbar/assets/icon.png";
-  asser…100 tokens truncated…PluginFiles?.[icon].type, "image/png");
+  assert.equal(skin.schemaVersion, 4);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.runtimePlugins?.plugins[0].id, "voice-toolbar");
+  assert.equal(await skin.runtimePluginFiles?.[entry].text(), "export const render = () => document.createElement('button');");
+  assert.equal(await skin.runtimePluginFiles?.[style].text(), ".toolbar { color: teal; }");
+  assert.equal(skin.runtimePluginFiles?.[icon].type, "image/png");
   assert.equal(skin.assets[icon]?.type, "image/png", "declared plugin media is available only by its package path for scoped CSS and host remapping");
   assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /data-ws-runtime-plugin="voice-toolbar".*?\.toolbar/s);
   assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /color: teal/);
@@ -462,7 +464,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.54");
+  assert.equal(skin.version, "3.1.55");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
