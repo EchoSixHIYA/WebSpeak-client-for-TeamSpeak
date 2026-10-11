@@ -28,6 +28,8 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 The connection page and voice workspace are full-page declarative surfaces in [components.json](./kaak-voice/components.json). The voice surface requests only the capabilities it uses: visible server shortcuts, channel and member data, cached profile-avatar display inside the trusted member-card widget, channel joining, channel chat, voice status, microphone/output controls, whisper controls, and disconnect. KAAK explicitly disables the share UI and does not request its member-card permissions. The host renders trusted connection, language, skin, and audio controls. It rechecks permissions and connection state when each action runs; approval is local to this skin version and can be revoked from the host access control.
 
+On desktop, right-clicking another member card opens the same host-owned member actions menu as the card's accessible action button. Keyboard activation remains anchored to the button, and touch layouts keep the action button available.
+
 Member cards are rendered by WebSpeak's trusted `voice.member-cards` widget. It displays an already available TeamSpeak profile avatar, or the host-generated nickname initial when no avatar is available; image bytes stay in the host and are not exposed in the skin's data context or Wasm runtime. The skin does not receive server addresses, passwords, identity keys, raw audio, private messages, or arbitrary network/storage APIs. Its markup is data-only; it contains no executable JavaScript or Wasm. The `/demo` page uses synthetic data and does not connect to TeamSpeak.
 
 ## Files

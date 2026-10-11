@@ -1,6 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { placeMemberMenu, placeMemberSubmenu } from "./member-menu-placement.js";
+import { memberMenuInvocationPoint, placeMemberMenu, placeMemberSubmenu } from "./member-menu-placement.js";
+
+test("right-click member actions use the pointer even when contextmenu detail is zero", () => {
+  assert.deepEqual(memberMenuInvocationPoint(
+    { type: "contextmenu", detail: 0, clientX: 234, clientY: 178 },
+    { x: 42, y: 80 },
+  ), { x: 234, y: 178 });
+});
+
+test("keyboard member actions stay anchored to their trigger", () => {
+  assert.deepEqual(memberMenuInvocationPoint(
+    { type: "click", detail: 0, clientX: 0, clientY: 0 },
+    { x: 42, y: 80 },
+  ), { x: 42, y: 80 });
+});
+
+test("pointer member actions use the pointer location", () => {
+  assert.deepEqual(memberMenuInvocationPoint(
+    { type: "click", detail: 1, clientX: 234, clientY: 178 },
+    { x: 42, y: 80 },
+  ), { x: 234, y: 178 });
+});
 
 test("the complete menu stays inside a short desktop window", () => {
   assert.deepEqual(placeMemberMenu({ x: 167, y: 309 }, { width: 188, height: 271 }, { width: 1280, height: 568 }), { x: 167, y: 285 });

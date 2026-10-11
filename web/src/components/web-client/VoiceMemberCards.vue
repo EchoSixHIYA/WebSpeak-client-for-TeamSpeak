@@ -16,6 +16,7 @@
       :data-ws-member-id="member.id"
       :data-ws-speaking="isSpeaking(member) ? 'true' : 'false'"
       :data-ws-self="member.isSelf ? 'true' : 'false'"
+      @contextmenu="handleMemberContextMenu(member, $event)"
     >
       <button
         v-if="!member.isSelf && (isMobileViewport || showMemberActions)"
@@ -185,6 +186,13 @@ function toggleScreenShareSettings() {
 }
 const emit = defineEmits<{ memberActions: [member: ChannelMember, event: MouseEvent]; stopShare: [] }>();
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
+
+function handleMemberContextMenu(member: ChannelMember, event: MouseEvent): void {
+  if (!props.showMemberActions || member.isSelf) return;
+  event.preventDefault();
+  event.stopPropagation();
+  emit("memberActions", member, event);
+}
 </script>
 
 <style scoped>
