@@ -535,4 +535,4 @@
 - 根因：共享状态由 WebSpeak/TeamSpeak 共用链路检测；KAAK 使用带共享状态的宿主成员卡片，其他整页替换示例则自行绘制成员行，而公开成员数据没有共享标记，导致传输层已发现的共享无法映射到自绘成员列表。
 - 修改范围：给 `session.members` 增加 `screenSharing` 与 `screenShareStreamId`，两字段单独要求 `voice.screenShare.read`；自绘皮肤用 `voice.joinScreenShare` 观看时还需 `voice.screenShare.control`。按原有限定权限投影到 Wasm，未将 TeamSpeak SDK 对象或连接信息暴露给皮肤。
 - 示例皮肤：Open Voice Surface 与 Harbor 的成员列表现可显示共享标记并提供观看按钮；KAAK 的宿主成员卡片和屏幕共享逻辑不变。
-- 验证：Open Voice Surface 与 Harbor `.wskin` 已从各自组件源码重建；共享字段权限与运行时投影专项测试通过，包含屏幕共享 UI/皮肤包测试的完整套件 684/684 通过；`npm run build`、`npm run web:build` 与 `git diff --check` 通过。没有真实共享中的频道可用于端到端观看验收。
+- 验证：Open Voice Surface 与 Harbor `.wskin` 已从各自组件源码重建；共享字段权限与运行时投影专项测试通过，包含屏幕共享 UI/皮肤包测试的完整套件 684/684 通过；`npm run build`、`npm run web:build` 与 `git diff --check` 通过。提交 `8b5db8a` 已推送至 `dev`；本地 3040 的页面和新 WebClient 资源均返回 HTTP 200，资源内含新成员共享字段。没有真实共享中的频道可用于端到端观看验收。
