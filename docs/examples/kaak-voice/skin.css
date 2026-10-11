@@ -1490,16 +1490,9 @@
 [data-ws-plugin-part="kaak-workspace.audio-controls"] { display: contents; }
 
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-room-panel {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-row: 1 / span 2;
-  grid-template-columns: subgrid;
-  grid-template-rows: subgrid;
-  align-items: center;
-  width: auto;
-  gap: inherit;
-  padding: 0;
+  display: contents;
 }
+[data-ws-plugin-part="kaak-workspace.audio-controls"] .desktop-audio-dock-copy { display: none; }
 [data-ws-plugin-part="kaak-workspace.audio-controls"] .room-panel-audio-settings {
   display: inline-flex;
   align-items: center;
@@ -1718,14 +1711,7 @@
   }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] { display: contents; }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-controls {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-row: 1 / span 2;
-    grid-template-columns: subgrid;
-    grid-template-rows: subgrid;
-    align-items: center;
-    column-gap: inherit;
-    row-gap: inherit;
+    display: contents;
   }
   [data-ws-plugin-part="kaak-workspace.audio-controls"] .mobile-voice-activity {
     grid-column: 1;
