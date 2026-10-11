@@ -16,6 +16,7 @@
     "skin:harbor:build": "node web/scripts/build-harbor-voice-skin.mjs",
     "skin:open-voice:build": "node web/scripts/build-open-voice-surface-skin.mjs",
     "skin:kaak:build": "node web/scripts/build-kaak-voice-skin.mjs",
+    "skin:illusia:build": "node web/scripts/build-illusia-voice-skin.mjs",
     "start": "node dist/index.js",
     "web:dev": "cd web && npx vite --host",
     "web:build": "npm --prefix web run build",

@@ -1110,6 +1110,33 @@
   background: linear-gradient(145deg, #fff, #eaf7f9);
 }
 
+/* Shared voice roster: give live screen-share status and watch actions an ILLUSIA treatment. */
+[data-ws-part="voice.member.live-indicator"] {
+  color: #075b65;
+  border-color: rgba(34, 156, 167, .48);
+  background: rgba(250, 255, 255, .98);
+  box-shadow: 0 5px 16px rgba(27, 119, 137, .2), inset 0 1px 0 #fff;
+}
+[data-ws-part="voice.member.live-indicator"]::before {
+  background: #25c18a;
+  box-shadow: 0 0 0 3px rgba(37, 193, 138, .16);
+}
+[data-ws-part="voice.member.live-indicator"] .screen-share-wave { color: #078b98; }
+[data-ws-part="voice.member.share-actions"] .screen-share-card-button {
+  color: #075e68;
+  border-color: rgba(34, 156, 167, .42);
+  background: linear-gradient(120deg, #f6ffff, #dff7f5);
+  box-shadow: 0 4px 12px rgba(30, 150, 163, .12), inset 0 1px 0 #fff;
+}
+[data-ws-part="voice.member.share-actions"] .screen-share-card-button:hover {
+  background: linear-gradient(120deg, #fff, #c9f0ec);
+}
+[data-ws-part="voice.member.share-actions"] .screen-share-card-button.viewing {
+  color: #fff;
+  border-color: #087e86;
+  background: linear-gradient(110deg, #0a9997, #08717e);
+}
+
 /* The demo keeps its original controls, labels, and interactions. */
 [data-ws-page="demo"] {
   color: var(--skin-illusia-ink);

@@ -141,7 +141,7 @@ test("the ILLUSIA v3 example and bundled package import without replacing WebSpe
   const skin = await importSkinPack(new File([exampleBytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "2.0.0");
+  assert.equal(skin.version, "2.0.1");
   assert.equal(skin.schemaVersion, 3);
   assert.equal(skin.packageType, "open-skin");
   assert.equal(skin.layoutData, undefined);
@@ -169,6 +169,8 @@ test("the ILLUSIA v3 example and bundled package import without replacing WebSpe
   assert.match(skin.css, /data-ws-skin-id="community\.illusia-voice"/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.rail"/);
   assert.match(skin.css, /data-ws-plugin-part="illusia-now-playing\.channel-name"/);
+  assert.match(skin.css, /data-ws-part="voice\.member\.live-indicator"\]\s*\{[^}]*border-color:[^}]*background:/s);
+  assert.match(skin.css, /data-ws-part="voice\.member\.share-actions"\] \.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
   assert.match(skin.css, /data-ws-part="home\.server-history\.item"/);
   assert.match(skin.css, /data-ws-part="home\.server-history\.favorite-toggle"\]\[data-ws-state="saved"\]/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.favorite-toggle"\]\[data-ws-state="saved"\]/);
@@ -464,7 +466,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.72");
+  assert.equal(skin.version, "3.1.73");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -498,6 +500,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     }
     return undefined;
   }
+  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: true, memberActions: true });
   assert.equal(findPart(voice?.root, "server-summary")?.widget, "voice.server-header");
   assert.equal(findPart(voice?.root, "server-banner")?.widget, "voice.server-banner");
   assert.equal(findPart(voice?.root, "record-placeholder"), undefined, "the KAAK voice dock has no recording control");
@@ -690,6 +693,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /conversation[\s\S]*?grid-template-rows: 58px minmax\(0, 1fr\) auto/);
   assert.match(skin.css, /chat-send[\s\S]*?::after \{ content: "➤";/);
   assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?aspect-ratio: 1\.82;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-live-indicator[\s\S]*?background: #20251e;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-card-button\.viewing[\s\S]*?background: #8be31e;/);
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-wave/);
   assert.ok(skin.css.includes("animation: ws-community-kaak-voice-kaak-performance-refresh-spin .72s linear infinite;"));
   assert.ok(skin.css.includes("performance-refresh:disabled .ui-icon { animation: none; }"));

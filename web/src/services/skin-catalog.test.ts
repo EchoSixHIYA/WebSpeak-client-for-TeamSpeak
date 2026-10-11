@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   BUILTIN_SKIN_CATALOG,
@@ -6,6 +7,27 @@ import {
   isPublicSkinEnabled,
   listPublicSkins,
 } from "./skin-catalog.js";
+
+test("built-in appearance manifests and catalog versions match the bundled share treatments", async () => {
+  const [lightManifestText, darkManifestText, lightCss, darkCss] = await Promise.all([
+    readFile(new URL("../skins/builtin/light/manifest.json", import.meta.url), "utf8"),
+    readFile(new URL("../skins/builtin/dark/manifest.json", import.meta.url), "utf8"),
+    readFile(new URL("../skins/builtin/light/skin.css", import.meta.url), "utf8"),
+    readFile(new URL("../skins/builtin/dark/skin.css", import.meta.url), "utf8"),
+  ]);
+  const lightManifest = JSON.parse(lightManifestText) as { id: string; version: string };
+  const darkManifest = JSON.parse(darkManifestText) as { id: string; version: string };
+
+  for (const manifest of [lightManifest, darkManifest]) {
+    assert.equal(BUILTIN_SKIN_CATALOG.find((skin) => skin.id === manifest.id)?.version, manifest.version);
+  }
+  assert.equal(lightManifest.version, "1.0.1");
+  assert.equal(darkManifest.version, "1.0.1");
+  assert.match(lightCss, /\.screen-share-live-indicator\s*\{[^}]*background:/s);
+  assert.match(lightCss, /\.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
+  assert.match(darkCss, /\.screen-share-live-indicator\s*\{[^}]*background:/s);
+  assert.match(darkCss, /\.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
+});
 
 test("skin catalog always includes protected built-ins and exposes only enabled custom skins", async () => {
   const originalFetch = globalThis.fetch;

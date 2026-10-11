@@ -1676,6 +1676,28 @@
 [data-ws-plugin-part="kaak-workspace.voice-dock-share"] [data-ws-plugin-part="kaak-workspace.screen-share-stop"]:active { transform: scale(.985); }
 [data-ws-plugin-part="kaak-workspace.voice-dock-share"] .skin-runtime-screen-share-start:disabled { opacity: .5; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card.self .screen-share-card-actions { display: none; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-live-indicator {
+  color: #e6ffd0;
+  border-color: rgba(108, 191, 0, .62);
+  background: #20251e;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .42), inset 0 0 0 1px rgba(108, 191, 0, .08);
+}
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-live-indicator::before {
+  background: #7bd80a;
+  box-shadow: 0 0 0 3px rgba(123, 216, 10, .18);
+}
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-wave { color: #9be031; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button {
+  color: #c8f39a;
+  border-color: rgba(108, 191, 0, .46);
+  background: #27311f;
+}
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button:hover { background: #344626; }
+[data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-card-button.viewing {
+  color: #171b15;
+  border-color: #8be31e;
+  background: #8be31e;
+}
 
 @media (max-width: 820px) {
   [data-ws-plugin-part="kaak-workspace.voice-dock"] {

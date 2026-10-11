@@ -536,3 +536,11 @@
 - 修改范围：给 `session.members` 增加 `screenSharing` 与 `screenShareStreamId`，两字段单独要求 `voice.screenShare.read`；自绘皮肤用 `voice.joinScreenShare` 观看时还需 `voice.screenShare.control`。按原有限定权限投影到 Wasm，未将 TeamSpeak SDK 对象或连接信息暴露给皮肤。
 - 示例皮肤：Open Voice Surface 与 Harbor 的成员列表现可显示共享标记并提供观看按钮；KAAK 的宿主成员卡片和屏幕共享逻辑不变。
 - 验证：Open Voice Surface 与 Harbor `.wskin` 已从各自组件源码重建；共享字段权限与运行时投影专项测试通过，包含屏幕共享 UI/皮肤包测试的完整套件 684/684 通过；`npm run build`、`npm run web:build` 与 `git diff --check` 通过。提交 `8b5db8a` 已推送至 `dev`；本地 3040 的页面和新 WebClient 资源均返回 HTTP 200，资源内含新成员共享字段。没有真实共享中的频道可用于端到端观看验收。
+
+## 本轮皮肤更新（2026-10-11，内置皮肤与 KAAK 显示共享状态）
+
+- 目标：让内置浅色、深色、ILLUSIA 和 KAAK 四款皮肤都清晰呈现活跃屏幕共享状态及观看入口。
+- 实现：浅色/深色给宿主成员卡的直播标记和观看按钮加入匹配主题的配色；ILLUSIA 更新其开放皮肤 CSS；KAAK 更新成员卡直播标记、波形和观看按钮。KAAK 组件树显式保持 `screenShare: true`；修正文档原先错误地声称其关闭了共享 UI 的说明。未改屏幕采集和 WebRTC 传输逻辑。
+- 版本与分发：浅色/深色升至 1.0.1，ILLUSIA 升至 2.0.1，KAAK 升至 3.1.73。新增可复用的 ILLUSIA `.wskin` 构建脚本；重建 ILLUSIA 与 KAAK 示例包及内置分发包。
+- 验证：皮肤目录和包定向测试 24/24 通过；`npm run verify` 全部通过（685/685 测试、服务端构建、前端类型检查及 Vite 生产构建）；`git diff --check` 通过。3040 上 ILLUSIA 包返回 3,545,262 字节、KAAK 包返回 21,761 字节，均与刚构建的分发包长度一致。没有正在共享的真实语音会话可供目视确认动态标记和观看行为。
+- 当前状态：代码、皮肤包、记录和自动验证已完成；按持续指示推送到 `dev`。
