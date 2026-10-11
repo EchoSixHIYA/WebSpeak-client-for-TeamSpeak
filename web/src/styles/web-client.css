@@ -7136,6 +7136,8 @@
 
 :deep(.screen-share-player) {
   position: relative;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 17px;
   overflow: hidden;
   color: var(--text-primary);
@@ -7148,9 +7150,10 @@
 :deep(.screen-share-player-stage) {
   position: relative;
   display: grid;
-  width: 100%;
-  min-height: 245px;
+  width: min(100%, 1100px);
+  max-width: 100%;
   aspect-ratio: 16 / 9;
+  box-sizing: border-box;
   place-items: center;
   overflow: hidden;
   background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 12%, var(--surface-1)), var(--surface-2) 74%);
@@ -7167,6 +7170,8 @@
 }
 
 :deep(.screen-share-player-placeholder) {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -7410,7 +7415,7 @@
     border-radius: 14px;
   }
   :deep(.screen-share-player-stage) {
-    min-height: 210px;
+    width: 100%;
   }
   :deep(.screen-share-player-viewers) {
     top: 10px;

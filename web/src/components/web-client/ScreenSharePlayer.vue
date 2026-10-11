@@ -7,8 +7,10 @@
     :aria-label="t('screenShare')"
   >
     <div
+      :ref="setStageElement"
       class="screen-share-player-stage"
       data-ws-part="voice.screen-player.stage"
+      :style="stageSizeStyle"
     >
       <video
         v-if="screenShareRemoteStream"
@@ -18,6 +20,7 @@
         autoplay
         playsinline
         :muted="screenShareRemoteVolume === 0"
+        @loadedmetadata="updateStageSize"
       ></video>
       <div
         v-else
@@ -113,11 +116,57 @@
 
 <script setup lang="ts">
 import Icon from "../Icon.vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
+import { calculateScreenSharePlayerSize } from "../../composables/useWebClientScreenShare.js";
 const props = defineProps<{
   model: Pick<ReturnType<typeof useWebClientScreenShare>, "fullscreen" | "viewers" | "viewerCount" | "ownerName" | "errorText" | "setPlayerElement" | "setVideoElement" | "viewerStyle" | "setVolume" | "toggleFullscreen">;
   screenShareRemoteStream: MediaStream | null; screenShareRemoteVolume: number; screenShareError: string;
   leaveScreenShare: () => void; avatarInitial: (name: string) => string; t: (key: string) => string;
 }>();
 const { fullscreen: screenShareFullscreen, viewers: screenSharePlayerViewers, viewerCount: screenSharePlayerViewerCount, ownerName: screenSharePlayerOwnerName, errorText: screenShareErrorText, setPlayerElement, setVideoElement: setScreenVideoElement, viewerStyle: screenShareViewerStyle, setVolume: onScreenShareVolume, toggleFullscreen: toggleScreenShareFullscreen } = props.model;
+const stageElement = ref<HTMLElement | null>(null);
+const stageSizeStyle = ref<Record<string, string>>({ aspectRatio: "16 / 9" });
+let stageResizeObserver: ResizeObserver | null = null;
+
+function updateStageSize(): void {
+  const stage = stageElement.value;
+  const video = stage?.querySelector("video");
+  if (stage && screenShareFullscreen.value) {
+    stageSizeStyle.value = { width: "100%", height: "100%", aspectRatio: "auto" };
+    return;
+  }
+  if (!stage || !video?.videoWidth || !video.videoHeight) return;
+  const parentWidth = stage.parentElement?.parentElement?.clientWidth || window.innerWidth;
+  const size = calculateScreenSharePlayerSize(
+    video.videoWidth,
+    video.videoHeight,
+    Math.min(parentWidth, 1100),
+    Math.max(220, Math.min(window.innerHeight - 220, 720)),
+  );
+  if (!size) return;
+  stageSizeStyle.value = {
+    width: `${size.width}px`,
+    height: `${size.height}px`,
+    aspectRatio: `${video.videoWidth} / ${video.videoHeight}`,
+  };
+}
+
+function setStageElement(element: unknown): void {
+  stageResizeObserver?.disconnect();
+  stageElement.value = element instanceof HTMLElement ? element : null;
+  if (stageElement.value && typeof ResizeObserver !== "undefined") {
+    stageResizeObserver = new ResizeObserver(updateStageSize);
+    const parent = stageElement.value.parentElement?.parentElement ?? stageElement.value.parentElement;
+    if (parent) stageResizeObserver.observe(parent);
+    updateStageSize();
+  }
+}
+
+onMounted(() => window.addEventListener("resize", updateStageSize));
+watch(screenShareFullscreen, updateStageSize);
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateStageSize);
+  stageResizeObserver?.disconnect();
+});
 </script>

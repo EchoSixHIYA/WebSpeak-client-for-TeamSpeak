@@ -10,6 +10,20 @@ interface ScreenShareResolutionOption {
   label: string;
 }
 
+export function calculateScreenSharePlayerSize(
+  sourceWidth: number,
+  sourceHeight: number,
+  maxWidth: number,
+  maxHeight: number,
+): { width: number; height: number } | null {
+  if (![sourceWidth, sourceHeight, maxWidth, maxHeight].every((value) => Number.isFinite(value) && value > 0)) return null;
+  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+  return {
+    width: Math.max(1, Math.floor(sourceWidth * scale)),
+    height: Math.max(1, Math.floor(sourceHeight * scale)),
+  };
+}
+
 interface UseWebClientScreenShareOptions {
   streams: ScreenShareStream[];
   viewing: Ref<boolean>;

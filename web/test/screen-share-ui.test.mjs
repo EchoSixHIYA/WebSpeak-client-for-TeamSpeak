@@ -5,11 +5,11 @@ import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
 import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
 import { renderToString } from "@vue/server-renderer";
-let vite, useWebClientScreenShare, VoiceMemberCards;
+let vite, useWebClientScreenShare, calculateScreenSharePlayerSize, VoiceMemberCards;
 const renderer = createRenderer({ createComment: text => ({ text }), createText: text => ({ text }), createElement: () => ({}), insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {}, parentNode: () => null, nextSibling: () => null });
 before(async () => {
   vite = await createServer({ configFile: false, plugins: [vue()], root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
-  ({ useWebClientScreenShare } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
+  ({ useWebClientScreenShare, calculateScreenSharePlayerSize } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
   ({ default: VoiceMemberCards } = await vite.ssrLoadModule("/src/components/web-client/VoiceMemberCards.vue"));
 });
 after(async () => { await vite?.close(); });
@@ -38,6 +38,12 @@ test("a newly mounted or replaced video receives the existing stream and volume"
     assert.equal(first.srcObject, null); assert.equal(second.srcObject, media); assert.equal(second.volume, .4);
     f.volume.value = .7; await nextTick(); assert.equal(second.volume, .7);
   } finally { f.app.unmount(); }
+});
+
+test("screen-share player dimensions follow source orientation and stay inside the viewport bounds", () => {
+  assert.deepEqual(calculateScreenSharePlayerSize(1080, 1920, 1100, 720), { width: 405, height: 720 });
+  assert.deepEqual(calculateScreenSharePlayerSize(1920, 1080, 1100, 720), { width: 1100, height: 618 });
+  assert.equal(calculateScreenSharePlayerSize(0, 1080, 1100, 720), null);
 });
 
 test("unmount detaches video and retires a pending binding without stopping its stream", async t => {
