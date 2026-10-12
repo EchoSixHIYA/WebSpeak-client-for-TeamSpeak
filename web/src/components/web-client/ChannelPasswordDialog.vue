@@ -81,7 +81,7 @@
               v-if="busy"
               class="button-spinner"
             ></span
-            ><span>{{ t("channelPasswordSubmit") }}</span
+            ><span>{{ submitLabel ?? t("channelPasswordSubmit") }}</span
             ><Icon
               v-if="!busy"
               name="chevron-right"
@@ -97,7 +97,7 @@ import { ref } from "vue";
 import Icon from "../Icon.vue";
 import { useDialogFocus } from "../../composables/useDialogFocus.js";
 
-defineProps<{ busy: boolean; error: string; t: (key: string) => string }>();
+defineProps<{ busy: boolean; error: string; submitLabel?: string; t: (key: string) => string }>();
 const password = defineModel<string>({ required: true });
 const emit = defineEmits<{ cancel: []; submit: [] }>();
 const dialog = ref<HTMLElement | null>(null);

@@ -73,7 +73,7 @@
             type="submit"
             class="primary-button channel-password-submit"
             :disabled="!password"
-            ><span>{{ t("serverPasswordRetry") }}</span
+            ><span>{{ submitLabel ?? t("serverPasswordRetry") }}</span
             ><Icon
               name="chevron-right"
               :size="17" /></button
@@ -88,7 +88,7 @@ import { ref } from "vue";
 import Icon from "../Icon.vue";
 import { useDialogFocus } from "../../composables/useDialogFocus.js";
 
-defineProps<{ errorCode: string; t: (key: string) => string }>();
+defineProps<{ errorCode: string; submitLabel?: string; t: (key: string) => string }>();
 const password = defineModel<string>({ required: true });
 const emit = defineEmits<{ cancel: []; submit: [] }>();
 const dialog = ref<HTMLElement | null>(null);

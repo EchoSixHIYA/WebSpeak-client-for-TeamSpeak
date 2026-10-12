@@ -919,6 +919,7 @@
       v-model="channelPasswordDialog.password"
       :busy="channelPasswordDialog.submitting"
       :error="channelPasswordDialog.error"
+      :submit-label="activeSkin?.id === BUILTIN_KAAK_SKIN_ID ? t('passwordDialogConfirm') : undefined"
       :t="t"
       @cancel="cancelChannelPassword"
       @submit="submitChannelPassword"
@@ -929,6 +930,7 @@
       v-if="serverPasswordDialog.open"
       v-model="serverPasswordDialog.password"
       :error-code="serverPasswordDialog.errorCode"
+      :submit-label="activeSkin?.id === BUILTIN_KAAK_SKIN_ID ? t('passwordDialogConfirm') : undefined"
       :t="t"
       @cancel="cancelFavoriteServerPassword"
       @submit="submitServerPassword"
@@ -1018,7 +1020,7 @@ import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
 import { isQuickServerAddressLabel, type QuickServer } from "../services/quick-servers.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
-import { isPublicSkinEnabled } from "../services/skin-catalog.js";
+import { BUILTIN_KAAK_SKIN_ID, isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
