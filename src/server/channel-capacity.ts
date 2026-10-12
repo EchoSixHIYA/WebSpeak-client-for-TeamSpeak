@@ -3,6 +3,10 @@ export interface ChannelCapacity {
   maxClientsLimited: boolean;
 }
 
+export interface ChannelPasswordProtection {
+  passwordProtected: boolean;
+}
+
 const UINT64_MAX = 18_446_744_073_709_551_615n;
 
 function parseChannelId(value: string | undefined): bigint | null {
@@ -32,6 +36,44 @@ export function parseChannelCapacities(rows: readonly Record<string, string>[]):
     if (id !== null && capacity) capacities.set(id, capacity);
   }
   return capacities;
+}
+
+/** The password flag reveals whether a password is required, never the password itself. */
+export function parseChannelPasswordProtection(row: Record<string, string>): boolean | null {
+  if (row.channel_flag_password === "1") return true;
+  if (row.channel_flag_password === "0") return false;
+  return null;
+}
+
+export function parseChannelPasswordProtections(rows: readonly Record<string, string>[]): Map<bigint, boolean> {
+  const protections = new Map<bigint, boolean>();
+  for (const row of rows) {
+    const id = parseChannelId(row.cid);
+    const passwordProtected = parseChannelPasswordProtection(row);
+    if (id !== null && passwordProtected !== null) protections.set(id, passwordProtected);
+  }
+  return protections;
+}
+
+/** Keep the password-required flag current as channels are created or edited. */
+export function applyChannelPasswordProtectionNotification(
+  name: string,
+  params: Record<string, string>,
+  protections: Map<bigint, boolean>,
+): { channelId: bigint; passwordProtected: boolean } | null {
+  const id = parseChannelId(params.cid);
+  if (id === null) return null;
+
+  if (name === "notifychanneldeleted") {
+    protections.delete(id);
+    return null;
+  }
+  if (name !== "notifychannelcreated" && name !== "notifychanneledited") return null;
+
+  const passwordProtected = parseChannelPasswordProtection(params);
+  if (passwordProtected === null) return null;
+  protections.set(id, passwordProtected);
+  return { channelId: id, passwordProtected };
 }
 
 /** Keep capacity metadata in step with TeamSpeak's incremental channel events. */

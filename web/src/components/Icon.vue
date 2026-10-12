@@ -38,6 +38,10 @@
     </template>
     <path v-else-if="name === 'headset'" d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v5H5a1 1 0 0 1-1-1zm16 0h-3v5h2a1 1 0 0 1-1-1z" />
     <path v-else-if="name === 'volume'" d="M4 10v4h3l4 3V7l-4 3zm10.5-2.5a6 6 0 0 1 0 9m2-11a9 9 0 0 1 0 13" />
+    <template v-else-if="name === 'speaker'">
+      <path d="M3 9v6h4l5 4V5L7 9H3Z" fill="currentColor" stroke="none" />
+      <path d="M16 9a4 4 0 0 1 0 6m2.5-8.5a7.5 7.5 0 0 1 0 11" />
+    </template>
     <path v-else-if="name === 'volume-off'" d="m4 4 16 16M4 10v4h3l4 3V7l-4 3z" />
     <template v-else-if="name === 'search'">
       <circle cx="10.8" cy="10.8" r="6.8" />

@@ -72,6 +72,7 @@ function channel(value: unknown): value is ChannelInfo {
     && text(value.name) && optional(value.order, text) && optional(value.description, text)
     && optional(value.maxClients, maximum => finite(maximum) && Number.isInteger(maximum) && maximum >= 0 && maximum <= 65_535)
     && optional(value.maxClientsLimited, boolean)
+    && optional(value.passwordProtected, boolean)
     && (value.maxClients === undefined) === (value.maxClientsLimited === undefined)
     && optional(value.members, members => arrayOf(members, member));
 }

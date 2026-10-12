@@ -11,6 +11,7 @@ export function mapChannelTree(snapshot: TSDirectorySnapshot, avatarCache = new 
     ...(typeof channel.maxClients === "number" && typeof channel.maxClientsLimited === "boolean"
       ? { maxClients: channel.maxClients, maxClientsLimited: channel.maxClientsLimited }
       : {}),
+    ...(typeof channel.passwordProtected === "boolean" ? { passwordProtected: channel.passwordProtected } : {}),
     members: snapshot.clients
       .filter((client) => client.channelID === channel.id)
       .map((client) => {

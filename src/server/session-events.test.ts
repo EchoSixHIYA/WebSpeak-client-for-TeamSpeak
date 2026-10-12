@@ -98,6 +98,24 @@ test("channel changes preserve large identifiers and publish only actual create,
   assert.equal(f.events.length, 0);
 });
 
+test("live channel password changes update and publish the lock state without a full tree refresh", t => {
+  const f = fixture(t);
+  f.client.emit("directorySnapshot", snapshot(member(1)));
+  f.coordinator.syncSelf(); f.phase.published = true;
+
+  f.client.emit("channelPasswordProtectionChanged", { channelId: 2n, passwordProtected: true });
+  assert.equal(f.state.channelTree.find(item => item.id === "2")?.passwordProtected, true);
+  let published = f.messages.at(-1);
+  assert.equal(published?.type, "channelList");
+  if (published?.type === "channelList") assert.equal(published.channels.find(item => item.id === "2")?.passwordProtected, true);
+
+  f.client.emit("channelPasswordProtectionChanged", { channelId: 2n, passwordProtected: false });
+  assert.equal(f.state.channelTree.find(item => item.id === "2")?.passwordProtected, false);
+  published = f.messages.at(-1);
+  assert.equal(published?.type, "channelList");
+  if (published?.type === "channelList") assert.equal(published.channels.find(item => item.id === "2")?.passwordProtected, false);
+});
+
 test("reset rejects backoff events and close detaches only owned listeners including captured callbacks", t => {
   const f = fixture(t);
   f.client.emit("directorySnapshot", snapshot(member(1), member(2)));

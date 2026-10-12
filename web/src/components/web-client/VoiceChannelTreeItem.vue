@@ -25,7 +25,8 @@
         class="ws-voice-channel-row"
         data-ws-part="voice.channel-tree.row"
         :data-drag-over="memberDragDrop && dragOverChannelId === node.channel.id ? 'true' : undefined"
-        :title="`双击或按 Enter 加入 ${node.channel.name} / Double-click or press Enter to join`"
+        :title="`双击或按 Enter 加入 ${node.channel.name} / Double-click or press Enter to join${node.channel.passwordProtected ? ' · 需要频道密码 / Channel password required' : ''}`"
+        :data-password-protected="node.channel.passwordProtected ? 'true' : undefined"
         @click="emit('select', node.channel.id)"
         @dblclick.stop.prevent="join"
         @keydown.enter.prevent.stop="join"
@@ -33,7 +34,13 @@
         @dragleave="handleChannelDragLeave($event)"
         @drop="handleChannelDrop($event)"
       >
-        <Icon class="ws-voice-channel-type" data-ws-part="voice.channel-tree.icon" name="volume" :size="14" />
+        <Icon
+          class="ws-voice-channel-type"
+          data-ws-part="voice.channel-tree.icon"
+          :name="node.channel.passwordProtected ? 'lock' : 'speaker'"
+          :data-password-protected="node.channel.passwordProtected ? 'true' : 'false'"
+          :size="14"
+        />
         <span class="ws-voice-channel-name" data-ws-part="voice.channel-tree.name">{{ node.channel.name }}</span>
         <span v-if="selected && !current" class="ws-voice-channel-join-hint" data-ws-part="voice.channel-tree.join-hint">双击加入</span>
         <span class="ws-voice-channel-count" data-ws-part="voice.channel-tree.count">

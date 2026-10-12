@@ -65,7 +65,7 @@
           @click="emit('selectChannel', channelItem)"
         >
           <Icon
-            name="volume"
+            :name="channelItem.passwordProtected ? 'lock' : 'speaker'"
             :size="16"
           />
           <span>{{ channelItem.name }}</span>

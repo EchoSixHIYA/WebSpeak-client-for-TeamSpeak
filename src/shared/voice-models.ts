@@ -23,6 +23,8 @@ export interface ChannelInfo {
   maxClients?: number;
   /** False means the channel has no individual client limit. */
   maxClientsLimited?: boolean;
+  /** TeamSpeak's public channel flag; absent when the connected server omits it. */
+  passwordProtected?: boolean;
   members?: ChannelMember[];
 }
 

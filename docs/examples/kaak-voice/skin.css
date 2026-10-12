@@ -756,7 +756,7 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.voice-stage-heading-item"] { display: contents; }
-[data-ws-plugin-part="kaak-workspace.voice-stage-glyph"] { color: var(--skin-kaak-muted); font-size: 17px; }
+[data-ws-plugin-part="kaak-workspace.voice-stage-glyph"] { color: var(--skin-kaak-muted); font-family: "Segoe UI Symbol", "Apple Symbols", sans-serif; font-size: 15px; filter: grayscale(1); }
 [data-ws-plugin-part="kaak-workspace.voice-stage-title"] { min-width: 0; margin: 0; overflow: hidden; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 [data-ws-plugin-part="kaak-workspace.voice-stage-member-count"] { color: var(--skin-kaak-muted); font-size: 12px; }
 [data-ws-plugin-part="kaak-workspace.voice-stage-member-count"]::before { content: "-"; margin-right: 6px; color: var(--skin-kaak-dim); }

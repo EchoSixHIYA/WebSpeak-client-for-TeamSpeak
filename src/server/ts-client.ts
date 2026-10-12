@@ -20,7 +20,14 @@ import { describeTeamSpeakError, normalizeTeamSpeakError, normalizeTeamSpeakKick
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { createAccelerationRelayClient, type AccelerationRelayClient, type AccelerationRelayOptions } from "./acceleration-relay.js";
-import { applyChannelCapacityNotification, parseChannelCapacities, type ChannelCapacity } from "./channel-capacity.js";
+import {
+  applyChannelCapacityNotification,
+  applyChannelPasswordProtectionNotification,
+  parseChannelCapacities,
+  parseChannelPasswordProtections,
+  type ChannelCapacity,
+  type ChannelPasswordProtection,
+} from "./channel-capacity.js";
 
 export interface TSClientOptions {
   target: TeamSpeakTarget;
@@ -62,7 +69,7 @@ const MAX_SERVER_ICON_BYTES = 128 * 1024;
 const MAX_SERVER_BANNER_URL_LENGTH = 2_048;
 const MAX_SERVER_WELCOME_MESSAGE_LENGTH = 4_096;
 
-export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity>;
+export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity> & Partial<ChannelPasswordProtection>;
 export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
 export type TSDirectoryClient = DirectoryClientInfo;
 export type TSRawNotification = RawNotification;
@@ -108,6 +115,7 @@ export class TSClient extends EventEmitter {
   private preferredChannelId = 0n;
   private accelerationClient: AccelerationRelayClient | null = null;
   private readonly channelCapacities = new Map<bigint, ChannelCapacity>();
+  private readonly channelPasswordProtection = new Map<bigint, boolean>();
   // Reason id of the most recent self leave, kept so the SDK `kicked` event can
   // tell a plain kick (4) from a kick with ban (5). The SDK only forwards the
   // reason message to its `kicked` handler, not the reason id.
@@ -126,6 +134,7 @@ export class TSClient extends EventEmitter {
     this.inputStateQueue = Promise.resolve();
     this.selfLeaveReasonId = null;
     this.channelCapacities.clear();
+    this.channelPasswordProtection.clear();
     if (!this.adapter || !this.client) {
       let transportTarget = this.options.target;
       if (this.options.acceleration && !this.accelerationClient) {
@@ -184,14 +193,19 @@ export class TSClient extends EventEmitter {
         // The high-level SDK directory type intentionally omits channel limit
         // metadata. Its raw client-protocol rows still include the public
         // maximum-client properties, so retain those without another SDK API.
-        const rows = await client.execCommandWithResponse("channellist", 5_000);
+        // TeamSpeak only includes channel flag fields (including the public
+        // password-required bit) when the client asks for flags explicitly.
+        const rows = await client.execCommandWithResponse("channellist -flags", 5_000);
         const capacities = parseChannelCapacities(rows);
         for (const [id, capacity] of capacities) this.channelCapacities.set(id, capacity);
+        for (const [id, passwordProtected] of parseChannelPasswordProtections(rows)) {
+          this.channelPasswordProtection.set(id, passwordProtected);
+        }
       } catch (error: unknown) {
         this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not read TeamSpeak channel limits");
       }
       this.emit("directorySnapshot", {
-        channels: channels.map((channel) => ({ ...channel, ...this.channelCapacities.get(channel.id) })),
+        channels: this.applyChannelMetadata(channels),
         clients,
       });
     } catch (error: unknown) {
@@ -356,7 +370,7 @@ export class TSClient extends EventEmitter {
     client.on("directorySnapshot", (snapshot) => {
       if (this.client !== client) return;
       this.emit("directorySnapshot", {
-        channels: snapshot.channels.map((channel) => ({ ...channel, ...this.channelCapacities.get(channel.id) })),
+        channels: this.applyChannelMetadata(snapshot.channels),
         clients: snapshot.clients.slice(),
       });
     });
@@ -364,6 +378,12 @@ export class TSClient extends EventEmitter {
     client.on("rawNotification", (notification: RawNotification) => {
       if (this.client !== client) return;
       applyChannelCapacityNotification(notification.name, notification.params, this.channelCapacities);
+      const protectionChange = applyChannelPasswordProtectionNotification(
+        notification.name,
+        notification.params,
+        this.channelPasswordProtection,
+      );
+      if (protectionChange) this.emit("channelPasswordProtectionChanged", protectionChange);
       this.emit("rawNotification", {
         name: notification.name,
         params: { ...notification.params },
@@ -395,6 +415,7 @@ export class TSClient extends EventEmitter {
       this.connected = false;
       this.clientId = 0;
       this.channelCapacities.clear();
+      this.channelPasswordProtection.clear();
       this.emit("disconnected", err);
     });
 
@@ -589,6 +610,16 @@ export class TSClient extends EventEmitter {
       this.client = null;
       this.clientId = 0;
     }
+  }
+
+  private applyChannelMetadata(channels: readonly TSDirectoryChannel[]): TSDirectoryChannel[] {
+    return channels.map((channel) => ({
+      ...channel,
+      ...this.channelCapacities.get(channel.id),
+      ...(this.channelPasswordProtection.has(channel.id)
+        ? { passwordProtected: this.channelPasswordProtection.get(channel.id)! }
+        : {}),
+    }));
   }
 }
 

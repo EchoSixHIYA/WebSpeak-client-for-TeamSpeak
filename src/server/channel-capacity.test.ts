@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyChannelCapacityNotification, parseChannelCapacities } from "./channel-capacity.js";
+import {
+  applyChannelCapacityNotification,
+  applyChannelPasswordProtectionNotification,
+  parseChannelCapacities,
+  parseChannelPasswordProtections,
+} from "./channel-capacity.js";
 
 test("channel capacity rows keep finite limits and distinguish unlimited channels", () => {
   const capacities = parseChannelCapacities([
@@ -34,4 +39,26 @@ test("channel capacity notifications merge edits and remove deleted channels", (
 
   applyChannelCapacityNotification("notifychanneldeleted", { cid: "2" }, capacities);
   assert.equal(capacities.has(2n), false);
+});
+
+test("channel password protection is parsed as a public boolean and tracks channel edits", () => {
+  const protections = parseChannelPasswordProtections([
+    { cid: "1", channel_flag_password: "1" },
+    { cid: "2", channel_flag_password: "0" },
+    { cid: "3", channel_flag_password: "unknown" },
+    { cid: "18446744073709551616", channel_flag_password: "1" },
+  ]);
+  assert.deepEqual([...protections], [[1n, true], [2n, false]]);
+
+  assert.deepEqual(
+    applyChannelPasswordProtectionNotification("notifychanneledited", { cid: "1", channel_flag_password: "0" }, protections),
+    { channelId: 1n, passwordProtected: false },
+  );
+  assert.deepEqual(
+    applyChannelPasswordProtectionNotification("notifychannelcreated", { cid: "4", channel_flag_password: "1" }, protections),
+    { channelId: 4n, passwordProtected: true },
+  );
+  assert.equal(applyChannelPasswordProtectionNotification("notifychanneldeleted", { cid: "4" }, protections), null);
+  assert.equal(protections.has(4n), false);
+  assert.equal(protections.has(3n), false, "unknown flag values are not interpreted as unlocked");
 });
