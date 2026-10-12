@@ -479,7 +479,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.78");
+  assert.equal(skin.version, "3.1.79");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -670,6 +670,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
   assert.match(skin.css, /grid-template-rows: 40px/);
   assert.match(skin.css, /kaak-workspace\.server-rail"\]\s*\{[\s\S]*?--skin-kaak-rail-bg: #191a1d;[\s\S]*?--skin-kaak-rail-item-bg: #2b2d32;[\s\S]*?--skin-kaak-rail-accent: #75c900;[\s\S]*?gap: 18px;[\s\S]*?padding: 14px 0 96px;[\s\S]*?background: var\(--skin-kaak-rail-bg\);/);
+  assert.match(skin.css, /kaak-workspace\.server-add"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border-radius: 18px;/);
   assert.match(skin.css, /kaak-workspace\.quick-server-item"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;/);
   assert.match(skin.css, /kaak-workspace\.quick-server"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border: 2px solid transparent;[\s\S]*?border-radius: 18px;/);
   assert.match(skin.css, /quick-server\"\]\:hover[\s\S]*?background: #383a40;/);

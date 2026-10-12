@@ -31,6 +31,8 @@
         data-ws-part="voice.server-switcher.item"
         :class="{ 'is-current': server.current }"
         :aria-current="server.current ? 'true' : undefined"
+        :aria-disabled="server.current || server.switchRestricted"
+        :title="server.switchTitle"
         :disabled="server.current"
         @click="switchServer(server)"
       >

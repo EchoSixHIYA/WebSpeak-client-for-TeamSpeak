@@ -59,6 +59,8 @@ export default defineComponent({
     data: { type: Object as PropType<SafeContext>, required: true },
     assets: { type: Object as PropType<Record<string, Blob>>, required: true },
     actions: { type: Object as PropType<Record<string, HostAction>>, required: true },
+    serverAddLabel: { type: String, default: "添加服务器 / Add server" },
+    onAddServer: { type: Function as PropType<() => void>, default: () => undefined },
     widgets: { type: Object as PropType<Partial<Record<SkinPluginHostWidget, HostWidget>>>, default: () => ({}) },
   },
   emits: {
@@ -317,6 +319,16 @@ export default defineComponent({
         if (key.startsWith("data-ws-")) continue;
         attrs[svgAttributeNames[key] ?? key] = typeof value === "string" ? interpolate(value, context, state) : value;
       }
+      if (node.tag === "button" && node.part === "quick-server") {
+        const server = context.server;
+        if (server && typeof server === "object" && !Array.isArray(server)) {
+          const restricted = (server as Record<string, unknown>).switchRestricted === true;
+          if (restricted) delete attrs.disabled;
+          attrs["aria-disabled"] = String(restricted);
+          const switchTitle = (server as Record<string, unknown>).switchTitle;
+          if (typeof switchTitle === "string") attrs.title = switchTitle;
+        }
+      }
       if (node.asset) {
         const url = assetUrl(node.asset);
         if (url) attrs.src = url;
@@ -358,6 +370,25 @@ export default defineComponent({
       }
       if (node.tag === "form" && !node.events?.submit) attrs.onSubmit = (event: Event) => event.preventDefault();
       const children = (node.children ?? []).map((child, index) => renderNode(component, child, context, state, budget, false, `${nodePath}-${index}`));
+      if (props.page === "voice" && node.tag === "nav" && ["server-rail", "quick-rail"].includes(node.part ?? "")) {
+        children.push(h("span", {
+          class: "ws-plugin-server-add-divider",
+          "data-ws-part": "voice.favorite-servers.skin-add-divider",
+          "aria-hidden": "true",
+        }));
+        children.push(h("button", {
+          type: "button",
+          class: "ws-plugin-server-add",
+          "data-ws-plugin-part": `${component.id}.server-add`,
+          "data-ws-part": `skin.voice.${component.id}.control-part-server-add`,
+          "aria-label": props.serverAddLabel,
+          title: props.serverAddLabel,
+          onClick: (event: Event) => {
+            if (!event.isTrusted) return;
+            props.onAddServer?.();
+          },
+        }, [h("span", { "aria-hidden": "true" }, "+")]));
+      }
       // Custom element names are inert host-rendered placeholders. Never instantiate a page-registered
       // custom element from generated output, since its connectedCallback would run with page privileges.
       const tag = node.tag.includes("-") ? "div" : node.tag;

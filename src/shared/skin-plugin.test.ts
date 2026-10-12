@@ -102,6 +102,7 @@ test("replacing a built-in public page requires an explicit user approval capabi
 
 test("custom surfaces can safely render and switch unified favorite and recent server entries", () => {
   const document = validDocument();
+  document.schemaVersion = 3;
   document.components[0].permissions = ["servers.quickList.read", "servers.quickList.switch"];
   document.components[0].actions = {
     switch: { type: "quickServers.switch", args: { quickServerId: "{{server.id}}" } },
@@ -109,10 +110,17 @@ test("custom surfaces can safely render and switch unified favorite and recent s
   document.components[0].root = {
     tag: "nav",
     repeat: { path: "servers.quickList", as: "server" },
-    children: [{ tag: "button", events: { dblclick: "switch" }, children: [{ text: "{{server.label}}" }] }],
+    children: [{
+      tag: "button",
+      attributes: { "aria-disabled": "{{server.switchRestricted}}", title: "{{server.switchTitle}}" },
+      events: { dblclick: "switch" },
+      children: [{ text: "{{server.label}}" }],
+    }],
   };
   const parsed = parseSkinPluginDocument(document).components[0];
   assert.equal(parsed.root.repeat?.path, "servers.quickList");
+  assert.equal(parsed.root.children?.[0].attributes?.["aria-disabled"], "{{server.switchRestricted}}");
+  assert.equal(parsed.root.children?.[0].attributes?.title, "{{server.switchTitle}}");
   assert.equal(parsed.actions.switch.type, "quickServers.switch");
 
   document.components[0].permissions = ["servers.quickList.read"];

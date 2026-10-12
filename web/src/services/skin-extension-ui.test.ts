@@ -217,6 +217,109 @@ test("generated SVG restores case-sensitive standard attribute names in host-ren
   assert.match(html, /gradientUnits="userSpaceOnUse"/);
 });
 
+test("host adds a trusted server-add control to custom server rails in every skin", async () => {
+  for (const part of ["server-rail", "quick-rail"]) {
+    const html = await renderToString(createSSRApp(SkinPluginOutlet, {
+      skinId: "community.server-add-test",
+      skinVersion: "1.0.0",
+      document: { schemaVersion: 3, components: [] },
+      extensionOutput: generatedOutput("voice-workspace", { tag: "nav", part, children: [] }),
+      page: "voice",
+      data: {},
+      assets: {},
+      actions: {},
+      serverAddLabel: "Add server",
+    }));
+    assert.match(html, /data-ws-plugin-part="voice-workspace\.server-add"/);
+    assert.match(html, /aria-label="Add server"/);
+  }
+
+  const homeHtml = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.server-add-test",
+    skinVersion: "1.0.0",
+    document: { schemaVersion: 3, components: [] },
+    extensionOutput: generatedOutput("home-workspace", { tag: "nav", part: "server-rail", children: [] }),
+    page: "home",
+    data: {},
+    assets: {},
+    actions: {},
+  }));
+  assert.doesNotMatch(homeHtml, /\.server-add/);
+
+  const restrictedQuickServerHtml = await renderToString(createSSRApp(SkinPluginOutlet, {
+    skinId: "community.server-add-test",
+    skinVersion: "1.0.0",
+    document: { schemaVersion: 3, components: [] },
+    extensionOutput: generatedOutput("voice-workspace", {
+      tag: "nav",
+      part: "server-rail",
+      children: [{ tag: "button", part: "quick-server", attributes: { type: "button", disabled: true } }],
+    }),
+    page: "voice",
+    data: { server: { switchRestricted: true, switchTitle: "管理员不允许切换TS服务器" } },
+    assets: {},
+    actions: {},
+  }));
+  assert.match(restrictedQuickServerHtml, /aria-disabled="true"/);
+  assert.match(restrictedQuickServerHtml, /title="管理员不允许切换TS服务器"/);
+  assert.doesNotMatch(restrictedQuickServerHtml, /\sdisabled(?:="(?:true|disabled)?")?(?:\s|>)/);
+
+  type HostNode = { type: string; props: Record<string, unknown>; text: string; children: HostNode[]; parent?: HostNode };
+  const createHostNode = (type: string, text = ""): HostNode => ({ type, props: {}, text, children: [] });
+  const renderer = createRenderer<HostNode, HostNode>({
+    patchProp(node, key, _previous, next) { node.props[key] = next; },
+    insert(node, parent, anchor) {
+      node.parent = parent;
+      const oldIndex = parent.children.indexOf(node);
+      if (oldIndex >= 0) parent.children.splice(oldIndex, 1);
+      const anchorIndex = anchor ? parent.children.indexOf(anchor) : -1;
+      parent.children.splice(anchorIndex >= 0 ? anchorIndex : parent.children.length, 0, node);
+    },
+    remove(node) {
+      if (!node.parent) return;
+      const index = node.parent.children.indexOf(node);
+      if (index >= 0) node.parent.children.splice(index, 1);
+      node.parent = undefined;
+    },
+    createElement: (type) => createHostNode(type),
+    createText: (text) => createHostNode("#text", text),
+    createComment: (text) => createHostNode("#comment", text),
+    setText(node, text) { node.text = text; },
+    setElementText(node, text) { node.children = []; node.text = text; },
+    parentNode: (node) => node.parent ?? null,
+    nextSibling(node) {
+      if (!node.parent) return null;
+      return node.parent.children[node.parent.children.indexOf(node) + 1] ?? null;
+    },
+  });
+  let addCount = 0;
+  const app = renderer.createApp(SkinPluginOutlet, {
+    skinId: "community.server-add-test",
+    skinVersion: "1.0.0",
+    document: { schemaVersion: 3, components: [] },
+    extensionOutput: generatedOutput("voice-workspace", { tag: "nav", part: "server-rail", children: [] }),
+    page: "voice",
+    data: {},
+    assets: {},
+    actions: {},
+    onAddServer: () => { addCount += 1; },
+  });
+  const host = createHostNode("root");
+  app.mount(host);
+  await nextTick();
+  const findAddButton = (node: HostNode): HostNode | undefined => {
+    if (node.type === "button" && node.props["data-ws-plugin-part"] === "voice-workspace.server-add") return node;
+    return node.children.map(findAddButton).find(Boolean);
+  };
+  const addButton = findAddButton(host);
+  assert.ok(addButton);
+  (addButton.props.onClick as (event: Event) => void)({ isTrusted: false } as Event);
+  assert.equal(addCount, 0, "synthetic events cannot open the host dialog");
+  (addButton.props.onClick as (event: Event) => void)({ isTrusted: true } as Event);
+  assert.equal(addCount, 1, "a trusted click opens the existing host add-server flow");
+  app.unmount();
+});
+
 test("generated UI can exceed the former 16 KiB output ceiling while staying within the new package-sized limit", () => {
   const source = JSON.stringify({
     schemaVersion: 4,

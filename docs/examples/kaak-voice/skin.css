@@ -236,6 +236,42 @@
   flex: 0 0 58px;
 }
 
+[data-ws-plugin-part="kaak-workspace.server-add"] {
+  display: grid;
+  box-sizing: border-box;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  color: #aeb2ba;
+  background: var(--skin-kaak-rail-item-bg);
+  font-family: var(--skin-kaak-font);
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-add"]:hover,
+[data-ws-plugin-part="kaak-workspace.server-add"]:focus-visible {
+  color: var(--skin-kaak-rail-text);
+  background: #383a40;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-add"]:focus-visible {
+  outline: 2px solid #f0f1f3;
+  outline-offset: 3px;
+}
+
+[data-ws-plugin-part="kaak-workspace.quick-server"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
 [data-ws-plugin-part="kaak-workspace.quick-server"] {
   position: relative;
   display: grid;

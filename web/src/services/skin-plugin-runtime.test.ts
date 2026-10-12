@@ -8,6 +8,7 @@ import {
   revokeSkinPluginApprovals,
 } from "./skin-plugin-approval.js";
 import { createSkinPluginQuickServerProjection } from "./skin-plugin-context.js";
+import { webClientTranslations } from "../i18n/web-client.js";
 import "./skin-plugin-asset-urls.test.js";
 
 function surfaceDocument(): SkinPluginDocument {
@@ -74,6 +75,7 @@ test("skin quick-server data redacts connection targets and resolves only host-g
     ["Recent 2", "recent", false, false],
     ["Friends", "favorite", true, true],
   ]);
+  assert.ok(rows.every(({ switchRestricted, switchTitle }) => !switchRestricted && typeof switchTitle === "string"));
   assert.equal(JSON.stringify(rows).includes("192.0.2.10"), false);
   assert.equal(JSON.stringify(rows).includes("voice.example"), false);
   const friendsTone = rows.find(({ label }) => label === "Friends")?.tone;
@@ -82,6 +84,10 @@ test("skin quick-server data redacts connection targets and resolves only host-g
   assert.equal(reorderedTone, friendsTone, "a server keeps its color tone when its saved-list position changes");
   assert.equal(projection.resolve("opaque-1")?.address, "192.0.2.10:9987");
   assert.equal(projection.resolve("192.0.2.10:9987"), undefined);
+
+  const restricted = projection.project(servers, () => false, true, "管理员不允许切换TS服务器");
+  assert.ok(restricted.every(({ switchRestricted, switchTitle }) => switchRestricted && switchTitle === "管理员不允许切换TS服务器"));
+  assert.equal(JSON.stringify(restricted).includes("192.0.2.10"), false);
 });
 
 test("skin quick-server projection uses the TeamSpeak name and public icon while keeping its target private", () => {
@@ -115,4 +121,9 @@ test("skin quick-server projection does not expose a network target used as the 
   assert.equal(server.label, "Favorite 1");
   assert.equal(server.monogram, "F");
   assert.equal(JSON.stringify(server).includes("server.example.invalid"), false);
+});
+
+test("fixed-mode server controls use the requested Chinese restriction messages", () => {
+  assert.equal(webClientTranslations.zh.serverFeatureAdminDisabled, "该功能已被管理员关闭");
+  assert.equal(webClientTranslations.zh.serverSwitchRestricted, "管理员不允许切换TS服务器");
 });

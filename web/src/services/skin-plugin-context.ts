@@ -8,6 +8,8 @@ export interface SkinPluginQuickServer {
   icon: string;
   tone: number;
   current: boolean;
+  switchRestricted: boolean;
+  switchTitle: string;
   kind: "favorite" | "recent";
   favorite: boolean;
 }
@@ -44,7 +46,12 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
   const targetByOpaqueId = new Map<string, QuickServer>();
 
   return {
-    project(servers: readonly QuickServer[], isCurrent: (server: QuickServer) => boolean): SkinPluginQuickServer[] {
+    project(
+      servers: readonly QuickServer[],
+      isCurrent: (server: QuickServer) => boolean,
+      switchRestricted = false,
+      switchRestrictedLabel = "Server switching is restricted by the administrator",
+    ): SkinPluginQuickServer[] {
       const activeServerIds = new Set(servers.map((server) => server.id));
       for (const id of opaqueIdByServerId.keys()) if (!activeServerIds.has(id)) opaqueIdByServerId.delete(id);
       targetByOpaqueId.clear();
@@ -70,6 +77,8 @@ export function createSkinPluginQuickServerProjection(createId: () => string = r
           icon: isSafeQuickServerIcon(server.serverIcon) ? server.serverIcon : "",
           tone: safeLabelTone(safeLabel),
           current: isCurrent(server),
+          switchRestricted,
+          switchTitle: switchRestricted ? switchRestrictedLabel : safeLabel,
           kind: server.isFavorite ? "favorite" : "recent",
           favorite: server.isFavorite,
         };

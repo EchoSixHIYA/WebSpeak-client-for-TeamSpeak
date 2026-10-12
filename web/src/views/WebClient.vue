@@ -20,6 +20,8 @@
       :data="skinPluginContext"
       :assets="activeSkin.assets"
       :actions="skinPluginActions"
+      :server-add-label="t('addFavoriteServer')"
+      :on-add-server="openFavoriteServerDialog"
       :widgets="skinPluginWidgets"
       @surface-change="skinPluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"
@@ -45,6 +47,8 @@
       :mount-revision="accessMode"
       :context="skinPluginContext"
       :actions="skinPluginActions"
+      :server-add-label="t('addFavoriteServer')"
+      :on-add-server="openFavoriteServerDialog"
       :widgets="skinPluginWidgets"
       :read-session-status="readSkinRuntimeSessionStatus"
       @surface-change="skinRuntimePluginSurfaceActive = $event"
@@ -334,12 +338,11 @@
       v-else-if="showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       :class="['app-shell', `mobile-view-${mobileSection}`]"
       :data-performance-open="performancePanelOpen ? 'true' : 'false'"
-      :data-favorite-rail="accessMode === 'open' ? 'true' : 'false'"
+      :data-favorite-rail="'true'"
       data-ws-part="voice.shell"
       @click="memberMenu = null"
     >
       <aside
-        v-if="accessMode === 'open'"
         class="favorite-server-rail"
         data-ws-part="voice.favorite-servers.rail"
         :aria-label="t('quickServers')"
@@ -359,10 +362,11 @@
               data-ws-part="voice.favorite-servers.server"
               :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
               :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
-              :title="server.label + '\n' + server.address"
               :aria-label="t('switchToServer', { server: server.label })"
               :aria-pressed="isQuickServerTarget(server)"
               :disabled="voiceState.connecting"
+              :aria-disabled="!serverCanSwitch(server)"
+              :title="serverCanSwitch(server) ? server.label + '\n' + server.address : t('serverSwitchRestricted')"
               @click.stop="connectQuickServer(server)"
             >
               <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span>
@@ -388,13 +392,12 @@
           data-ws-part="voice.favorite-servers.add"
           :aria-label="t('addFavoriteServer')"
           :title="t('addFavoriteServer')"
-          @click.stop="favoriteServerDialogOpen = true"
+          @click.stop="openFavoriteServerDialog"
         ><Icon name="plus" :size="20" /></button>
         <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.after"></div>
       </aside>
 
       <nav
-        v-if="accessMode === 'open'"
         class="favorite-server-strip"
         data-ws-part="voice.favorite-servers.strip"
         :aria-label="t('quickServers')"
@@ -414,6 +417,8 @@
           :aria-label="t('switchToServer', { server: server.label })"
           :aria-pressed="isQuickServerTarget(server)"
           :disabled="voiceState.connecting"
+          :aria-disabled="!serverCanSwitch(server)"
+          :title="serverCanSwitch(server) ? server.label : t('serverSwitchRestricted')"
           @click="connectQuickServer(server)"
         ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span><span>{{ server.label }}</span></button
           ><button
@@ -433,7 +438,7 @@
           data-ws-part="voice.favorite-servers.strip.add"
           :aria-label="t('addFavoriteServer')"
           :title="t('addFavoriteServer')"
-          @click="favoriteServerDialogOpen = true"
+          @click="openFavoriteServerDialog"
         ><Icon name="plus" :size="18" /></button>
       </nav>
 
@@ -1455,6 +1460,10 @@ function isQuickServerTarget(server: QuickServer): boolean {
   return server.id === currentServerTarget().toLocaleLowerCase();
 }
 
+function serverCanSwitch(_server: QuickServer): boolean {
+  return accessMode.value === "open";
+}
+
 const quickServersForDisplay = computed(() => quickServers.value.map((server) => {
   const liveInfo = isQuickServerTarget(server) ? voiceServerInfo.value : null;
   const serverName = liveInfo?.name.trim() || server.serverName;
@@ -1470,7 +1479,11 @@ const quickServersForDisplay = computed(() => quickServers.value.map((server) =>
 }));
 
 function connectQuickServer(server: QuickServer): void {
-  if (accessMode.value !== "open" || voiceState.connecting || (voiceState.connected && isQuickServerTarget(server))) return;
+  if (voiceState.connecting || (voiceState.connected && isQuickServerTarget(server))) return;
+  if (accessMode.value !== "open") {
+    showToast(t("serverSwitchRestricted"));
+    return;
+  }
   const target = splitTeamSpeakTarget(server.address);
   serverHost.value = target.address;
   serverPort.value = target.port || DEFAULT_TEAM_SPEAK_PORT;
@@ -1517,6 +1530,15 @@ function toggleQuickFavorite(server: QuickServer): void {
   void toggleQuickServerFavorite(server);
 }
 
+function openFavoriteServerDialog(): void {
+  if (accessMode.value !== "open") {
+    showToast(t("serverFeatureAdminDisabled"));
+    return;
+  }
+  if (!showVoiceShell.value || voiceState.connecting || favoriteDialogBusy.value) return;
+  favoriteServerDialogOpen.value = true;
+}
+
 async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<void> {
   if (favoriteDialogBusy.value || voiceState.connecting || accessMode.value !== "open") return;
   const port = draft.port || DEFAULT_TEAM_SPEAK_PORT;
@@ -1552,7 +1574,12 @@ async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<vo
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
 
 const skinPluginQuickServers = createSkinPluginQuickServerProjection();
-const skinPluginQuickList = computed(() => skinPluginQuickServers.project(quickServersForDisplay.value, isQuickServerTarget));
+const skinPluginQuickList = computed(() => skinPluginQuickServers.project(
+  quickServersForDisplay.value,
+  isQuickServerTarget,
+  accessMode.value !== "open",
+  t("serverSwitchRestricted"),
+));
 const currentServerDisplayName = computed(() => {
   const target = currentServerTarget();
   const liveName = safeSkinServerDisplayName(voiceServerInfo.value?.name ?? "", target);
@@ -1657,7 +1684,10 @@ const readSkinRuntimeSessionStatus = (_signal: AbortSignal) => ({
 });
 
 function switchQuickServerByOpaqueId(quickServerId: string): void {
-  if (accessMode.value !== "open") return;
+  if (accessMode.value !== "open") {
+    showToast(t("serverSwitchRestricted"));
+    return;
+  }
   const target = skinPluginQuickServers.resolve(quickServerId);
   if (target && quickServers.value.some((server) => server.id === target.id)) connectQuickServer(target);
 }
