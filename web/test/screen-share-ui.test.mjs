@@ -6,11 +6,11 @@ import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
 import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
 import { renderToString } from "@vue/server-renderer";
-let vite, useWebClientScreenShare, calculateScreenSharePlayerSize, VoiceMemberCards;
+let vite, useWebClientScreenShare, VoiceMemberCards;
 const renderer = createRenderer({ createComment: text => ({ text }), createText: text => ({ text }), createElement: () => ({}), insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {}, parentNode: () => null, nextSibling: () => null });
 before(async () => {
   vite = await createServer({ configFile: false, plugins: [vue()], root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
-  ({ useWebClientScreenShare, calculateScreenSharePlayerSize } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
+  ({ useWebClientScreenShare } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
   ({ default: VoiceMemberCards } = await vite.ssrLoadModule("/src/components/web-client/VoiceMemberCards.vue"));
 });
 after(async () => { await vite?.close(); });
@@ -41,18 +41,19 @@ test("a newly mounted or replaced video receives the existing stream and volume"
   } finally { f.app.unmount(); }
 });
 
-test("screen-share player dimensions follow source orientation and stay inside the viewport bounds", () => {
-  assert.deepEqual(calculateScreenSharePlayerSize(1080, 1920, 1100, 720), { width: 405, height: 720 });
-  assert.deepEqual(calculateScreenSharePlayerSize(1920, 1080, 1100, 720), { width: 1100, height: 618 });
-  assert.equal(calculateScreenSharePlayerSize(0, 1080, 1100, 720), null);
-});
-
-test("screen-share player keeps a visible fallback width while video metadata is pending", async () => {
+test("screen-share player keeps a fixed 16:9 stage and letterboxes other video ratios in black", async () => {
   const css = await readFile(new URL("../src/styles/web-client.css", import.meta.url), "utf8");
   const component = await readFile(new URL("../src/components/web-client/ScreenSharePlayer.vue", import.meta.url), "utf8");
   const playerRule = css.match(/:deep\(\.screen-share-player\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  const stageRule = css.match(/:deep\(\.screen-share-player-stage\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  const videoRule = css.match(/:deep\(\.screen-share-player-video\)\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.match(playerRule, /width:\s*min\(100%,\s*1100px\)/);
   assert.doesNotMatch(playerRule, /width:\s*fit-content/);
+  assert.match(stageRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(stageRule, /background:\s*#000/);
+  assert.match(videoRule, /object-fit:\s*contain/);
+  assert.match(videoRule, /background:\s*#000/);
+  assert.doesNotMatch(component, /video\.video(?:Width|Height)/, "source dimensions must not resize the fixed player stage");
   assert.doesNotMatch(component, /ResizeObserver/, "player sizing must not create a resize-feedback loop while video starts");
   assert.match(component, /if \(playerElement\.value === next\) return;/, "stable function refs must not rewrite player styles on every render");
   assert.match(component, /if \(stageElement\.value === next\) return;/, "stable function refs must not rewrite stage styles on every render");

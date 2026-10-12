@@ -1682,6 +1682,8 @@
   background: #20251e;
   box-shadow: 0 5px 16px rgba(0, 0, 0, .42), inset 0 0 0 1px rgba(108, 191, 0, .08);
 }
+[data-ws-plugin-part="kaak-workspace"] [data-ws-part="voice.screen-player.stage"] { background: #000; }
+[data-ws-plugin-part="kaak-workspace"] [data-ws-part="voice.screen-player.video"] { object-fit: contain; background: #000; }
 [data-ws-plugin-part="kaak-workspace.member-cards"] .screen-share-live-indicator::before {
   background: #7bd80a;
   box-shadow: 0 0 0 3px rgba(123, 216, 10, .18);

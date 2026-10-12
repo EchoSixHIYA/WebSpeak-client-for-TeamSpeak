@@ -1,6 +1,6 @@
 # ILLUSIA风
 
-ILLUSIA 风格 is a schema v3 open-skin example built from the local artwork in [illusia-voice/assets](./illusia-voice/assets/). Version 2.0.1 keeps its existing light-glass CSS and current-channel card, and adds matching visual treatment for the host member-card screen-share status and watch action. The package still uses WebSpeak's base translations and contains no executable skin code.
+ILLUSIA 风格 is a schema v3 open-skin example built from the local artwork in [illusia-voice/assets](./illusia-voice/assets/). Version 2.0.2 keeps its existing light-glass CSS and current-channel card, adds matching visual treatment for the host member-card screen-share status and watch action, and uses a black letterbox background for the fixed WebSpeak screen-share player. The package still uses WebSpeak's base translations and contains no executable skin code.
 
 The new voice-page component is defined in [components.json](./illusia-voice/components.json). It reads only the current public channel name through session.status.read and uses a local mascot image for a compact, non-interactive glass badge. The component needs the user's local approval before it renders; that approval is scoped to this skin version and can be revoked from the host access control. It cannot switch channels, read favorites, access a server address, or control audio.
 

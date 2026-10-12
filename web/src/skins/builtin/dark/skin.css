@@ -277,6 +277,8 @@
 .ws-skin-root[data-ws-skin="builtin.dark"] *::-webkit-scrollbar-thumb:hover { background: #69c7bc; }
 
 /* Keep live screen sharing obvious in the built-in dark voice roster. */
+.ws-skin-root[data-ws-skin="builtin.dark"] [data-ws-part="voice.screen-player.stage"] { background: #000; }
+.ws-skin-root[data-ws-skin="builtin.dark"] [data-ws-part="voice.screen-player.video"] { object-fit: contain; background: #000; }
 .ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-live-indicator {
   color: #bdfff1;
   border-color: rgba(105, 210, 199, .48);

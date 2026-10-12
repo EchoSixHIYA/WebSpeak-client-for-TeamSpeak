@@ -891,11 +891,12 @@
 
 [data-ws-part="voice.screen-player.stage"] {
   border-radius: 22px;
-  background: radial-gradient(ellipse at 50% 38%, rgba(248, 255, 255, .98), rgba(220, 246, 250, .92) 58%, rgba(202, 237, 244, .9));
+  background: #000;
 }
 
 [data-ws-part="voice.screen-player.video"] {
-  background: #e5f4f8;
+  object-fit: contain;
+  background: #000;
 }
 
 [data-ws-part="voice.screen-player.placeholder"] {

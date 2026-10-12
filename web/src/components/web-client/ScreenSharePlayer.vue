@@ -117,7 +117,6 @@
 import Icon from "../Icon.vue";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
-import { calculateScreenSharePlayerSize } from "../../composables/useWebClientScreenShare.js";
 const props = defineProps<{
   model: Pick<ReturnType<typeof useWebClientScreenShare>, "fullscreen" | "viewers" | "viewerCount" | "ownerName" | "errorText" | "setPlayerElement" | "setVideoElement" | "viewerStyle" | "setVolume" | "toggleFullscreen">;
   screenShareRemoteStream: MediaStream | null; screenShareRemoteVolume: number; screenShareError: string;
@@ -138,7 +137,6 @@ function setInlineStyle(element: HTMLElement, property: string, value: string | 
 function updateStageSize(): void {
   const stage = stageElement.value;
   const player = playerElement.value ?? stage?.parentElement ?? null;
-  const video = stage?.querySelector("video");
   if (!stage || !player) return;
   if (screenShareFullscreen.value) {
     setInlineStyle(player, "width", "100vw");
@@ -150,24 +148,9 @@ function updateStageSize(): void {
   }
   setInlineStyle(player, "width", null);
   setInlineStyle(player, "height", null);
-  if (!video?.videoWidth || !video.videoHeight) {
-    setInlineStyle(stage, "width", null);
-    setInlineStyle(stage, "height", null);
-    setInlineStyle(stage, "aspect-ratio", "16 / 9");
-    return;
-  }
-  const parentWidth = stage.parentElement?.parentElement?.clientWidth || window.innerWidth;
-  const size = calculateScreenSharePlayerSize(
-    video.videoWidth,
-    video.videoHeight,
-    Math.min(parentWidth, 1100),
-    Math.max(220, Math.min(window.innerHeight - 220, 720)),
-  );
-  if (!size) return;
-  setInlineStyle(player, "width", `${size.width + 2}px`);
-  setInlineStyle(stage, "width", `${size.width}px`);
-  setInlineStyle(stage, "height", `${size.height}px`);
-  setInlineStyle(stage, "aspect-ratio", `${video.videoWidth} / ${video.videoHeight}`);
+  setInlineStyle(stage, "width", null);
+  setInlineStyle(stage, "height", null);
+  setInlineStyle(stage, "aspect-ratio", "16 / 9");
 }
 
 function setPlayerElementNode(element: unknown): void {

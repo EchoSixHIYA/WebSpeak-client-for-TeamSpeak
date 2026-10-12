@@ -9,7 +9,7 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
     id: "builtin.light",
     name: "Day mode",
-    version: "1.0.1",
+    version: "1.0.2",
     author: "WebSpeak",
     license: "AGPL-3.0-only",
     description: "The default light appearance.",
@@ -21,7 +21,7 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
     id: "builtin.dark",
     name: "Night mode",
-    version: "1.0.1",
+    version: "1.0.2",
     author: "WebSpeak",
     license: "AGPL-3.0-only",
     description: "The default dark appearance.",
@@ -33,7 +33,7 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
     id: BUILTIN_ILLUSIA_SKIN_ID,
     name: "ILLUSIA风",
-    version: "2.0.1",
+    version: "2.0.2",
     author: "WebSpeak Project",
     license: "All rights reserved",
     description: "A bright original-character art skin with a safe declarative live-channel badge.",
@@ -46,7 +46,7 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
     id: BUILTIN_KAAK_SKIN_ID,
     name: "KAAK",
-    version: "3.1.73",
+    version: "3.1.74",
     author: "WebSpeak Project",
     license: "AGPL-3.0-only",
     description: "A KOOK-inspired voice-room workspace with a searchable server header, TeamSpeak banner and welcome message, nested channel members, attached channel chat, and a compact WebSpeak audio dock.",

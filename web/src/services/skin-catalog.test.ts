@@ -21,12 +21,16 @@ test("built-in appearance manifests and catalog versions match the bundled share
   for (const manifest of [lightManifest, darkManifest]) {
     assert.equal(BUILTIN_SKIN_CATALOG.find((skin) => skin.id === manifest.id)?.version, manifest.version);
   }
-  assert.equal(lightManifest.version, "1.0.1");
-  assert.equal(darkManifest.version, "1.0.1");
+  assert.equal(lightManifest.version, "1.0.2");
+  assert.equal(darkManifest.version, "1.0.2");
   assert.match(lightCss, /\.screen-share-live-indicator\s*\{[^}]*background:/s);
   assert.match(lightCss, /\.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
   assert.match(darkCss, /\.screen-share-live-indicator\s*\{[^}]*background:/s);
   assert.match(darkCss, /\.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
+  assert.match(lightCss, /screen-player\.stage"\] \{ background: #000; \}/);
+  assert.match(lightCss, /screen-player\.video"\] \{ object-fit: contain; background: #000; \}/);
+  assert.match(darkCss, /screen-player\.stage"\] \{ background: #000; \}/);
+  assert.match(darkCss, /screen-player\.video"\] \{ object-fit: contain; background: #000; \}/);
 });
 
 test("skin catalog always includes protected built-ins and exposes only enabled custom skins", async () => {

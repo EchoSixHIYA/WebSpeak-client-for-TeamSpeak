@@ -84,6 +84,17 @@ test("community skins use a scoped light fallback instead of inheriting the nigh
   assert.match(scoped, /:where\(\.ws-skin-root\[data-ws-skin="community\.illusia-voice"\]\) \.settings-content/);
 });
 
+test("built-in light and dark skins keep letterbox areas black", async () => {
+  const [light, dark] = await Promise.all([
+    readFile(new URL("../skins/builtin/light/skin.css", import.meta.url), "utf8"),
+    readFile(new URL("../skins/builtin/dark/skin.css", import.meta.url), "utf8"),
+  ]);
+  for (const [css, id] of [[light, "builtin.light"], [dark, "builtin.dark"]] as const) {
+    assert.match(css, new RegExp(`data-ws-skin="${id}"[^{}]*\\[data-ws-part="voice\\.screen-player\\.stage"\\] \\{ background: #000; \\}`));
+    assert.match(css, new RegExp(`data-ws-skin="${id}"[^{}]*\\[data-ws-part="voice\\.screen-player\\.video"\\] \\{ object-fit: contain; background: #000; \\}`));
+  }
+});
+
 async function componentSources(directory: string): Promise<string> {
   const componentRoot = new URL(directory, import.meta.url);
   const componentFiles = (await readdir(componentRoot, { recursive: true })).filter(path => path.endsWith(".vue"));
@@ -141,7 +152,7 @@ test("the ILLUSIA v3 example and bundled package import without replacing WebSpe
   const skin = await importSkinPack(new File([exampleBytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "2.0.1");
+  assert.equal(skin.version, "2.0.2");
   assert.equal(skin.schemaVersion, 3);
   assert.equal(skin.packageType, "open-skin");
   assert.equal(skin.layoutData, undefined);
@@ -171,6 +182,8 @@ test("the ILLUSIA v3 example and bundled package import without replacing WebSpe
   assert.match(skin.css, /data-ws-plugin-part="illusia-now-playing\.channel-name"/);
   assert.match(skin.css, /data-ws-part="voice\.member\.live-indicator"\]\s*\{[^}]*border-color:[^}]*background:/s);
   assert.match(skin.css, /data-ws-part="voice\.member\.share-actions"\] \.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
+  assert.match(skin.css, /data-ws-part="voice\.screen-player\.stage"\]\s*\{[^}]*background: #000/);
+  assert.match(skin.css, /data-ws-part="voice\.screen-player\.video"\]\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
   assert.match(skin.css, /data-ws-part="home\.server-history\.item"/);
   assert.match(skin.css, /data-ws-part="home\.server-history\.favorite-toggle"\]\[data-ws-state="saved"\]/);
   assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.favorite-toggle"\]\[data-ws-state="saved"\]/);
@@ -225,8 +238,8 @@ test("the activity artwork layer floats above room content without intercepting 
   assert.match(css, /:deep\(\.app-shell \.chat-panel \.section-heading\),[\s\S]*?:deep\(\.app-shell \.chat-panel \.message-composer\)\s*\{\s*position: relative;\s*z-index: 3;/);
   assert.match(css, /\.screen-share-player\)?\s*\{[^}]*background: var\(--surface-1\)/);
   assert.match(css, /\.screen-share-player-exit\)?\s*\{[^}]*z-index: 3;/);
-  assert.match(css, /\.screen-share-player-stage\)?\s*\{[^}]*var\(--accent\)[^}]*var\(--surface-2\)/);
-  assert.match(css, /\.screen-share-player-video\)?\s*\{[^}]*background: var\(--surface-2\)/);
+  assert.match(css, /\.screen-share-player-stage\)?\s*\{[^}]*background: #000/);
+  assert.match(css, /\.screen-share-player-video\)?\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
   assert.match(css, /@media \(min-width: 741px\)\s*\{\s*\/\* Keep header menus above the independently stacked screen-share stage\. \*\/\s*\.app-shell \.workspace-header\s*\{\s*position: relative;\s*z-index: 40;/);
 });
 
@@ -466,7 +479,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.73");
+  assert.equal(skin.version, "3.1.74");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -695,6 +708,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-live-indicator[\s\S]*?background: #20251e;/);
   assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-card-button\.viewing[\s\S]*?background: #8be31e;/);
+  assert.match(skin.css, /kaak-workspace"\] \[data-ws-part="voice\.screen-player\.stage"\]\s*\{[^}]*background: #000/);
+  assert.match(skin.css, /kaak-workspace"\] \[data-ws-part="voice\.screen-player\.video"\]\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
   assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-wave/);
   assert.ok(skin.css.includes("animation: ws-community-kaak-voice-kaak-performance-refresh-spin .72s linear infinite;"));
   assert.ok(skin.css.includes("performance-refresh:disabled .ui-icon { animation: none; }"));
