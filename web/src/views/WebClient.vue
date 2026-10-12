@@ -1741,6 +1741,7 @@ const skinPluginActions = {
     if (!text || text.length > 1000 || text.includes("\u0000")) return;
     void sendTextMessage(text, currentChannel.value.id);
   },
+  "session.copyInviteLink": () => doShare(),
   "chat.togglePanel": () => chat.togglePanel(),
   "voice.toggleMicrophone": () => { if (voiceState.connected) toggleMicrophone(); },
   "voice.toggleOutputMute": () => { if (voiceState.connected) toggleOutputMute(); },

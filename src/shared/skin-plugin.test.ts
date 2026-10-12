@@ -168,6 +168,25 @@ test("chat panel visibility is host-controlled and its toggle requires chat acce
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
 });
 
+test("copying a session invite link is an explicit permission-gated host action", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].actions = {
+    invite: { type: "session.copyInviteLink", args: {} },
+  };
+  document.components[0].root = {
+    tag: "button",
+    events: { click: "invite" },
+  };
+
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["session.invite.copy"];
+  const parsed = parseSkinPluginDocument(document).components[0];
+  assert.equal(parsed.actions.invite.type, "session.copyInviteLink");
+  assert.equal(Object.keys(parsed.actions.invite.args).length, 0);
+});
+
 test("host widget references stay allowlisted and cannot be used on the demo page", () => {
   const unknownWidget = validDocument();
   unknownWidget.schemaVersion = 2;

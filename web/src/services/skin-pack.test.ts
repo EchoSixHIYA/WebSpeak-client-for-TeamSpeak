@@ -486,7 +486,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.107");
+  assert.equal(skin.version, "3.1.108");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -508,6 +508,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(voice?.permissions.includes("servers.quickList.read"));
   assert.ok(voice?.permissions.includes("servers.quickList.switch"));
   assert.ok(voice?.permissions.includes("session.status.read"));
+  assert.ok(voice?.permissions.includes("session.invite.copy"));
+  assert.equal(voice?.actions["copy-invite-link"]?.type, "session.copyInviteLink");
   assert.ok(voice?.permissions.includes("session.channels.read"));
   assert.ok(voice?.permissions.includes("session.members.read"));
   assert.ok(voice?.permissions.includes("session.memberAvatars.read"));
@@ -567,6 +569,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const desktopRoomControls = findPart(voice?.root, "desktop-room-controls");
   assert.equal(desktopRoomControls?.attributes?.role, "toolbar");
   assert.equal(findPart(desktopRoomControls, "desktop-room-settings")?.events?.click, "open-audio-settings");
+  const audioSettingsIcon = findPart(desktopRoomControls, "desktop-room-settings")?.children?.find((child) => child.tag === "svg");
+  assert.match(String(audioSettingsIcon?.children?.[1]?.attributes?.d ?? ""), /^M10 2h4/, "the settings gear uses a centered, complete outline");
   assert.equal(findPart(desktopRoomControls, "desktop-room-noise-suppression")?.events?.click, "toggle-noise-suppression");
   assert.equal(findPart(desktopRoomControls, "desktop-room-microphone")?.events?.click, "toggle-microphone");
   assert.equal(findPart(desktopRoomControls, "desktop-room-output")?.events?.click, "toggle-output-mute");
@@ -595,11 +599,15 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.deepEqual(chatExpand?.when, { path: "chat.status.panelOpen", equals: false });
   assert.equal(chatExpand?.events?.click, "toggle-chat-panel");
   assert.equal(chatExpand?.attributes?.["aria-expanded"], "{{chat.status.panelOpen}}");
-  assert.equal(chatExpand?.children?.[0]?.text, "聊天");
+  assert.equal(chatExpand?.children?.[0]?.text, "#");
+  const voiceStageInvite = findPart(voice?.root, "voice-stage-invite");
+  assert.equal(voiceStageInvite?.events?.click, "copy-invite-link");
+  assert.equal(voiceStageInvite?.attributes?.["aria-label"], "复制邀请链接 / Copy invite link");
   assert.equal(findPart(voice?.root, "chat-panel")?.widget, "voice.chat-panel");
   assert.deepEqual(findPart(voice?.root, "chat-panel")?.when, { path: "chat.status.panelOpen", equals: true });
   assert.equal(voice?.root.attributes?.["data-chat-open"], "{{chat.status.panelOpen}}");
   assert.equal(findPart(voice?.root, "whisper-controls"), undefined, "the KAAK surface does not add a duplicate whisper button");
+  assert.equal(findPart(voice?.root, "mobile-room-invite-copy")?.events?.click, "copy-invite-link");
   assert.equal(voice?.actions["whisper-on"], undefined);
   assert.equal(voice?.actions["whisper-off"], undefined);
   assert.equal(voice?.permissions.includes("voice.whisper.control"), false);
@@ -791,6 +799,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /@media \(max-width: 820px\)[\s\S]*?grid-template-columns: 86px minmax\(0, 1fr\);[\s\S]*?grid-template-columns: 86px minmax\(0, 1fr\);/);
   assert.match(skin.css, /@media \(max-height: 620px\)[\s\S]*?server-rail[\s\S]*?padding-bottom: 76px;/);
   assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
+  assert.match(skin.css, /kaak-workspace\.desktop-room-settings"\]\s*\{[\s\S]*?display: flex;[\s\S]*?align-items: center;/, "the settings gear and label share a centered control row");
+  assert.match(skin.css, /kaak-workspace\.voice-stage-invite"\]\s*\{[\s\S]*?width: 34px;[\s\S]*?height: 34px;/, "the invite action is an icon-only header control");
   assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
   assert.match(skin.css, /\.voice-card\s*\{[\s\S]*?transition: border-color \.18s ease, background-color \.18s ease, box-shadow \.18s ease;/);
   assert.match(skin.css, /voice-card[\s\S]*?max-width: 480px;/);

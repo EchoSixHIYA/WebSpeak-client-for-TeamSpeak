@@ -15,6 +15,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.surface.replace": Object.freeze({ policyVersion: 1, description: "Replace the built-in public page with a custom skin surface; the host recovery controls remain available." }),
   "ui.input.read": Object.freeze({ policyVersion: 1, description: "Read values entered or autofilled in this plugin's own input fields. Never enter passwords or other secrets." }),
   "session.status.read": Object.freeze({ policyVersion: 1, description: "Read the current connection and channel summary." }),
+  "session.invite.copy": Object.freeze({ policyVersion: 1, description: "Copy a WebSpeak invite link for the current public server and channel; credentials are excluded." }),
   "session.channels.read": Object.freeze({ policyVersion: 1, description: "Read the public TeamSpeak channel tree; the demo page uses synthetic sample data." }),
   "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names, initials derived from those names, and speaking states; the demo page uses synthetic sample data." }),
   "session.memberAvatars.read": Object.freeze({ policyVersion: 1, description: "Display cached TeamSpeak profile pictures for visible members inside trusted host member-card or channel-tree widgets. Images are not exposed to skin markup or plugin runtimes." }),
@@ -117,6 +118,7 @@ export type SkinPluginEvent =
   | "pointerenter" | "pointerleave" | "dragstart" | "dragover" | "drop";
 export type SkinPluginAction =
   | "ui.setState" | "ui.toggleState"
+  | "session.copyInviteLink"
   | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage" | "chat.togglePanel"
   | "voice.toggleMicrophone" | "voice.toggleOutputMute" | "voice.setOutputVolume" | "audio.openSettings"
   | "audio.toggleNoiseSuppression" | "audio.toggleAccompaniment"
@@ -200,12 +202,12 @@ const V3_EVENTS = new Set<string>([
 ]);
 const PASSIVE_EVENTS = new Set<string>(["focus", "blur", "pointerenter", "pointerleave", "dragstart", "dragover"]);
 const ACTIONS = new Set<string>([
-  "ui.setState", "ui.toggleState", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage", "chat.togglePanel",
+  "ui.setState", "ui.toggleState", "session.copyInviteLink", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage", "chat.togglePanel",
   "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
   "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const V3_ACTIONS = new Set<string>([
-  "ui.toggleState", "chat.togglePanel", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway",
+  "ui.toggleState", "session.copyInviteLink", "chat.togglePanel", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway",
   "voice.setWhisperActive", "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const PERMISSIONS = new Set<string>(Object.keys(SKIN_PLUGIN_PERMISSIONS));
@@ -213,6 +215,7 @@ const HOST_WIDGETS = new Set<string>(SKIN_PLUGIN_HOST_WIDGETS);
 const ACTION_ARGS: Record<SkinPluginAction, ReadonlySet<string>> = {
   "ui.setState": new Set(["key", "value"]),
   "ui.toggleState": new Set(["key", "resetKey"]),
+  "session.copyInviteLink": new Set([]),
   "voice.joinChannel": new Set(["channelId"]),
   "favorites.switch": new Set(["favoriteId"]),
   "quickServers.switch": new Set(["quickServerId"]),
@@ -235,6 +238,7 @@ const ACTION_ARGS: Record<SkinPluginAction, ReadonlySet<string>> = {
 const ACTION_PERMISSION: Record<SkinPluginAction, SkinPluginPermission | null> = {
   "ui.setState": null,
   "ui.toggleState": null,
+  "session.copyInviteLink": "session.invite.copy",
   "voice.joinChannel": "session.channel.join",
   "favorites.switch": "favorites.switch",
   "quickServers.switch": "servers.quickList.switch",
