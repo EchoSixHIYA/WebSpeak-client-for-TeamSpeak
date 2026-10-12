@@ -70,6 +70,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 
 当前宿主动作如下：
 
+- session.copyInviteLink 需要 session.invite.copy，只复制当前公开服务器与频道的邀请链接；宿主会排除连接凭据。
 - voice.joinChannel 需要 session.channel.join，只能请求加入当前页面公开可见的 TeamSpeak 频道，仍经过宿主和原有密码、权限流程。
 - favorites.switch 需要 favorites.switch，只能让宿主按不透明令牌选择本机已有收藏并走原连接流程。
 - quickServers.switch 需要 servers.quickList.switch，只能让宿主按不透明令牌选择本机已有收藏或最近连接并走原连接流程。

@@ -364,6 +364,7 @@
       "permissions": [
         "ui.surface.replace",
         "session.status.read",
+        "session.invite.copy",
         "session.channels.read",
         "session.members.read",
         "session.memberAvatars.read",
@@ -390,6 +391,10 @@
         },
         "disconnect": {
           "type": "voice.disconnect",
+          "args": {}
+        },
+        "copy-invite-link": {
+          "type": "session.copyInviteLink",
           "args": {}
         },
         "stop-screen-share": {
@@ -700,6 +705,23 @@
                 "children": [
                   {
                     "text": "聊天记录"
+                  }
+                ]
+              },
+              {
+                "tag": "button",
+                "part": "mobile-room-invite-copy",
+                "attributes": {
+                  "type": "button",
+                  "role": "menuitem",
+                  "aria-label": "复制邀请链接 / Copy invite link"
+                },
+                "events": {
+                  "click": "copy-invite-link"
+                },
+                "children": [
+                  {
+                    "text": "复制邀请链接 / Copy invite link"
                   }
                 ]
               },
@@ -1108,6 +1130,50 @@
                       },
                       {
                         "tag": "button",
+                        "part": "voice-stage-invite",
+                        "className": "voice-stage-invite",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "复制邀请链接 / Copy invite link",
+                          "title": "复制邀请链接 / Copy invite link"
+                        },
+                        "events": {
+                          "click": "copy-invite-link"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "voice-stage-action-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": "true"
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
                         "part": "chat-panel-expand",
                         "when": {
                           "path": "chat.status.panelOpen",
@@ -1123,7 +1189,7 @@
                         },
                         "children": [
                           {
-                            "text": "聊天"
+                            "text": "#"
                           }
                         ]
                       }
@@ -1283,7 +1349,7 @@
                               {
                                 "tag": "path",
                                 "attributes": {
-                                  "d": "M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.74.45l-.06.06h-3.4l-.03-.08a1.7 1.7 0 0 0-1.35-1.14l-.08-.01-1.7-2.95.05-.06a1.7 1.7 0 0 0 0-1.96l-.05-.07 1.7-2.94.08.02a1.7 1.7 0 0 0 1.74-.45l.06-.06h3.4l.03.08a1.7 1.7 0 0 0 1.35 1.14l.08.01 1.7 2.95-.05.06Z"
+                                  "d": "M10 2h4l1 3 2 1 3-1 2 4-2 2v2l2 2-2 4-3-1-2 1-1 3h-4l-1-3-2-1-3 1-2-4 2-2v-2l-2-2 2-4 3 1 2-1z"
                                 }
                               }
                             ]
