@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
 import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
@@ -44,6 +45,13 @@ test("screen-share player dimensions follow source orientation and stay inside t
   assert.deepEqual(calculateScreenSharePlayerSize(1080, 1920, 1100, 720), { width: 405, height: 720 });
   assert.deepEqual(calculateScreenSharePlayerSize(1920, 1080, 1100, 720), { width: 1100, height: 618 });
   assert.equal(calculateScreenSharePlayerSize(0, 1080, 1100, 720), null);
+});
+
+test("screen-share player keeps a visible fallback width while video metadata is pending", async () => {
+  const css = await readFile(new URL("../src/styles/web-client.css", import.meta.url), "utf8");
+  const playerRule = css.match(/:deep\(\.screen-share-player\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.match(playerRule, /width:\s*min\(100%,\s*1100px\)/);
+  assert.doesNotMatch(playerRule, /width:\s*fit-content/);
 });
 
 test("unmount detaches video and retires a pending binding without stopping its stream", async t => {

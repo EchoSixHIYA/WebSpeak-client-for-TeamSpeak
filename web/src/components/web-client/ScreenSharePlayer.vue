@@ -2,6 +2,7 @@
   <section
     :ref="setPlayerElement"
     class="screen-share-player"
+    :style="playerSizeStyle"
     data-ws-part="voice.screen-player"
     role="region"
     :aria-label="t('screenShare')"
@@ -127,16 +128,21 @@ const props = defineProps<{
 const { fullscreen: screenShareFullscreen, viewers: screenSharePlayerViewers, viewerCount: screenSharePlayerViewerCount, ownerName: screenSharePlayerOwnerName, errorText: screenShareErrorText, setPlayerElement, setVideoElement: setScreenVideoElement, viewerStyle: screenShareViewerStyle, setVolume: onScreenShareVolume, toggleFullscreen: toggleScreenShareFullscreen } = props.model;
 const stageElement = ref<HTMLElement | null>(null);
 const stageSizeStyle = ref<Record<string, string>>({ aspectRatio: "16 / 9" });
+const playerSizeStyle = ref<Record<string, string>>({});
 let stageResizeObserver: ResizeObserver | null = null;
 
 function updateStageSize(): void {
   const stage = stageElement.value;
   const video = stage?.querySelector("video");
   if (stage && screenShareFullscreen.value) {
+    playerSizeStyle.value = { width: "100vw", height: "100vh" };
     stageSizeStyle.value = { width: "100%", height: "100%", aspectRatio: "auto" };
     return;
   }
-  if (!stage || !video?.videoWidth || !video.videoHeight) return;
+  if (!stage) return;
+  playerSizeStyle.value = {};
+  stageSizeStyle.value = { aspectRatio: "16 / 9" };
+  if (!video?.videoWidth || !video.videoHeight) return;
   const parentWidth = stage.parentElement?.parentElement?.clientWidth || window.innerWidth;
   const size = calculateScreenSharePlayerSize(
     video.videoWidth,
@@ -145,6 +151,7 @@ function updateStageSize(): void {
     Math.max(220, Math.min(window.innerHeight - 220, 720)),
   );
   if (!size) return;
+  playerSizeStyle.value = { width: `${size.width + 2}px` };
   stageSizeStyle.value = {
     width: `${size.width}px`,
     height: `${size.height}px`,

@@ -7136,8 +7136,9 @@
 
 :deep(.screen-share-player) {
   position: relative;
-  width: fit-content;
+  width: min(100%, 1100px);
   max-width: 100%;
+  box-sizing: border-box;
   margin-top: 17px;
   overflow: hidden;
   color: var(--text-primary);
