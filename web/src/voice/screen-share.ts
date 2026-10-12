@@ -418,9 +418,9 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     // Prefer H.264/AV1 for screen content: both compress text/UI far better
     // than VP8 at the bitrates typical of relayed screen shares. VP8 stays as
     // a fallback when neither is available.
-    const h264 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/h264");
-    const av1 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/av1");
-    const preferred = h264.length ? h264 : av1.length ? av1 : capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/vp8");
+    const preferred = ["video/h264", "video/av1", "video/vp8"].flatMap((mimeType) =>
+      capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === mimeType),
+    );
     if (!preferred.length) return;
     const remaining = capabilities.codecs.filter((codec) => !preferred.includes(codec));
     try { transceiver.setCodecPreferences([...preferred, ...remaining]); } catch { /* older browsers may reject codec preference changes */ }
