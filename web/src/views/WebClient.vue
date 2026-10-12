@@ -1409,6 +1409,7 @@ const {
   initialized,
   accessMode,
   isConnecting: computed(() => voiceState.connecting),
+  isConnected: computed(() => voiceState.connected),
   errorCode: computed(() => voiceState.errorCode),
   errorMessage: computed(() => localizedMessage(voiceState.error)),
   channelSwitchedChannelId: computed(() => voiceState.channelSwitchedChannelId),
