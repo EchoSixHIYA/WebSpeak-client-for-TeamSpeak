@@ -4,6 +4,8 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
+Latest release: [WebSpeak 0.2.7 release notes](./releases/v0.2.7.md).
+
 Skin authors should start with the [skin development guide](./SKIN_DEVELOPMENT.md). A `.wskin` package is the portable deliverable: skin UI and assets travel with the package, while skin-only work should not require core runtime edits. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
 
 ## Live demo
@@ -165,6 +167,7 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 | Version | Date | Summary |
 | --- | --- | --- |
+| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | Completed the KAAK responsive voice skin with channel navigation, chat, remembered passwords and invite links; improved stalled-connection switching and fixed-mode feedback; fixed screen-share layouts and added bitrate/codec controls. Builds: Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | Relative to 0.2.5, broadly refactored gateway voice, shared protocol, frontend voice workspace, and admin modules; fixed #6/#7/#10, implemented #9/#12 settings, and fixed the existing-TS6-share discovery case reported in PR #13. Improved Opus/session lifecycles and mobile controls. Packages: Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | Added `.wskin` skins, administrator enable/default controls, and protected Day/Night/ILLUSIA built-ins; removed the unfinished Aurora Voice sample, fixed skin-load flashes, dark-control contrast, and voice-room artwork layering, and added the official skin-development Agent Skill. |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | Added cross-platform P2P screen sharing between browsers and native TeamSpeak 6 clients; added STUN/external-TURN configuration, live player and viewer state, 1080p/60 FPS capture settings, and WebRTC statistics; refined screen-share interactions and added visitor numbering. |

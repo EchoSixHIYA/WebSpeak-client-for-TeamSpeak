@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.7] — 2026-10-13
+
+### 中文
+
+- **KAAK 皮肤：** 完成独立的宽屏/窄屏语音工作区、频道树与聊天入口，补齐服务器横幅、成员操作、语音控制、邀请链接及密码对话框；统一频道密码状态显示并支持在浏览器本地记住服务器和频道密码。
+- **连接与频道：** 支持从昵称目标连接、取消卡住的连接并切换服务器；服务器固定模式会明确提示管理员限制。修复频道树、成员列表和屏幕共享播放器在窄屏及皮肤切换时的布局问题。
+- **屏幕共享与皮肤接口：** 新增共享码率选择，按浏览器能力选择编码器并保留 AV1 回退；为皮肤开放生成邀请链接的受权限控制动作。
+- **发布架构：** 提供 Windows x64、Linux x64/ARM64、Docker amd64/arm64，以及 Android arm64-v8a、armeabi-v7a、x86_64 构建。
+
+### English
+
+- **KAAK skin:** Added dedicated desktop and narrow-screen voice workspaces, a channel tree and chat entry, server banners, member actions, voice controls, invite links, and consistent password dialogs. Channel password state is shown correctly, and server/channel passwords can be remembered in the browser.
+- **Connections and channels:** Added nickname-based server targets, cancellation of stalled joins, and server switching, with clear administrator-restriction feedback in fixed-server mode. Fixed channel tree, member list, and screen-share player layout across narrow screens and skin changes.
+- **Screen sharing and skin API:** Added a share bitrate selector, browser-capability-based codec selection with AV1 fallback, and a permission-gated invite-link action for skins.
+- **Release architectures:** Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a, armeabi-v7a, and x86_64 builds.
+
+### Deutsch
+
+- **KAAK-Skin:** Eigenständige Sprachbereiche für Desktop und schmale Bildschirme, Kanalliste und Chat-Einstieg sowie Serverbanner, Mitgliederaktionen, Sprachsteuerung, Einladungslinks und einheitliche Passwortdialoge. Der Passwortstatus von Kanälen wird korrekt angezeigt; Server- und Kanalpasswörter können im Browser gespeichert werden.
+- **Verbindungen und Kanäle:** Serverziele über TeamSpeak-Nicknames, Abbruch hängender Verbindungsversuche und Serverwechsel; im festgelegten Servermodus werden Administratoreinschränkungen verständlich angezeigt. Layoutfehler in Kanalliste, Mitgliederbereich und Bildschirmfreigabe auf schmalen Displays und beim Skinwechsel wurden behoben.
+- **Bildschirmfreigabe und Skin-API:** Auswahl der Freigabe-Bitrate, Codec-Auswahl nach Browserfähigkeiten mit AV1-Rückfall sowie eine berechtigungsgeschützte Aktion für Einladungslinks.
+- **Build-Architekturen:** Windows x64, Linux x64/ARM64, Docker amd64/arm64 und Android arm64-v8a, armeabi-v7a sowie x86_64.
+
+### Русский
+
+- **Скин KAAK:** Добавлены отдельные голосовые интерфейсы для широких и узких экранов, дерево каналов и переход к чату, баннер сервера, действия с участниками, голосовые элементы управления, ссылки-приглашения и единые диалоги паролей. Состояние защищённых каналов отображается правильно; пароли сервера и каналов можно запомнить в браузере.
+- **Подключения и каналы:** Подключение по псевдониму сервера TeamSpeak, отмена зависшего подключения и переключение серверов; в режиме фиксированного сервера показывается понятное сообщение об ограничениях администратора. Исправлена компоновка дерева каналов, списка участников и плеера демонстрации экрана на узких экранах и при смене скина.
+- **Демонстрация экрана и API скинов:** Добавлен выбор битрейта, выбор кодека с учётом возможностей браузера и сохранением AV1 как запасного варианта, а также действие создания приглашения с проверкой разрешений.
+- **Архитектуры сборок:** Windows x64, Linux x64/ARM64, Docker amd64/arm64 и Android arm64-v8a, armeabi-v7a, x86_64.
+
+### 日本語
+
+- **KAAK スキン：** デスクトップと狭い画面で別々の音声ワークスペースを追加し、チャンネルツリー、チャット入口、サーバーバナー、メンバー操作、音声コントロール、招待リンク、統一されたパスワードダイアログを整えました。保護チャンネルの状態を正しく表示し、サーバーとチャンネルのパスワードをブラウザーに保存できます。
+- **接続とチャンネル：** TeamSpeak のニックネーム指定、停止した接続の中断、サーバー切り替えに対応しました。固定サーバーモードでは管理者による制限を明示します。狭い画面やスキン切り替え時のチャンネルツリー、メンバー一覧、画面共有プレーヤーのレイアウトを修正しました。
+- **画面共有とスキン API：** 共有ビットレート選択、ブラウザー機能に応じたコーデック選択と AV1 フォールバック、権限で保護された招待リンク生成アクションを追加しました。
+- **ビルド対象：** Windows x64、Linux x64/ARM64、Docker amd64/arm64、Android arm64-v8a、armeabi-v7a、x86_64。
+
 ## [0.2.6] — 2026-10-08（相对 0.2.5 正式版）
 
 ### 中文

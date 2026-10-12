@@ -38,13 +38,13 @@
 
 ## 文档 · Documentation
 
+- [0.2.7 发布说明 / Release notes](./docs/releases/v0.2.7.md)
 - [简体中文](./docs/README.zh-CN.md)
 - [English](./docs/README.en.md)
 - [Deutsch](./docs/README.de.md)
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
 - [皮肤开发规范 / Skin Development Guide](./docs/SKIN_DEVELOPMENT.md)
-- [更开放的皮肤系统路线图](./docs/OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)
 - [更开放的皮肤系统规格与权限沙箱](./docs/OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)
 - [皮肤开发 Agent Skill / Skin Development Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
 
@@ -74,7 +74,7 @@ Ein plattformübergreifender Musikbot für TeamSpeak 3/6 mit Netease Cloud Music
 
 ## Contributors · 贡献者
 
-感谢通过 PR 改进 WebSpeak 的贡献者。以下按 GitHub 的合并记录列出；上方 0.2.6 摘要只描述本版本实际纳入的改动。
+感谢通过 PR 改进 WebSpeak 的贡献者。以下按 GitHub 的合并记录列出。
 
 - [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) 改进浏览器端报错翻译；[PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) 修正缩放、浮动布局和首页脚注。
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。

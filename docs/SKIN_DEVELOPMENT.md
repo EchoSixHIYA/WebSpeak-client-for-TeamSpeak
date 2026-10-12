@@ -1,6 +1,6 @@
 # WebSpeak 皮肤开发规范
 
-本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 有插件清单、文件校验和本地缓存；有界 Wasm 已接入 WebClient 授权、UI 生命周期、按清单过滤的只读数据投影、worker 资源治理和首版宿主动作桥，并在生产构建开放。作者 JavaScript 仍不执行；跨浏览器端到端验证和独立安全审查仍待完成。路线和安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+本文说明 v1 视觉皮肤、v2 声明式布局皮肤、v3 开放皮肤以及 v4 插件包格式。v1/v2 保持固定 CSS 几何边界；v3 可重排公开 UI、用自定义声明式节点构建界面，并用 components.json schema v2/v3 替换首页/语音工作区的整页可见界面。v4 有插件清单、文件校验和本地缓存；有界 Wasm 已接入 WebClient 授权、UI 生命周期、按清单过滤的只读数据投影、worker 资源治理和首版宿主动作桥，并在生产构建开放。作者 JavaScript 仍不执行；跨浏览器端到端验证和独立安全审查仍待完成。当前包格式与安全边界见[皮肤系统规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
 ## 目标：皮肤是可移植的外挂包
 
@@ -14,7 +14,7 @@
 
 开发者 Skill：[WebSpeak Skin Development](../.agents/skills/webspeak-skin-development/SKILL.md)。它给 Agent 提供皮肤任务的决策和交付步骤；本文件及[系统规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)是格式与接口的事实来源。
 
-KOOK 语音界面参考仅覆盖用户授权的语音频道，语音区结构记录在[参考文档](./KOOK_VOICE_REFERENCE.zh-CN.md)；发现、陪玩、活动、广告、商城和管理后台不属于复刻范围。
+示例展示公开皮肤接口的用法，不代表未记录的运行时接口也可依赖；发现、活动、广告、商城和管理后台不属于语音皮肤范围。
 
 完整的 KOOK 语音端体验测试皮肤见 [KAAK](./examples/KAAK-VOICE.md)：它复用 WebSpeak 可信宿主控件和公开 TeamSpeak 会话数据，不包含站点素材、运营页面或后台。Harbor Voice 保留为通用 surface 格式验证样例。
 
@@ -66,7 +66,7 @@ plugins/<plugin-id>/assets/   # v4 插件专属的本地图片或字体素材
   "description": "A visual-only art skin using the WebSpeak interface translations.",
   "entry": "skin.css",
   "preview": "assets/background-composite.webp",
-  "minAppVersion": "0.2.7-preview"
+  "minAppVersion": "0.2.7"
 }
 ```
 
@@ -200,7 +200,7 @@ v4 在 open-skin 包中增加必需的 `plugins` 路径，并允许沿用可选 
   "license": "MIT",
   "entry": "skin.css",
   "plugins": "plugins.json",
-  "minAppVersion": "0.2.7-preview"
+  "minAppVersion": "0.2.7"
 }
 ```
 
@@ -422,4 +422,3 @@ CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删�
 - surface 上的“恢复内置皮肤”操作必须调用无条件的内置皮肤切换路径；用于“皮肤加载失败”提示的回退函数会在正常情况下直接返回。
 - 自定义服务器栏需要用 `servers.quickList` 同时显示收藏与最近连接；只能把标签、类型、当前标记和随机令牌交给组件，切换时再由宿主解析本地目标。
 - 最近连接和默认收藏名可能直接是服务器地址；组件上下文会在投影阶段将这种标签改为通用名称，不能改为暴露原始地址。
-- KOOK 登录后的前两个用户授权语音房间已在 IAB 中读取。记录的仅为语音界面布局关系；没有保存服务器/房间标识、成员名称或聊天内容。完整的发现、运营及管理页面不属于皮肤范围，也没有检查。

@@ -9,5 +9,5 @@
   "description": "A complete, script-free public voice client surface scaffold.",
   "entry": "skin.css",
   "components": "components.json",
-  "minAppVersion": "0.2.7-preview"
+  "minAppVersion": "0.2.7"
 }

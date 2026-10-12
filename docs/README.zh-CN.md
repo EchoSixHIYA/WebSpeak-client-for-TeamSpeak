@@ -4,13 +4,15 @@
 
 WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户无需安装桌面客户端即可从浏览器加入频道，管理员可以在控制台管理目标服务器、访问方式和运行状态。
 
-皮肤开发请从[皮肤开发规范](./SKIN_DEVELOPMENT.md)开始；它以可移植 `.wskin` 为交付物，要求皮肤实现和素材随包分发，不为单款皮肤修改核心运行时代码。Agent 工作流见[WebSpeak Skin Development Skill](../.agents/skills/webspeak-skin-development/SKILL.md)。当前格式与安全边界见[路线图](./OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)与[规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+皮肤开发请从[皮肤开发规范](./SKIN_DEVELOPMENT.md)开始；它以可移植 `.wskin` 为交付物，要求皮肤实现和素材随包分发，不为单款皮肤修改核心运行时代码。Agent 工作流见[WebSpeak Skin Development Skill](../.agents/skills/webspeak-skin-development/SKILL.md)。当前包格式与安全边界见[皮肤系统规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
 
 ## 在线 Demo
 
 地址：<https://webspeak.example.invalid>
 
 公共 Demo 位于香港，网络和负载可能不稳定。延迟、断线或暂时不可用不代表自行部署后的实际表现。
+
+最新版本：[WebSpeak 0.2.7 发布说明](./releases/v0.2.7.md)。
 
 ## ✨ 特性
 
@@ -167,6 +169,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
+| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | 完成 KAAK 宽屏/窄屏语音皮肤，新增频道树、聊天、密码记忆和邀请链接；改进卡住连接的中断与固定模式提示；修复屏幕共享布局，增加码率和编码器选择。构建覆盖 Windows x64、Linux x64/ARM64、Docker amd64/arm64 和 Android arm64-v8a、armeabi-v7a、x86_64。 |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | 相对 0.2.5 大范围重构语音网关、共享协议、前端语音工作区与管理模块；修复 #6/#7/#10，完成 #9/#12 配置，并修复 PR #13 报告的既有 TS6 屏幕共享漏发现问题；改善 Opus/重连生命周期和移动端控制。提供 Windows x64、Linux x64/ARM64、Docker amd64/arm64，以及 Android arm64-v8a、armeabi-v7a、x86_64 APK。 |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | 新增 `.wskin` 皮肤系统、管理员启用/默认管理和受保护的日间/夜间/ILLUSIA 内置皮肤；移除未完成 Aurora Voice 样例，修复皮肤加载闪烁、暗色控件可读性与语音界面美术层级，并加入官方皮肤开发 Agent Skill。 |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | 新增浏览器与 TeamSpeak 6 原生客户端之间的跨端 P2P 屏幕共享；提供 STUN/外部 TURN 配置、直播播放器、观众状态、1080p/60 FPS 采集设置和 WebRTC 统计；优化屏幕共享交互并新增访客编号。 |
@@ -262,7 +265,7 @@ npm start
 
 ## 近期合并贡献者
 
-- 以下依据 GitHub 合并记录列出；上方版本摘要只描述对应版本实际纳入的改动。
+- 以下依据 GitHub 合并记录列出。
 - [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) 改进浏览器端报错翻译；[PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) 修正缩放、浮动布局和首页脚注。
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) 支持通过 TeamSpeak 注册昵称连接，并在设置、收藏和邀请中保留昵称目标。

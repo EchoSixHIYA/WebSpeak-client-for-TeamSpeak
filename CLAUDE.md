@@ -207,4 +207,4 @@ Skin cache writes and preference persistence accept the owning AbortSignal, incl
 
 Validate admin responses before applying them to page state. Network and protocol failures must preserve unsaved input; a failed logout must not be presented as a successful logout. Keep secret keep/replace/remove actions intact and do not persist credentials in UI error messages or diagnostic logs.
 
-The repository remote is `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak`. Preserve existing local work when implementing the plan in `docs/CODE_REFACTOR_PLAN.zh-CN.md`. Keep private configuration, runtime data and local deployment archives out of source commits. Preserve documented skin hooks and browser persistence formats during component refactors.
+The repository remote is `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak`. Preserve existing local work and keep private configuration, runtime data, local deployment archives, and machine-specific notes out of source commits. Preserve documented skin hooks and browser persistence formats during component refactors.

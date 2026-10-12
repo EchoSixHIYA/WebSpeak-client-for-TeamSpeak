@@ -10,5 +10,5 @@
   "entry": "skin.css",
   "components": "components.json",
   "content": "content.json",
-  "minAppVersion": "0.2.7-preview"
+  "minAppVersion": "0.2.7"
 }

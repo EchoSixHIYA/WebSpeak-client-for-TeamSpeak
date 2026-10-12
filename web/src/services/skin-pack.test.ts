@@ -158,7 +158,7 @@ test("the ILLUSIA v3 example and bundled package import without replacing WebSpe
   assert.equal(skin.layoutData, undefined);
   assert.equal(skin.pluginData?.components[0].id, "illusia-now-playing");
   assert.deepEqual(skin.pluginData?.components[0].permissions, ["session.status.read"]);
-  assert.equal(skin.minAppVersion, "0.2.7-preview");
+  assert.equal(skin.minAppVersion, "0.2.7");
   assert.equal(skin.contentData, undefined);
   assert.equal(skin.previewBlob?.type, "image/webp");
   assert.ok(skin.assets["assets/background-composite.webp"]);

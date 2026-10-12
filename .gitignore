@@ -13,7 +13,7 @@ data/
 config.json
 *.log
 .env
-# Local deployment/download artifacts (see docs/LOCAL_ARTIFACTS.zh-CN.md).
+# Local deployment notes and downloaded artifacts.
 /release-artifacts/
 /webspeak-deploy*.tar.gz
 /webspeak-update*.tar.gz
