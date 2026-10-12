@@ -7136,6 +7136,7 @@
 
 :deep(.screen-share-player) {
   position: relative;
+  z-index: 3;
   width: min(100%, 1100px);
   max-width: 100%;
   box-sizing: border-box;

@@ -49,9 +49,14 @@ test("screen-share player dimensions follow source orientation and stay inside t
 
 test("screen-share player keeps a visible fallback width while video metadata is pending", async () => {
   const css = await readFile(new URL("../src/styles/web-client.css", import.meta.url), "utf8");
+  const component = await readFile(new URL("../src/components/web-client/ScreenSharePlayer.vue", import.meta.url), "utf8");
   const playerRule = css.match(/:deep\(\.screen-share-player\)\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.match(playerRule, /width:\s*min\(100%,\s*1100px\)/);
   assert.doesNotMatch(playerRule, /width:\s*fit-content/);
+  assert.doesNotMatch(component, /ResizeObserver/, "player sizing must not create a resize-feedback loop while video starts");
+  assert.match(component, /if \(playerElement\.value === next\) return;/, "stable function refs must not rewrite player styles on every render");
+  assert.match(component, /if \(stageElement\.value === next\) return;/, "stable function refs must not rewrite stage styles on every render");
+  assert.match(playerRule, /z-index:\s*3/, "the shared video must layer above decorative activity artwork");
 });
 
 test("unmount detaches video and retires a pending binding without stopping its stream", async t => {

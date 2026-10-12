@@ -1,8 +1,7 @@
 <template>
   <section
-    :ref="setPlayerElement"
+    :ref="setPlayerElementNode"
     class="screen-share-player"
-    :style="playerSizeStyle"
     data-ws-part="voice.screen-player"
     role="region"
     :aria-label="t('screenShare')"
@@ -11,7 +10,6 @@
       :ref="setStageElement"
       class="screen-share-player-stage"
       data-ws-part="voice.screen-player.stage"
-      :style="stageSizeStyle"
     >
       <video
         v-if="screenShareRemoteStream"
@@ -126,23 +124,38 @@ const props = defineProps<{
   leaveScreenShare: () => void; avatarInitial: (name: string) => string; t: (key: string) => string;
 }>();
 const { fullscreen: screenShareFullscreen, viewers: screenSharePlayerViewers, viewerCount: screenSharePlayerViewerCount, ownerName: screenSharePlayerOwnerName, errorText: screenShareErrorText, setPlayerElement, setVideoElement: setScreenVideoElement, viewerStyle: screenShareViewerStyle, setVolume: onScreenShareVolume, toggleFullscreen: toggleScreenShareFullscreen } = props.model;
+const playerElement = ref<HTMLElement | null>(null);
 const stageElement = ref<HTMLElement | null>(null);
-const stageSizeStyle = ref<Record<string, string>>({ aspectRatio: "16 / 9" });
-const playerSizeStyle = ref<Record<string, string>>({});
-let stageResizeObserver: ResizeObserver | null = null;
+
+function setInlineStyle(element: HTMLElement, property: string, value: string | null): void {
+  if (value === null) {
+    if (element.style.getPropertyValue(property)) element.style.removeProperty(property);
+  } else if (element.style.getPropertyValue(property) !== value) {
+    element.style.setProperty(property, value);
+  }
+}
 
 function updateStageSize(): void {
   const stage = stageElement.value;
+  const player = playerElement.value ?? stage?.parentElement ?? null;
   const video = stage?.querySelector("video");
-  if (stage && screenShareFullscreen.value) {
-    playerSizeStyle.value = { width: "100vw", height: "100vh" };
-    stageSizeStyle.value = { width: "100%", height: "100%", aspectRatio: "auto" };
+  if (!stage || !player) return;
+  if (screenShareFullscreen.value) {
+    setInlineStyle(player, "width", "100vw");
+    setInlineStyle(player, "height", "100vh");
+    setInlineStyle(stage, "width", "100%");
+    setInlineStyle(stage, "height", "100%");
+    setInlineStyle(stage, "aspect-ratio", "auto");
     return;
   }
-  if (!stage) return;
-  playerSizeStyle.value = {};
-  stageSizeStyle.value = { aspectRatio: "16 / 9" };
-  if (!video?.videoWidth || !video.videoHeight) return;
+  setInlineStyle(player, "width", null);
+  setInlineStyle(player, "height", null);
+  if (!video?.videoWidth || !video.videoHeight) {
+    setInlineStyle(stage, "width", null);
+    setInlineStyle(stage, "height", null);
+    setInlineStyle(stage, "aspect-ratio", "16 / 9");
+    return;
+  }
   const parentWidth = stage.parentElement?.parentElement?.clientWidth || window.innerWidth;
   const size = calculateScreenSharePlayerSize(
     video.videoWidth,
@@ -151,29 +164,30 @@ function updateStageSize(): void {
     Math.max(220, Math.min(window.innerHeight - 220, 720)),
   );
   if (!size) return;
-  playerSizeStyle.value = { width: `${size.width + 2}px` };
-  stageSizeStyle.value = {
-    width: `${size.width}px`,
-    height: `${size.height}px`,
-    aspectRatio: `${video.videoWidth} / ${video.videoHeight}`,
-  };
+  setInlineStyle(player, "width", `${size.width + 2}px`);
+  setInlineStyle(stage, "width", `${size.width}px`);
+  setInlineStyle(stage, "height", `${size.height}px`);
+  setInlineStyle(stage, "aspect-ratio", `${video.videoWidth} / ${video.videoHeight}`);
+}
+
+function setPlayerElementNode(element: unknown): void {
+  const next = element instanceof HTMLElement ? element : null;
+  if (playerElement.value === next) return;
+  playerElement.value = next;
+  setPlayerElement(next);
+  updateStageSize();
 }
 
 function setStageElement(element: unknown): void {
-  stageResizeObserver?.disconnect();
-  stageElement.value = element instanceof HTMLElement ? element : null;
-  if (stageElement.value && typeof ResizeObserver !== "undefined") {
-    stageResizeObserver = new ResizeObserver(updateStageSize);
-    const parent = stageElement.value.parentElement?.parentElement ?? stageElement.value.parentElement;
-    if (parent) stageResizeObserver.observe(parent);
-    updateStageSize();
-  }
+  const next = element instanceof HTMLElement ? element : null;
+  if (stageElement.value === next) return;
+  stageElement.value = next;
+  updateStageSize();
 }
 
 onMounted(() => window.addEventListener("resize", updateStageSize));
 watch(screenShareFullscreen, updateStageSize);
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateStageSize);
-  stageResizeObserver?.disconnect();
 });
 </script>

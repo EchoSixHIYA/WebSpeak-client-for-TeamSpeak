@@ -139,3 +139,16 @@ test("ICE configuration belongs to each controller independently", async () => {
     ]);
   } finally { second.stopTransport(false); }
 });
+
+test("viewer visibility follows the selected stream so the player and card cannot disagree", async () => {
+  assert.equal(controller.api.screenShareViewing.value, false);
+  assert.equal(controller.api.screenShareViewingStreamId.value, "");
+
+  controller.handleMessage({ type: "screenShareJoined", stream: remote });
+  assert.equal(controller.api.screenShareViewing.value, true);
+  assert.equal(controller.api.screenShareViewingStreamId.value, remote.streamId);
+
+  controller.handleMessage({ type: "screenShareStopped", streamId: remote.streamId });
+  assert.equal(controller.api.screenShareViewing.value, false);
+  assert.equal(controller.api.screenShareViewingStreamId.value, "");
+});
