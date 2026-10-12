@@ -479,7 +479,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.74");
+  assert.equal(skin.version, "3.1.75");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -702,6 +702,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /kaak-workspace\.chat-panel-expand[\s\S]*?background: var\(--skin-kaak-accent\);/);
   assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
   assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
+  assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?overflow: hidden;/);
+  assert.match(skin.css, /kaak-workspace\.screen-share-player"\]\s*\{[^}]*flex: 0 0 auto;[^}]*width: 100%;[^}]*max-width: 100%;/);
+  assert.match(skin.css, /kaak-workspace\.screen-share-player"\] \.screen-share-player-stage \{[^}]*height: auto;[^}]*aspect-ratio: 16 \/ 9;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards"\]\s*\{[^}]*flex: 1 1 0%;[^}]*overflow-y: auto;/);
   assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);
   assert.match(skin.css, /conversation[\s\S]*?grid-template-rows: 58px minmax\(0, 1fr\) auto/);
   assert.match(skin.css, /chat-send[\s\S]*?::after \{ content: "➤";/);

@@ -710,11 +710,33 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 16px 14px;
   border-left: 1px solid var(--skin-kaak-border);
   border-right: 1px solid var(--skin-kaak-border);
   background: var(--skin-kaak-bg);
+}
+
+[data-ws-plugin-part="kaak-workspace.screen-share-player"] {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[data-ws-plugin-part="kaak-workspace.screen-share-player"] .screen-share-player {
+  z-index: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+[data-ws-plugin-part="kaak-workspace.screen-share-player"] .screen-share-player-stage {
+  height: auto;
+  min-height: 0;
+  max-height: min(64dvh, 640px);
+  aspect-ratio: 16 / 9;
 }
 
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.voice-stage"] {
@@ -807,7 +829,7 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.member-cards"] {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
@@ -1307,14 +1329,24 @@
 [data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-line{ min-height: 44px; }
 [data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-row{ min-height: 44px; }
 [data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-join-hint{ display: none; }
-[data-ws-plugin-part="kaak-workspace.voice-stage"] {
+  [data-ws-plugin-part="kaak-workspace.voice-stage"] {
     grid-column: 2;
     grid-row: 3;
     min-height: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 5px 8px;
     border: 0;
     border-bottom: 1px solid var(--skin-kaak-border);
+  }
+
+  [data-ws-plugin-part="kaak-workspace.screen-share-player"] .screen-share-player-stage {
+    max-height: min(28dvh, 220px);
+  }
+
+  [data-ws-plugin-part="kaak-workspace.member-cards"] {
+    flex: 0 0 126px;
+    height: 126px;
   }
 
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.voice-stage"] { grid-column: 2; }
