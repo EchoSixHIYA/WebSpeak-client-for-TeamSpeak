@@ -479,7 +479,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.77");
+  assert.equal(skin.version, "3.1.78");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -584,6 +584,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /ws-voice-channel-member-avatar[\s\S]*?border-radius: 50%;/);
   assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.backdrop"\]\s*\{[^}]*background: rgba\(10, 11, 13, \.54\);/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\s*\{[^}]*width: min\(438px, calc\(100vw - 32px\)\);[^}]*min-height: 204px;[^}]*background: #242529;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.title"\]\s*\{[^}]*font-size: 13px;[^}]*font-weight: 700;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.field"\]\s*\{[^}]*height: 40px;[^}]*border: 1px solid #3b3c40;[^}]*border-radius: 12px;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.actions"\] > button:last-child\s*\{[^}]*width: 82px;[^}]*height: 36px;[^}]*background: #6cbf00;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?width: min\(282px, calc\(100% - 22px\)\);[\s\S]*?margin-bottom: 11px;[\s\S]*?border-radius: 17px;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
   assert.match(skin.css, /ws-voice-channel-tree\[data-layout="server-sidebar"\] \.ws-voice-channel-line[\s\S]*?min-height: 38px;/);

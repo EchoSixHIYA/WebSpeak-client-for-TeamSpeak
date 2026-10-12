@@ -262,6 +262,10 @@ widget 的可选 `mount` 只接受这些公开锚点：`home.header.after`、`ho
 
 下列名称来自当前前端模板。对新功能，作者可以先用通用 `control` 部件；后续新增稳定部件会更新本目录。
 
+服务器和频道密码弹窗共用 `auth.password.backdrop`、`auth.password.dialog`、`auth.password.decoration`、`auth.password.eyebrow`、`auth.password.title`、`auth.password.lead`、`auth.password.form`、`auth.password.label`、`auth.password.field`、`auth.password.field-icon`、`auth.password.error` 和 `auth.password.actions`。
+
+服务器和频道密码弹窗共用 `auth.password.backdrop`、`auth.password.dialog`、`auth.password.close`、`auth.password.close-icon`、`auth.password.decoration`、`auth.password.eyebrow`、`auth.password.title`、`auth.password.lead`、`auth.password.form`、`auth.password.label`、`auth.password.field`、`auth.password.field-icon`、`auth.password.input`、`auth.password.error`、`auth.password.actions`、`auth.password.cancel`、`auth.password.submit`、`auth.password.spinner` 和 `auth.password.submit-icon`。
+
 | 页面区域 | `data-ws-part` |
 | --- | --- |
 | 通用 | `app`、`app.toast`、`control`、`skin.trigger`、`skin.menu`、`skin.option`、`language.trigger`、`language.menu`、`language.option` |

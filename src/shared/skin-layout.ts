@@ -46,9 +46,25 @@ export interface SkinLayoutComponent {
   editable: boolean;
 }
 
+const AUTH_PASSWORD_PART_IDS = [
+  "auth.password.backdrop",
+  "auth.password.dialog",
+  "auth.password.decoration",
+  "auth.password.eyebrow",
+  "auth.password.title",
+  "auth.password.lead",
+  "auth.password.form",
+  "auth.password.label",
+  "auth.password.field",
+  "auth.password.field-icon",
+  "auth.password.error",
+  "auth.password.actions",
+] as const;
+
 const PUBLIC_PART_IDS = new Set<string>([
   "app",
   "app.toast",
+  ...AUTH_PASSWORD_PART_IDS,
   "control",
   "demo.action.poke",
   "demo.action.reconnect",
@@ -306,6 +322,7 @@ const PUBLIC_PART_IDS = new Set<string>([
 
 const CONTROL_KINDS = ["button", "link", "input", "checkbox", "range", "select", "textarea", "menuitem", "draggable"] as const;
 const TRUSTED_PART_IDS = new Set([
+  ...AUTH_PASSWORD_PART_IDS,
   "app",
   "app.toast",
   "home.security-note",
@@ -371,6 +388,7 @@ const IDENTITY_PART_IDS = new Set([
   "home.identity-import.textarea", "home.identity-import.security",
 ]);
 const COMMON_PART_IDS = new Set([
+  ...AUTH_PASSWORD_PART_IDS,
   "app", "app.toast", "control", "skin.trigger", "skin.menu", "skin.option",
   "language.trigger", "language.menu", "language.option",
 ]);
