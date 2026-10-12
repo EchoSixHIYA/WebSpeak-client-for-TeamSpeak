@@ -733,10 +733,9 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.screen-share-player"] .screen-share-player-stage {
-  height: auto;
-  min-height: 0;
+  height: min(42dvh, 400px);
+  min-height: 180px;
   max-height: min(64dvh, 640px);
-  aspect-ratio: 16 / 9;
 }
 
 [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) [data-ws-plugin-part="kaak-workspace.voice-stage"] {
@@ -1341,7 +1340,9 @@
   }
 
   [data-ws-plugin-part="kaak-workspace.screen-share-player"] .screen-share-player-stage {
-    max-height: min(28dvh, 220px);
+    height: clamp(120px, 28dvh, 220px);
+    min-height: 120px;
+    max-height: 220px;
   }
 
   [data-ws-plugin-part="kaak-workspace.member-cards"] {
