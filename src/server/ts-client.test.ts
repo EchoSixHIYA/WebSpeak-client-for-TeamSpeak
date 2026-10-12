@@ -355,6 +355,19 @@ test("public channel metadata survives directory snapshots and follows channel e
   assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, undefined);
 });
 
+test("TeamSpeak SDK password flags pass through to the directory snapshot", () => {
+  const f = fixture();
+  let snapshot: { channels: Array<{ id: bigint; passwordProtected?: boolean }>; clients: unknown[] } | undefined;
+  f.client.on("directorySnapshot", value => { snapshot = value; });
+
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 2n, parentID: 0n, order: 0n, name: "msicbot", description: "", passwordProtected: true }],
+    clients: [],
+  });
+
+  assert.equal(snapshot?.channels[0]?.passwordProtected, true);
+});
+
 test("a retired SDK client's disconnect cannot invalidate a current avatar request", async () => {
   const f = fixture();
   const replacement = new SdkStub();

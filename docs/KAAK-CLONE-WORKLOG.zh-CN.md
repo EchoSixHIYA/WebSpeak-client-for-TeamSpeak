@@ -607,3 +607,10 @@
 - 根因：TeamSpeak 初始频道查询未请求 flags，密码标记无法进入共享频道模型；KAAK 当前频道标题使用皮肤模板中的固定半圆字符。此外，已安装的 KAAK 包按皮肤版本复用，本地 3.1.76 包会覆盖服务端更新后的同版本包。
 - 修复：初始查询请求 `channellist -flags`，将密码状态送到树形频道图标；普通成员栏也按同一状态显示锁或喇叭。KAAK 标题符号换为喇叭，并升至 3.1.77 触发本地包更新。
 - 验证：完整验证通过（692/692 测试、服务端构建、前端类型检查和生产构建）；示例皮肤包与内置包同步。3040 已重启并返回健康状态；未在浏览器中进行目视验收。
+
+### 频道锁图标复查
+
+- 用户反馈：`msicbot` 确认设有密码，但频道树仍显示喇叭。
+- 根因：服务器在订阅目录时已发送 `channel_flag_password=1`，但 SDK 的 `ChannelInfo` 解析器没有把这个公开标志放进目录快照；普通客户端随后执行独立 `channellist` 查询会收到权限错误，所以 WebSpeak 没有第二条数据来源。
+- 修复：SDK 新增可选的 `ChannelInfo.passwordProtected`，从频道列表和频道编辑通知解析 `channel_flag_password`；WebSpeak 锁定新版 SDK。频道密码本身不会读取或传输。
+- 验证：真实上海测试连接的 WebSpeak `TSClient` 收到 `msicbot passwordProtected=true`；SDK 全量测试 72 通过、类型检查、lint 和构建通过，改动文件格式检查通过。WebSpeak `npm run verify` 通过（693/693）；3040 已重启，健康接口、首页和生产 JS 均返回 HTTP 200。全仓格式检查仍报 53 个未格式化文件。
