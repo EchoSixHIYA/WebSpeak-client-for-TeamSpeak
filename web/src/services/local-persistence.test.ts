@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { before, after, beforeEach, test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import { getChatHistoryConversationKey, loadLocalPreferences, normalizeChatHistoryServerKey, saveInstalledSkin, saveLocalPreferences } from "./local-persistence.js";
+import { getChatHistoryConversationKey, loadLocalPreferences, loadStoredChannelPassword, normalizeBrowserCredentialServerKey, normalizeChatHistoryServerKey, saveInstalledSkin, saveLocalPreferences, saveStoredChannelPassword, saveStoredServerPassword } from "./local-persistence.js";
 import type { InstalledSkin } from "./skin-pack.js";
 
 // Control IndexedDB's request and transaction completion separately. These tests
@@ -11,9 +11,9 @@ let opening: any;
 let transactions: Transaction[] = [];
 class Transaction {
   oncomplete?: () => void; onerror?: () => void; onabort?: () => void;
-  getRequest: any; putRequest: any; written: unknown; aborted = false;
+  getRequest: any; getKey: unknown; putRequest: any; written: unknown; aborted = false;
   objectStore() { return {
-    get: () => this.getRequest = {},
+    get: (key: unknown) => { this.getKey = key; return this.getRequest = {}; },
     put: (value: unknown) => { this.written = value; return this.putRequest = {}; },
   }; }
   abort() { this.aborted = true; this.onabort?.(); }
@@ -47,6 +47,39 @@ test("cancelling a skin while IndexedDB opens prevents the delayed write", async
   owner.abort(); opening.onsuccess();
   await rejected;
   assert.equal(transactions.length, 0);
+});
+test("browser credentials are normalized and scoped by server plus channel", async () => {
+  assert.equal(normalizeBrowserCredentialServerKey(" Example.COM:9987 "), "example.com:9987");
+  const serverWrite = saveStoredServerPassword("Example.COM:9987", "server-secret");
+  await nextTurn();
+  const serverTx = transactions[0]!;
+  const serverRecord = serverTx.written as { id: string; serverKey: string; kind: string; password: string; updatedAt: number };
+  assert.equal(serverRecord.id, "server:example.com:9987");
+  assert.equal(serverRecord.serverKey, "example.com:9987");
+  assert.equal(serverRecord.kind, "server-password");
+  assert.equal(serverRecord.password, "server-secret");
+  assert.equal(typeof serverRecord.updatedAt, "number");
+  serverTx.writtenSuccessfully(); serverTx.commit(); await serverWrite;
+
+  const channelWrite = saveStoredChannelPassword("example.com:9987", "42", "channel-secret");
+  await nextTurn();
+  const channelTx = transactions[1]!;
+  const channelRecord = channelTx.written as { id: string; serverKey: string; kind: string; channelId: string; password: string; updatedAt: number };
+  assert.equal(channelRecord.id, 'channel:["example.com:9987","42"]');
+  assert.equal(channelRecord.serverKey, "example.com:9987");
+  assert.equal(channelRecord.kind, "channel-password");
+  assert.equal(channelRecord.channelId, "42");
+  assert.equal(channelRecord.password, "channel-secret");
+  assert.equal(typeof channelRecord.updatedAt, "number");
+  channelTx.writtenSuccessfully(); channelTx.commit(); await channelWrite;
+
+  const channelRead = loadStoredChannelPassword("other.example:9987", "42");
+  await nextTurn();
+  const readTx = transactions[2]!;
+  assert.equal(readTx.getKey, 'channel:["other.example:9987","42"]');
+  readTx.read({ id: 'channel:["other.example:9987","42"]', serverKey: "other.example:9987", kind: "channel-password", channelId: "42", password: "other-secret" });
+  readTx.commit();
+  assert.equal(await channelRead, "other-secret");
 });
 test("a successful request is not reported as durable until its transaction commits", async () => {
   let settled = false;

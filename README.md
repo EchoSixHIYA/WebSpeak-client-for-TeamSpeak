@@ -44,6 +44,8 @@
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
 - [皮肤开发规范 / Skin Development Guide](./docs/SKIN_DEVELOPMENT.md)
+- [更开放的皮肤系统路线图](./docs/OPEN_SKIN_SYSTEM_ROADMAP.zh-CN.md)
+- [更开放的皮肤系统规格与权限沙箱](./docs/OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)
 - [皮肤开发 Agent Skill / Skin Development Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
 
 ## 社区 · Community

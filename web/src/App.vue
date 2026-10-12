@@ -1,6 +1,11 @@
 <template>
   <router-view />
+  <SkinLayoutEditor />
 </template>
+
+<script setup lang="ts">
+import SkinLayoutEditor from "./components/SkinLayoutEditor.vue";
+</script>
 
 <style>
 * { box-sizing: border-box; }

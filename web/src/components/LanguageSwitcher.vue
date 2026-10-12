@@ -11,6 +11,7 @@
       :aria-controls="menuId"
       @click.stop="toggle"
     >
+      <Icon class="language-current-icon" name="translate" :size="24" />
       <span class="language-current-flag" aria-hidden="true">{{ currentLanguage.flag }}</span>
       <span class="language-current-code">{{ currentLanguage.code }}</span>
       <Icon name="chevron-down" :size="13" />
@@ -130,12 +131,12 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   box-shadow: 0 7px 16px rgba(0, 106, 100, .16);
 }
 
-.language-trigger .ui-icon {
+.language-trigger > .ui-icon:last-child {
   margin-left: auto;
   transition: transform .16s;
 }
 
-.language-switcher.open .language-trigger .ui-icon {
+.language-switcher.open .language-trigger > .ui-icon:last-child {
   transform: rotate(180deg);
 }
 
@@ -143,6 +144,10 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
 .language-option-flag {
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   line-height: 1;
+}
+
+.language-current-icon {
+  display: none;
 }
 
 .language-current-flag {

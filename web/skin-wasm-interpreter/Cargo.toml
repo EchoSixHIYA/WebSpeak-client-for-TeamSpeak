@@ -1,0 +1,12 @@
+[package]
+name = "webspeak-skin-wasm-interpreter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# On wasm32, the portable loop dispatcher prevents one native Wasm stack frame per guest instruction.
+wasmi = { version = "=2.0.0", default-features = false, features = ["std", "validate", "portable-dispatch"] }

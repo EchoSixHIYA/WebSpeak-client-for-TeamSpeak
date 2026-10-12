@@ -1,0 +1,70 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createSkinExtensionApproval, parseSkinExtensionManifest } from "../../../src/shared/skin-extension.js";
+import {
+  createSkinExtensionWasmSandbox,
+  SKIN_EXTENSION_WASM_RUNTIME_ENABLED,
+} from "./skin-extension-wasm-sandbox.js";
+import { SKIN_EXTENSION_WASM_SOURCE_LIMIT } from "./skin-extension-wasm-policy.js";
+import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui-input.js";
+
+const manifest = parseSkinExtensionManifest({
+  schemaVersion: 1,
+  packageType: "extension",
+  id: "test.wasm-extension",
+  name: "Wasm extension",
+  version: "1.0.0",
+  apiVersion: 1,
+  permissions: [],
+});
+
+test("production Wasm runtime is enabled behind the bounded approval and ABI checks", () => {
+  assert.equal(SKIN_EXTENSION_WASM_RUNTIME_ENABLED, true);
+  assert.throws(() => createSkinExtensionWasmSandbox({
+    manifest,
+    approval: createSkinExtensionApproval(manifest),
+    wasmBytes: new Uint8Array(SKIN_EXTENSION_WASM_SOURCE_LIMIT + 1),
+    readSessionStatus: () => ({ connected: false, channelName: null, memberCount: 0 }),
+  }), { code: "SKIN_EXTENSION_WASM_SIZE" });
+});
+
+test("Wasm UI input preserves bounded local state and safe event data", () => {
+  const parsed = parseSkinExtensionUiInput({
+    schemaVersion: 1,
+    state: { open: true, query: "team", count: 2 },
+    event: { componentId: "server-rail", handlerId: "select-server", eventName: "click" },
+  });
+  assert.deepEqual({ ...parsed.state }, { open: true, query: "team", count: 2 });
+  assert.deepEqual(parsed.event, { componentId: "server-rail", handlerId: "select-server", eventName: "click" });
+});
+
+test("Wasm UI input sanitizes host-projected public data before it enters the guest", () => {
+  const parsed = parseSkinExtensionUiInput({
+    schemaVersion: 1,
+    state: {},
+    event: null,
+    data: {
+      session: {
+        channels: [{ id: "lobby", name: "Lobby", address: "private.example:9987", members: [{ name: "not a projected field" }] }],
+      },
+      private: { token: "must not cross the guest boundary" },
+    },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.data)), {
+    session: { channels: [{ id: "lobby", name: "Lobby" }] },
+  });
+});
+
+test("Wasm UI input rejects unsupported fields, oversized text, and mismatched event values", () => {
+  assert.throws(() => parseSkinExtensionUiInput({ schemaVersion: 1, state: {}, event: null, trusted: true }), {
+    code: "SKIN_EXTENSION_UI_INPUT_INVALID",
+  });
+  assert.throws(() => parseSkinExtensionUiInput({ schemaVersion: 1, state: {}, event: {
+    componentId: "server-rail", handlerId: "select-server", eventName: "click", value: "forged",
+  } }), { code: "SKIN_EXTENSION_UI_INPUT_INVALID" });
+  assert.throws(() => parseSkinExtensionUiInput({
+    schemaVersion: 1,
+    state: { query: "x".repeat(1_025) },
+    event: null,
+  }), { code: "SKIN_EXTENSION_UI_INPUT_INVALID" });
+});

@@ -1,0 +1,2044 @@
+{
+  "schemaVersion": 3,
+  "components": [
+    {
+      "id": "kaak-home",
+      "name": "KAAK connection home",
+      "page": "home",
+      "mode": "surface",
+      "accessibleName": "KAAK 连接页 / Connection page",
+      "permissions": [
+        "ui.surface.replace",
+        "session.status.read"
+      ],
+      "actions": {},
+      "root": {
+        "tag": "main",
+        "part": "home",
+        "children": [
+          {
+            "tag": "section",
+            "part": "hero",
+            "children": [
+              {
+                "tag": "div",
+                "part": "brand",
+                "children": [
+                  {
+                    "tag": "span",
+                    "part": "logo",
+                    "children": [
+                      {
+                        "text": "W"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "brand-name",
+                    "children": [
+                      {
+                        "text": "WebSpeak"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "p",
+                "part": "slogan",
+                "children": [
+                  {
+                    "text": "YOUR VOICE, EVERYWHERE."
+                  }
+                ]
+              },
+              {
+                "widget": "home.server-announcement",
+                "part": "server-announcement"
+              },
+              {
+                "tag": "div",
+                "part": "hero-media",
+                "children": [
+                  {
+                    "tag": "svg",
+                    "part": "illustration",
+                    "attributes": {
+                      "viewbox": "0 0 550 510",
+                      "role": "img",
+                      "aria-label": "WebSpeak 展示插画"
+                    },
+                    "children": [
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 45,
+                          "y": 65,
+                          "width": 460,
+                          "height": 400,
+                          "rx": 80,
+                          "fill": "#b0f49b"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 90,
+                          "y": 145,
+                          "width": 370,
+                          "height": 275,
+                          "rx": 28,
+                          "fill": "#223641"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 103,
+                          "y": 157,
+                          "width": 344,
+                          "height": 250,
+                          "rx": 18,
+                          "fill": "#f7fff7"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 103,
+                          "y": 157,
+                          "width": 344,
+                          "height": 45,
+                          "rx": 18,
+                          "fill": "#e4f5e6"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 128,
+                          "cy": 178,
+                          "r": 6,
+                          "fill": "#82cd62"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 149,
+                          "cy": 178,
+                          "r": 6,
+                          "fill": "#c2e3b2"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 236,
+                          "width": 135,
+                          "height": 14,
+                          "rx": 7,
+                          "fill": "#acdca6"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 265,
+                          "width": 100,
+                          "height": 12,
+                          "rx": 6,
+                          "fill": "#d6e8d8"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 292,
+                          "width": 110,
+                          "height": 12,
+                          "rx": 6,
+                          "fill": "#d6e8d8"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 348,
+                          "cy": 287,
+                          "r": 54,
+                          "fill": "#7dcf4b"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M319 287v-10a29 29 0 0 1 58 0v10",
+                          "stroke": "white",
+                          "stroke-width": 10,
+                          "fill": "none",
+                          "stroke-linecap": "round"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 311,
+                          "y": 279,
+                          "width": 17,
+                          "height": 32,
+                          "rx": 8,
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 369,
+                          "y": 279,
+                          "width": 17,
+                          "height": 32,
+                          "rx": 8,
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 255,
+                          "y": 417,
+                          "width": 143,
+                          "height": 13,
+                          "rx": 6,
+                          "fill": "#233641"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 77,
+                          "cy": 348,
+                          "r": 39,
+                          "fill": "#55c3cf"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M58 342h12l14-12v37l-14-12H58z",
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M92 340q12 12 0 25",
+                          "stroke": "white",
+                          "stroke-width": 5,
+                          "fill": "none"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 457,
+                          "cy": 100,
+                          "r": 18,
+                          "fill": "#ff9b70"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M454 75v-23M478 76l15-14",
+                          "stroke": "#ff9b70",
+                          "stroke-width": 9,
+                          "fill": "none",
+                          "stroke-linecap": "round"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "right",
+            "children": [
+              {
+                "tag": "div",
+                "part": "content",
+                "children": [
+                  {
+                    "tag": "h1",
+                    "part": "welcome-title",
+                    "children": [
+                      {
+                        "text": "欢迎来到 WebSpeak"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "section",
+                    "part": "connection-card",
+                    "children": [
+                      {
+                        "tag": "div",
+                        "part": "card-heading",
+                        "children": [
+                          {
+                            "tag": "h2",
+                            "part": "connection-title",
+                            "children": [
+                              {
+                                "text": "连接 TeamSpeak 服务器"
+                              }
+                            ]
+                          },
+                          {
+                            "widget": "home.identity-provider",
+                            "part": "identity-provider",
+                            "options": {
+                              "identityProviderId": "myts",
+                              "identityProviderLabel": "myts"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "p",
+                        "part": "description",
+                        "children": [
+                          {
+                            "text": "无需注册账号，填写服务器信息即可加入语音"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "home.connection-form",
+                        "part": "connection-form"
+                      },
+                      {
+                        "tag": "p",
+                        "part": "note",
+                        "children": [
+                          {
+                            "text": "浏览器直连 · 无需安装 TeamSpeak 客户端"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "home.connection-status",
+                        "part": "status"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "widget": "home.social-links",
+            "part": "home-social-links"
+          },
+          {
+            "widget": "app.language-switcher",
+            "part": "home-language"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kaak-workspace",
+      "name": "KAAK voice workspace",
+      "page": "voice",
+      "mode": "surface",
+      "accessibleName": "KAAK 语音工作区 / Voice workspace",
+      "stateScope": "session.status.channelId",
+      "permissions": [
+        "ui.surface.replace",
+        "session.status.read",
+        "session.channels.read",
+        "session.members.read",
+        "session.memberAvatars.read",
+        "session.channel.join",
+        "servers.quickList.read",
+        "servers.quickList.switch",
+        "chat.channel.read",
+        "chat.channel.send",
+        "audio.status.read",
+        "audio.microphone.control",
+        "audio.output.control",
+        "audio.settings.open",
+        "voice.disconnect",
+        "voice.screenShare.status.read",
+        "voice.screenShare.read",
+        "voice.screenShare.control"
+      ],
+      "actions": {
+        "switch-server": {
+          "type": "quickServers.switch",
+          "args": {
+            "quickServerId": "{{server.id}}"
+          }
+        },
+        "disconnect": {
+          "type": "voice.disconnect",
+          "args": {}
+        },
+        "stop-screen-share": {
+          "type": "voice.stopScreenShare",
+          "args": {}
+        },
+        "start-screen-share": {
+          "type": "voice.startScreenShare",
+          "args": {}
+        },
+        "toggle-microphone": {
+          "type": "voice.toggleMicrophone",
+          "args": {}
+        },
+        "toggle-noise-suppression": {
+          "type": "audio.toggleNoiseSuppression",
+          "args": {}
+        },
+        "toggle-accompaniment": {
+          "type": "audio.toggleAccompaniment",
+          "args": {}
+        },
+        "toggle-output-mute": {
+          "type": "voice.toggleOutputMute",
+          "args": {}
+        },
+        "open-audio-settings": {
+          "type": "audio.openSettings",
+          "args": {}
+        },
+        "toggle-chat-panel": {
+          "type": "chat.togglePanel",
+          "args": {}
+        },
+        "toggle-mobile-page": {
+          "type": "ui.toggleState",
+          "args": {
+            "key": "channelspage",
+            "resetKey": "roommenu"
+          }
+        },
+        "toggle-room-menu": {
+          "type": "ui.toggleState",
+          "args": {
+            "key": "roommenu"
+          }
+        },
+        "toggle-voice-group": {
+          "type": "ui.toggleState",
+          "args": {
+            "key": "voicegroupopen"
+          }
+        }
+      },
+      "state": {
+        "channelspage": false,
+        "roommenu": false,
+        "voicegroupopen": true
+      },
+      "root": {
+        "tag": "main",
+        "part": "workspace",
+        "children": [
+          {
+            "tag": "nav",
+            "part": "server-rail",
+            "attributes": {
+              "aria-label": "收藏与历史服务器 / Favorites and history"
+            },
+            "children": [
+              {
+                "tag": "div",
+                "part": "server-list",
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "quick-server-item",
+                    "repeat": {
+                      "path": "servers.quickList",
+                      "as": "server"
+                    },
+                    "children": [
+                      {
+                        "tag": "button",
+                        "part": "quick-server",
+                        "attributes": {
+                          "type": "button",
+                          "aria-current": "{{server.current}}",
+                          "aria-label": "切换到 {{server.label}}"
+                        },
+                        "events": {
+                          "click": "switch-server"
+                        },
+                        "children": [
+                          {
+                            "tag": "span",
+                            "part": "server-monogram",
+                            "attributes": {
+                              "data-tone": "{{server.tone}}"
+                            },
+                            "children": [
+                              {
+                                "tag": "img",
+                                "part": "server-icon",
+                                "when": {
+                                  "path": "server.icon"
+                                },
+                                "attributes": {
+                                  "src": "{{server.icon}}",
+                                  "alt": ""
+                                }
+                              },
+                              {
+                                "tag": "span",
+                                "part": "server-monogram-initial",
+                                "when": {
+                                  "path": "server.icon",
+                                  "equals": ""
+                                },
+                                "children": [
+                                  {
+                                    "text": "{{server.monogram}}"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "server-kind",
+                            "when": {
+                              "path": "server.favorite",
+                              "equals": true
+                            },
+                            "children": [
+                              {
+                                "text": "收藏"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "server-kind",
+                            "when": {
+                              "path": "server.kind",
+                              "equals": "recent"
+                            },
+                            "children": [
+                              {
+                                "text": "最近"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "widget": "app.skin-switcher",
+                "part": "rail-skin"
+              },
+              {
+                "widget": "app.language-switcher",
+                "part": "rail-language"
+              }
+            ]
+          },
+          {
+            "tag": "header",
+            "part": "mobile-room-topbar",
+            "attributes": {
+              "aria-label": "语音房间控制"
+            },
+            "children": [
+              {
+                "tag": "button",
+                "part": "mobile-room-back",
+                "attributes": {
+                  "type": "button",
+                  "aria-label": "返回频道树，不断开语音"
+                },
+                "events": {
+                  "click": "toggle-mobile-page"
+                },
+                "children": [
+                  {
+                    "tag": "svg",
+                    "className": "mobile-room-top-icon",
+                    "attributes": {
+                      "width": 23,
+                      "height": 23,
+                      "viewbox": "0 0 24 24",
+                      "fill": "none",
+                      "stroke": "currentColor",
+                      "stroke-width": 1.8,
+                      "stroke-linecap": "round",
+                      "stroke-linejoin": "round",
+                      "aria-hidden": "true"
+                    },
+                    "children": [
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M20 12H4m7-7-7 7 7 7"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "strong",
+                "part": "mobile-room-mode",
+                "children": [
+                  {
+                    "text": "语音感应"
+                  }
+                ]
+              },
+              {
+                "tag": "button",
+                "part": "mobile-room-more-toggle",
+                "attributes": {
+                  "type": "button",
+                  "aria-expanded": "{{state.roommenu}}",
+                  "aria-label": "更多语音功能"
+                },
+                "events": {
+                  "click": "toggle-room-menu"
+                },
+                "children": [
+                  {
+                    "tag": "svg",
+                    "className": "mobile-room-top-icon",
+                    "attributes": {
+                      "width": 23,
+                      "height": 23,
+                      "viewbox": "0 0 24 24",
+                      "fill": "none",
+                      "stroke": "currentColor",
+                      "stroke-width": 1.8,
+                      "stroke-linecap": "round",
+                      "stroke-linejoin": "round",
+                      "aria-hidden": "true"
+                    },
+                    "children": [
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 5,
+                          "cy": 12,
+                          "r": 1,
+                          "fill": "currentColor",
+                          "stroke": "none"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 12,
+                          "cy": 12,
+                          "r": 1,
+                          "fill": "currentColor",
+                          "stroke": "none"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 19,
+                          "cy": 12,
+                          "r": 1,
+                          "fill": "currentColor",
+                          "stroke": "none"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "part": "mobile-room-menu",
+            "when": {
+              "path": "state.roommenu",
+              "equals": true
+            },
+            "attributes": {
+              "role": "menu",
+              "aria-label": "更多语音功能"
+            },
+            "children": [
+              {
+                "tag": "button",
+                "part": "mobile-room-chat-open",
+                "attributes": {
+                  "type": "button",
+                  "role": "menuitem",
+                  "aria-label": "打开聊天记录"
+                },
+                "events": {
+                  "click": "toggle-chat-panel"
+                },
+                "children": [
+                  {
+                    "text": "聊天记录"
+                  }
+                ]
+              },
+              {
+                "tag": "button",
+                "part": "mobile-room-menu-close",
+                "attributes": {
+                  "type": "button",
+                  "role": "menuitem"
+                },
+                "events": {
+                  "click": "toggle-room-menu"
+                },
+                "children": [
+                  {
+                    "text": "关闭菜单"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "mobile-room-head",
+            "attributes": {
+              "aria-label": "当前语音频道"
+            },
+            "children": [
+              {
+                "tag": "div",
+                "part": "mobile-room-channel-item",
+                "repeat": {
+                  "path": "session.channels",
+                  "as": "roomchannel"
+                },
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "mobile-room-channel-current",
+                    "when": {
+                      "path": "roomchannel.current",
+                      "equals": true
+                    },
+                    "children": [
+                      {
+                        "tag": "h1",
+                        "part": "mobile-room-channel-name",
+                        "children": [
+                          {
+                            "text": "{{roomchannel.name}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "div",
+                        "part": "mobile-room-channel-subtitle",
+                        "children": [
+                          {
+                            "tag": "span",
+                            "part": "mobile-room-online-indicator",
+                            "attributes": {
+                              "aria-hidden": "true"
+                            },
+                            "children": [
+                              {
+                                "text": "●"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "mobile-room-connection-label",
+                            "children": [
+                              {
+                                "text": "TeamSpeak · 已加入语音"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "mobile-room-subtitle-separator",
+                            "attributes": {
+                              "aria-hidden": "true"
+                            },
+                            "children": [
+                              {
+                                "text": "·"
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "part": "mobile-room-member-count",
+                            "children": [
+                              {
+                                "text": "{{roomchannel.memberCountLabel}} 人"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "channel-panel",
+            "attributes": {
+              "aria-label": "服务器频道 / Server channels"
+            },
+            "children": [
+              {
+                "widget": "voice.server-header",
+                "part": "server-summary"
+              },
+              {
+                "widget": "voice.server-banner",
+                "part": "server-banner"
+              },
+              {
+                "tag": "nav",
+                "part": "channel-list",
+                "attributes": {
+                  "aria-label": "频道 / Channels"
+                },
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "voice-channel-group-toggle",
+                    "attributes": {
+                      "type": "button",
+                      "aria-expanded": "{{state.voicegroupopen}}",
+                      "aria-label": "展开或收起语音分组 / Toggle voice group"
+                    },
+                    "events": {
+                      "click": "toggle-voice-group"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "voice-group-chevron",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "text": "›"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "voice-group-name",
+                        "children": [
+                          {
+                            "text": "语音分组"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "div",
+                    "part": "voice-channel-list",
+                    "children": [
+                      {
+                        "tag": "div",
+                        "part": "voice-channel-items",
+                        "children": [
+                          {
+                            "widget": "voice.channel-tree",
+                            "part": "voice-channel-tree",
+                            "options": {
+                              "layout": "server-sidebar",
+                              "memberActions": true,
+                              "memberDragDrop": true
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "button",
+                "part": "mobile-room-return",
+                "when": {
+                  "path": "session.status.connected",
+                  "equals": true
+                },
+                "attributes": {
+                  "type": "button",
+                  "aria-label": "返回当前语音房间"
+                },
+                "events": {
+                  "click": "toggle-mobile-page"
+                },
+                "children": [
+                  {
+                    "tag": "span",
+                    "part": "mobile-room-return-indicator",
+                    "attributes": {
+                      "aria-hidden": "true"
+                    },
+                    "children": [
+                      {
+                        "text": "●"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "mobile-room-return-copy",
+                    "children": [
+                      {
+                        "text": "语音已连接 · 点击返回房间"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "strong",
+                    "part": "mobile-room-return-channel",
+                    "children": [
+                      {
+                        "text": "{{session.status.channelName}}"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "mobile-room-return-arrow",
+                    "attributes": {
+                      "aria-hidden": "true"
+                    },
+                    "children": [
+                      {
+                        "text": "›"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "conversation",
+            "attributes": {
+              "aria-label": "聊天 / Chat",
+              "data-chat-open": "{{chat.status.panelOpen}}"
+            },
+            "children": [
+              {
+                "tag": "header",
+                "part": "conversation-heading",
+                "children": [
+                  {
+                    "tag": "h1",
+                    "part": "conversation-title",
+                    "children": [
+                      {
+                        "text": "{{chat.status.tabLabel}}"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "chat-panel-toggle",
+                    "attributes": {
+                      "type": "button",
+                      "aria-expanded": "{{chat.status.panelOpen}}",
+                      "aria-label": "收起或展开聊天面板 / Toggle chat panel"
+                    },
+                    "events": {
+                      "click": "toggle-chat-panel"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "part": "chat-panel-chevron",
+                        "when": {
+                          "path": "chat.status.panelOpen",
+                          "equals": true
+                        },
+                        "children": [
+                          {
+                            "text": "×"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "chat-panel-chevron",
+                        "when": {
+                          "path": "chat.status.panelOpen",
+                          "equals": false
+                        },
+                        "children": [
+                          {
+                            "text": "‹"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "widget": "voice.chat-panel",
+                "part": "chat-panel",
+                "when": {
+                  "path": "chat.status.panelOpen",
+                  "equals": true
+                }
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "voice-stage",
+            "attributes": {
+              "aria-label": "语音房间 / Voice room"
+            },
+            "children": [
+              {
+                "tag": "div",
+                "part": "voice-stage-heading-item",
+                "repeat": {
+                  "path": "session.channels",
+                  "as": "stagechannel"
+                },
+                "children": [
+                  {
+                    "tag": "header",
+                    "part": "voice-stage-heading",
+                    "when": {
+                      "path": "stagechannel.current",
+                      "equals": true
+                    },
+                    "children": [
+                      {
+                        "tag": "button",
+                        "part": "mobile-channel-back",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "返回频道树"
+                        },
+                        "events": {
+                          "click": "toggle-mobile-page"
+                        },
+                        "children": [
+                          {
+                            "text": "‹"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "voice-stage-glyph",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "text": "🔊︎"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "h2",
+                        "part": "voice-stage-title",
+                        "children": [
+                          {
+                            "text": "{{stagechannel.name}}"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "part": "voice-stage-member-count",
+                        "attributes": {
+                          "aria-label": "频道成员数 / Channel member count"
+                        },
+                        "children": [
+                          {
+                            "text": "{{stagechannel.memberCountLabel}}"
+                          },
+                          {
+                            "tag": "span",
+                            "part": "voice-stage-capacity",
+                            "when": {
+                              "path": "stagechannel.maxClientsLimited",
+                              "equals": true
+                            },
+                            "children": [
+                              {
+                                "text": "/{{stagechannel.maxClients}}"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "chat-panel-expand",
+                        "when": {
+                          "path": "chat.status.panelOpen",
+                          "equals": false
+                        },
+                        "attributes": {
+                          "type": "button",
+                          "aria-expanded": "{{chat.status.panelOpen}}",
+                          "aria-label": "展开聊天面板 / Expand chat panel"
+                        },
+                        "events": {
+                          "click": "toggle-chat-panel"
+                        },
+                        "children": [
+                          {
+                            "text": "聊天"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "widget": "voice.screen-share-player",
+                "part": "screen-share-player"
+              },
+              {
+                "widget": "voice.member-cards",
+                "part": "member-cards",
+                "options": {
+                  "screenShare": true,
+                  "memberActions": true
+                }
+              }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "voice-dock",
+            "attributes": {
+              "aria-label": "语音控制 / Voice controls"
+            },
+            "children": [
+              {
+                "tag": "div",
+                "part": "voice-dock-heading",
+                "children": [
+                  {
+                    "tag": "span",
+                    "part": "connection-indicator",
+                    "children": [
+                      {
+                        "text": "●"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "strong",
+                    "part": "voice-channel-name",
+                    "children": [
+                      {
+                        "text": "{{session.status.channelName}}"
+                      }
+                    ]
+                  },
+                  {
+                    "widget": "voice.performance-panel",
+                    "part": "performance-panel",
+                    "options": {
+                      "screenShare": false
+                    }
+                  },
+                  {
+                    "tag": "button",
+                    "part": "disconnect-control",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "断开语音"
+                    },
+                    "events": {
+                      "click": "disconnect"
+                    },
+                    "children": [
+                      {
+                        "text": "离开"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "voice-dock-actions",
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "voice-dock-share",
+                    "children": [
+                      {
+                        "widget": "voice.screen-share-start",
+                        "part": "screen-share-start",
+                        "when": {
+                          "path": "screenShare.status.active",
+                          "equals": false
+                        }
+                      },
+                      {
+                        "tag": "button",
+                        "part": "screen-share-stop",
+                        "when": {
+                          "path": "screenShare.status.active",
+                          "equals": true
+                        },
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "停止屏幕共享"
+                        },
+                        "events": {
+                          "click": "stop-screen-share"
+                        },
+                        "children": [
+                          {
+                            "text": "停止屏幕共享"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "div",
+                    "part": "desktop-room-controls",
+                    "className": "desktop-room-controls",
+                    "attributes": {
+                      "role": "toolbar",
+                      "aria-label": "语音设置 / Audio controls"
+                    },
+                    "children": [
+                      {
+                        "tag": "button",
+                        "part": "desktop-room-settings",
+                        "className": "desktop-room-control desktop-room-settings",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "语音设置 / Audio settings",
+                          "title": "语音设置 / Audio settings"
+                        },
+                        "events": {
+                          "click": "open-audio-settings"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "desktop-room-control-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": true
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.74.45l-.06.06h-3.4l-.03-.08a1.7 1.7 0 0 0-1.35-1.14l-.08-.01-1.7-2.95.05-.06a1.7 1.7 0 0 0 0-1.96l-.05-.07 1.7-2.94.08.02a1.7 1.7 0 0 0 1.74-.45l.06-.06h3.4l.03.08a1.7 1.7 0 0 0 1.35 1.14l.08.01 1.7 2.95-.05.06Z"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "tag": "span",
+                            "className": "desktop-room-control-label",
+                            "children": [
+                              {
+                                "text": "语音设置"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "desktop-room-noise-suppression",
+                        "className": "desktop-room-control desktop-room-noise-suppression",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "噪声抑制 / Noise suppression",
+                          "title": "噪声抑制 / Noise suppression",
+                          "aria-pressed": "{{audio.status.noiseSuppressionEnabled}}"
+                        },
+                        "events": {
+                          "click": "toggle-noise-suppression"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "desktop-room-control-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": true
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M3 12h4l3-4v8l-3-4H3Z"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M14 9l6 6"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M20 9l-6 6"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "desktop-room-microphone",
+                        "className": "desktop-room-control desktop-room-microphone",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "麦克风 / Microphone",
+                          "title": "麦克风 / Microphone",
+                          "aria-pressed": "{{audio.status.microphoneMuted}}"
+                        },
+                        "events": {
+                          "click": "toggle-microphone"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "desktop-room-control-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": true
+                            },
+                            "children": [
+                              {
+                                "tag": "rect",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "x": 9,
+                                  "y": 2,
+                                  "width": 6,
+                                  "height": 13,
+                                  "rx": 3
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "d": "M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": true
+                                },
+                                "attributes": {
+                                  "d": "M9 9V5a3 3 0 0 1 6 0v6M9 11a3 3 0 0 0 4 2.8M5 10a7 7 0 0 0 12 4M19 10a7 7 0 0 1-.7 3M12 18v4M8 22h8M3 3l18 18"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "desktop-room-output",
+                        "className": "desktop-room-control desktop-room-output",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "扬声器静音 / Speaker mute",
+                          "title": "扬声器静音 / Speaker mute",
+                          "aria-pressed": "{{audio.status.outputMuted}}"
+                        },
+                        "events": {
+                          "click": "toggle-output-mute"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "desktop-room-control-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": true
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M3 9v6h4l5 4V5L7 9H3Z"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.outputMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "d": "M16 9a5 5 0 0 1 0 6"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.outputMuted",
+                                  "equals": true
+                                },
+                                "attributes": {
+                                  "d": "M19 6l-8 12"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "button",
+                        "part": "desktop-room-accompaniment",
+                        "className": "desktop-room-control desktop-room-accompaniment",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "伴奏 / Accompaniment",
+                          "title": "伴奏 / Accompaniment",
+                          "aria-pressed": "{{audio.status.accompanimentActive}}"
+                        },
+                        "events": {
+                          "click": "toggle-accompaniment"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "desktop-room-control-icon",
+                            "attributes": {
+                              "width": 18,
+                              "height": 18,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round",
+                              "aria-hidden": true
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M9 18V5l12-2v13"
+                                }
+                              },
+                              {
+                                "tag": "circle",
+                                "attributes": {
+                                  "cx": 6,
+                                  "cy": 18,
+                                  "r": 3
+                                }
+                              },
+                              {
+                                "tag": "circle",
+                                "attributes": {
+                                  "cx": 18,
+                                  "cy": 16,
+                                  "r": 3
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "mobile-room-controls",
+                "className": "mobile-room-controls",
+                "attributes": {
+                  "role": "toolbar",
+                  "aria-label": "语音控制"
+                },
+                "children": [
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-microphone",
+                    "className": "mobile-room-control mobile-room-microphone",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "麦克风",
+                      "aria-pressed": "{{audio.status.microphoneMuted}}",
+                      "data-muted": "{{audio.status.microphoneMuted}}",
+                      "title": "麦克风"
+                    },
+                    "events": {
+                      "click": "toggle-microphone"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "rect",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "x": 9,
+                                  "y": 2,
+                                  "width": 6,
+                                  "height": 13,
+                                  "rx": 3
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "d": "M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.microphoneMuted",
+                                  "equals": true
+                                },
+                                "attributes": {
+                                  "d": "M9 9V5a3 3 0 0 1 6 0v6M9 11a3 3 0 0 0 4 2.8M5 10a7 7 0 0 0 12 4M19 10a7 7 0 0 1-.7 3M12 18v4M8 22h8M3 3l18 18"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "when": {
+                          "path": "audio.status.microphoneMuted",
+                          "equals": false
+                        },
+                        "children": [
+                          {
+                            "text": "闭麦"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "when": {
+                          "path": "audio.status.microphoneMuted",
+                          "equals": true
+                        },
+                        "children": [
+                          {
+                            "text": "开麦"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-deafen",
+                    "className": "mobile-room-control mobile-room-deafen",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "耳机静音",
+                      "aria-pressed": "{{audio.status.outputMuted}}",
+                      "data-muted": "{{audio.status.outputMuted}}",
+                      "title": "耳机静音"
+                    },
+                    "events": {
+                      "click": "toggle-output-mute"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.outputMuted",
+                                  "equals": false
+                                },
+                                "attributes": {
+                                  "d": "M3 14v-3a9 9 0 0 1 18 0v3M3 14h5v7H6a3 3 0 0 1-3-3v-4ZM16 14h5v4a3 3 0 0 1-3 3h-2v-7Z"
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "when": {
+                                  "path": "audio.status.outputMuted",
+                                  "equals": true
+                                },
+                                "attributes": {
+                                  "d": "M3 14v-3a9 9 0 0 1 3-7M9 2.5A9 9 0 0 1 21 11v3M3 14h5v7H6a3 3 0 0 1-3-3v-4ZM16 14h5v4a3 3 0 0 1-3 3h-2v-7ZM3 3l18 18"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "when": {
+                          "path": "audio.status.outputMuted",
+                          "equals": false
+                        },
+                        "children": [
+                          {
+                            "text": "静音"
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "when": {
+                          "path": "audio.status.outputMuted",
+                          "equals": true
+                        },
+                        "children": [
+                          {
+                            "text": "恢复"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-speaker",
+                    "className": "mobile-room-control mobile-room-speaker",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "扬声器",
+                      "title": "扬声器"
+                    },
+                    "events": {
+                      "click": "open-audio-settings"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M11 5 6 9H3v6h3l5 4V5ZM15 9a5 5 0 0 1 0 6m3-9a9 9 0 0 1 0 12"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "children": [
+                          {
+                            "text": "扬声器"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-share",
+                    "className": "mobile-room-control mobile-room-share",
+                    "when": {
+                      "path": "screenShare.status.active",
+                      "equals": false
+                    },
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "屏幕共享",
+                      "title": "屏幕共享",
+                      "aria-pressed": false
+                    },
+                    "events": {
+                      "click": "start-screen-share"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "rect",
+                                "attributes": {
+                                  "x": 3,
+                                  "y": 4,
+                                  "width": 18,
+                                  "height": 14,
+                                  "rx": 2
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M8 22h8M12 18v4"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "children": [
+                          {
+                            "text": "屏幕共享"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-share-active",
+                    "className": "mobile-room-control mobile-room-share active",
+                    "when": {
+                      "path": "screenShare.status.active",
+                      "equals": true
+                    },
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "停止屏幕共享",
+                      "title": "停止屏幕共享",
+                      "aria-pressed": true
+                    },
+                    "events": {
+                      "click": "stop-screen-share"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "rect",
+                                "attributes": {
+                                  "x": 3,
+                                  "y": 4,
+                                  "width": 18,
+                                  "height": 14,
+                                  "rx": 2
+                                }
+                              },
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M8 22h8M12 18v4"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "children": [
+                          {
+                            "text": "屏幕共享"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "button",
+                    "part": "mobile-room-exit",
+                    "className": "mobile-room-control mobile-room-exit",
+                    "attributes": {
+                      "type": "button",
+                      "aria-label": "退出",
+                      "title": "退出"
+                    },
+                    "events": {
+                      "click": "disconnect"
+                    },
+                    "children": [
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-disc",
+                        "attributes": {
+                          "aria-hidden": "true"
+                        },
+                        "children": [
+                          {
+                            "tag": "svg",
+                            "className": "mobile-room-control-icon",
+                            "attributes": {
+                              "width": 28,
+                              "height": 28,
+                              "viewbox": "0 0 24 24",
+                              "fill": "none",
+                              "stroke": "currentColor",
+                              "stroke-width": 1.8,
+                              "stroke-linecap": "round",
+                              "stroke-linejoin": "round"
+                            },
+                            "children": [
+                              {
+                                "tag": "path",
+                                "attributes": {
+                                  "d": "M12 2v10M6 5a9 9 0 1 0 12 0"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "span",
+                        "className": "mobile-room-control-caption",
+                        "children": [
+                          {
+                            "text": "退出"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "part": "identity-entry",
+            "when": {
+              "path": "session.status.userName"
+            },
+            "attributes": {
+              "role": "group",
+              "aria-label": "当前 TeamSpeak 身份"
+            },
+            "children": [
+              {
+                "tag": "span",
+                "part": "identity-monogram",
+                "children": [
+                  {
+                    "text": "TS"
+                  },
+                  {
+                    "tag": "span",
+                    "part": "identity-online",
+                    "when": {
+                      "path": "session.status.connected",
+                      "equals": true
+                    },
+                    "attributes": {
+                      "role": "img",
+                      "aria-label": "在线"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "span",
+                "part": "identity-name",
+                "children": [
+                  {
+                    "text": "{{session.status.userName}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "attributes": {
+          "data-chat-open": "{{chat.status.panelOpen}}",
+          "data-mobile-channels": "{{state.channelspage}}",
+          "data-session-connected": "{{session.status.connected}}",
+          "data-voice-group-open": "{{state.voicegroupopen}}"
+        }
+      }
+    }
+  ]
+}

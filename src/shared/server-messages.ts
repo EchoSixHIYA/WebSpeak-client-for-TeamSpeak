@@ -13,6 +13,7 @@ type ChatFields = { invokerId?: number; invokerName?: string; message: string; t
 /** Public JSON messages. Internal sockets, SDK clients and media objects stay out. */
 export type ServerMessage =
   | Message<"connected", { tsClientId: number; members?: ChannelMember[]; serverEventLog?: ServerEvent[]; identity?: string; webrtcAvailable?: boolean; webRtcStunServer?: string; whisperTargetIds?: number[]; whisperActive?: boolean; screenShareIceServers?: ScreenShareIceServer[]; accelerated?: boolean }>
+  | Message<"serverInfo", { name: string; icon?: string | null; bannerUrl?: string | null; welcomeMessage?: string }>
   | Message<"memberEnter", ChannelMember>
   | Message<"memberLeave", { id: number }>
   | Message<"memberAvatar", { id: number; uid?: string; avatar?: string }>
@@ -50,6 +51,15 @@ const identifier = (value: unknown): value is string => text(value) && value.len
 const channelId = (value: unknown): value is string | number => (text(value) && /^\d{1,20}$/.test(value)) || (finite(value) && Number.isSafeInteger(value) && value >= 0);
 const optional = (value: unknown, check: (value: unknown) => boolean): boolean => value === undefined || check(value);
 const arrayOf = (value: unknown, check: (value: unknown) => boolean): boolean => Array.isArray(value) && value.every(check);
+const safeHttpUrl = (value: unknown): boolean => {
+  if (!text(value) || value.length > 2_048) return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+};
 
 function member(value: unknown): value is ChannelMember {
   return isRecord(value) && clientId(value.id) && text(value.nickname)
@@ -60,6 +70,10 @@ function member(value: unknown): value is ChannelMember {
 function channel(value: unknown): value is ChannelInfo {
   return isRecord(value) && text(value.id) && channelId(value.id) && text(value.parentID) && channelId(value.parentID)
     && text(value.name) && optional(value.order, text) && optional(value.description, text)
+    && optional(value.maxClients, maximum => finite(maximum) && Number.isInteger(maximum) && maximum >= 0 && maximum <= 65_535)
+    && optional(value.maxClientsLimited, boolean)
+    && optional(value.passwordProtected, boolean)
+    && (value.maxClients === undefined) === (value.maxClientsLimited === undefined)
     && optional(value.members, members => arrayOf(members, member));
 }
 
@@ -112,6 +126,11 @@ const valid: Record<ServerMessage["type"], (message: RecordValue) => boolean> = 
   connected: m => clientId(m.tsClientId) && optional(m.members, v => arrayOf(v, member)) && optional(m.serverEventLog, v => arrayOf(v, event))
     && optional(m.identity, v => text(v) && v.length <= 8192) && optional(m.webrtcAvailable, boolean) && optional(m.webRtcStunServer, v => normalizeVoiceStunServer(v) !== null)
     && optional(m.whisperTargetIds, v => arrayOf(v, clientId)) && optional(m.whisperActive, boolean) && optional(m.accelerated, boolean),
+  serverInfo: m => text(m.name) && m.name.length <= 256
+    && optional(m.icon, v => v === null || (text(v) && v.length <= 180_000
+      && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(v)))
+    && optional(m.bannerUrl, v => v === null || safeHttpUrl(v))
+    && optional(m.welcomeMessage, v => text(v) && v.length <= 4_096),
   memberEnter: member,
   memberLeave: m => clientId(m.id),
   memberAvatar: m => clientId(m.id) && optional(m.uid, text) && optional(m.avatar, text),

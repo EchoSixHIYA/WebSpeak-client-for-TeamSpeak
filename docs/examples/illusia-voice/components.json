@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "id": "illusia-now-playing",
+      "name": "ILLUSIA 当前频道 / current channel",
+      "page": "voice",
+      "accessibleName": "当前语音频道 / Current voice channel",
+      "permissions": ["session.status.read"],
+      "actions": {},
+      "root": {
+        "tag": "aside",
+        "part": "room-card",
+        "className": "illusia-now-playing",
+        "attributes": { "role": "status" },
+        "children": [
+          {
+            "tag": "small",
+            "part": "eyebrow",
+            "children": [{ "text": "ILLUSIA · 当前频道 / NOW IN" }]
+          },
+          {
+            "tag": "strong",
+            "part": "channel-name",
+            "children": [{ "text": "{{session.status.channelName}}" }]
+          }
+        ]
+      }
+    }
+  ]
+}

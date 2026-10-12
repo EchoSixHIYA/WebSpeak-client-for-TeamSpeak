@@ -1,6 +1,7 @@
 node_modules/
 dist/
 web/dist/
+web/skin-wasm-interpreter/target/
 mobile/node_modules/
 web/android/.gradle/
 web/android/build/

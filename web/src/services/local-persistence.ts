@@ -1,5 +1,5 @@
 const DB_NAME = "webspeak-local";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const CURRENT_IDENTITY_KEY = "current";
 const PREFERENCES_KEY = "singleton";
 
@@ -31,6 +31,8 @@ export interface FavoriteServer {
   nickname?: string;
   identityId?: string;
   lastChannelHint?: { id?: string; name?: string };
+  serverName?: string;
+  serverIcon?: string;
 }
 
 export interface RecentServer {
@@ -40,6 +42,101 @@ export interface RecentServer {
   identityId?: string;
   lastConnectedAt: number;
   lastChannelHint?: { id?: string; name?: string };
+  serverName?: string;
+  serverIcon?: string;
+}
+
+interface BrowserCredentialRecord {
+  id: string;
+  serverKey: string;
+  kind: "server-password" | "channel-password";
+  channelId?: string;
+  password: string;
+  updatedAt: number;
+}
+
+export function normalizeBrowserCredentialServerKey(target: string): string {
+  return target.trim().toLowerCase();
+}
+
+function serverCredentialId(serverKey: string): string {
+  return `server:${serverKey}`;
+}
+
+function channelCredentialId(serverKey: string, channelId: string): string {
+  return `channel:${JSON.stringify([serverKey, channelId])}`;
+}
+
+async function loadBrowserCredential(id: string, serverKey: string, kind: BrowserCredentialRecord["kind"], channelId?: string): Promise<string> {
+  if (!serverKey || (kind === "channel-password" && !channelId)) return "";
+  try {
+    const record = await request<BrowserCredentialRecord | null>("credentials", "readonly", (store, resolve, reject) => {
+      const get = store.get(id);
+      get.onsuccess = () => resolve((get.result as BrowserCredentialRecord | undefined) ?? null);
+      get.onerror = () => reject(get.error);
+    });
+    if (record?.serverKey !== serverKey || record.kind !== kind || record.channelId !== channelId) return "";
+    return typeof record.password === "string" ? record.password : "";
+  } catch {
+    return "";
+  }
+}
+
+async function saveBrowserCredential(record: BrowserCredentialRecord): Promise<void> {
+  if (!record.serverKey || !record.password || record.password.length > 512) return;
+  try {
+    await request("credentials", "readwrite", (store, resolve, reject) => {
+      const put = store.put(record);
+      put.onsuccess = () => resolve(undefined);
+      put.onerror = () => reject(put.error);
+    });
+  } catch {
+    // Credential persistence is best effort and must never block a connection.
+  }
+}
+
+async function removeBrowserCredential(id: string): Promise<void> {
+  try {
+    await request("credentials", "readwrite", (store, resolve, reject) => {
+      const remove = store.delete(id);
+      remove.onsuccess = () => resolve(undefined);
+      remove.onerror = () => reject(remove.error);
+    });
+  } catch {
+    // Credential removal is best effort when browser storage is unavailable.
+  }
+}
+
+export function loadStoredServerPassword(target: string): Promise<string> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  return loadBrowserCredential(serverCredentialId(serverKey), serverKey, "server-password");
+}
+
+export function saveStoredServerPassword(target: string, password: string): Promise<void> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  return saveBrowserCredential({ id: serverCredentialId(serverKey), serverKey, kind: "server-password", password, updatedAt: Date.now() });
+}
+
+export function removeStoredServerPassword(target: string): Promise<void> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  return removeBrowserCredential(serverCredentialId(serverKey));
+}
+
+export function loadStoredChannelPassword(target: string, channelId: string): Promise<string> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  return loadBrowserCredential(channelCredentialId(serverKey, channelId), serverKey, "channel-password", channelId);
+}
+
+export function saveStoredChannelPassword(target: string, channelId: string, password: string): Promise<void> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  if (!channelId) return Promise.resolve();
+  return saveBrowserCredential({ id: channelCredentialId(serverKey, channelId), serverKey, kind: "channel-password", channelId, password, updatedAt: Date.now() });
+}
+
+export function removeStoredChannelPassword(target: string, channelId: string): Promise<void> {
+  const serverKey = normalizeBrowserCredentialServerKey(target);
+  if (!channelId) return Promise.resolve();
+  return removeBrowserCredential(channelCredentialId(serverKey, channelId));
 }
 
 export interface LocalPreferences {
@@ -80,6 +177,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains("favorites")) database.createObjectStore("favorites", { keyPath: "id" });
       if (!database.objectStoreNames.contains("recent")) database.createObjectStore("recent", { keyPath: "id" });
       if (!database.objectStoreNames.contains("skins")) database.createObjectStore("skins", { keyPath: "id" });
+      if (!database.objectStoreNames.contains("credentials")) database.createObjectStore("credentials", { keyPath: "id" });
       if (!database.objectStoreNames.contains("chatHistory")) {
         const store = database.createObjectStore("chatHistory", { keyPath: "id" });
         store.createIndex("serverKey", "serverKey", { unique: false });
@@ -374,7 +472,7 @@ async function removeRecentServer(id: string): Promise<void> {
 export async function clearLocalData(): Promise<void> {
   try {
     const database = await openDatabase();
-    await Promise.all(["identities", "preferences", "favorites", "recent", "skins", "chatHistory"].map((storeName) => new Promise<void>((resolve, reject) => {
+    await Promise.all(["identities", "preferences", "favorites", "recent", "skins", "chatHistory", "credentials"].map((storeName) => new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(storeName, "readwrite");
       transaction.objectStore(storeName).clear();
       transaction.oncomplete = () => resolve();

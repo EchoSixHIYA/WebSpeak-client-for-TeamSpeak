@@ -26,6 +26,7 @@ import { WebRtcAudioSession, type WebRtcAudioOptions, type WebRtcAudioSessionOpt
 import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./acceleration-relay.js";
 import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenShareIceServer } from "./screen-share.js";
 import { OpusEncoder } from "./opus-codec.js";
+import { avatarDataUrl } from "./directory-view.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>): string | undefined {
@@ -242,6 +243,7 @@ export class VoiceBridge {
       }
 
       let initialStateSent = false;
+      let serverInfoGeneration = 0;
       let hasConnectedOnce = false;
       let reconnectStartedAt = 0;
       let reconnectAttempt = 0;
@@ -290,6 +292,7 @@ export class VoiceBridge {
         sendJson({ type: "channelList", channels: entry!.channelTree });
         if (wasReconnecting) sendJson({ type: "reconnected" });
         events.scheduleAvatars();
+        void publishServerInfo();
       };
 
       const resetDirectoryForReconnect = () => {
@@ -297,6 +300,33 @@ export class VoiceBridge {
         events.reset();
         void this.stopWebRtc(entry!);
         initialStateSent = false;
+      };
+
+      const publishServerInfo = async (): Promise<void> => {
+        const generation = ++serverInfoGeneration;
+        const isCurrent = () => generation === serverInfoGeneration
+          && this.entries.get(entryId) === entry && session.state === "connected";
+        try {
+          const info = await tsClient.getServerInfo();
+          if (!isCurrent()) return;
+          const name = info.name.trim().slice(0, 256);
+          const publicInfo = { name, icon: null as string | null, bannerUrl: null as string | null, welcomeMessage: "" };
+          sendJson({ type: "serverInfo", ...publicInfo });
+          const [presentation, icon] = await Promise.all([
+            tsClient.getServerPresentation().catch((error: unknown) => {
+              if (isCurrent()) this.logger.debug({ entryId, err: error instanceof Error ? error.message : String(error) }, "TeamSpeak server presentation unavailable");
+              return { bannerUrl: null, welcomeMessage: "" };
+            }),
+            info.iconId ? tsClient.getServerIcon(info.iconId).catch(() => null) : Promise.resolve(null),
+          ]);
+          if (!isCurrent()) return;
+          publicInfo.bannerUrl = presentation.bannerUrl;
+          publicInfo.welcomeMessage = presentation.welcomeMessage;
+          publicInfo.icon = icon ? avatarDataUrl(icon) : null;
+          sendJson({ type: "serverInfo", ...publicInfo });
+        } catch (error: unknown) {
+          if (isCurrent()) this.logger.debug({ entryId, err: error instanceof Error ? error.message : String(error) }, "TeamSpeak server icon unavailable");
+        }
       };
 
       const failReconnect = (normalized: ReturnType<typeof normalizeTeamSpeakError>) => {

@@ -23,6 +23,7 @@ interface SdkEvents {
   clientMoved: { id: number; targetChannelID?: bigint };
   clientUpdated: TSDirectoryClient;
   directoryClientsSnapshot: TSDirectoryClient[];
+  channelPasswordProtectionChanged: { channelId: bigint; passwordProtected: boolean };
   rawNotification: TSRawNotification;
   voiceData: TSVoiceData;
   textMessage: TSChatMessage;
@@ -133,6 +134,14 @@ export class SessionEventCoordinator {
     this.listenDirectory("directoryClientsSnapshot", clients => {
       this.directory.applyClientListSnapshot(clients);
       this.refresh();
+      this.publishDirectory();
+    });
+    this.listenDirectory("channelPasswordProtectionChanged", change => {
+      const channelId = String(change.channelId);
+      if (!state.channelTree.some(channel => channel.id === channelId)) return;
+      state.channelTree = state.channelTree.map(channel => channel.id === channelId
+        ? { ...channel, passwordProtected: change.passwordProtected }
+        : channel);
       this.publishDirectory();
     });
     this.listen("rawNotification", options.onNotification);

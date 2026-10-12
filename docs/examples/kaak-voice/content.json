@@ -1,0 +1,10 @@
+{
+  "defaultLocale": "zh-CN",
+  "locales": {
+    "zh-CN": { "home": { "brandName": "KAAK" }, "messages": { "passwordDialogConfirm": "确定" } },
+    "en": { "home": { "brandName": "KAAK" }, "messages": { "passwordDialogConfirm": "Confirm" } },
+    "de": { "home": { "brandName": "KAAK" }, "messages": { "passwordDialogConfirm": "Bestätigen" } },
+    "ru": { "home": { "brandName": "KAAK" }, "messages": { "passwordDialogConfirm": "Подтвердить" } },
+    "ja": { "home": { "brandName": "KAAK" }, "messages": { "passwordDialogConfirm": "確定" } }
+  }
+}

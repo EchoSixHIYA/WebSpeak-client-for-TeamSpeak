@@ -38,6 +38,10 @@
     </template>
     <path v-else-if="name === 'headset'" d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v5H5a1 1 0 0 1-1-1zm16 0h-3v5h2a1 1 0 0 1-1-1z" />
     <path v-else-if="name === 'volume'" d="M4 10v4h3l4 3V7l-4 3zm10.5-2.5a6 6 0 0 1 0 9m2-11a9 9 0 0 1 0 13" />
+    <template v-else-if="name === 'speaker'">
+      <path d="M3 9v6h4l5 4V5L7 9H3Z" fill="currentColor" stroke="none" />
+      <path d="M16 9a4 4 0 0 1 0 6m2.5-8.5a7.5 7.5 0 0 1 0 11" />
+    </template>
     <path v-else-if="name === 'volume-off'" d="m4 4 16 16M4 10v4h3l4 3V7l-4 3z" />
     <template v-else-if="name === 'search'">
       <circle cx="10.8" cy="10.8" r="6.8" />
@@ -53,6 +57,7 @@
     <template v-else-if="name === 'plus'">
       <path d="M12 5v14M5 12h14" />
     </template>
+    <path v-else-if="name === 'star'" d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />
     <path v-else-if="name === 'chevron-down'" d="m6 9 6 6 6-6" />
     <path v-else-if="name === 'chevron-right'" d="m9 6 6 6-6 6" />
     <path v-else-if="name === 'hash'" d="M9 3 7 21M17 3l-2 18M4 9h16M3 15h16" />
@@ -66,12 +71,18 @@
     <path v-else-if="name === 'copy'" d="M8 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M6 8h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" />
     <path v-else-if="name === 'close'" d="m6 6 12 12M18 6 6 18" />
     <path v-else-if="name === 'more'" d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3" />
+    <path v-else-if="name === 'menu'" d="M4 6h16M4 12h16M4 18h16" />
     <path v-else-if="name === 'refresh'" d="M20 11a8 8 0 0 0-14-4L4 9m0-4v4h4M4 13a8 8 0 0 0 14 4l2-2m0 4v-4h-4" />
     <path v-else-if="name === 'lock'" d="M6 10h12v10H6zM8 10V7a4 4 0 0 1 8 0v3" />
     <path v-else-if="name === 'users'" d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6-7a4 4 0 0 1 0 7m2 5h1a4 4 0 0 1 4 4v1" />
     <path v-else-if="name === 'message'" d="M20 11.5a7.5 7.5 0 0 1-8 7.5 9.4 9.4 0 0 1-3-.5L4 20l1.5-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z" />
     <path v-else-if="name === 'door'" d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5m5 14 5-5-5-5m5 5H9" />
+    <path v-else-if="name === 'power'" d="M12 2v10m-5.9-5.1a9 9 0 1 0 11.8 0" />
     <path v-else-if="name === 'waveform'" d="M3 12h2l2-6 3 12 3-9 2 6h6" />
+    <template v-else-if="name === 'noise-suppression'">
+      <path d="M2.5 13h2l2-5 2.7 9 2.4-7 1.4 3H15" />
+      <path d="M19 5.5v4m-2-2h4" />
+    </template>
     <path v-else-if="name === 'shield'" d="M12 21s8-3.5 8-10V5l-8-3-8 3v6c0 6.5 8 10 8 10Z" />
     <template v-else-if="name === 'sun'">
       <circle cx="12" cy="12" r="4" />
@@ -79,6 +90,7 @@
     </template>
     <path v-else-if="name === 'moon'" d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2Z" />
     <path v-else-if="name === 'monitor'" d="M4 4h16v12H4zM8 20h8M12 16v4" />
+    <path v-else-if="name === 'translate'" fill="currentColor" stroke="none" d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.99-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.14 8.44 10 10.47 8 12.1c-1.31-1.08-2.39-2.39-3.2-3.91H2.8c.93 2.07 2.26 3.9 4.05 5.41l-3.74 3.71L4.5 18.7 8 15.2l2.18 2.18.69-2.31zm4.63-6.07h-2L11 22h2l1.12-3h4.75L20 22h2l-4.5-13zm-2.62 8 1.62-4.33L18.12 17h-3.24z" />
     <path v-else-if="name === 'fullscreen'" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
     <path v-else-if="name === 'fullscreen-exit'" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
     <path v-else-if="name === 'github'" fill="currentColor" stroke="none" d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.53-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.73-1.52-2.55-.29-5.23-1.28-5.23-5.68 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.03 0 0 .96-.31 3.15 1.17.91-.25 1.88-.38 2.85-.38.97 0 1.94.13 2.85.38 2.19-1.48 3.15-1.17 3.15-1.17.62 1.58.23 2.74.11 3.03.73.8 1.18 1.82 1.18 3.07 0 4.41-2.69 5.38-5.25 5.67.41.35.78 1.04.78 2.1 0 1.52-.01 2.75-.01 3.12 0 .3.21.67.8.56C20.71 21.39 24 17.08 24 12 24 5.65 18.35.5 12 .5Z" />

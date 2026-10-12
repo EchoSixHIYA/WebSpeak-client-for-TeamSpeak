@@ -4,6 +4,9 @@ import test from "node:test";
 import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
+import { BUILTIN_SKIN_CATALOG } from "./skin-catalog.js";
+import type { SkinPluginDocument, SkinPluginNode } from "../../../src/shared/skin-plugin.js";
+import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 
 const manifest = {
   schemaVersion: 1,
@@ -46,6 +49,7 @@ test("skin CSS permits visual decoration but prevents layout, text-flow, and con
   assert.match(skin.css, /animation: ws-ocean-night-fade-wave 1s/);
 
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { display: none; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { d\\69splay: none; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.screen-player.exit"] { position: fixed; inset: 0; z-index: 99999; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="voice.member"] { padding: 30px; transform: scale(1.2); }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home.hero.title"] { font-size: 3rem; line-height: 1; white-space: nowrap; }')), (error: unknown) => error instanceof Error && error.message.includes("must not change layout"));
@@ -60,6 +64,9 @@ test("skin CSS permits visual decoration but prevents layout, text-flow, and con
   await assert.rejects(importSkinPack(makeSkin(".internal-class { color: red; }")), (error: unknown) => error instanceof Error && error.message.includes("must use :root"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="demo.voice-card"].private-component { color: red; }')), (error: unknown) => error instanceof Error && error.message.includes("must use :root"));
   await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: image-set("https://example.invalid/remote.png" 1x); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: u\\72l("https://example.invalid/escaped.png"); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('[data-ws-part="home"] { background-image: u\\72l(h\\74 tps\\3a //example.invalid/escaped-scheme.png); }')), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_EXTERNAL_RESOURCE");
+  await assert.rejects(importSkinPack(makeSkin('@font-face { font-family: "Local Font"; src: l\\6f cal("Arial"); } [data-ws-part="home"] { color: teal; }')), (error: unknown) => error instanceof Error && error.message.includes("local() is not allowed"));
 });
 
 test("custom skins can override theme appearance without !important or private class selectors", () => {
@@ -75,6 +82,17 @@ test("community skins use a scoped light fallback instead of inheriting the nigh
   const scoped = scopeBuiltinThemeForCustomSkin(lightCss, "light", "community.illusia-voice");
   assert.match(scoped, /:where\(\.ws-skin-root\[data-ws-skin="community\.illusia-voice"\]\) \{\s*color-scheme: light;/);
   assert.match(scoped, /:where\(\.ws-skin-root\[data-ws-skin="community\.illusia-voice"\]\) \.settings-content/);
+});
+
+test("built-in light and dark skins keep letterbox areas black", async () => {
+  const [light, dark] = await Promise.all([
+    readFile(new URL("../skins/builtin/light/skin.css", import.meta.url), "utf8"),
+    readFile(new URL("../skins/builtin/dark/skin.css", import.meta.url), "utf8"),
+  ]);
+  for (const [css, id] of [[light, "builtin.light"], [dark, "builtin.dark"]] as const) {
+    assert.match(css, new RegExp(`data-ws-skin="${id}"[^{}]*\\[data-ws-part="voice\\.screen-player\\.stage"\\] \\{ background: #000; \\}`));
+    assert.match(css, new RegExp(`data-ws-skin="${id}"[^{}]*\\[data-ws-part="voice\\.screen-player\\.video"\\] \\{ object-fit: contain; background: #000; \\}`));
+  }
 });
 
 async function componentSources(directory: string): Promise<string> {
@@ -127,12 +145,20 @@ test("skin content supports localized interface message overrides and includes t
   assert.ok(skin.assets["assets/preview.png"]);
 });
 
-test("the ILLUSIA visual-only example imports without replacing WebSpeak's base translations", async () => {
-  const bytes = await readFile(new URL("../../../docs/examples/illusia-voice.wskin", import.meta.url));
-  const skin = await importSkinPack(new File([bytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
+test("the ILLUSIA v3 example and bundled package import without replacing WebSpeak's base translations", async () => {
+  const exampleBytes = await readFile(new URL("../../../docs/examples/illusia-voice.wskin", import.meta.url));
+  const bundledBytes = await readFile(new URL("../../public/skins/illusia-voice.wskin", import.meta.url));
+  assert.deepEqual(bundledBytes, exampleBytes);
+  const skin = await importSkinPack(new File([exampleBytes], "illusia-voice.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.illusia-voice");
   assert.equal(skin.name, "ILLUSIA风");
-  assert.equal(skin.version, "1.0.27");
+  assert.equal(skin.version, "2.0.2");
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.layoutData, undefined);
+  assert.equal(skin.pluginData?.components[0].id, "illusia-now-playing");
+  assert.deepEqual(skin.pluginData?.components[0].permissions, ["session.status.read"]);
+  assert.equal(skin.minAppVersion, "0.2.7-preview");
   assert.equal(skin.contentData, undefined);
   assert.equal(skin.previewBlob?.type, "image/webp");
   assert.ok(skin.assets["assets/background-composite.webp"]);
@@ -152,6 +178,19 @@ test("the ILLUSIA visual-only example imports without replacing WebSpeak's base 
   assert.match(skin.css, /language\.menu[^{}]*\[role="listbox"\]/);
   assert.match(skin.css, /language\.option/);
   assert.match(skin.css, /data-ws-skin-id="community\.illusia-voice"/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.rail"/);
+  assert.match(skin.css, /data-ws-plugin-part="illusia-now-playing\.channel-name"/);
+  assert.match(skin.css, /data-ws-part="voice\.member\.live-indicator"\]\s*\{[^}]*border-color:[^}]*background:/s);
+  assert.match(skin.css, /data-ws-part="voice\.member\.share-actions"\] \.screen-share-card-button\.viewing\s*\{[^}]*background:/s);
+  assert.match(skin.css, /data-ws-part="voice\.screen-player\.stage"\]\s*\{[^}]*background: #000/);
+  assert.match(skin.css, /data-ws-part="voice\.screen-player\.video"\]\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
+  assert.match(skin.css, /data-ws-part="home\.server-history\.item"/);
+  assert.match(skin.css, /data-ws-part="home\.server-history\.favorite-toggle"\]\[data-ws-state="saved"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.favorite-toggle"\]\[data-ws-state="saved"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.strip\.favorite-toggle"\]\[data-ws-state="saved"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.strip\.server"\]\[data-ws-state="current"\]/);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog"\]\s*\{[^}]*background:\s*linear-gradient/s);
+  assert.match(skin.css, /data-ws-part="voice\.favorite-servers\.dialog\.input"\]:focus-visible\s*\{[^}]*box-shadow:/s);
   assert.match(skin.css, /data-ws-part="home\.join-card\.waveform"/);
   assert.match(skin.css, /data-ws-part="home\.join-card\.sonar"/);
   assert.match(skin.css, /data-ws-part="home\.join-card"\]\s*\{[^}]*background-image:\s*url\("wskin-asset:assets%2Fbanner-mascot-blob\.webp"\)/s);
@@ -176,7 +215,8 @@ test("the ILLUSIA visual-only example imports without replacing WebSpeak's base 
   assert.match(skin.css, /@media \(max-width: 1100px\)[\s\S]*?voice\.chat\.empty[^{}]*\{[^}]*background-position:\s*0 0, right 8px center, center, center 8px;[^}]*background-size:\s*22px 22px, 260px 220px, cover, min\(300px, 66vw\) auto/s);
   assert.match(skin.css, /@media \(max-width: 1100px\)[\s\S]*?voice\.chat\.empty[^{}]*data-ws-state="messages-empty"[^{}]*\{[^}]*background-position:\s*0 0, right center, center, center 8px;[^}]*background-size:\s*22px 22px, 260px 220px, cover, min\(300px, 66vw\) auto/s);
   assert.doesNotMatch(skin.css, /data-ws-state="messages-empty"[^{}]*\{[^}]*color: transparent/s);
-  assert.doesNotMatch(skin.css, /(?:^|[;{\s])(?:position|inset|top|right|bottom|left|width|height|min-height|padding|z-index|transform)\s*:/);
+  assert.match(skin.css, /illusia-now-playing[^{}]*\{[^}]*position:\s*fixed/);
+  assert.match(skin.css, /illusia-now-playing[^{}]*\{[^}]*background-image:[^;]*assets%2Fbanner-mascot-blob\.webp/);
   assert.doesNotMatch(skin.css, /\[data-ws-part="home\.join-card"\]\s*\{[^}]*animation:/);
   assert.doesNotMatch(skin.css, /\[data-ws-part="home\.join-card"\]\s*\{\s*animation: none;/);
   assert.match(skin.css, /home\.footer[\s\S]*?footer-wave\.png/);
@@ -198,8 +238,8 @@ test("the activity artwork layer floats above room content without intercepting 
   assert.match(css, /:deep\(\.app-shell \.chat-panel \.section-heading\),[\s\S]*?:deep\(\.app-shell \.chat-panel \.message-composer\)\s*\{\s*position: relative;\s*z-index: 3;/);
   assert.match(css, /\.screen-share-player\)?\s*\{[^}]*background: var\(--surface-1\)/);
   assert.match(css, /\.screen-share-player-exit\)?\s*\{[^}]*z-index: 3;/);
-  assert.match(css, /\.screen-share-player-stage\)?\s*\{[^}]*var\(--accent\)[^}]*var\(--surface-2\)/);
-  assert.match(css, /\.screen-share-player-video\)?\s*\{[^}]*background: var\(--surface-2\)/);
+  assert.match(css, /\.screen-share-player-stage\)?\s*\{[^}]*background: #000/);
+  assert.match(css, /\.screen-share-player-video\)?\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
   assert.match(css, /@media \(min-width: 741px\)\s*\{\s*\/\* Keep header menus above the independently stacked screen-share stage\. \*\/\s*\.app-shell \.workspace-header\s*\{\s*position: relative;\s*z-index: 40;/);
 });
 
@@ -211,6 +251,13 @@ test("channel empty state removes its bubble ornament and keeps the text-channel
   assert.doesNotMatch(view, /data-ws-state="messages-empty"><div class="chat-empty-icon"/);
   assert.match(view, /class="section-kicker">\{\{ chatTabLabel \}\}/);
   assert.match(chat, /tab\.value === "channel" \? t\("textChannel"\)/);
+});
+
+test("mobile chat starts closed and follows viewport changes", async () => {
+  const chat = await readFile(new URL("../composables/useWebClientChat.ts", import.meta.url), "utf8");
+  assert.match(chat, /const panelOpen = ref\(!isMobileViewport\.value\)/);
+  assert.match(chat, /watch\(isMobileViewport,[\s\S]*?panelOpen\.value = !mobile;/);
+  assert.match(chat, /panelOpen\.value = !isMobileViewport\.value;/);
 });
 
 test("homepage motion and room content spacing preserve the ILLUSIA layout", async () => {
@@ -240,4 +287,730 @@ function makeSkin(css: string, content?: unknown): File {
   if (content) packageFiles["content.json"] = strToU8(JSON.stringify(content));
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin.wskin", { type: "application/octet-stream" });
+}
+
+test("schema version 2 skin packages load only validated declarative layouts with no permissions", async () => {
+  const layout = {
+    schemaVersion: 1,
+    pages: {
+      home: { desktop: { "home.header": { x: 48, y: -12, scale: 1.1, background: "#123456" } } },
+    },
+  };
+  const skin = await importSkinPack(makeSkinV2(layout));
+  assert.equal(skin.schemaVersion, 2);
+  assert.equal(skin.packageType, "layout-skin");
+  assert.deepEqual(skin.permissions, []);
+  assert.equal(skin.layoutData?.pages.home?.desktop?.["home.header"]?.x, 48);
+  assert.equal(skin.layoutData?.pages.home?.desktop?.["home.header"]?.background, "#123456");
+
+  await assert.rejects(
+    importSkinPack(makeSkinV2(layout, { permissions: ["network.fetch"] })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PERMISSION_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2(layout, { capabilities: ["network.fetch"] })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_MANIFEST_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2({ schemaVersion: 1, pages: { home: { desktop: { "home.unknown": { x: 4 } } } } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_LAYOUT_INVALID",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV2({ schemaVersion: 1, pages: { home: { desktop: { "home.security-note": { visible: false } } } } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_LAYOUT_INVALID",
+  );
+});
+
+test("schema version 3 supports arbitrary public layouts and validated declarative plugin components", async () => {
+  const components = {
+    schemaVersion: 1,
+    components: [{
+      id: "channel-list",
+      name: "Channel list",
+      page: "voice",
+      accessibleName: "TeamSpeak channels",
+      permissions: ["session.channels.read", "session.channel.join"],
+      actions: { join: { type: "voice.joinChannel", args: { channelId: "{{channel.id}}" } } },
+      root: {
+        tag: "nav",
+        repeat: { path: "session.channels", as: "channel" },
+        children: [{ tag: "button", part: "row", events: { dblclick: "join" }, children: [{ text: "{{channel.name}}" }] }],
+      },
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV3(components, `
+    [data-ws-part="voice.channel-group"] { display: none; }
+    .channel-row[data-ws-plugin-part="channel-list.row"] { position: fixed; inset: 10px; width: 240px; order: 1; }
+  `));
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.pluginData?.components[0].id, "channel-list");
+  assert.equal(skin.pluginData?.components[0].root.children?.[0].events?.dblclick, "join");
+  assert.match(skin.css, /position: fixed/);
+  assert.match(skin.css, /display: none/);
+  assert.ok(skin.warnings.some((warning) => warning.includes("hides an interface part")));
+
+  const unsafe = structuredClone(components) as typeof components;
+  unsafe.components[0].permissions = ["network.fetch"];
+  await assert.rejects(importSkinPack(makeSkinV3(unsafe, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_INVALID");
+  await assert.rejects(importSkinPack(makeSkinV3({ schemaVersion: 1, components: [] }, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_INVALID");
+  const missingAsset = structuredClone(components) as unknown as SkinPluginDocument;
+  missingAsset.components[0].root = { tag: "img", asset: "assets/missing.webp" };
+  await assert.rejects(importSkinPack(makeSkinV3(missingAsset, "[data-ws-part=app] { color: red; }")), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_ASSET_INVALID");
+});
+
+test("schema version 3 permits an open visual skin without a components document", async () => {
+  const bytes = zipSync({
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 3, packageType: "open-skin" })),
+    "skin.css": strToU8('[data-ws-part="app"] { position: fixed; }'),
+  });
+  const skin = await importSkinPack(new File([bytes.slice().buffer as ArrayBuffer], "v3-visual-only.wskin"));
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.pluginData, undefined);
+  assert.match(skin.css, /position: fixed/);
+});
+
+test("schema version 3 accepts a schema v2 full-page surface with host widgets", async () => {
+  const components = {
+    schemaVersion: 2,
+    components: [{
+      id: "custom-voice-surface",
+      name: "Custom voice surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Custom voice workspace",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: {
+        tag: "main",
+        className: "custom-workspace",
+        children: [
+          { widget: "voice.channel-panel" },
+          { widget: "voice.member-cards" },
+          { widget: "voice.chat-panel" },
+          { widget: "voice.audio-controls" },
+        ],
+      },
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV3(components, '[data-ws-part="app"] { --skin-surface: #123456; }'));
+  assert.equal(skin.pluginData?.schemaVersion, 2);
+  assert.equal(skin.pluginData?.components[0].mode, "surface");
+  assert.deepEqual(skin.pluginData?.components[0].root.children?.map((node) => node.widget), [
+    "voice.channel-panel", "voice.member-cards", "voice.chat-panel", "voice.audio-controls",
+  ]);
+});
+
+test("schema version 4 validates and caches isolated plugin package files without executing them", async () => {
+  const defaultLayout = {
+    schemaVersion: 1,
+    pages: { voice: { desktop: { "skin.voice.runtime_plugin_root_voice-toolbar": { order: 2, visible: true } } } },
+  };
+  const skin = await importSkinPack(makeSkinV4(undefined, { layout: defaultLayout }));
+  const entry = "plugins/voice-toolbar/index.js";
+  const style = "plugins/voice-toolbar/style.css";
+  const icon = "plugins/voice-toolbar/assets/icon.png";
+  assert.equal(skin.schemaVersion, 4);
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.runtimePlugins?.plugins[0].id, "voice-toolbar");
+  assert.equal(await skin.runtimePluginFiles?.[entry].text(), "export const render = () => document.createElement('button');");
+  assert.equal(await skin.runtimePluginFiles?.[style].text(), ".toolbar { color: teal; }");
+  assert.equal(skin.runtimePluginFiles?.[icon].type, "image/png");
+  assert.equal(skin.assets[icon]?.type, "image/png", "declared plugin media is available only by its package path for scoped CSS and host remapping");
+  assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /data-ws-runtime-plugin="voice-toolbar".*?\.toolbar/s);
+  assert.match(skin.runtimePluginStyles?.["voice-toolbar"] ?? "", /color: teal/);
+  assert.match(skin.css, /position: fixed/);
+  assert.deepEqual(skin.layoutData?.pages.voice?.desktop?.["skin.voice.runtime_plugin_root_voice-toolbar"], { order: 2, visible: true });
+
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { includeEntry: false })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_FILE_MISSING",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { extra: { "plugins/unlisted/rogue.js": strToU8("export {};") } })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_FILE_UNSUPPORTED",
+  );
+  await assert.rejects(
+    importSkinPack(makeSkinV4(undefined, { entryBytes: new Uint8Array(256 * 1024 + 1) })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_SOURCE_SIZE",
+  );
+});
+
+test("a v4 surface cannot compete with a v3 surface on the same public page", async () => {
+  const components = {
+    schemaVersion: 2,
+    components: [{
+      id: "voice-v3-surface",
+      name: "Voice v3 surface",
+      page: "voice",
+      mode: "surface",
+      accessibleName: "Voice workspace",
+      permissions: ["ui.surface.replace"],
+      actions: {},
+      root: { tag: "main", children: [{ tag: "p", children: [{ text: "replacement UI" }] }] },
+    }],
+  };
+  const plugins = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-v4-surface",
+      name: "Voice v4 surface",
+      version: "1.0.0",
+      apiVersion: 1,
+      runtime: "wasm",
+      page: "voice",
+      mode: "surface",
+      entry: "plugins/voice-v4-surface/index.wasm",
+      assets: [],
+      permissions: ["ui.surface.replace"],
+    }],
+  };
+  const files = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", components: "components.json", plugins: "plugins.json" })),
+    "skin.css": strToU8('[data-ws-part="app"] { color: teal; }'),
+    "components.json": strToU8(JSON.stringify(components)),
+    "plugins.json": strToU8(JSON.stringify(plugins)),
+    "plugins/voice-v4-surface/index.wasm": createSkinExtensionWasmPrefixByteImmediateProbe(),
+  };
+  const archive = zipSync(files);
+  await assert.rejects(
+    importSkinPack(new File([archive.slice().buffer as ArrayBuffer], "competing-surfaces.wskin")),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_SURFACE_DUPLICATE",
+  );
+});
+
+test("the distributable KAAK package provides full home and voice surfaces", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/kaak-voice.wskin", import.meta.url));
+  const bundledArchive = await readFile(new URL("../../public/skins/kaak-voice.wskin", import.meta.url));
+  assert.deepEqual(archive, bundledArchive, "the downloadable example and bundled skin stay in sync");
+  const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.kaak-voice");
+  assert.equal(skin.version, "3.1.107");
+  assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
+  assert.equal(skin.schemaVersion, 3);
+  const home = skin.pluginData?.components.find((component) => component.page === "home");
+  const voice = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.id, component.mode]), [
+    ["kaak-home", "surface"],
+    ["kaak-workspace", "surface"],
+  ]);
+  assert.ok(home?.permissions.includes("ui.surface.replace"));
+  assert.match(skin.css, /@media \(max-width: 850px\)[\s\S]*?\[data-ws-plugin-part="kaak-home\.hero"\]\s*\{\s*display: none;/, "the narrow connection home hides the green hero and screen illustration");
+  assert.match(skin.css, /@media \(max-width: 850px\)[\s\S]*?\[data-ws-plugin-part="kaak-home\.welcome-title"\]\s*\{\s*display: none;/, "the narrow connection home shows only the login card");
+  assert.equal(voice?.stateScope, "session.status.channelId");
+  assert.equal(voice?.state?.channelspage, false);
+  assert.equal(voice?.actions["toggle-mobile-page"]?.type, "ui.toggleState");
+  assert.equal(voice?.actions["toggle-mobile-page"]?.args.resetKey, "roommenu");
+  assert.equal(voice?.root.attributes?.["data-mobile-channels"], "{{state.channelspage}}");
+  assert.equal(voice?.root.attributes?.["data-session-connected"], "{{session.status.connected}}");
+  assert.ok(voice?.permissions.includes("ui.surface.replace"));
+  assert.ok(voice?.permissions.includes("servers.quickList.read"));
+  assert.ok(voice?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voice?.permissions.includes("session.status.read"));
+  assert.ok(voice?.permissions.includes("session.channels.read"));
+  assert.ok(voice?.permissions.includes("session.members.read"));
+  assert.ok(voice?.permissions.includes("session.memberAvatars.read"));
+  assert.ok(voice?.permissions.includes("chat.channel.read"));
+  assert.ok(voice?.permissions.includes("chat.channel.send"));
+  assert.ok(voice?.permissions.includes("audio.microphone.control"));
+  assert.ok(voice?.permissions.includes("audio.output.control"));
+  assert.equal(voice?.permissions.includes("voice.screenShare.read"), true);
+  assert.equal(voice?.permissions.includes("voice.screenShare.control"), true);
+  assert.equal(voice?.permissions.includes("voice.screenShare.status.read"), true);
+  function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
+    if (!node) return undefined;
+    if (node.part === part) return node;
+    for (const child of node.children ?? []) {
+      const found = findPart(child, part);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  assert.equal(findPart(home?.root, "home-language")?.widget, "app.language-switcher", "the KAAK connection home has a language switcher in its top corner");
+  assert.equal(findPart(home?.root, "server-announcement")?.widget, "home.server-announcement", "the KAAK connection home displays the localized administrator announcement");
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.hero"\]\s*\{[^}]*overflow: visible;/, "the hero does not clip the announcement as it spans the full home width");
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.server-announcement"\][^}]*width: calc\(100% - 40px\);[^}]*margin: 20px 20px 0;/, "the announcement card fills its half-width hero with 20px side margins");
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.server-announcement"\] \[data-ws-part="home\.server-announcement\.body"\]\s*\{[^}]*color: #273248;/, "the announcement uses the published semantic text part with a readable color");
+  assert.equal(findPart(home?.root, "home-social-links")?.widget, "home.social-links", "the KAAK connection home exposes icon links beside the language switcher");
+  assert.equal(findPart(home?.root, "identity-provider")?.widget, "home.identity-provider");
+  assert.deepEqual(findPart(home?.root, "identity-provider")?.options, { identityProviderId: "myts", identityProviderLabel: "myts" });
+  assert.doesNotMatch(skin.css, /kaak-home-announcement-text|kaak-home-social-links|kaak-home-status|kaak-myts/);
+  assert.match(skin.css, /kaak-home\.home-social-links"\]\s*\{[^}]*position: fixed;[^}]*top: 18px;[^}]*right: 74px;/);
+  assert.match(skin.css, /kaak-home\.home-social-links"\] \[data-ws-part="home\.social-links"\]\s*\{[^}]*display: flex;[^}]*gap: 8px;/);
+  assert.equal(findPart(voice?.root, "topbar"), undefined, "the KAAK voice surface has no top bar");
+  assert.equal(findPart(voice?.root, "rail-skin")?.widget, "app.skin-switcher", "skin selection lives in the server rail");
+  assert.equal(findPart(voice?.root, "rail-language")?.widget, "app.language-switcher", "language selection lives in the server rail");
+  assert.equal(findPart(voice?.root, "server-list")?.children?.[0]?.repeat?.path, "servers.quickList");
+  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: true, memberActions: true });
+  assert.equal(findPart(voice?.root, "server-summary")?.widget, "voice.server-header");
+  assert.equal(findPart(voice?.root, "server-banner")?.widget, "voice.server-banner");
+  assert.deepEqual(findPart(voice?.root, "mobile-room-return")?.when, { path: "session.status.connected", equals: true });
+  assert.equal(findPart(voice?.root, "mobile-room-return")?.events?.click, "toggle-mobile-page");
+  assert.equal(findPart(voice?.root, "mobile-room-topbar")?.children?.[0]?.events?.click, "toggle-mobile-page");
+  assert.equal(findPart(voice?.root, "mobile-room-more-toggle")?.events?.click, "toggle-room-menu");
+  assert.equal(findPart(voice?.root, "mobile-room-chat-open")?.events?.click, "toggle-chat-panel");
+  assert.equal(findPart(voice?.root, "mobile-room-sheet"), undefined, "the narrow room page reuses the sample-matched voice console");
+  const roomControls = findPart(voice?.root, "mobile-room-controls");
+  assert.equal(roomControls?.attributes?.role, "toolbar");
+  assert.deepEqual(roomControls?.children?.map((control) => control.part), [
+    "mobile-room-microphone", "mobile-room-deafen", "mobile-room-speaker", "mobile-room-share", "mobile-room-share-active", "mobile-room-exit",
+  ]);
+  assert.equal(findPart(roomControls, "mobile-room-microphone")?.events?.click, "toggle-microphone");
+  assert.equal(findPart(roomControls, "mobile-room-deafen")?.events?.click, "toggle-output-mute");
+  assert.equal(findPart(roomControls, "mobile-room-speaker")?.events?.click, "open-audio-settings");
+  assert.equal(findPart(roomControls, "mobile-room-share")?.events?.click, "start-screen-share");
+  assert.equal(findPart(roomControls, "mobile-room-share-active")?.events?.click, "stop-screen-share");
+  assert.equal(findPart(roomControls, "mobile-room-exit")?.events?.click, "disconnect");
+  assert.equal(voice?.actions["open-audio-settings"]?.type, "audio.openSettings");
+  assert.equal(findPart(voice?.root, "audio-controls"), undefined, "KAAK declares its desktop audio toolbar in the package instead of selecting a host layout");
+  const desktopRoomControls = findPart(voice?.root, "desktop-room-controls");
+  assert.equal(desktopRoomControls?.attributes?.role, "toolbar");
+  assert.equal(findPart(desktopRoomControls, "desktop-room-settings")?.events?.click, "open-audio-settings");
+  assert.equal(findPart(desktopRoomControls, "desktop-room-noise-suppression")?.events?.click, "toggle-noise-suppression");
+  assert.equal(findPart(desktopRoomControls, "desktop-room-microphone")?.events?.click, "toggle-microphone");
+  assert.equal(findPart(desktopRoomControls, "desktop-room-output")?.events?.click, "toggle-output-mute");
+  assert.equal(findPart(desktopRoomControls, "desktop-room-accompaniment")?.events?.click, "toggle-accompaniment");
+  assert.equal(voice?.actions["toggle-noise-suppression"]?.type, "audio.toggleNoiseSuppression");
+  assert.equal(voice?.actions["toggle-accompaniment"]?.type, "audio.toggleAccompaniment");
+  assert.equal(findPart(voice?.root, "record-placeholder"), undefined, "the KAAK voice dock has no recording control");
+  assert.equal(findPart(voice?.root, "voice-channel-tree")?.widget, "voice.channel-tree");
+  assert.deepEqual(findPart(voice?.root, "voice-channel-tree")?.options, { layout: "server-sidebar", memberActions: true, memberDragDrop: true });
+  assert.equal(findPart(voice?.root, "channel-row"), undefined, "channels render in the trusted nested tree widget");
+  assert.equal(voice?.actions["select-channel"], undefined);
+  assert.equal(voice?.actions["join-channel"], undefined);
+  assert.equal(findPart(voice?.root, "text-channel-group-toggle"), undefined);
+  assert.equal(findPart(voice?.root, "text-channel-list"), undefined);
+  const voiceGroupToggle = findPart(voice?.root, "voice-channel-group-toggle");
+  assert.equal(voiceGroupToggle?.events?.click, "toggle-voice-group");
+  assert.equal(voiceGroupToggle?.attributes?.["aria-expanded"], "{{state.voicegroupopen}}");
+  assert.equal(findPart(voice?.root, "voice-channel-list")?.when, undefined, "the collapsible channel list stays mounted during its transition");
+  assert.equal(voice?.root.attributes?.["data-voice-group-open"], "{{state.voicegroupopen}}");
+  const chatToggle = findPart(voice?.root, "chat-panel-toggle");
+  assert.equal(chatToggle?.events?.click, "toggle-chat-panel");
+  assert.equal(chatToggle?.attributes?.["aria-expanded"], "{{chat.status.panelOpen}}");
+  assert.equal(voice?.actions["toggle-chat-panel"]?.type, "chat.togglePanel");
+  assert.equal(findPart(voice?.root, "conversation")?.attributes?.["data-chat-open"], "{{chat.status.panelOpen}}");
+  const chatExpand = findPart(voice?.root, "chat-panel-expand");
+  assert.deepEqual(chatExpand?.when, { path: "chat.status.panelOpen", equals: false });
+  assert.equal(chatExpand?.events?.click, "toggle-chat-panel");
+  assert.equal(chatExpand?.attributes?.["aria-expanded"], "{{chat.status.panelOpen}}");
+  assert.equal(chatExpand?.children?.[0]?.text, "聊天");
+  assert.equal(findPart(voice?.root, "chat-panel")?.widget, "voice.chat-panel");
+  assert.deepEqual(findPart(voice?.root, "chat-panel")?.when, { path: "chat.status.panelOpen", equals: true });
+  assert.equal(voice?.root.attributes?.["data-chat-open"], "{{chat.status.panelOpen}}");
+  assert.equal(findPart(voice?.root, "whisper-controls"), undefined, "the KAAK surface does not add a duplicate whisper button");
+  assert.equal(voice?.actions["whisper-on"], undefined);
+  assert.equal(voice?.actions["whisper-off"], undefined);
+  assert.equal(voice?.permissions.includes("voice.whisper.control"), false);
+  assert.equal(voice?.permissions.includes("voice.whisper.status.read"), false);
+  assert.equal(findPart(voice?.root, "server-icon")?.attributes?.src, "{{server.icon}}");
+  assert.equal(findPart(voice?.root, "server-monogram-initial")?.children?.[0]?.text, "{{server.monogram}}");
+  assert.equal(findPart(voice?.root, "server-monogram")?.attributes?.["data-tone"], "{{server.tone}}");
+  assert.deepEqual(findPart(voice?.root, "identity-online")?.when, { path: "session.status.connected", equals: true });
+  assert.equal(findPart(voice?.root, "identity-online")?.attributes?.role, "img");
+  const voiceStageHeadingItem = findPart(voice?.root, "voice-stage-heading-item");
+  assert.equal(voiceStageHeadingItem?.repeat?.path, "session.channels");
+  const voiceStageHeading = findPart(voiceStageHeadingItem, "voice-stage-heading");
+  assert.deepEqual(voiceStageHeading?.when, { path: "stagechannel.current", equals: true });
+  assert.equal(findPart(voiceStageHeading, "mobile-channel-back")?.events?.click, "toggle-mobile-page");
+  assert.equal(findPart(voiceStageHeading, "voice-stage-glyph")?.children?.[0]?.text, "🔊︎");
+  assert.equal(findPart(voiceStageHeading, "voice-stage-title")?.children?.[0]?.text, "{{stagechannel.name}}");
+  assert.equal(findPart(voiceStageHeading, "voice-stage-member-count")?.children?.[0]?.text, "{{stagechannel.memberCountLabel}}");
+  assert.deepEqual(findPart(voiceStageHeading, "voice-stage-capacity")?.when, { path: "stagechannel.maxClientsLimited", equals: true });
+  assert.equal(findPart(voiceStageHeading, "voice-stage-capacity")?.children?.[0]?.text, "/{{stagechannel.maxClients}}");
+  assert.equal(findPart(voice?.root, "channel-count"), undefined, "real member counts come from the host-owned channel tree");
+  assert.equal(findPart(voice?.root, "channel-voice-member"), undefined, "avatar resources stay inside trusted host UI");
+  assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "语音房间 / Voice room");
+  assert.equal(findPart(voice?.root, "member-cards")?.widget, "voice.member-cards");
+  assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: true, memberActions: true });
+  assert.equal(findPart(voice?.root, "member-list"), undefined);
+  assert.equal(findPart(voice?.root, "screen-share-player")?.widget, "voice.screen-share-player");
+  assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
+  assert.deepEqual(findPart(voice?.root, "performance-panel")?.options, { screenShare: false });
+  assert.equal(findPart(voice?.root, "chat-input"), undefined, "KAAK uses the host-owned unified chat composer");
+  assert.ok(skin.css.includes("data-session-connected=\"true\""));
+  assert.ok(skin.css.includes("[data-ws-plugin-part=\"kaak-workspace.workspace\"][data-session-connected=\"true\"]:not([data-mobile-channels=\"true\"])"));
+  assert.ok(skin.css.includes("[data-ws-plugin-part=\"kaak-workspace\"][data-ws-plugin-surface=\"voice\"]:has([data-ws-plugin-part=\"kaak-workspace.chat-panel-toggle\"][aria-expanded=\"false\"])"));
+  assert.match(skin.css, /\.ws-skin-root\[data-ws-skin="community\.kaak-voice"\]\s+\[data-ws-plugin-part="kaak-workspace"\]\[data-ws-plugin-surface="voice"\]\s*\{[\s\S]*?height: 100dvh;/, "the voice surface owns the KAAK grid and viewport sizing");
+  assert.doesNotMatch(skin.css, /\[data-ws-plugin-part="kaak-workspace"\](?!\[data-ws-plugin-surface="voice"\])/, "KAAK workspace selectors must anchor to the voice surface root, not generic child nodes");
+  assert.ok(skin.css.includes("mobile-room-return"));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"][data-mobile-channels="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"]'), "the room menu stays hidden on the channel tree page");
+  assert.ok(skin.css.includes("grid-template-columns: 86px minmax(0, 1fr)"));
+  assert.ok(skin.css.includes("inset: 0 0 0 86px"));
+  assert.match(skin.css, /kaak-workspace"\]\[data-ws-plugin-surface="voice"\]:has\([\s\S]{0,180}kaak-workspace\.voice-stage"\]\s*\{[^}]*grid-column: 1;[^}]*grid-row: 3;/, "the collapsed chat state must not push the connected narrow room into an implicit side column");
+  assert.match(skin.css, /kaak-workspace\.conversation\"]\[data-chat-open="true"\]\s*\{\s*position: absolute;/);
+  assert.match(skin.css, /voice-dock-actions"\] \{ grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px; grid-template-rows: 29px 26px; column-gap: 6px; row-gap: 21px; \}/);
+  assert.match(skin.css, /voice-dock-actions"\]::after \{ top: 40px; \}/);
+  assert.match(skin.css, /max-width: 740px[\s\S]*?grid-template-rows: auto auto minmax\(0, 1fr\) auto;[\s\S]*?max-width: 500px;/);
+  assert.match(skin.css, /workspace\"\]\[data-session-connected=\"true\"\]:not\(\[data-mobile-channels=\"true\"\]\)[\s\S]*?server-rail[\s\S]*?display: none;/);
+  assert.match(skin.css, /voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;/);
+  assert.match(skin.css, /workspace"\]\[data-session-connected="true"\]:not\(\[data-mobile-channels="true"\]\) \[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?height: max-content;[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?grid-template-rows: 5px max-content;[\s\S]*?overflow: hidden;/, "the narrow room console stays content-sized in one column and clips controls to its boundary");
+  assert.match(skin.css, /mobile-room-control-disc[\s\S]*?aspect-ratio: 1;[\s\S]*?border-radius: 50%;/);
+  assert.match(skin.css, /mobile-room-controls[\s\S]*?width: min\(100%, 62px\);/);
+  assert.match(skin.css, /mobile-room-control-caption[\s\S]*?font-size: 11px;[\s\S]*?line-height: 1\.2;/);
+  assert.match(skin.css, /voice-dock-actions"\] \{ display: none; \}/);
+  assert.match(skin.css, /mobile-room-controls"\] \{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);[\s\S]*?grid-template-rows: max-content;[\s\S]*?height: max-content;[\s\S]*?gap: 2px;/);
+  assert.match(skin.css, /\.mobile-room-(microphone|deafen|speaker|share|exit) \{ grid-column: [1-5]; \}/);
+  assert.equal(findPart(voice?.root, "conversation-title")?.children?.[0]?.text, "{{chat.status.tabLabel}}");
+  assert.equal(findPart(voice?.root, "connection-state"), undefined);
+  assert.equal(findPart(voice?.root, "chat-message"), undefined, "private, server, and channel messages use the same host panel");
+  assert.equal(findPart(voice?.root, "screen-share-start")?.widget, "voice.screen-share-start");
+  assert.equal(findPart(voice?.root, "screen-share-stop")?.events?.click, "stop-screen-share");
+  assert.equal(findPart(voice?.root, "audio-controls"), undefined);
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.server-summary"]'));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.server-banner"]'));
+  assert.match(skin.css, /ws-voice-server-banner-image[\s\S]*?aspect-ratio: 1\.95 \/ 1;[\s\S]*?object-fit: cover;/);
+  assert.match(skin.css, /voice\.server-banner\.body[\s\S]*?white-space: pre-wrap;/);
+  assert.ok(skin.css.includes(".ws-voice-server-search-toggle"));
+  assert.ok(skin.css.includes(".ws-voice-server-switcher-menu"));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace"][data-ws-plugin-surface="voice"] .ws-voice-channel-row'));
+  assert.match(skin.css, /ws-voice-channel-node\[data-current="true"\][\s\S]*?box-shadow: inset 2px 0 var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /ws-voice-channel-branch\[data-expanded="false"\][\s\S]*?grid-template-rows: 0fr;/);
+  assert.match(skin.css, /ws-voice-channel-member-avatar[\s\S]*?border-radius: 50%;/);
+  assert.match(skin.css, /--skin-kaak-font:[\s\S]*?PingFang SC/);
+  assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.backdrop"\]\s*\{[^}]*background: rgba\(10, 11, 13, \.54\);/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\s*\{[^}]*width: min\(438px, calc\(100vw - 32px\)\);[^}]*min-height: 204px;[^}]*background: #242529;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\[data-ws-state="server-password"\]\s*\{[^}]*color: #273248;[^}]*border-color: #e3e8ec;[^}]*background: #fff;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.title"\]\s*\{[^}]*font-size: 13px;[^}]*font-weight: 700;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.field"\]\s*\{[^}]*height: 40px;[^}]*border: 1px solid #3b3c40;[^}]*border-radius: 12px;/);
+  assert.match(skin.css, /auth\.password\.dialog"\]\[data-ws-state="server-password"\][\s\S]*?auth\.password\.field"\]\s*\{[^}]*border-color: #e3e8ec;[^}]*background: #fff;/);
+  assert.match(skin.css, /auth\.password\.dialog"\]\[data-ws-state="server-password"\][\s\S]*?input:-webkit-autofill[\s\S]*?-webkit-box-shadow: 0 0 0 1000px #fff inset;/);
+  assert.match(skin.css, /\[data-ws-part="home\.form"\] \[data-ws-part="home\.field"\]:has\(input\[type="password"\]\)\s*\{[^}]*height: 42px;[^}]*border-radius: 11px;[^}]*background: #fff;/);
+  assert.match(skin.css, /home\.field"\]:has\(input\[type="password"\]\) input:-webkit-autofill[\s\S]*?-webkit-box-shadow: 0 0 0 1000px #fff inset;[\s\S]*?-webkit-text-fill-color: #273248;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.actions"\] > button:last-child\s*\{[^}]*width: 82px;[^}]*height: 36px;[^}]*background: #6cbf00;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?width: min\(282px, calc\(100% - 22px\)\);[\s\S]*?margin-bottom: 11px;[\s\S]*?border-radius: 17px;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
+  assert.match(skin.css, /ws-voice-channel-tree\[data-layout="server-sidebar"\] \.ws-voice-channel-line[\s\S]*?min-height: 38px;/);
+  assert.match(skin.css, /ws-voice-channel-tree\[data-layout="server-sidebar"\] \.ws-voice-channel-member[\s\S]*?min-height: 29px;/);
+  assert.match(skin.css, /ws-voice-channel-member:hover\s*\{[^}]*background: #303238;/);
+  assert.match(skin.css, /ws-voice-channel-row\[data-drag-over="true"\]\s*\{[^}]*box-shadow: inset 0 0 0 1px #72c866;/);
+  assert.doesNotMatch(skin.css, /kaak-workspace\.record-placeholder|kaak-workspace\.recording-label/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-controls"\] \{ display: contents; \}/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace"\]\[data-ws-plugin-surface="voice"\] \.desktop-audio-dock-copy \{ display: none; \}/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \{ grid-column: 1 \/ 4; grid-row: 1;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \.skin-runtime-screen-share-start \{[\s\S]*?background: #69c000;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-settings"\][\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-noise-suppression"\] \{ grid-column: 2; grid-row: 2; color: #fff; background: #6cbf00; \}/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-noise-suppression"\]\[aria-pressed="false"\],[\s\S]*?background: #e34848;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-microphone"\] \{ grid-column: 3; grid-row: 2; \}/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-output"\] \{ grid-column: 4; grid-row: 2; \}/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-accompaniment"\] \{[\s\S]*?grid-column: 4;[\s\S]*?grid-row: 1;/);
+  assert.match(skin.css, /voice-dock-heading"\] \[data-ws-plugin-part="kaak-workspace\.disconnect-control"\]::before \{ content: "⏻";/);
+  assert.doesNotMatch(skin.css, /desktop-audio-dock-room-panel|room-panel-audio-settings|data-ws-plugin-part="kaak-workspace\.audio-controls"/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-accompaniment"\]\[aria-pressed="true"\] \{ background: #477f00;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.mobile-room-controls"\] \{ display: none; \}/);
+  assert.match(skin.css, /kaak-workspace\.mobile-room-controls[\s\S]*?\.mobile-room-microphone \{ grid-column: 1; \}/);
+  assert.match(skin.css, /kaak-workspace\.mobile-room-controls[\s\S]*?\.mobile-room-exit \{ grid-column: 5; \}/);
+  assert.match(skin.css, /voice\.member\.action-trigger[\s\S]*?width: 44px;/);
+  assert.match(skin.css, /\.ws-skin-root\[data-ws-skin="community\.kaak-voice"\] \[data-ws-part="voice\.context-menu"\]\s*\{[^}]*background: #303136;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] \.menu-volume\s*\{[^}]*border-bottom: 1px solid #48494f;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] > button:hover[\s\S]*?background: #414248;/);
+  assert.match(skin.css, /\[data-ws-part="voice\.context-menu"\] \.member-menu-submenu\s*\{[^}]*border-top: 1px solid #48494f;/);
+  assert.match(skin.css, /--skin-kaak-accent-hover: #7ac51a;/);
+  assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] > span \{\s*color: var\(--skin-kaak-accent\);\s*\}/);
+  assert.doesNotMatch(skin.css, /#b2a8ff/i);
+  assert.match(skin.css, /performance-trigger \{[\s\S]*?color: var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /performance-trigger:hover,[\s\S]*?\{\s*color: var\(--skin-kaak-accent-hover\);/);
+  assert.match(skin.css, /performance-metrics strong \{\s*color: var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /dock-slider-heading strong \{\s*color: var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /settings-section h3 \.ui-icon \{\s*color: var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /settings-range-row strong \{\s*color: var\(--skin-kaak-accent\);/);
+  assert.doesNotMatch(skin.css, /#(?:77d68f|9af0ad|80df98|91e5a6|65be7e|79d991)/i);
+  assert.match(skin.css, /\.settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
+  assert.match(skin.css, /\.microphone-toggle:not\(\.muted\):active,[\s\S]*?background: #60ab00;\s*border-color: #60ab00;/);
+  assert.doesNotMatch(skin.css, /#58c877/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home"\] \{[^}]*font-family: Arial, "Microsoft YaHei", sans-serif;/);
+  assert.match(skin.css, /\[data-ws-part="home\.identity-provider\.button"\][\s\S]*?clip-path: polygon\(0 0, 100% 0, 100% 100%\);/);
+  assert.match(skin.css, /\[data-ws-part="home\.identity-provider\.label"\][\s\S]*?color: #fff;[\s\S]*?transform: rotate\(45deg\);/);
+  assert.match(skin.css, /settings-select-menu[\s\S]*?background: #25262a/);
+  assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
+  assert.match(skin.css, /settings-header h2 \{\s*color: #f2f3f5;\s*font-size: 32px;\s*font-weight: 600;/);
+  assert.match(skin.css, /settings-section h3 \{[\s\S]*?color: #eceef0;\s*font-size: 16px;\s*font-weight: 600;/);
+  assert.match(skin.css, /settings-audio-card \{\s*width: min\(660px, 100%\);[\s\S]*?background: #25262a;[\s\S]*?border-radius: 16px;/);
+  assert.match(skin.css, /settings-form-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 268fr\) minmax\(0, 320fr\);[\s\S]*?min-height: 72px;[\s\S]*?padding: 16px 24px;/);
+  assert.match(skin.css, /noise-suppression-toggle \{\s*grid-template-columns: minmax\(0, 1fr\) 34px;[\s\S]*?padding: 16px 24px;/);
+  assert.match(skin.css, /@media \(max-width: 680px\) \{[\s\S]*?settings-form-row \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-label \{\s*margin: 0;\s*font-weight: 400;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select \{[\s\S]*?border-radius: 12px;/);
+  assert.match(skin.css, /settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-menu \{[\s\S]*?padding: 8px;[\s\S]*?border-radius: 12px;[\s\S]*?background: #25262a;[\s\S]*?box-shadow: 0 2px 8px rgba\(0, 0, 0, \.32\);/);
+  assert.match(skin.css, /settings-select:focus-visible \{\s*border-color: #6cbf00;\s*box-shadow: 0 0 0 3px #6cbf001a;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-option \{[\s\S]*?height: 32px;[\s\S]*?margin-bottom: 2px;[\s\S]*?padding-inline: 8px;[\s\S]*?border-radius: 8px;/);
+  assert.match(skin.css, /settings-select\[aria-expanded="true"\] \.settings-select-chevron::before \{\s*transform: rotate\(225deg\);/);
+  assert.match(skin.css, /settings-select-option:hover \{ background: #ffffff0f; \}/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{\s*width: 16px;\s*height: 16px;\s*margin-top: -6px;/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-moz-range-thumb \{\s*width: 16px;\s*height: 16px;/);
+  assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{[\s\S]*?border: 2px solid #6cbf00;[\s\S]*?background: #fff;[\s\S]*?box-shadow: none;/);
+  assert.match(skin.css, /settings-range:hover::-webkit-slider-thumb,[\s\S]*?box-shadow: 0 0 0 3px rgba\(108, 191, 0, \.5\);/);
+  assert.doesNotMatch(skin.css, /settings-range:hover::-webkit-slider-thumb,[\s\S]*?transform: scale\(1\.12\);/);
+  assert.match(skin.css, /settings-range::-moz-range-progress \{ height: 4px; border-radius: 99px; background: #6cbf00; \}/);
+  assert.match(skin.css, /voice-performance-panel-enter-active[\s\S]*?transition: opacity \.16s/);
+  assert.match(skin.css, /voice-performance-panel-leave-active/);
+  assert.match(skin.css, /voice-performance-panel-enter-from,[\s\S]*?voice-performance-panel-leave-to \{\s*opacity: 0;/);
+  assert.match(skin.css, /kaak-workspace\.voice-channel-group-toggle/);
+  assert.match(skin.css, /voice-channel-list[\s\S]*?grid-template-rows: 1fr;[\s\S]*?transition: grid-template-rows \.18s ease/);
+  assert.match(skin.css, /data-voice-group-open="false"[\s\S]*?voice-channel-list[\s\S]*?grid-template-rows: 0fr;[\s\S]*?visibility: hidden;[\s\S]*?visibility 0s linear \.18s/);
+  assert.match(skin.css, /voice-stage-heading[\s\S]*?flex: 0 0 46px;/);
+  assert.doesNotMatch(skin.css, /aria-expanded="true"\]\s*[^\n]*voice-stage-heading[^\n]*display: none;/);
+  assert.match(skin.css, /grid-template-columns: 86px 304px minmax\(280px, 1fr\) 0;/);
+  assert.match(skin.css, /grid-template-columns: 86px 304px/);
+  assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
+  assert.match(skin.css, /grid-template-rows: minmax\(0, 1fr\)/);
+  assert.doesNotMatch(skin.css, /kaak-workspace\.topbar/);
+  assert.match(skin.css, /kaak-workspace\.server-rail"\]\s*\{[\s\S]*?--skin-kaak-rail-bg: #191a1d;[\s\S]*?--skin-kaak-rail-item-bg: #2b2d32;[\s\S]*?--skin-kaak-rail-accent: #75c900;[\s\S]*?gap: 18px;[\s\S]*?padding: 14px 0 96px;[\s\S]*?background: var\(--skin-kaak-rail-bg\);/);
+  assert.match(skin.css, /kaak-workspace\.server-add"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border-radius: 18px;/);
+  assert.match(skin.css, /kaak-workspace\.rail-skin"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?flex: 0 0 58px;/);
+  assert.match(skin.css, /kaak-workspace\.rail-language"\]\s*\{[\s\S]*?order: 4;[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?flex: 0 0 58px;/);
+  assert.match(skin.css, /rail-language"\] \.language-trigger\s*\{[^}]*width: 58px;[^}]*height: 58px;[^}]*border-radius: 18px;[^}]*background: var\(--skin-kaak-rail-item-bg\);/);
+  assert.match(skin.css, /rail-language"\] \.language-trigger > \.language-current-icon\s*\{\s*display: block;[^}]*width: 24px;[^}]*height: 24px;/);
+  assert.match(skin.css, /kaak-home\.home-language"\]\s*\{[^}]*position: fixed;[^}]*top: 18px;[^}]*right: 18px;/);
+  assert.match(skin.css, /kaak-home\.home-language"\] \.language-trigger\s*\{[^}]*width: 48px;[^}]*height: 48px;[^}]*background: #fff;/);
+  assert.match(skin.css, /kaak-home\.home-language"\] \.language-trigger > \.language-current-icon\s*\{\s*display: block;/);
+  assert.doesNotMatch(skin.css, /language-trigger::before\s*\{\s*content: "文\/A";/);
+  assert.match(skin.css, /skin-add-divider"\]\s*\{\s*order: 1;/);
+  assert.match(skin.css, /kaak-workspace\.server-add"\]\s*\{\s*order: 2;/);
+  assert.match(skin.css, /kaak-workspace\.rail-skin"\]\s*\{\s*order: 3;/);
+  assert.match(skin.css, /rail-language"\] \.language-dropdown\s*\{[^}]*position: fixed;[^}]*bottom: 161px;[^}]*left: 94px;/);
+  assert.match(skin.css, /rail-skin"\] \.skin-dropdown\s*\{[^}]*position: fixed;[^}]*bottom: 179px;[^}]*left: 94px;/);
+  assert.match(skin.css, /kaak-workspace\.quick-server-item"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;/);
+  assert.match(skin.css, /kaak-workspace\.quick-server"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border: 2px solid transparent;[\s\S]*?border-radius: 18px;/);
+  assert.match(skin.css, /quick-server\"\]\:hover[\s\S]*?background: #383a40;/);
+  assert.match(skin.css, /quick-server\"\]\:not\(\[aria-current=\"true\"\]\):hover[\s\S]*?server-monogram[\s\S]*?background: #383a40;/);
+  assert.match(skin.css, /quick-server\"\]\[aria-current=\"true\"\] \{[\s\S]*?border-color: var\(--skin-kaak-rail-accent\);[\s\S]*?background: var\(--skin-kaak-rail-item-bg\);/);
+  assert.match(skin.css, /quick-server\"\]\[aria-current=\"true\"\][\s\S]*?server-monogram[\s\S]*?background: var\(--skin-kaak-rail-item-bg\);/);
+  assert.match(skin.css, /quick-server\"\]\[aria-current=\"true\"\]::before[\s\S]*?left: -16px;[\s\S]*?top: 10px;[\s\S]*?width: 4px;[\s\S]*?height: 34px;/);
+  assert.match(skin.css, /kaak-workspace\.identity-entry\"\]\s*\{[\s\S]*?width: 86px;[\s\S]*?background: #191a1d;/);
+  assert.match(skin.css, /kaak-workspace\.server-monogram[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?border-radius: 16px;[\s\S]*?font-size: 23px;[\s\S]*?font-weight: 600;/);
+  assert.match(skin.css, /kaak-workspace\.server-icon[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?border-radius: inherit;[\s\S]*?object-fit: cover;/);
+  assert.doesNotMatch(skin.css, /server-monogram\"\]\[data-tone=/);
+  assert.match(skin.css, /kaak-workspace\.identity-monogram\"\]\s*\{[\s\S]*?width: 54px;[\s\S]*?height: 54px;[\s\S]*?border-radius: 50%;[\s\S]*?background: #176a9e;[\s\S]*?font-size: 17px;/);
+  assert.match(skin.css, /kaak-workspace\.identity-online\"\]\s*\{[\s\S]*?right: -2px;[\s\S]*?bottom: -2px;[\s\S]*?width: 17px;[\s\S]*?height: 17px;[\s\S]*?border: 3px solid #191a1d;[\s\S]*?background: #75c900;/);
+  assert.match(skin.css, /kaak-workspace\.identity-name\"\]\s*\{\s*display: none;/);
+  assert.match(skin.css, /@media \(max-width: 820px\)[\s\S]*?grid-template-columns: 86px minmax\(0, 1fr\);[\s\S]*?grid-template-columns: 86px minmax\(0, 1fr\);/);
+  assert.match(skin.css, /@media \(max-height: 620px\)[\s\S]*?server-rail[\s\S]*?padding-bottom: 76px;/);
+  assert.match(skin.css, /voice-grid[\s\S]*?grid-template-columns: repeat\(auto-fit/);
+  assert.match(skin.css, /voice-card[\s\S]*?aspect-ratio: 1\.82;/);
+  assert.match(skin.css, /\.voice-card\s*\{[\s\S]*?transition: border-color \.18s ease, background-color \.18s ease, box-shadow \.18s ease;/);
+  assert.match(skin.css, /voice-card[\s\S]*?max-width: 480px;/);
+  assert.match(skin.css, /voice-avatar \{[^}]*width: 104px; height: 104px;/);
+  assert.match(skin.css, /voice-avatar-wrap::after \{[\s\S]*?content: "";[\s\S]*?border: 2px solid #6cbf0088;/);
+  assert.match(skin.css, /voice-card\[data-ws-speaking="true"\] \.voice-avatar-wrap::after \{ display: block; animation: ws-community-kaak-voice-kaak-member-speaking-ring 1\.08s/);
+  assert.match(skin.css, /voice-card\[data-ws-speaking="true"\]::after \{ display: block; animation: ws-community-kaak-voice-kaak-member-speaking-wave \.72s ease-in-out infinite alternate/);
+  assert.match(skin.css, /server-name"\]\s*\{[\s\S]*?font-size: 16px;[\s\S]*?font-weight: 700;[\s\S]*?line-height: 22px;/);
+  assert.match(skin.css, /voice-channel-group-toggle"\]\s*\{[\s\S]*?font-size: 12px;[\s\S]*?font-weight: 700;[\s\S]*?letter-spacing: normal;/);
+  assert.match(skin.css, /ws-voice-channel-name\s*\{[^}]*font-size: 14px;[^}]*font-weight: 700;[^}]*line-height: 24px;/);
+  assert.match(skin.css, /ws-voice-channel-count\s*\{[^}]*color: rgba\(230, 234, 240, \.4\);[^}]*font-size: 12px;[^}]*font-weight: 400;/);
+  assert.match(skin.css, /\.ws-voice-member-move \{ transition: transform \.28s/);
+  assert.match(skin.css, /\.ws-voice-member-enter-from,[\s\S]*?\.ws-voice-member-leave-to \{ opacity: 0; transform: translateY\(10px\) scale\(\.975\); \}/);
+  assert.match(skin.css, /data-ws-part="voice\.member\.mic-status"[\s\S]*?color: #c8c9ce;[\s\S]*?background: #111216d9;/);
+  assert.match(skin.css, /aria-expanded="true"\]\)[\s\S]*?\.voice-card > strong \{[\s\S]*?opacity: 0;[\s\S]*?visibility: hidden;[\s\S]*?transition: opacity \.14s ease, transform \.14s ease, visibility 0s linear \.14s;/);
+  assert.match(skin.css, /aria-expanded="true"\]\)[\s\S]*?\.voice-card:hover > strong \{[\s\S]*?opacity: 1;[\s\S]*?visibility: visible;[\s\S]*?transition-delay: 0s;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-card > strong[\s\S]*?bottom: 8px;[\s\S]*?left: 8px;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?grid-template-columns:[^;]*0;/);
+  assert.match(skin.css, /chat-panel-toggle"\]\[aria-expanded="false"\][\s\S]*?voice-stage[\s\S]*?grid-column: 3 \/ 5;/);
+  assert.match(skin.css, /kaak-workspace\.chat-panel-expand[\s\S]*?background: var\(--skin-kaak-accent\);/);
+  assert.match(skin.css, /kaak-workspace\.chat-panel-toggle/);
+  assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?grid-column: 3;/);
+  assert.match(skin.css, /kaak-workspace\.voice-stage[\s\S]*?overflow: hidden;/);
+  assert.match(skin.css, /kaak-workspace\.screen-share-player"\]\s*\{[^}]*flex: 0 0 auto;[^}]*width: 100%;[^}]*max-width: 100%;/);
+  assert.match(skin.css, /kaak-workspace\.screen-share-player"\] \.screen-share-player-stage \{[^}]*height: min\(42dvh, 400px\);[^}]*min-height: 180px;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards"\]\s*\{[^}]*flex: 1 1 0%;[^}]*overflow-y: auto;/);
+  assert.match(skin.css, /kaak-workspace\.conversation[\s\S]*?grid-column: 4;/);
+  assert.match(skin.css, /conversation[\s\S]*?grid-template-rows: 50px minmax\(0, 1fr\);/);
+  assert.match(skin.css, /voice\.chat\.messages[\s\S]*?max-height: none;[\s\S]*?overflow-y: auto;/);
+  assert.match(skin.css, /voice\.chat\.message-bubble[\s\S]*?background: transparent;[\s\S]*?white-space: pre-wrap;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.voice-card[\s\S]*?aspect-ratio: 1\.82;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-live-indicator[\s\S]*?background: #20251e;/);
+  assert.match(skin.css, /kaak-workspace\.member-cards[\s\S]*?\.screen-share-card-button\.viewing[\s\S]*?background: #8be31e;/);
+  assert.match(skin.css, /kaak-workspace"\]\[data-ws-plugin-surface="voice"\] \[data-ws-part="voice\.screen-player\.stage"\]\s*\{[^}]*background: #000/);
+  assert.match(skin.css, /kaak-workspace"\]\[data-ws-plugin-surface="voice"\] \[data-ws-part="voice\.screen-player\.video"\]\s*\{[^}]*object-fit: contain;[^}]*background: #000/);
+  assert.match(skin.css, /@keyframes ws-community-kaak-voice-kaak-member-speaking-wave/);
+  assert.ok(skin.css.includes("animation: ws-community-kaak-voice-kaak-performance-refresh-spin .72s linear infinite;"));
+  assert.ok(skin.css.includes("performance-refresh:disabled .ui-icon { animation: none; }"));
+  assert.match(skin.css, /kaak-workspace\.performance-panel"\] \.network-performance \{\s*position: relative;\s*z-index: 8;/);
+  assert.match(skin.css, /kaak-workspace"\]\[data-ws-plugin-surface="voice"\] \.dock-hover-panel \{[\s\S]*?background: #202126;/);
+  assert.match(skin.css, /kaak-workspace\.identity-entry[\s\S]*?position: absolute;/);
+  assert.ok(skin.css.includes("@media (max-width: 820px)"));
+});
+
+test("v4 skin packages validate Wasm entry ABI and cache it as application/wasm", async () => {
+  const wasmPlugin = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      runtime: "wasm",
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.wasm",
+      style: "plugins/voice-toolbar/style.css",
+      assets: ["plugins/voice-toolbar/assets/icon.png"],
+      permissions: [],
+    }],
+  };
+  const skin = await importSkinPack(makeSkinV4(wasmPlugin, {
+    entryPath: "plugins/voice-toolbar/index.wasm",
+    entryBytes: createSkinExtensionWasmPrefixByteImmediateProbe(),
+  }));
+  assert.equal(skin.runtimePlugins?.plugins[0].runtime, "wasm");
+  assert.equal(skin.runtimePluginFiles?.["plugins/voice-toolbar/index.wasm"]?.type, "application/wasm");
+
+  await assert.rejects(
+    importSkinPack(makeSkinV4(wasmPlugin, {
+      entryPath: "plugins/voice-toolbar/index.wasm",
+      entryBytes: new Uint8Array([0, 1, 2, 3]),
+    })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_RUNTIME_PLUGIN_WASM_INVALID",
+  );
+});
+
+test("the full voice surface example packages share-aware members and host-owned controls", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/open-voice-surface.wskin", import.meta.url));
+  const file = new File([archive], "open-voice-surface.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.open-voice-surface");
+  assert.equal(skin.pluginData?.schemaVersion, 3);
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.page, component.mode]), [
+    ["home", "surface"], ["voice", "surface"],
+  ]);
+  const voiceSurface = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voiceSurface?.permissions.includes("ui.surface.replace"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.read"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voiceSurface?.permissions.includes("session.channels.read"));
+  assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.read"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.control"));
+  const openMemberWatchAction = voiceSurface?.actions["watch-screen-share"];
+  assert.equal(openMemberWatchAction?.type, "voice.joinScreenShare");
+  assert.equal(openMemberWatchAction?.args.streamId, "{{member.screenShareStreamId}}");
+  assert.ok(skin.css.includes("@media (max-width: 800px)"));
+});
+
+test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspace", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/harbor-voice.wskin", import.meta.url));
+  const file = new File([archive], "harbor-voice.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.harbor-voice");
+  assert.equal(skin.pluginData?.schemaVersion, 3);
+  assert.deepEqual(skin.pluginData?.components.map((component) => [component.page, component.mode]), [
+    ["home", "surface"], ["voice", "surface"],
+  ]);
+  const voiceSurface = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voiceSurface?.permissions.includes("session.channel.join"));
+  assert.ok(voiceSurface?.permissions.includes("servers.quickList.switch"));
+  assert.ok(voiceSurface?.permissions.includes("session.members.read"));
+  assert.ok(voiceSurface?.permissions.includes("chat.channel.read"));
+  assert.ok(voiceSurface?.permissions.includes("chat.channel.send"));
+  assert.ok(voiceSurface?.permissions.includes("audio.microphone.control"));
+  assert.ok(voiceSurface?.permissions.includes("audio.output.control"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.control"));
+  assert.ok(voiceSurface?.permissions.includes("voice.screenShare.read"));
+  function findPart(node: SkinPluginNode | undefined, part: string): SkinPluginNode | undefined {
+    if (!node) return undefined;
+    if (node.part === part) return node;
+    for (const child of node.children ?? []) {
+      const found = findPart(child, part);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const channelRow = findPart(voiceSurface?.root, "channel-row");
+  assert.equal(channelRow?.events?.click, "select-channel", "single-click only selects a channel in this skin");
+  assert.equal(channelRow?.events?.dblclick, "join-channel", "channel switching follows TeamSpeak's double-click join behavior");
+  assert.equal(channelRow?.attributes?.["data-depth"], "{{channel.depth}}", "the channel hierarchy is represented without a new host API");
+  assert.equal(findPart(channelRow, "selected-channel-indicator")?.when?.equals, "{{channel.id}}");
+  const identityEntry = findPart(voiceSurface?.root, "identity-entry");
+  assert.equal(identityEntry?.attributes?.role, "group");
+  assert.equal(identityEntry?.when?.path, "session.status.userName");
+  assert.equal(findPart(identityEntry, "identity-name")?.children?.[0]?.text, "{{session.status.userName}}");
+  const channelVoiceMembers = findPart(voiceSurface?.root, "channel-voice-members");
+  assert.equal(channelVoiceMembers?.when?.path, "channel.current");
+  assert.equal(findPart(channelVoiceMembers, "channel-voice-member")?.repeat?.path, "channel.members");
+  assert.equal(findPart(channelVoiceMembers, "channel-member-muted")?.when?.path, "voicemember.status");
+  assert.equal(findPart(voiceSurface?.root, "member-away-state")?.when?.path, "member.status");
+  assert.equal(findPart(voiceSurface?.root, "member-screen-share")?.when?.path, "member.screenSharing");
+  assert.equal(voiceSurface?.actions["watch-screen-share"]?.type, "voice.joinScreenShare");
+  assert.equal(voiceSurface?.actions["watch-channel-member-screen-share"]?.type, "voice.joinScreenShare");
+  const voiceDockActions = findPart(voiceSurface?.root, "voice-dock-actions");
+  assert.equal(findPart(voiceDockActions, "screen-share-start")?.widget, "voice.screen-share-start");
+  assert.equal(findPart(voiceDockActions, "audio-controls")?.widget, "voice.audio-controls");
+  assert.equal(findPart(voiceDockActions, "disconnect-control")?.events?.click, "disconnect");
+  const chat = findPart(voiceSurface?.root, "chat");
+  assert.equal(findPart(chat, "chat-message")?.repeat?.path, "chat.messages");
+  assert.equal(findPart(chat, "chat-composer")?.events?.submit, "send-message");
+  assert.equal(findPart(chat, "chat-input")?.bindValue, "message");
+  assert.equal(findPart(chat, "chat-empty")?.when?.empty, true);
+  assert.equal(findPart(voiceSurface?.root, "whisper-start")?.events?.click, "whisper-on");
+  assert.ok(skin.css.includes("@media (max-width: 820px)"));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="harbor-workspace.channel-row"][data-depth="1"]'));
+  assert.ok(skin.css.includes('[data-ws-plugin-part="harbor-workspace.identity-entry"]'));
+  assert.ok(skin.css.includes('data-ws-plugin-part="harbor-workspace.screen-share-start"'), "the host screen-share control uses the stable plugin part hook");
+  assert.ok(skin.css.includes(".accompaniment-toggle { display: none; }"));
+  assert.ok(!skin.css.includes("https://"), "the skin uses no remote artwork or font resources");
+});
+
+function makeSkinV2(layout: unknown, manifestChanges: Record<string, unknown> = {}): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({
+      ...manifest,
+      schemaVersion: 2,
+      packageType: "layout-skin",
+      layout: "layout.json",
+      permissions: [],
+      ...manifestChanges,
+    })),
+    "skin.css": strToU8('[data-ws-part="home.header"] { color: #123456; }'),
+    "layout.json": strToU8(JSON.stringify(layout)),
+  };
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v2.wskin", { type: "application/octet-stream" });
+}
+
+function makeSkinV3(components: unknown, css: string, assets: Record<string, Uint8Array> = {}): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 3, packageType: "open-skin", components: "components.json" })),
+    "skin.css": strToU8(css),
+    "components.json": strToU8(JSON.stringify(components)),
+    ...assets,
+  };
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v3.wskin", { type: "application/octet-stream" });
+}
+
+function makeSkinV4(
+  pluginDocument: unknown = {
+    schemaVersion: 1,
+    plugins: [{
+      id: "voice-toolbar",
+      name: "Voice toolbar",
+      version: "1.0.0",
+      apiVersion: 1,
+      page: "voice",
+      mode: "widget",
+      entry: "plugins/voice-toolbar/index.js",
+      style: "plugins/voice-toolbar/style.css",
+      assets: ["plugins/voice-toolbar/assets/icon.png"],
+      permissions: ["session.channels.read"],
+    }],
+  },
+  options: { includeEntry?: boolean; entryBytes?: Uint8Array; entryPath?: string; layout?: unknown; extra?: Record<string, Uint8Array> } = {},
+): File {
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({ ...manifest, schemaVersion: 4, packageType: "open-skin", plugins: "plugins.json", ...(options.layout ? { layout: "layout.json" } : {}) })),
+    "skin.css": strToU8('[data-ws-part="app"] { position: fixed; color: teal; }'),
+    "plugins.json": strToU8(JSON.stringify(pluginDocument)),
+    ...(options.layout ? { "layout.json": strToU8(JSON.stringify(options.layout)) } : {}),
+    "plugins/voice-toolbar/style.css": strToU8(".toolbar { color: teal; }"),
+    "plugins/voice-toolbar/assets/icon.png": new Uint8Array([1, 2, 3, 4]),
+    ...options.extra,
+  };
+  const entryPath = options.entryPath ?? "plugins/voice-toolbar/index.js";
+  if (options.includeEntry !== false) packageFiles[entryPath] = options.entryBytes ?? strToU8("export const render = () => document.createElement('button');");
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-v4.wskin", { type: "application/octet-stream" });
 }

@@ -1,5 +1,15 @@
 <template>
-  <div :class="['demo-page', 'ws-skin-root', { 'skin-initializing': !skinReady }]" data-ws-part="app" data-ws-page="demo">
+  <div :class="['demo-page', 'ws-skin-root', { 'skin-initializing': !skinReady }]" :lang="language" data-ws-part="app" data-ws-page="demo">
+    <SkinPluginOutlet
+      v-if="activeSkin?.pluginData"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :document="activeSkin.pluginData"
+      page="demo"
+      :data="skinPluginContext"
+      :assets="activeSkin.assets"
+      :actions="skinPluginActions"
+    />
     <header class="demo-header" data-ws-part="demo.header">
       <div class="demo-brand" data-ws-part="demo.brand"><span><Icon name="waveform" :size="21" /></span><div><strong>WebSpeak</strong><small>{{ copy.browserClient }}</small></div></div>
       <div class="demo-tools" data-ws-part="demo.header-tools"><span class="demo-badge" data-ws-part="demo.badge">{{ copy.demoBadge }}</span><SkinSwitcher v-model="activeSkinId" data-ws-part="demo.skin-switcher" :menu-label="copy.skinSelector" :options="skinOptions" @change="onSkinChange" /><LanguageSwitcher v-model="language" data-ws-part="demo.language-switcher" :menu-label="copy.languageMenu" @change="persistLanguage" /><a href="/" data-ws-part="demo.home-link">{{ copy.back }}</a></div>
@@ -18,7 +28,25 @@
       <section class="demo-main" data-ws-part="demo.main">
         <div class="demo-hero" data-ws-part="demo.hero"><div><span class="demo-live" data-ws-part="demo.live"><i></i>{{ copy.simulated }}</span><h1 data-ws-part="demo.hero.title"><Icon name="volume" :size="24" /> {{ selectedChannel.name }}</h1><p data-ws-part="demo.hero.description">{{ copy.heroLead }}</p><small data-ws-part="demo.hero.online"><Icon name="users" :size="14" /> {{ selectedChannel.members.length }} {{ copy.online }}</small></div><div class="demo-wave" data-ws-part="demo.wave" aria-hidden="true"><i v-for="bar in bars" :key="bar" :style="{ height: `${bar}px` }"></i></div></div>
         <div class="demo-section-heading" data-ws-part="demo.voice-heading"><span>{{ copy.voiceActivity }}</span><strong>{{ copy.speakingNow }}</strong></div>
-        <div class="demo-voice-grid" data-ws-part="demo.voice-grid"><article v-for="member in selectedChannel.members" :key="member.id" :class="['demo-voice-card', { speaking: speakingId === member.id }]" data-ws-part="demo.voice-card" :data-ws-state="speakingId === member.id ? 'speaking' : 'connected'" @click="speakingId = member.id"><i data-ws-part="demo.avatar" :style="avatarStyle(member.name)">{{ member.name[0] }}</i><strong data-ws-part="demo.member-name">{{ member.name }}</strong><span data-ws-part="demo.member-status">{{ speakingId === member.id ? copy.speaking : copy.connected }}</span></article></div>
+        <div class="demo-voice-grid" data-ws-part="demo.voice-grid">
+          <article
+            v-for="member in selectedChannel.members"
+            :key="member.id"
+            :class="['demo-voice-card', { speaking: speakingId === member.id }]"
+            data-ws-part="demo.voice-card"
+            :data-ws-state="speakingId === member.id ? 'speaking' : 'connected'"
+            role="button"
+            tabindex="0"
+            :aria-pressed="speakingId === member.id"
+            @click="speakingId = member.id"
+            @keydown.enter.prevent="speakingId = member.id"
+            @keydown.space.prevent="speakingId = member.id"
+          >
+            <i data-ws-part="demo.avatar" :style="avatarStyle(member.name)">{{ member.name[0] }}</i>
+            <strong data-ws-part="demo.member-name">{{ member.name }}</strong>
+            <span data-ws-part="demo.member-status">{{ speakingId === member.id ? copy.speaking : copy.connected }}</span>
+          </article>
+        </div>
 
         <div class="demo-chat-head" data-ws-part="demo.chat.heading"><div><span>{{ copy.textChannel }}</span><strong># {{ selectedChannel.name }} {{ copy.chat }}</strong></div><div class="demo-tabs" data-ws-part="demo.chat.tabs"><button v-for="tab in tabs" :key="tab.id" type="button" :class="{ active: activeTab === tab.id }" data-ws-part="demo.chat.tab" :data-ws-state="activeTab === tab.id ? 'active' : 'idle'" @click="activeTab = tab.id">{{ tab.label }}</button></div></div>
         <div class="demo-messages" data-ws-part="demo.chat.messages"><div v-for="message in visibleMessages" :key="message.id" :class="['demo-message', { mine: message.mine }]" data-ws-part="demo.chat.message" :data-ws-state="message.mine ? 'mine' : 'other'" @dblclick="message.mine = !message.mine"><i :style="avatarStyle(message.author)">{{ message.author[0] }}</i><div><small>{{ message.author }} · {{ message.time }}</small><p>{{ messageText(message) }}</p></div></div><div v-if="!visibleMessages.length" class="demo-empty" data-ws-part="demo.chat.empty"><Icon name="message" :size="22" /><strong>{{ copy.emptyChat }}</strong></div></div>
@@ -29,12 +57,16 @@
     </main>
     <div v-if="poke" class="demo-poke" data-ws-part="demo.poke-notification" role="status"><Icon name="bell" :size="17" /><span><strong>msicbot</strong> {{ copy.pokedYou }}</span><button type="button" data-ws-part="demo.poke.dismiss" @click="poke = false"><Icon name="close" :size="14" /></button></div>
   </div>
+  <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
+import "../styles/skin-plugin.css";
+import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
+import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
 import { saveLocalPreferences } from "../services/local-persistence.js";
 import { BUILTIN_ILLUSIA_SKIN_ID, isPublicSkinEnabled } from "../services/skin-catalog.js";
@@ -49,7 +81,8 @@ const storedLanguage = localStorage.getItem("webspeak:language");
 const language = ref<Language>(storedLanguage === "en" || storedLanguage === "de" || storedLanguage === "ru" || storedLanguage === "ja" ? storedLanguage : "zh");
 const baseCopy = computed(() => language.value === "zh" ? zh : language.value === "de" ? de : language.value === "ru" ? ru : language.value === "ja" ? ja : en);
 const { activeSkin, activeSkinId, skinReady, installedSkins, catalogSkins,
-  select: onSkinChange, initialize: initializeSkin } = usePublicSkin();
+  skinLoadError, select: onSkinChange, initialize: initializeSkin,
+  switchToBuiltInAfterLoadError } = usePublicSkin();
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
@@ -104,6 +137,35 @@ function toggleSpeaking() { speakingId.value = speakingId.value ? "" : selectedC
 function messageText(message: DemoMessage): string { return language.value === "zh" ? message.zhText ?? message.text : language.value === "ru" ? message.ruText ?? message.enText ?? message.text : language.value === "ja" ? message.jaText ?? message.enText ?? message.text : message.enText ?? message.text; }
 function sendMessage() { const text = draft.value.trim(); if (!text) return; messages.value.push({ id: Date.now(), author: "illusia", time: "now", text, mine: true }); draft.value = ""; }
 function avatarStyle(name: string) { let hash = 0; for (const char of name) hash = char.charCodeAt(0) + ((hash << 5) - hash); const colors = ["#168f83", "#7b9ed0", "#b99070", "#8b78b9"]; return { background: colors[Math.abs(hash) % colors.length] }; }
+
+const skinPluginContext = computed(() => ({
+  session: {
+    status: { connected: true, connecting: false, channelId: selectedChannel.value.id, channelName: selectedChannel.value.name, userName: "illusia" },
+    channels: channels.map((channel, depth) => ({ id: channel.id, name: channel.name, parentId: "", depth, memberCount: channel.members.length, current: channel.id === selectedChannel.value.id })),
+    members: selectedChannel.value.members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      channelId: selectedChannel.value.id,
+      status: member.id === speakingId.value ? "speaking" : "online",
+      speaking: member.id === speakingId.value,
+      self: member.id === "illusia",
+    })),
+  },
+  favorites: { items: [] },
+  chat: { messages: visibleMessages.value.map((message) => ({ id: String(message.id), author: message.author, text: messageText(message), time: message.time, kind: message.mine ? "self" : "message", channelId: selectedChannel.value.id })) },
+}));
+
+const skinPluginActions = {
+  "voice.joinChannel": (args: Record<string, string | number | boolean>) => {
+    if (typeof args.channelId === "string" && channels.some((channel) => channel.id === args.channelId)) selectChannel(args.channelId);
+  },
+  "favorites.switch": (_args: Record<string, string | number | boolean>) => undefined,
+  "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
+    if (typeof args.text !== "string" || args.text.length > 1000) return;
+    draft.value = args.text;
+    sendMessage();
+  },
+};
 </script>
 
 <style scoped>
@@ -130,5 +192,5 @@ function avatarStyle(name: string) { let hash = 0; for (const char of name) hash
 .demo-page[data-ws-skin="builtin.dark"] .demo-hero { background: linear-gradient(112deg, #173e3a, #172321); }
 .demo-page[data-ws-skin="builtin.dark"] .demo-message p, .demo-page[data-ws-skin="builtin.dark"] .demo-composer, .demo-page[data-ws-skin="builtin.dark"] .demo-actions-panel > button { background: #202f2c; color: #d7e7e3; }
 .demo-page[data-ws-skin="builtin.dark"] .demo-chat-head, .demo-page[data-ws-skin="builtin.dark"] .demo-user { border-color: #30413d; }
-.demo-page :where(button, a, input, select):focus-visible { outline: 3px solid #69d2c7; outline-offset: 2px; }
+.demo-page :where(button, a, input, select, [role="button"]):focus-visible { outline: 3px solid #69d2c7; outline-offset: 2px; }
 </style>

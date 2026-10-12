@@ -2,6 +2,14 @@ interface Size { width: number; height: number }
 interface Point { x: number; y: number }
 interface Anchor { left: number; right: number; top: number }
 
+export function memberMenuInvocationPoint(
+  event: Pick<MouseEvent, "type" | "detail" | "clientX" | "clientY">,
+  triggerPoint: Point,
+): Point {
+  if (event.type !== "contextmenu" && event.detail <= 0) return triggerPoint;
+  return { x: event.clientX, y: event.clientY };
+}
+
 // All inputs and results are rendered viewport pixels. CSS zoom conversion
 // belongs to the component, after placement has been constrained.
 export function placeMemberMenu(point: Point, size: Size, viewport: Size, inset = 12): Point {

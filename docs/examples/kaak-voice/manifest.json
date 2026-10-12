@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "packageType": "open-skin",
+  "id": "community.kaak-voice",
+  "name": "KAAK",
+  "version": "3.1.107",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "A KOOK-inspired WebSpeak skin with a split-screen connection home, searchable server header, TeamSpeak banner, nested channel members, unified chat with local history, and a compact audio dock.",
+  "entry": "skin.css",
+  "components": "components.json",
+  "content": "content.json",
+  "minAppVersion": "0.2.7-preview"
+}

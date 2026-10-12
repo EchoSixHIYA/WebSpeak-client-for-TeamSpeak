@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
-import { lookup } from "node:dns/promises";
+import { lookup, resolveSrv } from "node:dns/promises";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
+import { parseTeamSpeakTarget } from "../domain/teamspeak-target.js";
 
 export class UnsafeTeamSpeakTargetError extends Error {
   constructor(message = "This TeamSpeak target is not allowed in open mode") {
@@ -9,17 +10,77 @@ export class UnsafeTeamSpeakTargetError extends Error {
   }
 }
 
+export class TeamSpeakTargetResolutionError extends Error {
+  constructor(message = "TeamSpeak target could not be resolved", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "TeamSpeakTargetResolutionError";
+  }
+}
+
 /** Resolve and reject addresses that could turn a public gateway into an internal network probe. */
 export async function assertSafeOpenTarget(target: TeamSpeakTarget): Promise<void> {
   await resolveSafeOpenTarget(target);
 }
 
-export async function resolveSafeOpenTarget(target: TeamSpeakTarget): Promise<TeamSpeakTarget> {
+type ResolvedAddress = { address: string; family: number };
+type AddressLookup = (hostname: string) => Promise<ResolvedAddress[]>;
+type TeamSpeakSrvRecord = { name: string; port: number; priority: number; weight: number };
+type TeamSpeakSrvLookup = (service: string) => Promise<TeamSpeakSrvRecord[]>;
+
+export async function resolveSafeOpenTarget(
+  target: TeamSpeakTarget,
+  options: { lookup?: AddressLookup; resolveSrv?: TeamSpeakSrvLookup } = {},
+): Promise<TeamSpeakTarget> {
+  const addressLookup = options.lookup ?? ((hostname) => lookup(hostname, { all: true, verbatim: true }));
+  if (!isIP(target.host) && target.host.includes(".") && target.host !== "localhost") {
+    const srvLookup = options.resolveSrv ?? resolveSrv;
+    let srvRecords: TeamSpeakSrvRecord[] = [];
+    try {
+      srvRecords = await srvLookup(`_ts3._udp.${target.host}`);
+    } catch {
+      // No SRV record is normal; use the regular address lookup below.
+    }
+
+    if (srvRecords.length > 0) {
+      const srvTargets = srvRecords.map(({ name, port }) => {
+        const srvHost = name.replace(/\.$/, "");
+        if (!srvHost || !Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new TeamSpeakTargetResolutionError("Invalid TeamSpeak SRV record");
+        }
+        try {
+          return parseTeamSpeakTarget(`${srvHost}:${port}`);
+        } catch (error: unknown) {
+          throw new TeamSpeakTargetResolutionError("Invalid TeamSpeak SRV record", { cause: error });
+        }
+      });
+      const safeTargets = await Promise.all(srvTargets.map((srvTarget) => resolveSafeAddress(srvTarget, addressLookup)));
+      // The SDK uses the first record returned by the system SRV resolver;
+      // keep that ordering while validating every advertised destination.
+      return safeTargets[0]!;
+    }
+  }
+
+  return resolveSafeAddress(target, addressLookup);
+}
+
+async function resolveSafeAddress(target: TeamSpeakTarget, addressLookup: AddressLookup): Promise<TeamSpeakTarget> {
   const literalVersion = isIP(target.host);
-  const addresses = literalVersion
-    ? [{ address: target.host, family: literalVersion }]
-    : await lookup(target.host, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some(({ address }) => isRestrictedAddress(address))) {
+  let addresses: ResolvedAddress[];
+  try {
+    addresses = literalVersion
+      ? [{ address: target.host, family: literalVersion }]
+      : await addressLookup(target.host);
+  } catch (error: unknown) {
+    throw new TeamSpeakTargetResolutionError(undefined, { cause: error });
+  }
+  // Mihomo's default fake-IP pool is 198.18.0.0/16, allowing its TUN to
+  // route the eventual socket by hostname. Accept this only for DNS names
+  // whose complete answer set is synthetic; literal and mixed answers remain
+  // blocked, preserving the open-mode SSRF boundary.
+  const mihomoFakeIpResolution = !literalVersion
+    && addresses.length > 0
+    && addresses.every(({ address }) => isMihomoFakeIpv4(address));
+  if (!addresses.length || (!mihomoFakeIpResolution && addresses.some(({ address }) => isRestrictedAddress(address)))) {
     throw new UnsafeTeamSpeakTargetError();
   }
   // Use the address that was actually validated so a second DNS lookup cannot
@@ -66,6 +127,12 @@ export function isRestrictedAddress(address: string): boolean {
   if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
   if (normalized.startsWith("2001:db8:")) return true; // documentation range
   return false;
+}
+
+function isMihomoFakeIpv4(address: string): boolean {
+  if (isIP(address) !== 4) return false;
+  const [first, second] = address.split(".").map(Number);
+  return first === 198 && second === 18;
 }
 
 function isRestrictedIpv4(address: string): boolean {

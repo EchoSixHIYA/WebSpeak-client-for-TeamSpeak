@@ -94,3 +94,19 @@ test("open-target protection runs on the lookup result", async () => {
   }
   assert.deepEqual(await resolveSafeOpenTarget(await resolveTeamSpeakTarget("guild", lookup())), { host: "8.8.8.8", port: 10000 });
 });
+
+test("TeamSpeak nickname results continue through SRV discovery before open-mode validation", async () => {
+  const target = await resolveTarget("guild", lookup("ts.twilightly.top"), async () => undefined);
+  const safeTarget = await resolveSafeOpenTarget(target, {
+    resolveSrv: async (service) => {
+      assert.equal(service, "_ts3._udp.ts.twilightly.top");
+      return [{ name: "routerstun.speedtest.twilightly.top.", port: 18967, priority: 0, weight: 5 }];
+    },
+    lookup: async (hostname) => {
+      assert.equal(hostname, "routerstun.speedtest.twilightly.top");
+      return [{ address: "183.200.23.34", family: 4 }];
+    },
+  });
+
+  assert.deepEqual(safeTarget, { host: "183.200.23.34", port: 18967 });
+});

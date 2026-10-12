@@ -276,6 +276,32 @@
 }
 .ws-skin-root[data-ws-skin="builtin.dark"] *::-webkit-scrollbar-thumb:hover { background: #69c7bc; }
 
+/* Keep live screen sharing obvious in the built-in dark voice roster. */
+.ws-skin-root[data-ws-skin="builtin.dark"] [data-ws-part="voice.screen-player.stage"] { background: #000; }
+.ws-skin-root[data-ws-skin="builtin.dark"] [data-ws-part="voice.screen-player.video"] { object-fit: contain; background: #000; }
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-live-indicator {
+  color: #bdfff1;
+  border-color: rgba(105, 210, 199, .48);
+  background: #172321;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+}
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-live-indicator::before {
+  background: #78e489;
+  box-shadow: 0 0 0 3px rgba(120, 228, 137, .17);
+}
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-wave { color: #69d2c7; }
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-card-button {
+  color: #a9eee3;
+  border-color: rgba(105, 210, 199, .4);
+  background: #20342f;
+}
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-card-button:hover { background: #29443e; }
+.ws-skin-root[data-ws-skin="builtin.dark"] .screen-share-card-button.viewing {
+  color: #10201d;
+  border-color: #69d2c7;
+  background: #69d2c7;
+}
+
 @keyframes join-accent-breathe-dark {
   0%, 100% { transform: translateY(0); text-shadow: 0 0 8px rgba(125, 255, 174, .28), 0 0 18px rgba(105, 210, 199, .14); }
   50% { transform: translateY(-2px); text-shadow: 0 0 13px rgba(125, 255, 174, .5), 0 0 26px rgba(105, 210, 199, .22); }

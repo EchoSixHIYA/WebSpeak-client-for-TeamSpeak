@@ -133,7 +133,7 @@ import type { useWebClientAudioControls } from "../../composables/useWebClientAu
 
 const props = defineProps<{
   model: Pick<ReturnType<typeof useVoiceWebSocket>, "microphoneMuted" | "inputVolume" | "outputVolume" | "outputMuted" | "noiseSuppressionEnabled" | "accompanimentActive">;
-  controls: Pick<ReturnType<typeof useWebClientAudioControls>, "toggleMicrophone" | "onInputVolume" | "onOutputVolume" | "onNoiseSuppressionToggle" | "toggleAccompaniment">;
+  controls: Pick<ReturnType<typeof useWebClientAudioControls>, "toggleMicrophone" | "toggleNoiseSuppression" | "onInputVolume" | "onOutputVolume" | "onNoiseSuppressionToggle" | "toggleAccompaniment">;
   t: (key: string) => string;
   rangeStyle: (value: number, max: number) => Record<string, string>;
 }>();

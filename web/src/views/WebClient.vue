@@ -7,16 +7,56 @@
       { 'skin-initializing': !skinReady, 'keyboard-open': mobileViewport.keyboardOpen },
     ]"
     :style="{ '--ws-viewport-height': `${mobileViewport.height}px`, '--ws-viewport-top': `${mobileViewport.top}px` }"
+    :lang="language"
     data-ws-part="app"
-    :data-ws-page="
-      voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
-        ? 'voice'
-        : 'home'
-    "
+    :data-ws-page="showVoiceShell ? 'voice' : 'home'"
   >
+    <SkinPluginOutlet
+      v-if="activeSkin"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :document="skinPluginDocument"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :data="skinPluginContext"
+      :assets="activeSkin.assets"
+      :actions="skinPluginActions"
+      :server-add-label="t('addFavoriteServer')"
+      :on-add-server="openFavoriteServerDialog"
+      :widgets="skinPluginWidgets"
+      @surface-change="skinPluginSurfaceActive = $event"
+      @restore-skin="switchToBuiltIn"
+    />
+    <SkinPluginEditor
+      v-if="activeSkin && skinEditorMode.isEnabled.value"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :base-document="activeSkin.pluginData"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :lang="language"
+      @updated="skinPluginDocumentRevision += 1"
+    />
+    <SkinRuntimePluginHost
+      v-if="activeSkin?.runtimePlugins"
+      :skin-id="activeSkin.id"
+      :skin-version="activeSkin.version"
+      :plugins="activeSkin.runtimePlugins"
+      :files="activeSkin.runtimePluginFiles ?? {}"
+      :styles="activeSkin.runtimePluginStyles ?? {}"
+      :assets="activeSkin.assets"
+      :page="showVoiceShell ? 'voice' : 'home'"
+      :mount-revision="accessMode"
+      :context="skinPluginContext"
+      :actions="skinPluginActions"
+      :server-add-label="t('addFavoriteServer')"
+      :on-add-server="openFavoriteServerDialog"
+      :widgets="skinPluginWidgets"
+      :read-session-status="readSkinRuntimeSessionStatus"
+      @surface-change="skinRuntimePluginSurfaceActive = $event"
+      @restore-skin="switchToBuiltIn"
+    />
     <!-- Connection / welcome screen -->
     <section
-      v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed"
+      v-if="!showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       class="join-page"
       data-ws-part="home"
     >
@@ -32,11 +72,13 @@
         @skin-change="onSkinChange"
         @language-change="persistLanguage"
       />
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="home.header.after"></div>
 
       <main
         class="join-content"
         data-ws-part="home.content"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.content.before"></div>
         <div
           class="join-copy"
           data-ws-part="home.hero"
@@ -200,8 +242,7 @@
             :access-mode="accessMode"
             :open-target-prefill-blocked="openTargetPrefillBlocked"
             :acceleration-relays="accelerationRelays"
-            :favorite-servers="favoriteServers"
-            :recent-servers="recentServers"
+            :quick-servers="quickServers"
             :is-favorite="isFavorite"
             :identity-export-busy="identityExportBusy"
             :has-identity="Boolean(identityMaterial)"
@@ -214,6 +255,7 @@
             @disconnect="doDisconnect"
             @select-server="selectLocalServer"
             @toggle-favorite="toggleFavorite"
+            @toggle-quick-favorite="toggleQuickFavorite"
             @import-identity="openIdentityImport"
             @export-identity="exportIdentity"
           />
@@ -227,24 +269,14 @@
             {{ t("connectionAuthorized") }}</div
           >
         </div>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.content.after"></div>
       </main>
-
-      <IdentityImportDialog
-        v-if="identityImportOpen"
-        v-model="identityImportText"
-        :busy="identityImportBusy"
-        :reading="identityFileReading"
-        :error="identityImportError"
-        :t="t"
-        @close="closeIdentityImport"
-        @submit="importIdentity"
-        @file="readIdentityFile"
-      />
 
       <footer
         class="join-footer"
         data-ws-part="home.footer"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="home.footer.before"></div>
         <span>WebSpeak</span><span class="footer-separator">·</span
         ><span>{{ t("teamSpeakClient") }}</span
         ><span class="footer-spacer"></span
@@ -303,12 +335,130 @@
 
     <!-- Connected application shell -->
     <div
-      v-else
+      v-else-if="showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       :class="['app-shell', `mobile-view-${mobileSection}`]"
       :data-performance-open="performancePanelOpen ? 'true' : 'false'"
+      :data-favorite-rail="'true'"
       data-ws-part="voice.shell"
       @click="memberMenu = null"
     >
+      <aside
+        class="favorite-server-rail"
+        data-ws-part="voice.favorite-servers.rail"
+        :aria-label="t('quickServers')"
+      >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.before"></div>
+        <div class="favorite-server-rail-list" data-ws-part="voice.favorite-servers.rail.list">
+          <div
+            v-for="server in quickServersForDisplay"
+            :key="server.id"
+            class="favorite-server-rail-item"
+            data-ws-part="voice.favorite-servers.rail.item"
+            :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
+          >
+            <button
+              type="button"
+              :class="['favorite-server-button', { active: isQuickServerTarget(server) }]"
+              data-ws-part="voice.favorite-servers.server"
+              :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
+              :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
+              :aria-label="t('switchToServer', { server: server.label })"
+              :aria-pressed="isQuickServerTarget(server)"
+              :disabled="voiceState.connecting && isQuickServerTarget(server)"
+              :aria-disabled="!serverCanSwitch(server)"
+              :title="serverCanSwitch(server) ? server.label + '\n' + server.address : t('serverSwitchRestricted')"
+              @click.stop="connectQuickServer(server)"
+            >
+              <span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span>
+              <span class="favorite-server-tooltip" data-ws-part="voice.favorite-servers.tooltip"><strong>{{ server.label }}</strong><small>{{ server.address }}</small></span>
+            </button>
+            <button
+              type="button"
+              :class="['favorite-server-toggle', { active: server.isFavorite }]"
+              data-ws-part="voice.favorite-servers.favorite-toggle"
+              :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+              :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+              :title="server.isFavorite ? t('removeFavorite') : t('saveFavorite')"
+              :aria-pressed="server.isFavorite"
+              @click.stop="toggleQuickFavorite(server)"
+            >
+              <Icon name="star" :size="11" />
+            </button>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="favorite-server-add"
+          data-ws-part="voice.favorite-servers.add"
+          :aria-label="t('addFavoriteServer')"
+          :title="t('addFavoriteServer')"
+          @click.stop="openFavoriteServerDialog"
+        ><Icon name="plus" :size="20" /></button>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.server-rail.after"></div>
+      </aside>
+
+      <nav
+        class="favorite-server-strip"
+        data-ws-part="voice.favorite-servers.strip"
+        :aria-label="t('quickServers')"
+      >
+        <div
+          v-for="server in quickServersForDisplay"
+          :key="server.id"
+          class="favorite-server-strip-item"
+          data-ws-part="voice.favorite-servers.strip.item"
+          :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
+        ><button
+          type="button"
+          :class="['favorite-server-strip-button', { active: isQuickServerTarget(server) }]"
+          data-ws-part="voice.favorite-servers.strip.server"
+          :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
+          :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
+          :aria-label="t('switchToServer', { server: server.label })"
+          :aria-pressed="isQuickServerTarget(server)"
+          :disabled="voiceState.connecting && isQuickServerTarget(server)"
+          :aria-disabled="!serverCanSwitch(server)"
+          :title="serverCanSwitch(server) ? server.label : t('serverSwitchRestricted')"
+          @click="connectQuickServer(server)"
+        ><span class="favorite-server-avatar" data-ws-part="voice.favorite-servers.avatar" :style="avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span><span>{{ server.label }}</span></button
+          ><button
+            type="button"
+            :class="['favorite-server-strip-toggle', { active: server.isFavorite }]"
+            data-ws-part="voice.favorite-servers.strip.favorite-toggle"
+            :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+            :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+            :title="server.isFavorite ? t('removeFavorite') : t('saveFavorite')"
+            :aria-pressed="server.isFavorite"
+            @click.stop="toggleQuickFavorite(server)"
+          ><Icon name="star" :size="11" /></button
+        ></div>
+        <button
+          type="button"
+          class="favorite-server-strip-add"
+          data-ws-part="voice.favorite-servers.strip.add"
+          :aria-label="t('addFavoriteServer')"
+          :title="t('addFavoriteServer')"
+          @click="openFavoriteServerDialog"
+        ><Icon name="plus" :size="18" /></button>
+      </nav>
+
+      <div
+        v-if="isMobileViewport && (favoriteSwitchPending || favoriteSwitchFailed)"
+        :class="['favorite-switch-banner', 'favorite-switch-mobile-banner', { failed: favoriteSwitchFailed }]"
+        data-ws-part="voice.favorite-servers.switch-status"
+        :data-ws-state="favoriteSwitchFailed ? 'failed' : 'connecting'"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="favorite-switch-indicator"><Icon :name="favoriteSwitchFailed ? 'info' : 'server'" :size="17" /></span>
+        <span class="favorite-switch-copy">
+          <strong>{{ favoriteSwitchFailed ? t('favoriteConnectionFailed', { server: favoriteSwitchLabel }) : t('favoriteSwitching', { server: favoriteSwitchLabel }) }}</strong>
+          <small v-if="favoriteSwitchPending">{{ t('connecting') }}</small>
+          <small v-else>{{ favoriteSwitchError || t('quickConnectFailed') }}</small>
+        </span>
+        <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
+      </div>
+
       <main
         class="workspace"
         data-ws-part="voice.workspace"
@@ -317,6 +467,7 @@
           class="workspace-header"
           data-ws-part="voice.header"
         >
+          <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.header.before"></div>
           <div
             class="breadcrumbs"
             data-ws-part="voice.breadcrumbs"
@@ -344,6 +495,16 @@
                 name="share"
                 :size="18"
             /></button>
+            <button
+              v-if="accessMode === 'open'"
+              :class="['header-action', 'favorite-current-toggle', { active: isFavorite }]"
+              data-ws-part="voice.favorite-servers.current-toggle"
+              :data-ws-state="isFavorite ? 'saved' : 'unsaved'"
+              :title="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+              :aria-label="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+              :aria-pressed="isFavorite"
+              @click="toggleFavorite"
+            ><Icon name="star" :size="18" /></button>
             <button
               v-if="isMobileViewport"
               class="header-action microphone-header-toggle"
@@ -382,21 +543,32 @@
             <button
               class="disconnect-button"
               :aria-label="t('exit')"
-              @click="doDisconnect"
-              ><Icon
+              @click="leaveVoiceWorkspace"
+            ><Icon
                 name="door"
                 :size="17"
               /><span>{{ t("exit") }}</span></button
             >
           </div>
+          <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.header.after"></div>
         </header>
 
-        <ScreenShareSettingsDialog
-          v-if="screenShareSettingsOpen"
-          :model="screenShareControls"
-          :t="t"
-          @close="screenShareSettingsOpen = false"
-        />
+        <div
+          v-if="!isMobileViewport && (favoriteSwitchPending || favoriteSwitchFailed)"
+          :class="['favorite-switch-banner', { failed: favoriteSwitchFailed }]"
+          data-ws-part="voice.favorite-servers.switch-status"
+          :data-ws-state="favoriteSwitchFailed ? 'failed' : 'connecting'"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="favorite-switch-indicator"><Icon :name="favoriteSwitchFailed ? 'info' : 'server'" :size="17" /></span>
+          <span class="favorite-switch-copy">
+            <strong>{{ favoriteSwitchFailed ? t('favoriteConnectionFailed', { server: favoriteSwitchLabel }) : t('favoriteSwitching', { server: favoriteSwitchLabel }) }}</strong>
+            <small v-if="favoriteSwitchPending">{{ t('connecting') }}</small>
+            <small v-else>{{ favoriteSwitchError || t('quickConnectFailed') }}</small>
+          </span>
+          <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
+        </div>
 
         <div
           v-if="voiceState.reconnecting || voiceState.reconnectFailed"
@@ -423,7 +595,7 @@
             ><button
               type="button"
               class="text-button"
-              @click="doDisconnect"
+              @click="leaveVoiceWorkspace"
               >{{ t("back") }}</button
             ></div
           >
@@ -467,6 +639,7 @@
             class="workspace-content"
             data-ws-part="voice.content"
           >
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.activity.before"></div>
             <section
               :class="['voice-section', { 'mobile-section-hidden': mobileSection !== 'voice' }]"
               data-ws-part="voice.activity"
@@ -509,6 +682,7 @@
               <VoiceMemberCards
                 :current-members="currentMembers"
                 :is-mobile-viewport="isMobileViewport"
+                :show-screen-share="true"
                 :sharing="memberSharingState"
                 :controls="screenShareControls"
                 :is-speaking="isSpeaking"
@@ -551,11 +725,13 @@
                   @click="toggleOutputMute"
                   ><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="18" /><span>{{ t("speaker") }}</span></button
                 >
-                <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="17" /></button
+                <button type="button" class="mobile-voice-leave" :aria-label="t('exit')" :title="t('exit')" @click="leaveVoiceWorkspace"><Icon name="door" :size="17" /></button
                 >
               </div>
             </section>
 
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.activity.after"></div>
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.chat.before"></div>
             <ChatPanel
               :model="chat"
               :t="t"
@@ -567,10 +743,12 @@
               :message-avatar="messageAvatar"
               :format-time="formatTime"
             />
+            <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.chat.after"></div>
           </div>
         </div>
       </main>
 
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.channel-panel.before"></div>
       <ChannelMemberPanel
         v-model:query="memberQuery"
         :model="memberControls"
@@ -589,8 +767,9 @@
         <div v-if="isMobileViewport" class="mobile-member-controls" role="toolbar" :aria-label="t('desktopAudioControls')">
           <button type="button" class="mobile-voice-toggle" :class="{ muted: microphoneMuted }" :aria-label="t('microphone')" :title="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')" :aria-pressed="!microphoneMuted" @click="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="20" /><span>{{ t('microphone') }}</span></button>
           <button type="button" class="mobile-voice-toggle" :class="{ muted: outputMuted }" :aria-label="t('speaker')" :title="outputMuted ? t('outputMuted') : t('speaker')" :aria-pressed="!outputMuted" @click="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'volume'" :size="20" /><span>{{ t('speaker') }}</span></button>
-          <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="doDisconnect"><Icon name="door" :size="18" /></button>
+          <button type="button" class="mobile-member-leave" :aria-label="t('exit')" :title="t('exit')" @click="leaveVoiceWorkspace"><Icon name="door" :size="18" /></button>
         </div>
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.audio-dock.before"></div>
         <AudioDock
           v-if="!isMobileViewport"
           :model="audioDockState"
@@ -600,7 +779,9 @@
           @settings="settingsOpen = true"
           @output-mute="toggleOutputMute"
         />
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.audio-dock.after"></div>
       </ChannelMemberPanel>
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.channel-panel.after"></div>
 
       <section
         v-if="mobileSection === 'more'"
@@ -647,7 +828,7 @@
         <button
           type="button"
           class="danger"
-          @click="doDisconnect"
+          @click="leaveVoiceWorkspace"
           ><Icon
             name="door"
             :size="18"
@@ -661,6 +842,7 @@
         data-ws-part="voice.mobile-nav"
         :aria-label="t('mobileNavigation')"
       >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.mobile-nav.before"></div>
         <button
           type="button"
           :class="{ active: mobileSection === 'channels' }"
@@ -696,13 +878,34 @@
           :class="{ active: mobileSection === 'more' }"
           :aria-current="mobileSection === 'more' ? 'page' : undefined"
           @click="selectMobileSection('more')"
-          ><Icon
+        ><Icon
             name="more"
             :size="18"
           /><span>{{ t("mobileMore") }}</span></button
         >
+        <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.mobile-nav.after"></div>
       </nav>
+      <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
+
+    <IdentityImportDialog
+      v-if="identityImportOpen"
+      v-model="identityImportText"
+      :busy="identityImportBusy"
+      :reading="identityFileReading"
+      :error="identityImportError"
+      :t="t"
+      @close="closeIdentityImport"
+      @submit="importIdentity"
+      @file="readIdentityFile"
+    />
+
+    <ScreenShareSettingsDialog
+      v-if="screenShareSettingsOpen"
+      :model="screenShareControls"
+      :t="t"
+      @close="screenShareSettingsOpen = false"
+    />
 
     <MemberActionsMenu
       :model="memberControls"
@@ -721,6 +924,7 @@
       v-model="channelPasswordDialog.password"
       :busy="channelPasswordDialog.submitting"
       :error="channelPasswordDialog.error"
+      :submit-label="skinMessageOverrides.passwordDialogConfirm"
       :t="t"
       @cancel="cancelChannelPassword"
       @submit="submitChannelPassword"
@@ -731,9 +935,19 @@
       v-if="serverPasswordDialog.open"
       v-model="serverPasswordDialog.password"
       :error-code="serverPasswordDialog.errorCode"
+      :submit-label="skinMessageOverrides.passwordDialogConfirm"
       :t="t"
-      @cancel="cancelServerPassword"
+      @cancel="cancelFavoriteServerPassword"
       @submit="submitServerPassword"
+    />
+
+    <FavoriteServerDialog
+          :open="favoriteServerDialogOpen"
+          :busy="favoriteDialogBusy"
+          :default-nickname="nickname"
+          :t="t"
+          @close="favoriteServerDialogOpen = false"
+      @submit="submitFavoriteServerDraft"
     />
 
     <!-- Audio settings modal -->
@@ -742,7 +956,6 @@
       :model="audioSettingsState"
       :controls="audioControls"
       :microphone-error="voiceState.microphoneError"
-      :is-mobile-viewport="isMobileViewport"
       :t="t"
       :localized-message="localizedMessage"
       :range-style="rangeStyle"
@@ -761,14 +974,23 @@
       {{ toast }}</div
     >
   </div>
+  <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
 </template>
 
 <script setup lang="ts">
 import { observeMobileViewport } from "../services/mobile-viewport.js";
-import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
+import SkinPluginEditor from "../components/SkinPluginEditor.vue";
+import SkinRuntimePluginHost from "../components/SkinRuntimePluginHost.js";
+import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
+import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
+import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
+import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
+import VoiceServerBanner from "../components/web-client/VoiceServerBanner.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
 import ScreenSharePlayer from "../components/web-client/ScreenSharePlayer.vue";
 import AudioDock from "../components/web-client/AudioDock.vue";
@@ -782,7 +1004,9 @@ import JoinForm from "../components/web-client/JoinForm.vue";
 import ChatPanel from "../components/web-client/ChatPanel.vue";
 import WebClientHeader from "../components/web-client/WebClientHeader.vue";
 import IdentityImportDialog from "../components/web-client/IdentityImportDialog.vue";
+import FavoriteServerDialog, { type FavoriteServerDraft } from "../components/web-client/FavoriteServerDialog.vue";
 import { usePublicSkin } from "../composables/usePublicSkin.js";
+import { useSkinEditorMode } from "../services/skin-editor-mode.js";
 import { useWebClientIdentity } from "../composables/useWebClientIdentity.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
@@ -798,17 +1022,23 @@ import { useWebClientI18n } from "../composables/useWebClientI18n.js";
 import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfig.js";
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
-import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity } from "../services/local-persistence.js";
+import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
+import { isQuickServerAddressLabel, quickServerTargetsEqual, type QuickServer } from "../services/quick-servers.js";
+import { requestIdentityProviderLogin as dispatchIdentityProviderLogin } from "../services/identity-provider.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
-import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
+import { createSkinPluginQuickServerProjection, safeSkinServerDisplayName } from "../services/skin-plugin-context.js";
+import { loadSkinPluginAuthoringDocument } from "../services/skin-plugin-authoring.js";
+import type { SkinPluginDocument, SkinPluginWidgetOptions } from "../../../src/shared/skin-plugin.js";
+import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 
 const {
   state: voiceState,
+  serverInfo: voiceServerInfo,
   sessionEpoch,
   memberConversationKey,
   members,
@@ -892,7 +1122,7 @@ const { panelOpen: performancePanelOpen } = performance;
 
 const query = new URLSearchParams(location.search);
 const initialChannel = query.get("channel") ?? "";
-const inviteToken = query.get("invite") ?? "";
+const inviteToken = ref(query.get("invite") ?? "");
 const initialTarget = initialServerTarget();
 const nickname = ref(localStorage.getItem("webspeak:nickname") ?? "");
 const channel = ref(initialChannel);
@@ -903,12 +1133,19 @@ const rememberIdentity = ref(localStorage.getItem("webspeak:remember-identity") 
 const accelerationRelayId = ref("");
 const browserError = ref("");
 const memberQuery = ref("");
+const channelTreeSearchQuery = ref("");
 const selectedChannelId = ref("");
 const settingsOpen = ref(false);
+const favoriteServerDialogOpen = ref(false);
+const favoriteDialogBusy = ref(false);
+const favoriteSwitchPending = ref(false);
+const favoriteSwitchFailed = ref(false);
+const favoriteSwitchError = ref("");
 const channelPasswordDialog = reactive({ open: false, channelId: "", password: "", error: "", submitting: false });
 const serverPasswordDialog = reactive({ open: false, password: "", errorCode: "" });
 const qqModalOpen = ref(false);
 const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475";
+const githubRepositoryUrl = "https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak";
 const toast = ref("");
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
@@ -924,6 +1161,21 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const language = ref<Language>(getInitialLanguage());
 const activeSkin = shallowRef<InstalledSkin | null>(null);
+const skinEditorMode = useSkinEditorMode();
+const skinPluginDocumentRevision = ref(0);
+const emptySkinPluginDocument: SkinPluginDocument = { schemaVersion: 3, components: [] };
+const skinPluginDocument = computed<SkinPluginDocument>(() => {
+  skinPluginDocumentRevision.value;
+  const skin = activeSkin.value;
+  if (!skin) return emptySkinPluginDocument;
+  return loadSkinPluginAuthoringDocument(skin.id, skin.version) ?? skin.pluginData ?? emptySkinPluginDocument;
+});
+const skinPluginSurfaceActive = ref(false);
+const skinRuntimePluginSurfaceActive = ref(false);
+watch(activeSkin, () => {
+  skinPluginSurfaceActive.value = false;
+  skinRuntimePluginSurfaceActive.value = false;
+}, { flush: "sync" });
 const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value, language.value));
 const { t: translate, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
 function t(key: string, variables: Record<string, string | number> = {}) {
@@ -940,13 +1192,15 @@ const {
   readFile: readIdentityFile, submit: importIdentity, exportIdentity,
 } = useWebClientIdentity({ identityMaterial, rememberIdentity, t, showToast });
 const {
-  favoriteServers,
-  recentServers,
+  quickServers,
   isFavorite,
   loadSavedServers,
   recordCurrentServer,
+  updateCurrentServerIdentity,
   selectLocalServer,
+  saveFavoriteServer,
   toggleFavorite,
+  toggleQuickServerFavorite,
   clearServerHistory,
 } = useWebClientServerHistory({ serverHost, serverPort, nickname, channel, rememberIdentity, identityMaterial, t, showToast });
 const {
@@ -966,7 +1220,8 @@ const {
 const themeMode = ref<ThemeMode>(getStoredTheme());
 applyTheme(themeMode.value);
 const publicSkin = usePublicSkin({ activeSkin, themeMode, appVersion: () => appVersion.value });
-const { activeSkinId, skinReady, installedSkins, catalogSkins, select: onSkinChange, initialize: initializeSkin } = publicSkin;
+const { activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins,
+  select: onSkinChange, initialize: initializeSkin, switchToBuiltIn, switchToBuiltInAfterLoadError } = publicSkin;
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
@@ -1003,6 +1258,7 @@ const skinHomeFeatures = computed(() => {
 const audioControls = useWebClientAudioControls({
   settingsOpen,
   microphoneMuted,
+  noiseSuppressionEnabled,
   inputVolume,
   voxThreshold,
   notificationVolume,
@@ -1125,7 +1381,7 @@ const memberControls = useWebClientMembers({
   showToast,
   t,
 });
-const { away, memberMenu, clearWhisperTargets, isSpeaking, openMemberActions, setAutomaticAway } = memberControls;
+const { away, memberMenu, clearWhisperTargets, isSpeaking, openMemberMenu, openMemberActions, setAutomaticAway } = memberControls;
 const chat = useWebClientChat({
   messages: chatMessages,
   members,
@@ -1162,6 +1418,7 @@ const {
   initialized,
   accessMode,
   isConnecting: computed(() => voiceState.connecting),
+  isConnected: computed(() => voiceState.connected),
   errorCode: computed(() => voiceState.errorCode),
   errorMessage: computed(() => localizedMessage(voiceState.error)),
   channelSwitchedChannelId: computed(() => voiceState.channelSwitchedChannelId),
@@ -1192,7 +1449,600 @@ const {
   showToast,
   t,
 });
+
+const showVoiceShell = computed(() => Boolean(
+  voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
+  || favoriteSwitchPending.value || favoriteSwitchFailed.value,
+));
+const favoriteSwitchLabel = computed(() => quickServers.value.find((server) =>
+  isQuickServerTarget(server),
+)?.label ?? currentServerTarget());
+
+function isQuickServerTarget(server: QuickServer): boolean {
+  return server.id === currentServerTarget().toLocaleLowerCase()
+    || quickServerTargetsEqual(server.address, currentServerTarget());
+}
+
+function serverCanSwitch(_server: QuickServer): boolean {
+  return accessMode.value === "open";
+}
+
+const quickServersForDisplay = computed(() => quickServers.value.map((server) => {
+  const liveInfo = isQuickServerTarget(server) ? voiceServerInfo.value : null;
+  const serverName = liveInfo?.name.trim() || server.serverName;
+  const label = serverName && (!server.label.trim() || isQuickServerAddressLabel(server.label, server.address))
+    ? serverName
+    : server.label;
+  return {
+    ...server,
+    label,
+    ...(serverName ? { serverName } : {}),
+    serverIcon: liveInfo ? (liveInfo.icon || undefined) : server.serverIcon,
+  };
+}));
+
+function connectQuickServer(server: QuickServer): void {
+  if ((voiceState.connecting || voiceState.connected) && isQuickServerTarget(server)) return;
+  if (accessMode.value !== "open") {
+    showToast(t("serverSwitchRestricted"));
+    return;
+  }
+  // A slow TeamSpeak handshake can leave the previous attempt pending for a
+  // long time. Stop its ticket request/socket before starting the new target.
+  if (voiceState.connecting) doDisconnect(false);
+  const target = splitTeamSpeakTarget(server.address);
+  serverHost.value = target.address;
+  serverPort.value = target.port || DEFAULT_TEAM_SPEAK_PORT;
+  nickname.value = server.nickname?.trim() || nickname.value.trim();
+  channel.value = server.lastChannelHint?.name ?? "";
+  serverPassword.value = "";
+  accelerationRelayId.value = "";
+  inviteToken.value = "";
+  selectedChannelId.value = "";
+  serverPasswordDialog.open = false;
+  serverPasswordDialog.password = "";
+  serverPasswordDialog.errorCode = "";
+  favoriteServerDialogOpen.value = false;
+  beginFavoriteConnection();
+}
+
+function beginFavoriteConnection(): void {
+  favoriteSwitchPending.value = true;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
+  doConnect();
+  if (!voiceState.connecting && !voiceState.connected) failFavoriteConnection(t("quickConnectFailed"));
+}
+
+function failFavoriteConnection(message: string): void {
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = true;
+  favoriteSwitchError.value = message;
+}
+
+function cancelFavoriteServerPassword(): void {
+  cancelServerPassword();
+  if (favoriteSwitchPending.value) failFavoriteConnection(t("quickConnectFailed"));
+}
+
+function leaveVoiceWorkspace(): void {
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
+  doDisconnect();
+}
+
+function toggleQuickFavorite(server: QuickServer): void {
+  void toggleQuickServerFavorite(server);
+}
+
+function openFavoriteServerDialog(): void {
+  if (accessMode.value !== "open") {
+    showToast(t("serverFeatureAdminDisabled"));
+    return;
+  }
+  if (!showVoiceShell.value || voiceState.connecting || favoriteDialogBusy.value) return;
+  favoriteServerDialogOpen.value = true;
+}
+
+async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<void> {
+  if (favoriteDialogBusy.value || voiceState.connecting || accessMode.value !== "open") return;
+  const port = draft.port || DEFAULT_TEAM_SPEAK_PORT;
+  if (!draft.address || !draft.nickname || !isValidTeamSpeakPort(port)) {
+    showToast(t("quickConnectFailed"));
+    return;
+  }
+
+  const parsed = splitTeamSpeakTarget(draft.address, port);
+  serverHost.value = parsed.address;
+  serverPort.value = parsed.port || DEFAULT_TEAM_SPEAK_PORT;
+  nickname.value = draft.nickname;
+  channel.value = draft.channel;
+  serverPassword.value = "";
+  accelerationRelayId.value = "";
+  inviteToken.value = "";
+  selectedChannelId.value = "";
+  serverPasswordDialog.open = false;
+  serverPasswordDialog.password = "";
+  serverPasswordDialog.errorCode = "";
+
+  favoriteDialogBusy.value = true;
+  try {
+    const target = currentServerTarget();
+    await saveFavoriteServer(target, draft.label || target, nickname.value, channel.value);
+    favoriteServerDialogOpen.value = false;
+    beginFavoriteConnection();
+  } finally {
+    favoriteDialogBusy.value = false;
+  }
+}
+
 const visiblePokes = computed(() => pokeNotifications.slice(-3));
+
+const skinPluginQuickServers = createSkinPluginQuickServerProjection();
+const skinPluginQuickList = computed(() => skinPluginQuickServers.project(
+  quickServersForDisplay.value,
+  isQuickServerTarget,
+  accessMode.value !== "open",
+  t("serverSwitchRestricted"),
+));
+const currentServerDisplayName = computed(() => {
+  // The skin/plugin projection deliberately hides names that look like an
+  // address. The host's own server header should still show TeamSpeak's
+  // configured public server name instead of a synthetic "Recent N" label.
+  const liveName = cleanServerDisplayName(voiceServerInfo.value?.name);
+  if (liveName) return liveName;
+  const savedCurrent = quickServers.value.find(isQuickServerTarget);
+  const savedName = cleanServerDisplayName(savedCurrent?.serverName);
+  const savedLabel = savedCurrent?.label.trim() ?? "";
+  return savedName || (savedCurrent && savedLabel && !isQuickServerAddressLabel(savedLabel, savedCurrent.address) ? savedLabel : "TeamSpeak");
+});
+const currentServerPluginLabel = computed(() => {
+  const target = currentServerTarget();
+  const liveName = safeSkinServerDisplayName(voiceServerInfo.value?.name ?? "", target);
+  if (liveName) return liveName;
+  const savedCurrent = quickServers.value.find(isQuickServerTarget);
+  const savedName = savedCurrent ? safeSkinServerDisplayName(savedCurrent.serverName ?? "", savedCurrent.address) : "";
+  return savedName || skinPluginQuickList.value.find((server) => server.current)?.label || "TeamSpeak";
+});
+
+function cleanServerDisplayName(value: string | undefined): string {
+  return value?.trim().replace(/\u0000/g, "").slice(0, 160) ?? "";
+}
+const skinPluginFavorites = computed(() => skinPluginQuickList.value
+  .filter((server) => server.favorite)
+  .map(({ favorite: _favorite, ...server }) => server));
+const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => item.members.map((member) => {
+  const screenShare = screenShareControls.streamForMember(member);
+  return {
+    id: String(member.id),
+    name: member.nickname,
+    avatarInitial: Array.from(member.nickname.trim())[0] ?? "?",
+    channelId: item.id,
+    status: member.away ? "away" : member.inputMuted ? "muted" : speakingIds.has(member.id) ? "speaking" : "online",
+    speaking: speakingIds.has(member.id),
+    self: member.id === voiceState.tsClientId,
+    screenSharing: Boolean(screenShare),
+    ...(screenShare ? { screenShareStreamId: screenShare.streamId } : {}),
+  };
+})));
+
+const skinPluginContext = computed(() => ({
+  session: {
+    status: {
+      connected: voiceState.connected,
+      connecting: voiceState.connecting,
+      connectionState: voiceState.connected ? "connected" : voiceState.connecting || voiceState.reconnecting ? "connecting" : "disconnected",
+      channelId: currentChannel.value?.id ?? "",
+      channelName: currentChannelName.value,
+      userName: nickname.value,
+      serverLabel: currentServerPluginLabel.value,
+    },
+    channels: channelTree.value.map((item) => {
+      const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
+      return {
+        id: item.id,
+        name: item.name,
+        parentId: item.parentID,
+        depth: item.depth,
+        memberCount: item.members.length,
+        memberCountLabel: String(item.members.length).padStart(2, "0"),
+        ...(typeof item.maxClients === "number" && typeof item.maxClientsLimited === "boolean"
+          ? { maxClients: item.maxClients, maxClientsLimited: item.maxClientsLimited }
+          : {}),
+        current: item.id === currentChannel.value?.id,
+        members,
+      };
+    }),
+    members: skinPluginMembers.value,
+  },
+  favorites: { items: skinPluginFavorites.value },
+  servers: { quickList: skinPluginQuickList.value },
+  chat: {
+    status: {
+      panelOpen: chat.panelOpen.value,
+      tab: chat.tab.value,
+      tabLabel: chat.tabLabel.value,
+    },
+    messages: chat.visibleMessages.value.filter((message) => message.scope === "channel").map((message) => ({
+      id: message.id,
+      author: message.invokerName,
+      text: message.message,
+      time: new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      kind: message.isSelf ? "self" : "message",
+      channelId: message.targetId ?? currentChannel.value?.id ?? "",
+    })),
+  },
+  audio: {
+    status: {
+      microphoneMuted: microphoneMuted.value,
+      outputMuted: outputMuted.value,
+      noiseSuppressionEnabled: noiseSuppressionEnabled.value,
+      accompanimentActive: accompanimentActive.value,
+    },
+  },
+  whisper: {
+    status: {
+      active: whisperActive.value,
+      targetCount: whisperTargetIds.size,
+    },
+  },
+  screenShare: {
+    status: {
+      active: screenShareActive.value,
+      starting: screenShareStarting.value,
+      viewing: screenShareViewing.value,
+    },
+    streams: screenShareStreams.map((stream) => ({
+      streamId: stream.streamId,
+      source: stream.source,
+      ownerClientId: stream.ownerClientId ?? 0,
+      ownerNickname: stream.ownerNickname,
+      name: stream.name,
+      audio: stream.audio,
+      viewerCount: stream.viewerCount,
+    })),
+  },
+}));
+
+const readSkinRuntimeSessionStatus = (_signal: AbortSignal) => ({
+  connected: voiceState.connected,
+  channelName: voiceState.connected ? currentChannelName.value : null,
+  memberCount: skinPluginMembers.value.length,
+});
+
+function switchQuickServerByOpaqueId(quickServerId: string): void {
+  if (accessMode.value !== "open") {
+    showToast(t("serverSwitchRestricted"));
+    return;
+  }
+  const target = skinPluginQuickServers.resolve(quickServerId);
+  if (target && quickServers.value.some((server) => server.id === target.id)) connectQuickServer(target);
+}
+
+const skinPluginActions = {
+  "voice.joinChannel": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.channelId !== "string") return;
+    const target = channelTree.value.find((item) => item.id === args.channelId);
+    if (target && target.id !== currentChannel.value?.id) selectChannel(target);
+  },
+  "favorites.switch": (args: Record<string, string | number | boolean>) => {
+    if (accessMode.value !== "open" || typeof args.favoriteId !== "string") return;
+    const target = skinPluginQuickServers.resolve(args.favoriteId);
+    if (target?.isFavorite && quickServers.value.some((server) => server.id === target.id && server.isFavorite)) connectQuickServer(target);
+  },
+  "quickServers.switch": (args: Record<string, string | number | boolean>) => {
+    if (typeof args.quickServerId !== "string") return;
+    switchQuickServerByOpaqueId(args.quickServerId);
+  },
+  "chat.sendMessage": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.text !== "string" || !currentChannel.value?.id) return;
+    const text = args.text.trim();
+    if (!text || text.length > 1000 || text.includes("\u0000")) return;
+    void sendTextMessage(text, currentChannel.value.id);
+  },
+  "chat.togglePanel": () => chat.togglePanel(),
+  "voice.toggleMicrophone": () => { if (voiceState.connected) toggleMicrophone(); },
+  "voice.toggleOutputMute": () => { if (voiceState.connected) toggleOutputMute(); },
+  "audio.openSettings": () => { settingsOpen.value = true; },
+  "audio.toggleNoiseSuppression": () => { if (voiceState.connected) audioControls.toggleNoiseSuppression(); },
+  "audio.toggleAccompaniment": () => { if (voiceState.connected) void audioControls.toggleAccompaniment(); },
+  "voice.setOutputVolume": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected) return;
+    const volume = typeof args.volume === "number" ? args.volume
+      : typeof args.volume === "string" && args.volume.trim() ? Number(args.volume) : Number.NaN;
+    if (!Number.isFinite(volume)) return;
+    setOutputVolume(Math.max(0, Math.min(1, volume)));
+  },
+  "voice.disconnect": () => { if (voiceState.connected || voiceState.connecting) doDisconnect(); },
+  "voice.setAway": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.away !== "boolean") return;
+    const message = typeof args.message === "string" ? args.message.slice(0, 200) : "";
+    setAway(args.away, message);
+  },
+  "voice.setWhisperActive": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.active !== "boolean") return;
+    setWhisperActive(args.active);
+  },
+  "voice.startScreenShare": () => {
+    if (voiceState.connected && !screenShareActive.value && !screenShareStarting.value) void startScreenShare();
+  },
+  "voice.stopScreenShare": () => { if (screenShareActive.value) stopScreenShare(); },
+  "voice.joinScreenShare": (args: Record<string, string | number | boolean>) => {
+    if (!voiceState.connected || typeof args.streamId !== "string") return;
+    if (screenShareStreams.some((stream) => stream.streamId === args.streamId)) joinScreenShare(args.streamId);
+  },
+  "voice.leaveScreenShare": () => { if (screenShareViewing.value) leaveScreenShare(); },
+};
+
+const homeConnectionStatus = computed(() => {
+  if (voiceState.connecting) return t("connecting");
+  if (voiceState.error) return localizedMessage(voiceState.error);
+  if (browserError.value) return localizedMessage(browserError.value);
+  if (!serverConfigLoading.value && !initialized.value) return t("notConfigured");
+  if (!localPersistenceAvailable) return t("localPersistenceUnavailable");
+  return "";
+});
+
+const skinPluginWidgets = {
+  "home.server-announcement": () => h("section", {
+    "data-ws-part": "home.server-announcement",
+    "aria-label": t("serverAnnouncement"),
+  }, [
+    h("h2", { "data-ws-part": "home.server-announcement.title" }, t("serverAnnouncement")),
+    h("p", { "data-ws-part": "home.server-announcement.body" }, localizedWelcomeText.value),
+  ]),
+  "home.social-links": () => h("nav", {
+    "data-ws-part": "home.social-links",
+    "aria-label": t("communityLinks"),
+  }, [
+    h("a", {
+      href: githubRepositoryUrl,
+      target: "_blank",
+      rel: "noreferrer",
+      title: t("githubRepository"),
+      "aria-label": t("githubRepository"),
+    }, [h(Icon, { name: "github", size: 20 })]),
+    h("a", {
+      href: qqJoinUrl,
+      target: "_blank",
+      rel: "noreferrer",
+      title: t("qqGroup"),
+      "aria-label": t("qqGroup"),
+    }, [h(Icon, { name: "qq", size: 20 })]),
+    h("a", {
+      href: "/admin",
+      title: t("adminConsole"),
+      "aria-label": t("adminConsole"),
+    }, [h(Icon, { name: "settings", size: 20 })]),
+  ]),
+  "voice.screen-share-start": () => h("button", {
+    type: "button",
+    class: "skin-runtime-screen-share-start",
+    disabled: !voiceState.connected || screenShareActive.value || screenShareStarting.value,
+    "aria-label": t("startScreenShare"),
+    onClick: () => {
+      if (voiceState.connected && !screenShareActive.value && !screenShareStarting.value) void startScreenShare();
+    },
+  }, [h(Icon, { name: "share", size: 16 }), h("span", null, t("startScreenShare"))]),
+  "home.connection-form": () => h(JoinForm, {
+    autofocusNickname: !isMobileViewport.value,
+    serverHost: serverHost.value,
+    "onUpdate:serverHost": (value: string) => { serverHost.value = value; },
+    serverPort: serverPort.value,
+    "onUpdate:serverPort": (value: string) => { serverPort.value = value; },
+    serverPassword: serverPassword.value,
+    "onUpdate:serverPassword": (value: string) => { serverPassword.value = value; },
+    nickname: nickname.value,
+    "onUpdate:nickname": (value: string) => { nickname.value = value; },
+    channel: channel.value,
+    "onUpdate:channel": (value: string) => { channel.value = value; },
+    rememberIdentity: rememberIdentity.value,
+    "onUpdate:rememberIdentity": (value: boolean) => { rememberIdentity.value = value; },
+    accelerationRelayId: accelerationRelayId.value,
+    "onUpdate:accelerationRelayId": (value: string) => { accelerationRelayId.value = value; },
+    accessMode: accessMode.value,
+    openTargetPrefillBlocked: openTargetPrefillBlocked.value,
+    accelerationRelays: accelerationRelays.value,
+    quickServers: quickServersForDisplay.value,
+    isFavorite: isFavorite.value,
+    identityExportBusy: identityExportBusy.value,
+    hasIdentity: Boolean(identityMaterial.value),
+    connecting: voiceState.connecting,
+    joinDisabled: !canJoin.value || serverConfigLoading.value || !identityReady.value || voiceState.connecting,
+    t,
+    onConnect: doConnect,
+    onDisconnect: doDisconnect,
+    onSelectServer: selectLocalServer,
+    onToggleFavorite: toggleFavorite,
+    onToggleQuickFavorite: toggleQuickFavorite,
+    onImportIdentity: openIdentityImport,
+    onExportIdentity: exportIdentity,
+  }),
+  "home.connection-status": () => h("p", {
+    "data-ws-part": "home.connection-status",
+    role: "status",
+    "aria-live": "polite",
+  }, homeConnectionStatus.value),
+  "home.identity-provider": (options?: SkinPluginWidgetOptions) => {
+    const providerId = options?.identityProviderId ?? "external";
+    const providerLabel = options?.identityProviderLabel ?? providerId;
+    return h("button", {
+      type: "button",
+      class: "ws-home-identity-provider-button",
+      "data-ws-part": "home.identity-provider.button",
+      "aria-label": t("identityProviderLogin", { provider: providerLabel }),
+      onClick: () => requestIdentityProviderLogin(providerId, providerLabel),
+    }, [h("span", { class: "ws-home-identity-provider-label", "data-ws-part": "home.identity-provider.label", "aria-hidden": "true" }, providerLabel)]);
+  },
+  "app.skin-switcher": () => h(SkinSwitcher, {
+    modelValue: activeSkinId.value,
+    "onUpdate:modelValue": (value: string) => { activeSkinId.value = value; },
+    class: "skin-switcher",
+    menuLabel: t("skinSelector"),
+    options: skinOptions.value,
+    onChange: onSkinChange,
+  }),
+  "app.language-switcher": () => h(LanguageSwitcher, {
+    modelValue: language.value,
+    "onUpdate:modelValue": (value: Language) => { language.value = value; },
+    menuLabel: t("languageMenu"),
+    onChange: persistLanguage,
+  }),
+  "voice.channel-panel": () => h(ChannelMemberPanel, {
+    query: memberQuery.value,
+    "onUpdate:query": (value: string) => { memberQuery.value = value; },
+    model: memberControls,
+    filteredMemberChannels: filteredMemberChannels.value,
+    currentChannelId: currentChannel.value?.id,
+    mobileVisible: true,
+    isMobileViewport: isMobileViewport.value,
+    volumes,
+    avatarStyle,
+    avatarInitial,
+    rangeStyle,
+    t,
+    onSelectChannel: selectChannel,
+    onVolumeInput: onVolInput,
+  }),
+  "voice.server-switcher": () => h(VoiceServerSwitcher, {
+    servers: skinPluginQuickList.value,
+    onSwitchServer: switchQuickServerByOpaqueId,
+  }),
+  "voice.server-header": () => h(VoiceServerHeader, {
+    serverLabel: currentServerDisplayName.value,
+    connectionState: voiceState.connected ? "connected" : voiceState.connecting || voiceState.reconnecting ? "connecting" : "disconnected",
+    servers: skinPluginQuickList.value,
+    onSwitchServer: switchQuickServerByOpaqueId,
+    "onUpdate:query": (value: string) => { channelTreeSearchQuery.value = value; },
+  }),
+  "voice.server-banner": () => h(VoiceServerBanner, {
+    bannerUrl: voiceServerInfo.value?.bannerUrl ?? null,
+    welcomeMessage: voiceServerInfo.value?.welcomeMessage ?? "",
+    t,
+  }),
+  "voice.channel-tree": (options?: SkinPluginWidgetOptions) => h(VoiceChannelTree, {
+    channels: channelTree.value,
+    currentChannelId: currentChannel.value?.id,
+    query: channelTreeSearchQuery.value,
+    layout: options?.layout === "server-sidebar" ? "server-sidebar" : "default",
+    avatarStyle,
+    avatarInitial,
+    isSpeaking,
+    isScreenSharing: (member: ChannelMember) => Boolean(screenShareControls.streamForMember(member)),
+    showMemberActions: options?.memberActions === true,
+    memberDragDrop: options?.memberDragDrop === true,
+    draggedMemberId: memberControls.draggedMember.value?.id ?? null,
+    dragOverChannelId: memberControls.dragOverChannelId.value,
+    t,
+    onJoin: selectChannel,
+    onMemberContextMenu: ({ member, event }: { member: ChannelMember; event: MouseEvent }) => openMemberMenu(member, event),
+    onMemberDragStart: ({ member, event }: { member: ChannelMember; event: DragEvent }) => memberControls.onMemberDragStart(member, event),
+    onMemberDragEnd: () => memberControls.onMemberDragEnd(),
+    onChannelDragOver: ({ channel, event }: { channel: TreeChannel; event: DragEvent }) => memberControls.onChannelDragOver(channel, event),
+    onChannelDragLeave: ({ channel, event }: { channel: TreeChannel; event: DragEvent }) => memberControls.onChannelDragLeave(channel, event),
+    onChannelDrop: ({ channel, event }: { channel: TreeChannel; event: DragEvent }) => memberControls.onChannelDrop(channel, event),
+  }),
+  "voice.member-cards": (options?: SkinPluginWidgetOptions) => h(VoiceMemberCards, {
+    currentMembers: currentMembers.value,
+    isMobileViewport: isMobileViewport.value,
+    showMemberActions: options?.memberActions === true,
+    showScreenShare: options?.screenShare !== false,
+    sharing: options?.screenShare === false ? undefined : memberSharingState,
+    controls: options?.screenShare === false ? undefined : screenShareControls,
+    isSpeaking,
+    avatarStyle,
+    avatarInitial,
+    t,
+    onMemberActions: openMemberActions,
+    onStopShare: stopScreenShare,
+  }),
+  "voice.chat-panel": () => h(ChatPanel, {
+    model: chat,
+    t,
+    currentChannelName: currentChannelName.value,
+    mobileHidden: false,
+    serverEvents,
+    avatarStyle,
+    avatarInitial,
+    messageAvatar,
+    formatTime,
+  }),
+  "voice.audio-controls": () => isMobileViewport.value
+    ? h("div", { class: "mobile-voice-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
+      h("button", {
+        type: "button",
+        class: ["mobile-voice-toggle", "mobile-microphone-toggle", microphoneMuted.value && "muted"],
+        "aria-label": t("microphone"),
+        "aria-pressed": !microphoneMuted.value,
+        onClick: toggleMicrophone,
+      }, [h(Icon, { name: microphoneMuted.value ? "mic-off" : "mic", size: 20 }), h("span", null, t("microphone"))]),
+      h("button", {
+        type: "button",
+        class: ["mobile-voice-toggle", "mobile-output-toggle", outputMuted.value && "muted"],
+        "aria-label": t("speaker"),
+        "aria-pressed": !outputMuted.value,
+        onClick: toggleOutputMute,
+      }, [h(Icon, { name: outputMuted.value ? "volume-off" : "volume", size: 20 }), h("span", null, t("speaker"))]),
+    ])
+    : h(AudioDock, {
+      model: audioDockState,
+      controls: audioControls,
+      t,
+      rangeStyle,
+      onSettings: () => { settingsOpen.value = true; },
+      onOutputMute: toggleOutputMute,
+    }),
+  "voice.screen-share-player": () => screenShareViewing.value ? h(ScreenSharePlayer, {
+    model: screenShareControls,
+    screenShareRemoteStream: screenShareRemoteStream.value,
+    screenShareRemoteVolume: screenShareRemoteVolume.value,
+    screenShareError: screenShareError.value,
+    leaveScreenShare,
+    avatarInitial,
+    t,
+  }) : null,
+  "voice.whisper-controls": () => whisperTargetIds.size ? h(WhisperControls, {
+    targets: whisperTargets.value,
+    active: whisperActive.value,
+    enabled: !isMobileViewport.value || mobileSection.value === "voice",
+    controls: audioControls,
+    t,
+    onClear: clearWhisperTargets,
+  }) : null,
+  "voice.performance-panel": (options?: SkinPluginWidgetOptions) => h(VoicePerformancePanel, {
+    model: performance,
+    screenShareWebRtcStats,
+    showScreenShare: options?.screenShare !== false,
+    t,
+  }),
+  "voice.connection-controls": () => h("div", { class: "ws-plugin-connection-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
+    h("button", { type: "button", "aria-label": t("copyInvite"), title: t("copyInvite"), onClick: doShare }, [h(Icon, { name: "share", size: 18 })]),
+    ...(accessMode.value === "open" ? [h("button", {
+      type: "button",
+      "aria-label": t(isFavorite.value ? "removeFavorite" : "saveFavorite"),
+      "aria-pressed": isFavorite.value,
+      title: t(isFavorite.value ? "removeFavorite" : "saveFavorite"),
+      onClick: toggleFavorite,
+    }, [h(Icon, { name: "star", size: 18 })])] : []),
+    h("button", { type: "button", "aria-label": t("exit"), title: t("exit"), onClick: leaveVoiceWorkspace }, [h(Icon, { name: "door", size: 18 }), h("span", null, t("exit"))]),
+  ]),
+  "voice.disconnect-control": () => h("button", {
+    type: "button",
+    class: "ws-plugin-disconnect-control",
+    "aria-label": t("exit"),
+    onClick: leaveVoiceWorkspace,
+  }, [h(Icon, { name: "power", size: 18 }), h("span", null, t("exit"))]),
+};
+
+async function requestIdentityProviderLogin(providerId: string, providerLabel: string): Promise<void> {
+  try {
+    const handled = await dispatchIdentityProviderLogin({ providerId, providerLabel });
+    if (!handled) showToast(t("identityProviderInDevelopment", { provider: providerLabel }));
+  } catch {
+    showToast(t("identityProviderLoginFailed", { provider: providerLabel }));
+  }
+}
 
 watch(() => pokeNotifications.length, (length, previousLength) => {
   const latest = pokeNotifications[length - 1];
@@ -1214,10 +2064,22 @@ watch([rememberIdentity, identityMaterial], ([remember, material]) => {
 });
 watch(() => voiceState.connected, (connected) => {
   if (!connected) return;
+  favoriteSwitchPending.value = false;
+  favoriteSwitchFailed.value = false;
+  favoriteSwitchError.value = "";
   playNotification("connected");
   recordCurrentServer();
 });
-watch(() => voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed, (roomVisible) => {
+watch(voiceServerInfo, (server) => {
+  if (server && voiceState.connected && server.name.trim()) {
+    void updateCurrentServerIdentity(server.name, server.icon ?? null);
+  }
+});
+watch(() => voiceState.errorCode, (code) => {
+  if (!favoriteSwitchPending.value || !code || code === "SERVER_PASSWORD_REQUIRED" || code === "INVALID_SERVER_PASSWORD") return;
+  failFavoriteConnection(localizedMessage(voiceState.error) || t("quickConnectFailed"));
+});
+watch(() => showVoiceShell.value, (roomVisible) => {
   if (roomVisible) resetIdentityOperations();
 }, { flush: "sync" });
 
@@ -1367,7 +2229,10 @@ function formatTime(timestamp: number) {
 
 function rangeStyle(value: number, max: number) {
   const percent = Math.max(0, Math.min(100, (value / max) * 100));
-  return { background: `linear-gradient(to right, #006a64 0%, #006a64 ${percent}%, #e7eceb ${percent}%, #e7eceb 100%)` };
+  return {
+    "--ws-range-progress": `${percent}%`,
+    background: `linear-gradient(to right, #006a64 0%, #006a64 ${percent}%, #e7eceb ${percent}%, #e7eceb 100%)`,
+  };
 }
 
 function onVolInput(clientId: number, event: Event) {
@@ -1398,3 +2263,5 @@ function resolveSkinMessages(skin: InstalledSkin | null, locale: Language): Reco
 <style scoped src="../styles/web-client.css"></style>
 
 <style scoped src="../styles/web-client-mobile.css"></style>
+
+<style src="../styles/skin-plugin.css"></style>

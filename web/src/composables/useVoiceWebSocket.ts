@@ -43,6 +43,13 @@ export interface VoiceState {
   channelSwitchedChannelId: string;
 }
 
+export interface VoiceServerInfo {
+  name: string;
+  icon?: string | null;
+  bannerUrl?: string | null;
+  welcomeMessage?: string;
+}
+
 export interface AudioInputDevice {
   deviceId: string;
   label: string;
@@ -190,6 +197,7 @@ class CancelledMediaOperation extends Error {
 
 export function useVoiceWebSocket() {
   const ws = shallowRef<WebSocket | null>(null);
+  const serverInfo = shallowRef<VoiceServerInfo | null>(null);
   const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
   const sessionState = createVoiceSessionState({
     selfId: () => state.tsClientId,
@@ -993,6 +1001,7 @@ export function useVoiceWebSocket() {
   }
 
   function disconnect(preserveConnection = false): void {
+    serverInfo.value = null;
     const keepRememberedIdentity = lastConnection?.rememberIdentity === true;
     if (!preserveConnection) lastConnection = null;
     voiceConnection.stop(() => releaseSessionResources(!preserveConnection));
@@ -1036,6 +1045,14 @@ export function useVoiceWebSocket() {
     const msg = parseServerMessage(raw);
     if (!msg || screenShare.handleMessage(msg) || sessionState.receive(msg)) return;
     switch (msg.type) {
+      case "serverInfo":
+        serverInfo.value = {
+          name: msg.name,
+          icon: msg.icon ?? null,
+          bannerUrl: msg.bannerUrl ?? null,
+          welcomeMessage: msg.welcomeMessage ?? "",
+        };
+        break;
       case "connected":
         const wasReconnecting = state.reconnecting;
         state.connected = true;
@@ -1401,6 +1418,7 @@ export function useVoiceWebSocket() {
     ...screenShare.api,
     ws,
     state,
+    serverInfo,
     sessionEpoch: sessionState.epoch,
     memberConversationKey: sessionState.memberConversationKey,
     members,

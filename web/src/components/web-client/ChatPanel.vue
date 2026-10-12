@@ -1,6 +1,8 @@
 <template>
   <section
     :class="['chat-panel', { 'mobile-section-hidden': mobileHidden }]"
+    :data-ws-chat-tab="chatTab"
+    :data-ws-chat-panel-open="panelOpen"
     data-ws-part="voice.chat"
   >
     <div
@@ -12,6 +14,7 @@
       <button
         type="button"
         data-ws-part="voice.chat.tab"
+        data-ws-chat-kind="channel"
         :data-ws-state="chatTab === 'channel' ? 'active' : 'idle'"
         :class="{ active: chatTab === 'channel' }"
         @click="chatTab = 'channel'"
@@ -24,6 +27,7 @@
       <button
         type="button"
         data-ws-part="voice.chat.tab"
+        data-ws-chat-kind="server"
         :data-ws-state="chatTab === 'server' ? 'active' : 'idle'"
         :class="{ active: chatTab === 'server' }"
         @click="chatTab = 'server'"
@@ -38,6 +42,7 @@
         :key="conversation.key"
         type="button"
         data-ws-part="voice.chat.tab"
+        data-ws-chat-kind="private"
         :data-ws-state="
           chatTab === 'private' && privateConversationKey === conversation.key ? 'active' : 'idle'
         "
@@ -52,6 +57,7 @@
       <button
         type="button"
         data-ws-part="voice.chat.tab"
+        data-ws-chat-kind="events"
         :data-ws-state="chatTab === 'events' ? 'active' : 'idle'"
         :class="{ active: chatTab === 'events' }"
         @click="chatTab = 'events'"
@@ -203,6 +209,7 @@ import type { ChatMessage, ServerEvent } from "../../composables/useVoiceWebSock
 
 type ChatPanelModel = Pick<ReturnType<typeof useWebClientChat>,
   | "tab" | "privateConversationKey" | "canSend" | "status" | "messageDraft"
+  | "panelOpen"
   | "listElement" | "conversations" | "visibleMessages" | "tabLabel" | "title"
   | "placeholder" | "openConversation" | "submitMessage" | "onScroll"
 >;
@@ -223,6 +230,7 @@ const props = defineProps<{
 // Keep its list ref attached to the rendered scroller, including unmount cleanup.
 const {
   tab: chatTab,
+  panelOpen,
   privateConversationKey,
   canSend: canSendChat,
   status: chatStatus,

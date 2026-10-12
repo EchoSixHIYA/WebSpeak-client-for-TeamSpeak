@@ -17,6 +17,10 @@ const transfer = { size: 6n };
 
 class SdkStub extends EventEmitter {
   inputCommands: string[] = [];
+  fileTransfers: Array<{ channelId: bigint; path: string; password: string }> = [];
+  serverInfo: { name: string; iconId: number | null; hostBannerGfxUrl: string | null; welcomeMessage: string } | null = {
+    name: "兄弟们的teamspeak", iconId: 123456, hostBannerGfxUrl: null, welcomeMessage: "",
+  };
   inputUpdate = async (_command: string): Promise<void> => {};
   async execCommand(command: string) { this.inputCommands.push(command); await this.inputUpdate(command); }
   initialized = 0;
@@ -24,8 +28,15 @@ class SdkStub extends EventEmitter {
   metadata = async () => rows;
   transfer = async () => transfer;
   download = async (destination: Writable) => { destination.write(Buffer.from("GIF89a")); };
-  execCommandWithResponse() { return this.metadata(); }
-  async fileTransferInitDownload() { this.initialized++; return this.transfer(); }
+  execCommandWithResponse(command = "") {
+    this.inputCommands.push(command);
+    return this.metadata();
+  }
+  async fileTransferInitDownload(channelId: bigint, path: string, password: string) {
+    this.initialized++;
+    this.fileTransfers.push({ channelId, path, password });
+    return this.transfer();
+  }
   async downloadFileData(_host: string, _transfer: unknown, destination: Writable) { this.downloaded++; await this.download(destination); }
 }
 
@@ -51,6 +62,50 @@ test("stream commands wait for server acknowledgement and propagate refusals", a
   await pending;
   f.sdk.inputUpdate = async () => { throw new Error("missing required parameter"); };
   await assert.rejects(f.client.sendProtocolCommand("removeclientfromstream id=test"), /missing required parameter/);
+});
+
+test("server info uses the name and icon id captured by the SDK handshake", async () => {
+  const f = fixture();
+  assert.deepEqual(await f.client.getServerInfo(), { name: "兄弟们的teamspeak", iconId: 123456 });
+  assert.deepEqual(f.sdk.inputCommands, [], "server identity does not issue a ServerQuery-only command over the client session");
+  f.sdk.serverInfo = { name: "No icon", iconId: null, hostBannerGfxUrl: null, welcomeMessage: "" };
+  assert.deepEqual(await f.client.getServerInfo(), { name: "No icon", iconId: null });
+});
+
+test("server presentation reads bounded public banner and welcome fields", async () => {
+  const f = fixture();
+  f.sdk.serverInfo = {
+    name: "兄弟们的teamspeak",
+    iconId: 123456,
+    hostBannerGfxUrl: "https://assets.example.invalid/teamspeak/banner.png",
+    welcomeMessage: "欢迎来到服务器！\n请遵守频道规则。",
+  };
+  assert.deepEqual(await f.client.getServerPresentation(), {
+    bannerUrl: "https://assets.example.invalid/teamspeak/banner.png",
+    welcomeMessage: "欢迎来到服务器！\n请遵守频道规则。",
+  });
+  assert.deepEqual(f.sdk.inputCommands, [], "server presentation comes from the connection handshake without extra permissions");
+
+  f.sdk.serverInfo = {
+    name: "兄弟们的teamspeak",
+    iconId: null,
+    hostBannerGfxUrl: "javascript:alert(1)",
+    welcomeMessage: "x".repeat(5_000),
+  };
+  const sanitized = await f.client.getServerPresentation();
+  assert.equal(sanitized.bannerUrl, null);
+  assert.equal(sanitized.welcomeMessage.length, 4_096);
+});
+
+test("server icons use the TeamSpeak file transfer path and enforce the download limit", async () => {
+  const f = fixture();
+  assert.equal((await f.client.getServerIcon(123456))?.toString(), "GIF89a");
+  assert.deepEqual(f.sdk.fileTransfers, [{ channelId: 0n, path: "/icon_123456", password: "" }]);
+  assert.equal(f.sdk.downloaded, 1);
+
+  f.sdk.transfer = async () => ({ size: 128n * 1024n + 1n });
+  assert.equal(await f.client.getServerIcon(123456), null);
+  assert.equal(f.sdk.downloaded, 1);
 });
 
 test("stream cleanup flood retries back off and stop after two retries", async t => {
@@ -256,6 +311,61 @@ test("a current avatar download preserves its bytes and rejects a mismatched ide
   assert.equal(await f.client.getClientAvatar(2, "different-member"), null);
   assert.equal(f.sdk.initialized, 1);
   assert.equal(f.sdk.downloaded, 1);
+});
+
+test("public channel metadata survives directory snapshots and follows channel edits", () => {
+  const f = fixture();
+  const snapshots: Array<{ channels: Array<{ id: bigint; maxClients?: number; maxClientsLimited?: boolean; passwordProtected?: boolean }>; clients: unknown[] }> = [];
+  f.client.on("directorySnapshot", snapshot => snapshots.push(snapshot));
+
+  f.sdk.emit("rawNotification", {
+    name: "notifychannelcreated",
+    params: { cid: "1", channel_maxclients: "10", channel_flag_maxclients_unlimited: "0", channel_flag_password: "1" },
+  });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, 10);
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClientsLimited, true);
+  assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, true);
+
+  f.sdk.emit("rawNotification", { name: "notifychanneledited", params: { cid: "1", channel_maxclients: "12" } });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, 12);
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClientsLimited, true);
+  assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, true, "partial edits retain the previously reported password flag");
+
+  f.sdk.emit("rawNotification", { name: "notifychanneledited", params: { cid: "1", channel_flag_password: "0" } });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, false);
+
+  f.sdk.emit("rawNotification", { name: "notifychanneldeleted", params: { cid: "1" } });
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 1n, parentID: 0n, order: 0n, name: "Room", description: "" }],
+    clients: [],
+  });
+  assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, undefined);
+  assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, undefined);
+});
+
+test("TeamSpeak SDK password flags pass through to the directory snapshot", () => {
+  const f = fixture();
+  let snapshot: { channels: Array<{ id: bigint; passwordProtected?: boolean }>; clients: unknown[] } | undefined;
+  f.client.on("directorySnapshot", value => { snapshot = value; });
+
+  f.sdk.emit("directorySnapshot", {
+    channels: [{ id: 2n, parentID: 0n, order: 0n, name: "msicbot", description: "", passwordProtected: true }],
+    clients: [],
+  });
+
+  assert.equal(snapshot?.channels[0]?.passwordProtected, true);
 });
 
 test("a retired SDK client's disconnect cannot invalidate a current avatar request", async () => {

@@ -1,0 +1,175 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  projectSkinRuntimePluginContext,
+  SKIN_RUNTIME_PLUGIN_CONTEXT_LIMIT_BYTES,
+} from "./skin-runtime-plugin-context.js";
+
+test("runtime context exposes only fields covered by declared read permissions", () => {
+  const projected = projectSkinRuntimePluginContext(["session.channels.read"], {
+    session: {
+      status: { connected: true, serverLabel: "voice.internal.example:9987" },
+      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, memberCountLabel: "02", maxClients: 10, maxClientsLimited: true, current: true, address: "voice.internal.example:9987", members: [{ name: "private nested member" }] }],
+      members: [{ id: "member-1", name: "private member" }],
+    },
+    favorites: { items: [{ id: "opaque-1", label: "Saved", address: "secret.example:9987" }] },
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
+    session: {
+      channels: [{ id: "channel-1", name: "Lobby", parentId: null, depth: 0, memberCount: 2, memberCountLabel: "02", maxClients: 10, maxClientsLimited: true, current: true }],
+    },
+  });
+  assert.equal(JSON.stringify(projected).includes("voice.internal.example"), false);
+  assert.equal(JSON.stringify(projected).includes("secret.example"), false);
+});
+
+test("chat panel state is projected only to plugins with chat read permission", () => {
+  const context = { chat: { status: { panelOpen: true, tab: "private", tabLabel: "私聊", recipient: "not exposed" } } };
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext(["chat.channel.read"], context))), {
+    chat: { status: { panelOpen: true, tab: "private", tabLabel: "私聊" } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext([], context))), {});
+});
+
+test("audio processing and accompaniment states are projected only with audio status permission", () => {
+  const context = {
+    audio: {
+      status: {
+        microphoneMuted: false,
+        outputMuted: true,
+        noiseSuppressionEnabled: true,
+        accompanimentActive: false,
+        inputVolume: 0.75,
+      },
+    },
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext(["audio.status.read"], context))), {
+    audio: { status: { microphoneMuted: false, outputMuted: true, noiseSuppressionEnabled: true, accompanimentActive: false } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext([], context))), {});
+});
+
+test("runtime member screen-share status is separately permission-gated", () => {
+  const context = {
+    session: {
+      members: [{
+        id: "42",
+        name: "Sharing member",
+        channelId: "channel-1",
+        status: "online",
+        speaking: false,
+        self: false,
+        screenSharing: true,
+        screenShareStreamId: "share-opaque-id",
+      }],
+    },
+  };
+
+  const memberOnly = projectSkinRuntimePluginContext(["session.members.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(memberOnly)), {
+    session: { members: [{ id: "42", name: "Sharing member", channelId: "channel-1", status: "online", speaking: false, self: false }] },
+  });
+
+  const withShareRead = projectSkinRuntimePluginContext(["session.members.read", "voice.screenShare.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(withShareRead)), {
+    session: { members: [{
+      id: "42", name: "Sharing member", channelId: "channel-1", status: "online", speaking: false, self: false,
+      screenSharing: true, screenShareStreamId: "share-opaque-id",
+    }] },
+  });
+});
+
+test("runtime context keeps safe server names and redacts connection targets from all public labels", () => {
+  const projected = projectSkinRuntimePluginContext(
+    ["session.status.read", "favorites.read", "servers.quickList.read"],
+    {
+      session: { status: { connected: true, connecting: false, connectionState: "connected", serverLabel: "server.example.invalid:9987", channelName: "Lobby" } },
+      favorites: { items: [{ id: "opaque-favorite", label: "Saved voice.internal.example:9987", kind: "favorite" }] },
+      servers: { quickList: [
+        { id: "opaque-favorite", label: "Saved [2001:db8::1]:9987", favorite: true, kind: "favorite" },
+        { id: "opaque-recent", label: "Quick connect server.example.invalid", favorite: false, kind: "recent" },
+      ] },
+    },
+  );
+
+  assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
+    session: { status: { connected: true, connecting: false, connectionState: "connected", channelName: "Lobby" } },
+    favorites: { items: [{ id: "opaque-favorite", label: "Favorite 1", kind: "favorite" }] },
+    servers: { quickList: [
+      { id: "opaque-favorite", label: "Favorite 1", favorite: true, kind: "favorite" },
+      { id: "opaque-recent", label: "Recent 2", favorite: false, kind: "recent" },
+    ] },
+  });
+  assert.equal(JSON.stringify(projected).includes("server.example.invalid"), false);
+  assert.equal(JSON.stringify(projected).includes("internal.example"), false);
+  assert.equal(JSON.stringify(projected).includes("2001:db8::1"), false);
+
+  const safeServerName = projectSkinRuntimePluginContext(["session.status.read"], {
+    session: { status: { connected: true, connectionState: "connected", serverLabel: "兄弟们的teamspeak" } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(safeServerName)), {
+    session: { status: { connected: true, connectionState: "connected", serverLabel: "兄弟们的teamspeak" } },
+  });
+});
+
+test("runtime channel limits are bounded public metadata and do not admit neighboring fields", () => {
+  const projected = projectSkinRuntimePluginContext(["session.channels.read"], {
+    session: {
+      channels: [{
+        id: "channel-1", name: "Lobby", memberCount: 2, memberCountLabel: "02",
+        maxClients: 65_536, maxClientsLimited: true, address: "voice.internal.example:9987",
+      }],
+    },
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(projected)), {
+    session: { channels: [{ id: "channel-1", name: "Lobby", memberCount: 2, memberCountLabel: "02", maxClientsLimited: true }] },
+  });
+  assert.equal(JSON.stringify(projected).includes("voice.internal.example"), false);
+});
+
+test("profile-picture display permission does not expose image data to declarative or Wasm contexts", () => {
+  const context = {
+    session: {
+      members: [{ id: "member-1", name: "Visible member", channelId: "channel-1", status: "online", speaking: false, self: false, avatar: "data:image/png;base64,cHJpdmF0ZQ==" }],
+    },
+  };
+  const displayOnly = projectSkinRuntimePluginContext(["session.memberAvatars.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(displayOnly)), {});
+
+  const readableMembers = projectSkinRuntimePluginContext(["session.members.read", "session.memberAvatars.read"], context);
+  assert.deepEqual(JSON.parse(JSON.stringify(readableMembers)), {
+    session: {
+      members: [{ id: "member-1", name: "Visible member", channelId: "channel-1", status: "online", speaking: false, self: false }],
+    },
+  });
+  assert.equal(JSON.stringify(readableMembers).includes("data:image"), false);
+});
+
+test("large runtime context is capped across separately bounded collections", () => {
+  const projected = projectSkinRuntimePluginContext(["session.channels.read", "chat.channel.read"], {
+    session: {
+      channels: Array.from({ length: 1_000 }, (_, index) => ({
+        id: `channel-${index}`,
+        name: `Channel ${index} ${"x".repeat(150)}`,
+        depth: index % 4,
+        memberCount: index,
+        current: index === 0,
+      })),
+    },
+    chat: {
+      messages: Array.from({ length: 50 }, (_, index) => ({
+        id: `message-${index}`,
+        text: "x".repeat(1_024),
+        kind: "message",
+      })),
+    },
+  });
+  const channels = (projected.session as { channels: unknown[] }).channels;
+  const messages = (projected.chat as { messages: unknown[] }).messages;
+
+  assert.ok(channels.length <= 128, "the channel count remains bounded");
+  assert.ok(messages.length < 50, "the global byte cap trims a large collection");
+  assert.ok(new TextEncoder().encode(JSON.stringify(projected)).byteLength <= SKIN_RUNTIME_PLUGIN_CONTEXT_LIMIT_BYTES);
+});

@@ -20,6 +20,14 @@ import { describeTeamSpeakError, normalizeTeamSpeakError, normalizeTeamSpeakKick
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { createAccelerationRelayClient, type AccelerationRelayClient, type AccelerationRelayOptions } from "./acceleration-relay.js";
+import {
+  applyChannelCapacityNotification,
+  applyChannelPasswordProtectionNotification,
+  parseChannelCapacities,
+  parseChannelPasswordProtections,
+  type ChannelCapacity,
+  type ChannelPasswordProtection,
+} from "./channel-capacity.js";
 
 export interface TSClientOptions {
   target: TeamSpeakTarget;
@@ -43,12 +51,26 @@ export interface TSClientAvatar {
   data: Buffer;
 }
 
+export interface TSClientServerInfo {
+  name: string;
+  iconId: number | null;
+}
+
+export interface TSClientServerPresentation {
+  bannerUrl: string | null;
+  welcomeMessage: string;
+}
+
 // Keep enough room for avatars produced by the native client. The previous
 // 120 KiB limit rejected the 134 KiB PNG used by the Shanghai test account,
 // so every avatar silently fell back to its initial letter.
 const MAX_CLIENT_AVATAR_BYTES = 256 * 1024;
+const MAX_SERVER_ICON_BYTES = 128 * 1024;
+const MAX_SERVER_BANNER_URL_LENGTH = 2_048;
+const MAX_SERVER_WELCOME_MESSAGE_LENGTH = 4_096;
 
-export type TSDirectorySnapshot = DirectorySnapshot;
+export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity> & Partial<ChannelPasswordProtection>;
+export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
 export type TSDirectoryClient = DirectoryClientInfo;
 export type TSRawNotification = RawNotification;
 
@@ -92,6 +114,8 @@ export class TSClient extends EventEmitter {
   private inputStateQueue: Promise<void> = Promise.resolve();
   private preferredChannelId = 0n;
   private accelerationClient: AccelerationRelayClient | null = null;
+  private readonly channelCapacities = new Map<bigint, ChannelCapacity>();
+  private readonly channelPasswordProtection = new Map<bigint, boolean>();
   // Reason id of the most recent self leave, kept so the SDK `kicked` event can
   // tell a plain kick (4) from a kick with ban (5). The SDK only forwards the
   // reason message to its `kicked` handler, not the reason id.
@@ -109,6 +133,8 @@ export class TSClient extends EventEmitter {
     this.syncedInputMuted = null;
     this.inputStateQueue = Promise.resolve();
     this.selfLeaveReasonId = null;
+    this.channelCapacities.clear();
+    this.channelPasswordProtection.clear();
     if (!this.adapter || !this.client) {
       let transportTarget = this.options.target;
       if (this.options.acceleration && !this.accelerationClient) {
@@ -163,7 +189,25 @@ export class TSClient extends EventEmitter {
         tsListChannels(client),
         tsListClients(client),
       ]);
-      this.emit("directorySnapshot", { channels, clients });
+      try {
+        // The high-level SDK directory type intentionally omits channel limit
+        // metadata. Its raw client-protocol rows still include the public
+        // maximum-client properties, so retain those without another SDK API.
+        // TeamSpeak only includes channel flag fields (including the public
+        // password-required bit) when the client asks for flags explicitly.
+        const rows = await client.execCommandWithResponse("channellist -flags", 5_000);
+        const capacities = parseChannelCapacities(rows);
+        for (const [id, capacity] of capacities) this.channelCapacities.set(id, capacity);
+        for (const [id, passwordProtected] of parseChannelPasswordProtections(rows)) {
+          this.channelPasswordProtection.set(id, passwordProtected);
+        }
+      } catch (error: unknown) {
+        this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not read TeamSpeak channel limits");
+      }
+      this.emit("directorySnapshot", {
+        channels: this.applyChannelMetadata(channels),
+        clients,
+      });
     } catch (error: unknown) {
       this.logger.warn({
         failureCode: "DIRECTORY_SNAPSHOT_UNAVAILABLE",
@@ -257,6 +301,59 @@ export class TSClient extends EventEmitter {
     return { cacheKey, data };
   }
 
+  /** Read the public virtual-server name and icon marker from the active session. */
+  async getServerInfo(): Promise<TSClientServerInfo> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const generation = this.connectionGeneration;
+    if (this.client !== client || !this.connected || this.connectionGeneration !== generation) {
+      throw new Error("TeamSpeak session changed while reading server information");
+    }
+    const info = client.serverInfo;
+    return info ? { name: info.name, iconId: info.iconId } : { name: "", iconId: null };
+  }
+
+  /** Read only the public banner and welcome message from the active virtual server. */
+  async getServerPresentation(): Promise<TSClientServerPresentation> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    const generation = this.connectionGeneration;
+    const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
+    const empty: TSClientServerPresentation = { bannerUrl: null, welcomeMessage: "" };
+    const info = client.serverInfo;
+    if (!isCurrent() || !info) return empty;
+    return {
+      bannerUrl: normalizeTeamSpeakBannerUrl(info.hostBannerGfxUrl),
+      welcomeMessage: normalizeTeamSpeakWelcomeMessage(info.welcomeMessage),
+    };
+  }
+
+  /** Download the public virtual-server icon using TeamSpeak's normal file-transfer port. */
+  async getServerIcon(iconId: number): Promise<Buffer | null> {
+    const client = this.client;
+    if (!client || !this.connected) throw new Error("TeamSpeak session is not ready");
+    if (!Number.isSafeInteger(iconId) || iconId === 0) return null;
+    const generation = this.connectionGeneration;
+    const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
+    const transfer = await client.fileTransferInitDownload(0n, `/icon_${iconId}`, "");
+    if (!isCurrent()) return null;
+    const size = Number(transfer.size);
+    if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_SERVER_ICON_BYTES) return null;
+
+    const chunks: Buffer[] = [];
+    const destination = new Writable({
+      write(chunk: Buffer | string, _encoding, callback) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        callback();
+      },
+    });
+    await client.downloadFileData(this.options.target.host, transfer, destination);
+    if (!isCurrent()) return null;
+    const data = Buffer.concat(chunks);
+    if (data.length === 0 || data.length > MAX_SERVER_ICON_BYTES) return null;
+    return data;
+  }
+
   private attachClientListeners(client: TS3FullClient): void {
     client.on("voiceData", (data: VoiceData) => {
       if (this.client !== client) return;
@@ -273,13 +370,20 @@ export class TSClient extends EventEmitter {
     client.on("directorySnapshot", (snapshot) => {
       if (this.client !== client) return;
       this.emit("directorySnapshot", {
-        channels: snapshot.channels.slice(),
+        channels: this.applyChannelMetadata(snapshot.channels),
         clients: snapshot.clients.slice(),
       });
     });
 
     client.on("rawNotification", (notification: RawNotification) => {
       if (this.client !== client) return;
+      applyChannelCapacityNotification(notification.name, notification.params, this.channelCapacities);
+      const protectionChange = applyChannelPasswordProtectionNotification(
+        notification.name,
+        notification.params,
+        this.channelPasswordProtection,
+      );
+      if (protectionChange) this.emit("channelPasswordProtectionChanged", protectionChange);
       this.emit("rawNotification", {
         name: notification.name,
         params: { ...notification.params },
@@ -310,6 +414,8 @@ export class TSClient extends EventEmitter {
       }
       this.connected = false;
       this.clientId = 0;
+      this.channelCapacities.clear();
+      this.channelPasswordProtection.clear();
       this.emit("disconnected", err);
     });
 
@@ -505,6 +611,34 @@ export class TSClient extends EventEmitter {
       this.clientId = 0;
     }
   }
+
+  private applyChannelMetadata(channels: readonly TSDirectoryChannel[]): TSDirectoryChannel[] {
+    return channels.map((channel) => ({
+      ...channel,
+      ...this.channelCapacities.get(channel.id),
+      ...(this.channelPasswordProtection.has(channel.id)
+        ? { passwordProtected: this.channelPasswordProtection.get(channel.id)! }
+        : {}),
+    }));
+  }
+}
+
+function normalizeTeamSpeakBannerUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const candidate = value.trim();
+  if (!candidate || candidate.length > MAX_SERVER_BANNER_URL_LENGTH) return null;
+  try {
+    const url = new URL(candidate);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTeamSpeakWelcomeMessage(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\0/g, "").replace(/\r\n?/g, "\n").slice(0, MAX_SERVER_WELCOME_MESSAGE_LENGTH).trim();
 }
 
 function escapeTeamSpeakValue(value: string): string {

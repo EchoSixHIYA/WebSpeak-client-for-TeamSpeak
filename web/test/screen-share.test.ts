@@ -28,6 +28,12 @@ class Peer {
   iceConnectionState = "new";
   localDescription: unknown;
   parameters: RTCRtpSendParameters | null = null;
+  codecPreferences: RTCRtpCodecCapability[] = [];
+  private readonly transceivers: Array<{
+    sender: { track: { kind: string } | null };
+    receiver: { track: { kind: string } | null };
+    setCodecPreferences: (codecs: RTCRtpCodecCapability[]) => void;
+  }> = [];
   closed = false;
   constructor(public configuration: RTCConfiguration) { Peer.instances.push(this); }
   createOffer() { return Peer.offer(); }
@@ -35,9 +41,25 @@ class Peer {
   setLocalDescription(description: unknown) { this.localDescription = description; return Promise.resolve(); }
   setRemoteDescription() { return Promise.resolve(); }
   addIceCandidate() { return Promise.resolve(); }
-  addTransceiver() {}
-  addTrack() { return { getParameters: () => ({ encodings: [] }), setParameters: async (parameters: RTCRtpSendParameters) => { this.parameters = parameters; } }; }
-  getTransceivers() { return []; }
+  addTransceiver(kind: string) {
+    const transceiver = {
+      sender: { track: null },
+      receiver: { track: { kind } },
+      setCodecPreferences: (codecs: RTCRtpCodecCapability[]) => { this.codecPreferences = codecs; },
+    };
+    this.transceivers.push(transceiver);
+    return transceiver;
+  }
+  addTrack(track: Track) {
+    const sender = { track, getParameters: () => ({ encodings: [] }), setParameters: async (parameters: RTCRtpSendParameters) => { this.parameters = parameters; } };
+    this.transceivers.push({
+      sender,
+      receiver: { track: null },
+      setCodecPreferences: (codecs) => { this.codecPreferences = codecs; },
+    });
+    return sender;
+  }
+  getTransceivers() { return this.transceivers; }
   getStats() { return Peer.stats(); }
   close() { this.closed = true; this.connectionState = "closed"; }
 }
@@ -138,4 +160,37 @@ test("ICE configuration belongs to each controller independently", async () => {
       [{ urls: "stun:first.example" }], [{ urls: "stun:second.example" }],
     ]);
   } finally { second.stopTransport(false); }
+});
+
+test("screen share codecs are ordered H.264, AV1, then VP8 independent of browser order", async () => {
+  const codecs = [
+    { mimeType: "video/vp8", clockRate: 90_000 },
+    { mimeType: "video/rtx", clockRate: 90_000, sdpFmtpLine: "apt=96" },
+    { mimeType: "video/av1", clockRate: 90_000 },
+    { mimeType: "video/h264", clockRate: 90_000, sdpFmtpLine: "packetization-mode=1;profile-level-id=42e01f" },
+  ] satisfies RTCRtpCodecCapability[];
+  replaceGlobal("RTCRtpSender", { getCapabilities: () => ({ codecs }) });
+
+  controller.handleMessage({ type: "screenShareJoined", stream: remote });
+  await nextTurn();
+
+  assert.deepEqual(Peer.instances[0]?.codecPreferences.map((codec) => codec.mimeType), [
+    "video/h264",
+    "video/av1",
+    "video/vp8",
+    "video/rtx",
+  ]);
+});
+
+test("viewer visibility follows the selected stream so the player and card cannot disagree", async () => {
+  assert.equal(controller.api.screenShareViewing.value, false);
+  assert.equal(controller.api.screenShareViewingStreamId.value, "");
+
+  controller.handleMessage({ type: "screenShareJoined", stream: remote });
+  assert.equal(controller.api.screenShareViewing.value, true);
+  assert.equal(controller.api.screenShareViewingStreamId.value, remote.streamId);
+
+  controller.handleMessage({ type: "screenShareStopped", streamId: remote.streamId });
+  assert.equal(controller.api.screenShareViewing.value, false);
+  assert.equal(controller.api.screenShareViewingStreamId.value, "");
 });

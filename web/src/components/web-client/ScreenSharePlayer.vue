@@ -1,12 +1,13 @@
 <template>
   <section
-    :ref="setPlayerElement"
+    :ref="setPlayerElementNode"
     class="screen-share-player"
     data-ws-part="voice.screen-player"
     role="region"
     :aria-label="t('screenShare')"
   >
     <div
+      :ref="setStageElement"
       class="screen-share-player-stage"
       data-ws-part="voice.screen-player.stage"
     >
@@ -18,6 +19,7 @@
         autoplay
         playsinline
         :muted="screenShareRemoteVolume === 0"
+        @loadedmetadata="updateStageSize"
       ></video>
       <div
         v-else
@@ -113,6 +115,7 @@
 
 <script setup lang="ts">
 import Icon from "../Icon.vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
 const props = defineProps<{
   model: Pick<ReturnType<typeof useWebClientScreenShare>, "fullscreen" | "viewers" | "viewerCount" | "ownerName" | "errorText" | "setPlayerElement" | "setVideoElement" | "viewerStyle" | "setVolume" | "toggleFullscreen">;
@@ -120,4 +123,54 @@ const props = defineProps<{
   leaveScreenShare: () => void; avatarInitial: (name: string) => string; t: (key: string) => string;
 }>();
 const { fullscreen: screenShareFullscreen, viewers: screenSharePlayerViewers, viewerCount: screenSharePlayerViewerCount, ownerName: screenSharePlayerOwnerName, errorText: screenShareErrorText, setPlayerElement, setVideoElement: setScreenVideoElement, viewerStyle: screenShareViewerStyle, setVolume: onScreenShareVolume, toggleFullscreen: toggleScreenShareFullscreen } = props.model;
+const playerElement = ref<HTMLElement | null>(null);
+const stageElement = ref<HTMLElement | null>(null);
+
+function setInlineStyle(element: HTMLElement, property: string, value: string | null): void {
+  if (value === null) {
+    if (element.style.getPropertyValue(property)) element.style.removeProperty(property);
+  } else if (element.style.getPropertyValue(property) !== value) {
+    element.style.setProperty(property, value);
+  }
+}
+
+function updateStageSize(): void {
+  const stage = stageElement.value;
+  const player = playerElement.value ?? stage?.parentElement ?? null;
+  if (!stage || !player) return;
+  if (screenShareFullscreen.value) {
+    setInlineStyle(player, "width", "100vw");
+    setInlineStyle(player, "height", "100vh");
+    setInlineStyle(stage, "width", "100%");
+    setInlineStyle(stage, "height", "100%");
+    setInlineStyle(stage, "aspect-ratio", "auto");
+    return;
+  }
+  setInlineStyle(player, "width", null);
+  setInlineStyle(player, "height", null);
+  setInlineStyle(stage, "width", null);
+  setInlineStyle(stage, "height", null);
+  setInlineStyle(stage, "aspect-ratio", "auto");
+}
+
+function setPlayerElementNode(element: unknown): void {
+  const next = element instanceof HTMLElement ? element : null;
+  if (playerElement.value === next) return;
+  playerElement.value = next;
+  setPlayerElement(next);
+  updateStageSize();
+}
+
+function setStageElement(element: unknown): void {
+  const next = element instanceof HTMLElement ? element : null;
+  if (stageElement.value === next) return;
+  stageElement.value = next;
+  updateStageSize();
+}
+
+onMounted(() => window.addEventListener("resize", updateStageSize));
+watch(screenShareFullscreen, updateStageSize);
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateStageSize);
+});
 </script>

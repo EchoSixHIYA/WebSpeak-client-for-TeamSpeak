@@ -1,6 +1,9 @@
 <template>
-  <div
+  <TransitionGroup
     v-if="currentMembers.length"
+    name="ws-voice-member"
+    tag="div"
+    appear
     class="voice-grid"
     data-ws-part="voice.members"
   >
@@ -13,13 +16,17 @@
       :data-ws-member-id="member.id"
       :data-ws-speaking="isSpeaking(member) ? 'true' : 'false'"
       :data-ws-self="member.isSelf ? 'true' : 'false'"
+      @contextmenu="handleMemberContextMenu(member, $event)"
     >
       <button
-        v-if="isMobileViewport && !member.isSelf"
+        v-if="!member.isSelf && (isMobileViewport || showMemberActions)"
         type="button"
         class="voice-member-action"
+        data-ws-part="voice.member.action-trigger"
+        :data-ws-member-actions="showMemberActions ? 'enabled' : undefined"
         :aria-label="t('moreMemberOptions')"
-        @click.stop="emit('memberActions', member)"
+        :title="t('moreMemberOptions')"
+        @click.stop="emit('memberActions', member, $event)"
         ><Icon
           name="more"
           :size="17"
@@ -38,6 +45,16 @@
           >{{ member.avatar ? "" : avatarInitial(member.nickname) }}</div
         >
         <span
+          v-if="member.inputMuted"
+          class="voice-muted-indicator"
+          data-ws-part="voice.member.mic-status"
+          data-ws-state="muted"
+          role="img"
+          :aria-label="t('inputMuted')"
+          :title="t('inputMuted')"
+          ><Icon name="mic-off" :size="14" /></span
+        >
+        <span
           v-if="screenShareStreamForMember(member)"
           class="screen-share-live-indicator"
           data-ws-part="voice.member.live-indicator"
@@ -52,7 +69,7 @@
           ><span>{{ t("sharingScreen") }}</span></span
         >
         <button
-          v-if="member.isSelf && (screenShareActive || screenShareStarting)"
+          v-if="screenShareStatusEnabled && member.isSelf && (screenShareActive || screenShareStarting)"
           type="button"
           class="screen-share-stop-button"
           data-ws-part="voice.member.stop-share"
@@ -71,7 +88,7 @@
         isSpeaking(member) ? t("speaking") : member.isSelf ? t("connectedYou") : t("connected")
       }}</span>
       <div
-        v-if="member.isSelf || screenShareStreamForMember(member)"
+        v-if="screenShareStreamForMember(member) || (member.isSelf && screenShareStatusEnabled)"
         class="screen-share-card-actions"
         data-ws-part="voice.member.share-actions"
       >
@@ -93,7 +110,7 @@
               :aria-label="t('screenShareSettings')"
               :aria-expanded="screenShareSettingsOpen"
               :title="t('screenShareSettings')"
-              @click.stop="screenShareSettingsOpen = !screenShareSettingsOpen"
+              @click.stop="toggleScreenShareSettings"
               ><Icon
                 name="settings"
                 :size="13"
@@ -127,7 +144,7 @@
         >
       </div>
     </article>
-  </div>
+  </TransitionGroup>
   <div
     v-else
     class="voice-empty"
@@ -143,18 +160,60 @@
 
 <script setup lang="ts">
 import Icon from "../Icon.vue";
+import { computed } from "vue";
 import type { ChannelMember, useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientScreenShare } from "../../composables/useWebClientScreenShare.js";
-const props = defineProps<{
-  currentMembers: ChannelMember[]; isMobileViewport: boolean;
-  sharing: Pick<ReturnType<typeof useVoiceWebSocket>, "screenShareActive" | "screenShareStarting" | "screenShareViewingStreamId"> & Pick<ReturnType<typeof useWebClientScreenShare>, "settingsOpen">;
-  controls: Pick<ReturnType<typeof useWebClientScreenShare>, "streamForMember" | "toggleForMember" | "startWithSettings">;
+const props = withDefaults(defineProps<{
+  currentMembers: ChannelMember[]; isMobileViewport: boolean; showMemberActions?: boolean;
+  showScreenShare?: boolean;
+  sharing?: Pick<ReturnType<typeof useVoiceWebSocket>, "screenShareActive" | "screenShareStarting" | "screenShareViewingStreamId"> & Pick<ReturnType<typeof useWebClientScreenShare>, "settingsOpen">;
+  controls?: Pick<ReturnType<typeof useWebClientScreenShare>, "streamForMember" | "toggleForMember" | "startWithSettings">;
   isSpeaking: (member: ChannelMember) => boolean;
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => Record<string, string>;
   avatarInitial: (name: string) => string; t: (key: string) => string;
-}>();
-const { screenShareActive, screenShareStarting, screenShareViewingStreamId, settingsOpen: screenShareSettingsOpen } = props.sharing;
-const { streamForMember: screenShareStreamForMember, toggleForMember: toggleScreenShareForMember, startWithSettings: startScreenShareWithSettings } = props.controls;
-const emit = defineEmits<{ memberActions: [member: ChannelMember]; stopShare: [] }>();
+}>(), { showScreenShare: true });
+const screenShareControlsEnabled = computed(() => props.showScreenShare !== false && Boolean(props.controls));
+const screenShareStatusEnabled = computed(() => screenShareControlsEnabled.value && Boolean(props.sharing));
+const screenShareActive = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.screenShareActive.value));
+const screenShareStarting = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.screenShareStarting.value));
+const screenShareViewingStreamId = computed(() => screenShareStatusEnabled.value ? props.sharing?.screenShareViewingStreamId.value ?? null : null);
+const screenShareSettingsOpen = computed(() => screenShareStatusEnabled.value && Boolean(props.sharing?.settingsOpen.value));
+const screenShareStreamForMember = (member: ChannelMember) => screenShareControlsEnabled.value ? props.controls?.streamForMember(member) ?? null : null;
+const toggleScreenShareForMember = (member: ChannelMember) => { if (screenShareControlsEnabled.value) props.controls?.toggleForMember(member); };
+const startScreenShareWithSettings = () => { if (screenShareStatusEnabled.value) void props.controls?.startWithSettings(); };
+function toggleScreenShareSettings() {
+  if (!screenShareStatusEnabled.value || !props.sharing) return;
+  props.sharing.settingsOpen.value = !props.sharing.settingsOpen.value;
+}
+const emit = defineEmits<{ memberActions: [member: ChannelMember, event: MouseEvent]; stopShare: [] }>();
 const screenShareIndicatorBars = [5, 10, 7, 12, 8, 10];
+
+function handleMemberContextMenu(member: ChannelMember, event: MouseEvent): void {
+  if (!props.showMemberActions || member.isSelf) return;
+  event.preventDefault();
+  event.stopPropagation();
+  emit("memberActions", member, event);
+}
 </script>
+
+<style scoped>
+.voice-muted-indicator {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ffffff18;
+  border-radius: 5px;
+  color: #f0f0f2;
+  background: #17181bd9;
+  pointer-events: none;
+}
+
+.voice-card:has(.voice-member-action) .voice-muted-indicator {
+  right: 50px;
+}
+</style>

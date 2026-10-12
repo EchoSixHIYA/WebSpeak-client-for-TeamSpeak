@@ -1,4 +1,4 @@
-import { reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { parseScreenShareStream, parseScreenShareViewers, type ServerMessage } from "../../../src/shared/server-messages.js";
 import { normalizeScreenShareIceServers, type ScreenShareIceServer, type ScreenShareClientMessage, type ScreenShareStreamDescription as ScreenShareStream, type ScreenSharePeerSignal as ScreenShareSignal } from "../../../src/shared/screen-share.js";
 
@@ -57,8 +57,8 @@ export function createScreenShareController(transport: ScreenShareTransport) {
   const screenShareActive = ref(false);
   const screenShareStarting = ref(false);
   const screenShareActiveStreamId = ref("");
-  const screenShareViewing = ref(false);
   const screenShareViewingStreamId = ref("");
+  const screenShareViewing = computed(() => Boolean(screenShareViewingStreamId.value));
   const screenShareRemoteStream = ref<MediaStream | null>(null);
   const screenShareError = ref("");
   const screenShareErrorCode = ref("");
@@ -291,7 +291,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     if (viewingStream) sendScreenShareMessage({ type: "screenShareLeave", streamId: viewingStream.streamId });
     closeScreenSharePeer(peerId);
     if (viewingStream) {
-      screenShareViewing.value = false;
       screenShareViewingStreamId.value = "";
       screenShareRemoteStream.value = null;
     }
@@ -341,7 +340,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       if (!event.streams[0]) remote.addTrack(event.track);
       screenSharePeerStreams.set(peerId, remote);
       screenShareRemoteStream.value = remote;
-      screenShareViewing.value = true;
     };
     peer.onconnectionstatechange = () => {
       if (!isCurrentPeer(peerId, peer)) return;
@@ -420,9 +418,9 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     // Prefer H.264/AV1 for screen content: both compress text/UI far better
     // than VP8 at the bitrates typical of relayed screen shares. VP8 stays as
     // a fallback when neither is available.
-    const h264 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/h264");
-    const av1 = capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/av1");
-    const preferred = h264.length ? h264 : av1.length ? av1 : capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === "video/vp8");
+    const preferred = ["video/h264", "video/av1", "video/vp8"].flatMap((mimeType) =>
+      capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === mimeType),
+    );
     if (!preferred.length) return;
     const remaining = capabilities.codecs.filter((codec) => !preferred.includes(codec));
     try { transceiver.setCodecPreferences([...preferred, ...remaining]); } catch { /* older browsers may reject codec preference changes */ }
@@ -440,7 +438,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
   async function startScreenShareViewer(stream: ScreenShareStream): Promise<void> {
     closeAllScreenSharePeers();
     screenShareRemoteStream.value = null;
-    screenShareViewing.value = true;
     screenShareViewingStreamId.value = stream.streamId;
     screenShareErrorCode.value = "";
     screenShareError.value = "";
@@ -494,7 +491,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     if (signal.kind === "close") {
       closeScreenSharePeer(fromPeerId);
       if (screenShareViewingStreamId.value === streamId) {
-        screenShareViewing.value = false;
         screenShareViewingStreamId.value = "";
         screenShareRemoteStream.value = null;
       }
@@ -674,7 +670,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
   function leaveScreenShare(): void {
     if (screenShareViewingStreamId.value) sendScreenShareMessage({ type: "screenShareLeave", streamId: screenShareViewingStreamId.value });
     closeAllScreenSharePeers();
-    screenShareViewing.value = false;
     screenShareViewingStreamId.value = "";
     screenShareRemoteStream.value = null;
   }
@@ -692,7 +687,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     screenShareStartCancelled = false;
     screenShareActive.value = false;
     screenShareActiveStreamId.value = "";
-    screenShareViewing.value = false;
     screenShareViewingStreamId.value = "";
     screenShareRemoteStream.value = null;
     screenShareStreams.length = 0;
@@ -757,7 +751,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
         }
         if (screenShareViewingStreamId.value === streamId) {
           closeAllScreenSharePeers();
-          screenShareViewing.value = false;
           screenShareViewingStreamId.value = "";
           screenShareRemoteStream.value = null;
         }
@@ -799,7 +792,6 @@ export function createScreenShareController(transport: ScreenShareTransport) {
         if (screenShareViewing.value) {
           if (screenShareViewingStreamId.value) sendScreenShareMessage({ type: "screenShareLeave", streamId: screenShareViewingStreamId.value });
           closeAllScreenSharePeers();
-          screenShareViewing.value = false;
           screenShareViewingStreamId.value = "";
           screenShareRemoteStream.value = null;
         }

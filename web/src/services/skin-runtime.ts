@@ -4,6 +4,7 @@ import { applyTheme, getBuiltinSkinCss, getStoredTheme, isDarkTheme } from "./th
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
 import { getBundledSkinPackageUrl, isPublicSkinEnabled } from "./skin-catalog.js";
 import { createSkinOperation, type SkinLoadOptions } from "./skin-operation.js";
+import { setSkinLayoutPackage } from "./skin-layout-runtime.js";
 
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
@@ -33,7 +34,7 @@ export async function activateStoredSkin(): Promise<InstalledSkin | null> {
   return activateSkin(selectedId);
 }
 
-export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.6", options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
+export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.7-preview", options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
   // An already retired page must not cancel a newer page's activation.
   options.signal?.throwIfAborted();
   pendingActivation?.cancel();
@@ -52,6 +53,7 @@ async function prepareAndActivate(id: string, expectedVersion: string | undefine
   operation.check();
   if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN) {
     removeCustomSkinStyle();
+    setSkinLayoutPackage(id, null);
     applyTheme(id === BUILTIN_DARK_SKIN ? "dark" : "light");
     markCoreControls();
     storeSkinId(id);
@@ -120,6 +122,7 @@ async function prepareAndActivate(id: string, expectedVersion: string | undefine
     activeAssetUrls = compiled.objectUrls;
     candidateUrls = [];
     previousAssetUrls.forEach((url) => URL.revokeObjectURL(url));
+    setSkinLayoutPackage(skin.id, skin.layoutData ?? null);
     storeSkinId(id);
     return skin;
   } catch {
@@ -132,6 +135,7 @@ async function prepareAndActivate(id: string, expectedVersion: string | undefine
 function fallBackToBuiltin(): null {
   const fallback = isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN;
   removeCustomSkinStyle();
+  setSkinLayoutPackage(fallback, null);
   applyTheme(fallback === BUILTIN_DARK_SKIN ? "dark" : "light");
   storeSkinId(fallback);
   return null;
@@ -141,6 +145,7 @@ export function clearCustomSkinStyle(): void {
   pendingActivation?.cancel();
   pendingActivation = null;
   removeCustomSkinStyle();
+  setSkinLayoutPackage(getStoredSkinId() ?? BUILTIN_LIGHT_SKIN, null);
 }
 
 function removeCustomSkinStyle(): void {

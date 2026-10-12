@@ -24,6 +24,7 @@
               name="close"
               :size="19" /></button></header
         ><div class="settings-content">
+          <div class="settings-audio-card">
           <section class="settings-section"
             ><h3
               ><Icon
@@ -31,23 +32,19 @@
                 :size="20"
               />
               {{ t("inputDevice") }}</h3
-            ><label
-              class="settings-label"
-              for="input-device"
-              >{{ t("microphone") }}</label
-            ><select
-              id="input-device"
-              class="settings-select"
-              :value="selectedInputDeviceId"
-              :disabled="!inputDevices.length"
-              @change="onInputDeviceChange"
-              ><option value="">{{ t("defaultMicrophone") }}</option
-              ><option
-                v-for="(device, index) in inputDevices"
-                :key="device.deviceId || `microphone-${index}`"
-                :value="device.deviceId"
-                >{{ device.label || t("microphoneNumber", { index: index + 1 }) }}</option
-              ></select
+            ><div class="settings-form-row"
+              ><label
+                class="settings-label"
+                for="input-device"
+                >{{ t("microphone") }}</label
+              ><AudioDeviceSelect
+                id="input-device"
+                :model-value="selectedInputDeviceId"
+                :options="inputDeviceOptions"
+                :label="t('microphone')"
+                :disabled="!inputDevices.length"
+                @change="onInputDeviceChange"
+              /></div
             ><p
               v-if="audioSettingsError"
               class="settings-error"
@@ -80,8 +77,7 @@
                 {{ microphoneMuted ? t("unmuteMic") : t("muteMic") }}</button
               ></div
             ><label
-              v-if="isMobileViewport"
-              class="mobile-noise-toggle"
+              class="noise-suppression-toggle settings-form-row"
               ><span
                 ><strong>{{ t("noiseSuppression") }}</strong
                 ><small>{{ t("noiseSuppressionHint") }}</small></span
@@ -90,31 +86,39 @@
                 :checked="noiseSuppressionEnabled"
                 :aria-label="t('noiseSuppression')"
                 @change="onNoiseSuppressionToggle" /></label
-            ><template v-if="isMobileViewport"
-              ><div class="settings-range-row"
+              ><div class="settings-form-row settings-range-form-row"
                 ><label class="settings-label">{{ t("inputVolume") }}</label
-                ><strong>{{ Math.round(inputVolume * 100) }}%</strong></div
-              ><input
-                class="settings-range"
-                type="range"
-                min="0"
-                max="100"
-                :value="inputVolume * 100"
-                :style="rangeStyle(inputVolume, 1)"
-                :aria-label="t('inputVolume')"
-                @input="onInputVolume" /></template
-            ><div class="settings-range-row"
+                ><div class="settings-form-control"
+                  ><div class="settings-range-row"
+                    ><strong>{{ Math.round(inputVolume * 100) }}%</strong></div
+                  ><input
+                    class="settings-range"
+                    type="range"
+                    min="0"
+                    max="100"
+                    :value="inputVolume * 100"
+                    :style="rangeStyle(inputVolume, 1)"
+                    :aria-label="t('inputVolume')"
+                    @input="onInputVolume"
+                  /></div
+              ></div
+            ><div class="settings-form-row settings-range-form-row"
               ><label class="settings-label">{{ t("voxThreshold") }}</label
-              ><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div
-            ><input
-              class="settings-range"
-              type="range"
-              min="1"
-              max="80"
-              :value="voxThreshold * 1000"
-              :style="rangeStyle(voxThreshold, 0.08)"
-              :aria-label="t('voxThreshold')"
-              @input="onVoxThreshold" /><div class="audio-level-row"
+              ><div class="settings-form-control"
+                ><div class="settings-range-row"
+                  ><strong>{{ (voxThreshold * 100).toFixed(1) }}%</strong></div
+                ><input
+                  class="settings-range"
+                  type="range"
+                  min="1"
+                  max="80"
+                  :value="voxThreshold * 1000"
+                  :style="rangeStyle(voxThreshold, 0.08)"
+                  :aria-label="t('voxThreshold')"
+                  @input="onVoxThreshold"
+                /></div
+            ></div
+            ><div class="audio-level-row"
               ><span>{{ t("micLevel") }}</span
               ><strong>{{ Math.round(micLevel * 100) }}%</strong></div
             ><div class="audio-level-track"
@@ -155,25 +159,21 @@
                 :size="20"
               />
               {{ t("outputVolume") }}</h3
-            ><label
+              ><div
               v-if="outputDeviceSupported"
-              class="settings-label"
-              for="output-device"
-              >{{ t("outputDevice") }}</label
-            ><select
-              v-if="outputDeviceSupported"
-              id="output-device"
-              class="settings-select"
-              :value="selectedOutputDeviceId"
-              :disabled="!outputDevices.length"
-              @change="onOutputDeviceChange"
-              ><option value="">{{ t("defaultOutput") }}</option
-              ><option
-                v-for="(device, index) in outputDevices"
-                :key="device.deviceId || `speaker-${index}`"
-                :value="device.deviceId"
-                >{{ device.label || t("speakerNumber", { index: index + 1 }) }}</option
-              ></select
+              class="settings-form-row"
+              ><label
+                class="settings-label"
+                for="output-device"
+                >{{ t("outputDevice") }}</label
+              ><AudioDeviceSelect
+                id="output-device"
+                :model-value="selectedOutputDeviceId"
+                :options="outputDeviceOptions"
+                :label="t('outputDevice')"
+                :disabled="!outputDevices.length"
+                @change="onOutputDeviceChange"
+              /></div
             ><p
               v-else
               class="mode-note"
@@ -181,32 +181,39 @@
                 name="info"
                 :size="16"
               /><span>{{ t("outputDeviceUnsupported") }}</span></p
-            ><template v-if="isMobileViewport"
+            ><div class="settings-form-row settings-range-form-row"
+              ><label class="settings-label">{{ t("speakers") }}</label
+              ><div class="settings-form-control"
+                ><div class="settings-range-row"
+                  ><strong>{{ Math.round(outputVolume * 100) }}%</strong></div
+                ><input
+                  class="settings-range"
+                  type="range"
+                  min="0"
+                  max="100"
+                  :value="outputVolume * 100"
+                  :style="rangeStyle(outputVolume, 1)"
+                  :aria-label="t('outputVolume')"
+                  @input="onOutputVolume"
+                /></div
+            ></div
+          ><div class="settings-form-row settings-range-form-row"
+            ><label class="settings-label">{{ t("notificationVolume") }}</label
+            ><div class="settings-form-control"
               ><div class="settings-range-row"
-                ><label class="settings-label">{{ t("speakers") }}</label
-                ><strong>{{ Math.round(outputVolume * 100) }}%</strong></div
+                ><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div
               ><input
                 class="settings-range"
                 type="range"
                 min="0"
                 max="100"
-                :value="outputVolume * 100"
-                :style="rangeStyle(outputVolume, 1)"
-                :aria-label="t('outputVolume')"
-                @input="onOutputVolume" /></template
-            ><div class="settings-range-row"
-              ><label class="settings-label">{{ t("notificationVolume") }}</label
-              ><strong>{{ Math.round(notificationVolume * 100) }}%</strong></div
-            ><input
-              class="settings-range"
-              type="range"
-              min="0"
-              max="100"
-              :value="notificationVolume * 100"
-              :style="rangeStyle(notificationVolume, 1)"
-              :aria-label="t('notificationVolume')"
-              @input="onNotificationVolume"
-            /><div class="audio-diagnostic"
+                :value="notificationVolume * 100"
+                :style="rangeStyle(notificationVolume, 1)"
+                :aria-label="t('notificationVolume')"
+                @input="onNotificationVolume"
+              /></div
+          ></div
+            ><div class="audio-diagnostic"
               ><span>{{ t("audioStatus") }}</span
               ><strong>{{
                 audioContextState === "running"
@@ -227,7 +234,8 @@
                 :size="16"
               /><span>{{ t("audioPrivacy") }}</span></div
             ></section
-          > </div
+          ></div
+        ></div
         ><footer class="settings-footer"
           ><button
             class="primary-button save-button"
@@ -241,8 +249,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import Icon from "../Icon.vue";
+import AudioDeviceSelect from "./AudioDeviceSelect.vue";
 import { useDialogFocus } from "../../composables/useDialogFocus.js";
 import type { useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientAudioControls } from "../../composables/useWebClientAudioControls.js";
@@ -283,7 +292,6 @@ const props = defineProps<{
   model: AudioSettingsState;
   controls: AudioSettingsControls;
   microphoneError: string;
-  isMobileViewport: boolean;
   t: (key: string, variables?: Record<string, string | number>) => string;
   localizedMessage: (message: string) => string;
   rangeStyle: (value: number, max: number) => CSSProperties;
@@ -325,4 +333,19 @@ const {
   meterBarHeight,
   toggleMicrophone,
 } = props.controls;
+
+const inputDeviceOptions = computed(() => [
+  { value: "", label: props.t("defaultMicrophone") },
+  ...inputDevices.map((device, index) => ({
+    value: device.deviceId,
+    label: device.label || props.t("microphoneNumber", { index: index + 1 }),
+  })),
+]);
+const outputDeviceOptions = computed(() => [
+  { value: "", label: props.t("defaultOutput") },
+  ...outputDevices.map((device, index) => ({
+    value: device.deviceId,
+    label: device.label || props.t("speakerNumber", { index: index + 1 }),
+  })),
+]);
 </script>
