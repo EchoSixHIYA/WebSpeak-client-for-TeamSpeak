@@ -200,6 +200,7 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.channel-tree.member-away",
   "voice.channel-tree.member-muted",
   "voice.channel-tree.member-name",
+  "voice.channel-tree.member-screen-share",
   "voice.channel-tree.member-speaking",
   "voice.channel-tree.name",
   "voice.channel-tree.node",

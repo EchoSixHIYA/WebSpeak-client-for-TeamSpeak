@@ -169,21 +169,26 @@
       />
     </div>
 
-    <details
-      class="identity-options"
-      data-ws-part="home.identity"
-      ><summary>{{ t("identityOptions") }}</summary
-      ><label
-        class="field-label"
-        data-ws-part="home.field-label"
-        for="channel"
-        >{{ t("targetChannel") }} <span>{{ t("optional") }}</span></label
-      ><div class="field-wrap" data-ws-part="home.field"><Icon name="hash" :size="17" /><input
+    <label
+      class="field-label"
+      data-ws-part="home.field-label"
+      for="channel"
+      >{{ t("targetChannel") }} <span>{{ t("optional") }}</span></label
+    >
+    <div class="field-wrap" data-ws-part="home.field">
+      <Icon name="hash" :size="17" />
+      <input
         id="channel"
         v-model="channel"
         :placeholder="t('emptyDefault')"
         @keyup.enter="emit('connect')"
-      /></div
+      />
+    </div>
+
+    <details
+      class="identity-options"
+      data-ws-part="home.identity"
+      ><summary>{{ t("identityOptions") }}</summary
       ><div class="identity-controls"
         ><label class="remember-identity"
           ><input

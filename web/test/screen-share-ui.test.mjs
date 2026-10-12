@@ -6,12 +6,13 @@ import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
 import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
 import { renderToString } from "@vue/server-renderer";
-let vite, useWebClientScreenShare, VoiceMemberCards;
+let vite, useWebClientScreenShare, VoiceMemberCards, VoiceChannelTree;
 const renderer = createRenderer({ createComment: text => ({ text }), createText: text => ({ text }), createElement: () => ({}), insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {}, parentNode: () => null, nextSibling: () => null });
 before(async () => {
   vite = await createServer({ configFile: false, plugins: [vue()], root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
   ({ useWebClientScreenShare } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
   ({ default: VoiceMemberCards } = await vite.ssrLoadModule("/src/components/web-client/VoiceMemberCards.vue"));
+  ({ default: VoiceChannelTree } = await vite.ssrLoadModule("/src/components/web-client/VoiceChannelTree.vue"));
 });
 after(async () => { await vite?.close(); });
 function mount(t, initialStream = null) {
@@ -123,6 +124,34 @@ test("member cards detect and expose a remote share without depending on local s
   assert.match(html, /watchScreenShare/);
   assert.equal((html.match(/screen-share-card-actions/g) ?? []).length, 1);
   assert.doesNotMatch(html, /startScreenShare/);
+});
+
+test("channel tree marks only members who own an active screen share", async () => {
+  const component = await readFile(new URL("../src/components/web-client/VoiceChannelTreeItem.vue", import.meta.url), "utf8");
+  const html = await renderToString(createSSRApp(VoiceChannelTree, {
+    channels: [{
+      id: "channel-1",
+      parentID: "0",
+      depth: 0,
+      name: "General",
+      members: [
+        { id: 7, nickname: "MeissS" },
+        { id: 8, nickname: "NoShare" },
+      ],
+    }],
+    currentChannelId: "channel-1",
+    layout: "server-sidebar",
+    avatarStyle: () => ({}),
+    avatarInitial: nickname => nickname[0],
+    isSpeaking: () => false,
+    isScreenSharing: member => member.id === 7,
+    t: key => key,
+  }));
+
+  assert.equal((html.match(/data-ws-part="voice\.channel-tree\.member-screen-share"/g) ?? []).length, 1);
+  assert.match(html, /aria-label="screenShare"/);
+  assert.match(html, /d="M4 4h16v12H4zM8 20h8M12 16v4"/);
+  assert.match(component, /background:\s*#72c800/);
 });
 
 test("a skin can explicitly opt the member-card widget out of screen-share UI", async () => {

@@ -89,6 +89,14 @@
             :size="13"
             :title="t('microphoneActive')"
           />
+          <span
+            v-if="isScreenSharing?.(member)"
+            class="ws-voice-channel-member-screen-share"
+            data-ws-part="voice.channel-tree.member-screen-share"
+            role="img"
+            :aria-label="t('screenShare')"
+            :title="t('screenShare')"
+          ><Icon name="monitor" :size="12" /></span>
         </li>
       </ul>
       <div
@@ -110,6 +118,7 @@
             :avatar-style="avatarStyle"
             :avatar-initial="avatarInitial"
             :is-speaking="isSpeaking"
+            :is-screen-sharing="isScreenSharing"
             :show-member-actions="showMemberActions"
             :member-drag-drop="memberDragDrop"
             :dragged-member-id="draggedMemberId"
@@ -176,6 +185,14 @@
             aria-hidden="true"
           ></span>
           <span v-if="member.away" class="ws-voice-channel-member-away" data-ws-part="voice.channel-tree.member-away" aria-hidden="true">·</span>
+          <span
+            v-if="isScreenSharing?.(member)"
+            class="ws-voice-channel-member-screen-share"
+            data-ws-part="voice.channel-tree.member-screen-share"
+            role="img"
+            :aria-label="t('screenShare')"
+            :title="t('screenShare')"
+          ><Icon name="monitor" :size="12" /></span>
         </li>
         <VoiceChannelTreeItem
           v-for="child in node.children"
@@ -189,6 +206,7 @@
           :avatar-style="avatarStyle"
           :avatar-initial="avatarInitial"
           :is-speaking="isSpeaking"
+          :is-screen-sharing="isScreenSharing"
           :show-member-actions="showMemberActions"
           :member-drag-drop="memberDragDrop"
           :dragged-member-id="draggedMemberId"
@@ -228,6 +246,7 @@ const props = defineProps<{
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => CSSProperties;
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
+  isScreenSharing?: (member: ChannelMember) => boolean;
   showMemberActions?: boolean;
   memberDragDrop?: boolean;
   draggedMemberId?: number | null;
@@ -282,3 +301,18 @@ function handleChannelDrop(event: DragEvent): void {
   if (props.memberDragDrop) emit("channelDrop", { channel: props.node.channel, event });
 }
 </script>
+
+<style scoped>
+.ws-voice-channel-member-screen-share {
+  display: inline-grid;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  border-radius: 5px;
+  color: #fff;
+  background: #72c800;
+  line-height: 0;
+}
+</style>

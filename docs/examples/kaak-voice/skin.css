@@ -17,101 +17,464 @@
 }
 
 [data-ws-plugin-part="kaak-home"] {
+  --skin-kaak-home-green: #77cb25;
+  --skin-kaak-home-text: #273248;
+  --skin-kaak-home-muted: #8995a5;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  justify-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100vh;
   min-height: 100dvh;
-  gap: 28px;
-  padding: clamp(16px, 4vw, 42px);
-  color: var(--skin-kaak-text);
-  font-family: var(--skin-kaak-font);
-  background:
-    radial-gradient(ellipse at 50% 44%, #25272b 0, transparent 58%),
-    var(--skin-kaak-bg);
+  color: var(--skin-kaak-home-text);
+  color-scheme: light;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  background: #effff0;
 }
 
-[data-ws-plugin-part="kaak-home.home-header"] {
+[data-ws-plugin-part="kaak-home.home-language"] {
+  position: fixed;
+  z-index: 120;
+  top: 18px;
+  right: 18px;
+  width: 48px;
+  height: 48px;
+}
+
+[data-ws-plugin-part="kaak-home.home-language"] .language-switcher {
+  width: 100%;
+  height: 100%;
+}
+
+[data-ws-plugin-part="kaak-home.home-language"] .language-trigger {
+  display: grid;
+  box-sizing: border-box;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #dce4dc;
+  border-radius: 14px;
+  color: #273248;
+  background: #fff;
+  box-shadow: 0 5px 14px rgba(39, 50, 72, .1);
+}
+
+[data-ws-plugin-part="kaak-home.home-language"] .language-trigger > * {
+  display: none;
+}
+
+[data-ws-plugin-part="kaak-home.home-language"] .language-trigger > .language-current-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+[data-ws-plugin-part="kaak-home.home-language"] .language-trigger:hover,
+[data-ws-plugin-part="kaak-home.home-language"] .language-switcher.open .language-trigger,
+[data-ws-plugin-part="kaak-home.home-language"] .language-trigger:focus-visible {
+  color: #273248;
+  border-color: #c8d1c8;
+  background: #f4f6f3;
+  box-shadow: 0 7px 18px rgba(39, 50, 72, .14);
+}
+
+[data-ws-plugin-part="kaak-home.hero"] {
+  position: relative;
+  min-height: 600px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #f7ffbd, #d9ffb3 55%, #b7f89e);
+}
+
+[data-ws-plugin-part="kaak-home.hero"]::before {
+  position: absolute;
+  top: -130px;
+  right: -80px;
+  width: 330px;
+  height: 250px;
+  border-radius: 50%;
+  background: #effff0;
+  content: "";
+}
+
+[data-ws-plugin-part="kaak-home.hero"]::after {
+  position: absolute;
+  bottom: -320px;
+  left: -120px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: #a4f18b;
+  content: "";
+}
+
+[data-ws-plugin-part="kaak-home.brand"] {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 11px;
-  width: min(100%, 1080px);
-}
-
-[data-ws-plugin-part="kaak-home.brand-mark"],
-[data-ws-plugin-part="kaak-workspace.brand-mark"] {
-  display: grid;
-  place-items: center;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  color: #101512;
-  background: var(--skin-kaak-accent);
-  font-size: 14px;
+  gap: 10px;
+  margin: 35px 0 0 44px;
+  color: #1c2823;
+  font-size: 26px;
   font-weight: 900;
 }
 
-[data-ws-plugin-part="kaak-home.brand-name"],
-[data-ws-plugin-part="kaak-workspace.brand-name"] {
-  color: var(--skin-kaak-text);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: .1em;
+[data-ws-plugin-part="kaak-home.logo"] {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #daff97;
+  background: #1c2823;
+  font-size: 19px;
+  font-weight: 900;
 }
 
-[data-ws-plugin-part="kaak-home.language"] { margin-left: auto; }
+[data-ws-plugin-part="kaak-home.brand-name"] {
+  color: #1c2823;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+[data-ws-plugin-part="kaak-home.slogan"] {
+  position: relative;
+  z-index: 2;
+  margin: 12px 0 0 45px;
+  color: #627f5e;
+  font-size: 12px;
+  letter-spacing: 1.1px;
+}
+
+[data-ws-plugin-part="kaak-home.hero-media"] {
+  position: absolute;
+  z-index: 1;
+  inset: 20% 6% 5%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+[data-ws-plugin-part="kaak-home.illustration"] {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+[data-ws-plugin-part="kaak-home.right"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 45px 28px;
+}
+
+[data-ws-plugin-part="kaak-home.content"] {
+  width: min(100%, 440px);
+}
+
+[data-ws-plugin-part="kaak-home.welcome-title"] {
+  margin: 0 0 28px;
+  text-align: center;
+  font-size: 34px;
+}
 
 [data-ws-plugin-part="kaak-home.connection-card"] {
-  align-self: center;
-  width: min(100%, 510px);
-  padding: clamp(22px, 5vw, 40px);
-  border: 1px solid var(--skin-kaak-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--skin-kaak-panel) 96%, transparent);
-  box-shadow: 0 24px 70px #0007;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 32px 25px 25px;
+  overflow: hidden;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 5px 20px #273f3012;
 }
 
-[data-ws-plugin-part="kaak-home.eyebrow"] {
-  color: var(--skin-kaak-accent);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .14em;
+[data-ws-plugin-part="kaak-home.connection-card"]::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-top: 60px solid #79d02b;
+  border-left: 60px solid transparent;
+  content: "";
 }
 
-[data-ws-plugin-part="kaak-home.title"] {
-  margin: 12px 0 8px;
-  font-size: clamp(26px, 5vw, 38px);
+[data-ws-plugin-part="kaak-home.connection-title"] {
+  position: relative;
+  margin: 0 0 7px;
+  font-size: 19px;
+}
+
+[data-ws-plugin-part="kaak-home.card-heading"] {
+  position: relative;
+  min-height: 26px;
+  margin-bottom: 7px;
+}
+
+[data-ws-plugin-part="kaak-home.card-heading"] [data-ws-plugin-part="kaak-home.connection-title"] {
+  margin: 0;
+}
+
+[data-ws-plugin-part="kaak-home.myts-login"] {
+  position: absolute;
+  z-index: 1;
+  top: -32px;
+  right: -25px;
+  width: 60px;
+  height: 60px;
+}
+
+[data-ws-plugin-part="kaak-home.myts-login"] .kaak-myts-login {
+  position: relative;
+  display: block;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: transparent;
+  background: transparent;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  cursor: pointer;
+}
+
+[data-ws-plugin-part="kaak-home.myts-login"] .kaak-myts-wordmark {
+  position: absolute;
+  top: 11px;
+  right: 2px;
+  color: #fff;
+  font: 800 12px/1 Arial, sans-serif;
   letter-spacing: -.04em;
+  white-space: nowrap;
+  transform: rotate(45deg);
+  transform-origin: center;
+  transition: filter .16s ease;
 }
 
-[data-ws-plugin-part="kaak-home.description"],
-[data-ws-plugin-part="kaak-home.home-footer"] {
-  color: var(--skin-kaak-muted);
-  line-height: 1.6;
+[data-ws-plugin-part="kaak-home.myts-login"] .kaak-myts-login:hover .kaak-myts-wordmark {
+  filter: drop-shadow(0 0 2px #fff8);
 }
 
-[data-ws-plugin-part="kaak-home.home-footer"] {
-  width: min(100%, 1080px);
+[data-ws-plugin-part="kaak-home.myts-login"] .kaak-myts-login:focus-visible .kaak-myts-wordmark {
+  filter: drop-shadow(0 0 3px #fff);
+}
+
+[data-ws-plugin-part="kaak-home.description"] {
+  margin: 0 0 25px;
+  color: #9aa4b0;
   font-size: 12px;
 }
 
-[data-ws-plugin-part="kaak-home"] .join-card {
-  color: var(--skin-kaak-text);
+[data-ws-plugin-part="kaak-home.connection-form"] {
+  width: 100%;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .join-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-grid {
+  grid-template-columns: minmax(0, 1fr) 110px;
+  gap: 12px;
+  margin-bottom: 19px;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-label {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--skin-kaak-home-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-label:not(:first-child) {
+  margin-top: 0;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-label span {
+  color: #aab3bc;
+  font-weight: 400;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-wrap {
+  box-sizing: border-box;
+  display: flex;
+  height: 42px;
+  min-height: 42px;
+  gap: 0;
+  padding: 0 12px;
+  border: 1px solid #e3e8ec;
+  border-radius: 11px;
+  color: var(--skin-kaak-home-muted);
+  background: #fff;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-wrap > svg {
+  display: none;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-wrap:focus-within {
+  border-color: var(--skin-kaak-home-green);
+  color: var(--skin-kaak-home-text);
+  background: #fff;
+  box-shadow: 0 0 0 3px #79d02b22;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .field-wrap input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: var(--skin-kaak-home-text);
   background: transparent;
-  border-color: var(--skin-kaak-border);
-  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
 }
 
-[data-ws-plugin-part="kaak-home"] .field-wrap,
-[data-ws-plugin-part="kaak-home"] .settings-select {
-  color: var(--skin-kaak-muted);
-  background: var(--skin-kaak-raised);
-  border-color: var(--skin-kaak-border);
+[data-ws-plugin-part="kaak-home.connection-form"] .field-wrap input::placeholder {
+  color: #b6bec7;
 }
 
-[data-ws-plugin-part="kaak-home"] .field-wrap input,
-[data-ws-plugin-part="kaak-home"] .settings-select {
-  color: var(--skin-kaak-text);
+[data-ws-plugin-part="kaak-home.connection-form"] .connect-button {
+  width: 100%;
+  height: 43px;
+  min-height: 43px;
+  margin-top: 5px;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--skin-kaak-home-green);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .connect-button:hover:not(:disabled) {
+  background: #66b91d;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .connect-button:disabled {
+  opacity: .68;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .favorite-toggle,
+[data-ws-plugin-part="kaak-home.connection-form"] .identity-options summary {
+  color: #627f5e;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .local-servers {
+  margin: 0 0 16px;
+  padding: 11px 12px;
+  border: 1px solid #e8eee6;
+  border-radius: 11px;
+  background: #f8fcf6;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .local-server-item {
+  border-color: #edf1ec;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .acceleration-choice {
+  margin: 0 0 15px;
+  color: var(--skin-kaak-home-muted);
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .acceleration-choice select {
+  color: var(--skin-kaak-home-text);
+  border-color: #e3e8ec;
+  background: #fff;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .identity-options {
+  margin: 9px 0 0;
+  color: var(--skin-kaak-home-muted);
+  font-size: 12px;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .identity-options summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .cancel-connect-button {
+  color: var(--skin-kaak-home-muted);
+}
+
+[data-ws-plugin-part="kaak-home.connection-form"] .cancel-connect-button:hover {
+  color: #5ba91b;
+}
+
+[data-ws-plugin-part="kaak-home.note"] {
+  margin: 16px 0 0;
+  color: #a2abb2;
+  text-align: center;
+  font-size: 12px;
+}
+
+[data-ws-plugin-part="kaak-home.status"] {
+  margin: 0;
+  font-size: 12px;
+}
+
+[data-ws-plugin-part="kaak-home.status"] .kaak-home-status {
+  margin: 12px 0 0;
+  color: #9a6b20;
+  text-align: center;
+  font-size: 12px;
+}
+
+[data-ws-plugin-part="kaak-home.status"] .kaak-home-status:empty {
+  display: none;
+}
+
+@media (max-width: 850px) {
+  [data-ws-plugin-part="kaak-home"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-ws-plugin-part="kaak-home.hero"] {
+    min-height: 230px;
+  }
+
+  [data-ws-plugin-part="kaak-home.brand"] {
+    margin: 22px 0 0 24px;
+    font-size: 22px;
+  }
+
+  [data-ws-plugin-part="kaak-home.brand-name"] {
+    font-size: 22px;
+  }
+
+  [data-ws-plugin-part="kaak-home.slogan"] {
+    margin-left: 25px;
+  }
+
+  [data-ws-plugin-part="kaak-home.hero-media"] {
+    inset: 8% 4% 5% 46%;
+  }
+
+  [data-ws-plugin-part="kaak-home.right"] {
+    padding: 32px 18px 48px;
+  }
+
+  [data-ws-plugin-part="kaak-home.welcome-title"] {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 430px) {
+  [data-ws-plugin-part="kaak-home.card-heading"] {
+    padding-top: 34px;
+  }
+
+  [data-ws-plugin-part="kaak-home.myts-login"] {
+    top: -32px;
+    right: -25px;
+  }
 }
 
 [data-ws-plugin-part="kaak-workspace"] {
@@ -123,7 +486,7 @@
   position: relative;
   display: grid;
   grid-template-columns: 86px 304px minmax(280px, 1fr) minmax(340px, min(38vw, 520px));
-  grid-template-rows: 40px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;
   min-height: 560px;
@@ -183,31 +546,9 @@
 [data-ws-plugin-part="kaak-workspace"] *::-webkit-scrollbar { width: 6px; height: 6px; }
 [data-ws-plugin-part="kaak-workspace"] *::-webkit-scrollbar-thumb { background: #4a4c51; border-radius: 6px; }
 
-[data-ws-plugin-part="kaak-workspace.topbar"] {
-  z-index: 2;
-  grid-column: 1 / -1;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--skin-kaak-border);
-  background: var(--skin-kaak-rail);
-}
-
-[data-ws-plugin-part="kaak-workspace.server-title"] {
-  overflow: hidden;
-  margin-right: auto;
-  color: var(--skin-kaak-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 [data-ws-plugin-part="kaak-workspace.server-rail"] {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   --skin-kaak-rail-bg: #191a1d;
   --skin-kaak-rail-item-bg: #2b2d32;
   --skin-kaak-rail-accent: #75c900;
@@ -219,7 +560,7 @@
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 14px 0 96px;
   background: var(--skin-kaak-rail-bg);
   scrollbar-width: none;
@@ -227,6 +568,182 @@
 
 [data-ws-plugin-part="kaak-workspace.server-rail"]::-webkit-scrollbar {
   display: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-list"] {
+  display: flex;
+  box-sizing: border-box;
+  width: 58px;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  overflow-x: visible;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-list"]::-webkit-scrollbar {
+  display: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-rail"] [data-ws-part="voice.favorite-servers.skin-add-divider"] {
+  order: 1;
+}
+
+[data-ws-plugin-part="kaak-workspace.server-rail"] [data-ws-plugin-part="kaak-workspace.server-add"] {
+  order: 2;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] {
+  order: 3;
+  box-sizing: border-box;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] {
+  order: 4;
+  box-sizing: border-box;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-switcher {
+  z-index: 30;
+  width: 58px;
+  height: 58px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger {
+  display: grid;
+  box-sizing: border-box;
+  width: 58px;
+  min-width: 58px;
+  height: 58px;
+  min-height: 58px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  color: #aeb2ba;
+  background: var(--skin-kaak-rail-item-bg);
+  box-shadow: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger > span,
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger > .ui-icon:last-child {
+  display: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger > .ui-icon:first-child {
+  width: 20px;
+  height: 20px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger:hover,
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-switcher.open .skin-trigger,
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger:focus-visible {
+  color: var(--skin-kaak-rail-text);
+  border-color: var(--skin-kaak-rail-accent);
+  background: #383a40;
+  box-shadow: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-dropdown {
+  position: fixed;
+  z-index: 90;
+  top: auto;
+  right: auto;
+  bottom: 179px;
+  left: 94px;
+  box-sizing: border-box;
+  width: min(190px, calc(100vw - 104px));
+  min-width: min(176px, calc(100vw - 104px));
+  max-height: min(58dvh, 420px);
+  overflow-y: auto;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-switcher {
+  position: static;
+  z-index: 30;
+  width: 58px;
+  height: 58px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger {
+  display: grid;
+  box-sizing: border-box;
+  width: 58px;
+  min-width: 58px;
+  height: 58px;
+  min-height: 58px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  color: #aeb2ba;
+  background: var(--skin-kaak-rail-item-bg);
+  box-shadow: none;
+  font-family: var(--skin-kaak-font);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger > * {
+  display: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger > .language-current-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger:hover,
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-switcher.open .language-trigger,
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger:focus-visible {
+  color: var(--skin-kaak-rail-text);
+  border-color: var(--skin-kaak-rail-accent);
+  background: #383a40;
+  box-shadow: none;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-dropdown {
+  position: fixed;
+  z-index: 95;
+  top: auto;
+  right: auto;
+  bottom: 161px;
+  left: 94px;
+  box-sizing: border-box;
+  width: min(260px, calc(100vw - 104px));
+  min-width: min(240px, calc(100vw - 104px));
+  max-height: min(58dvh, 420px);
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+  background: #222428;
+  border-color: #3b3d43;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .38);
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-option {
+  color: #d8dbe0;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-option:hover,
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-option:focus-visible,
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-option.selected {
+  color: var(--skin-kaak-rail-text);
+  background: #383a40;
+  border-color: #4a4c51;
+}
+
+[data-ws-plugin-part="kaak-workspace.rail-language"] .language-option small {
+  color: #9da2ab;
 }
 
 [data-ws-plugin-part="kaak-workspace.quick-server-item"] {
@@ -237,6 +754,8 @@
 }
 
 [data-ws-plugin-part="kaak-workspace.server-add"] {
+  position: relative;
+  bottom: auto;
   display: grid;
   box-sizing: border-box;
   width: 58px;
@@ -411,7 +930,7 @@
 [data-ws-plugin-part="kaak-workspace.channel-panel"] {
   z-index: 1;
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -565,7 +1084,7 @@
 [data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-tree-empty{ padding: 8px 10px; color: var(--skin-kaak-dim); font-size: 11px; }
 [data-ws-plugin-part="kaak-workspace.conversation"] {
   grid-column: 4;
-  grid-row: 2;
+  grid-row: 1;
   display: grid;
   grid-template-rows: 58px minmax(0, 1fr) auto;
   gap: 10px;
@@ -741,7 +1260,7 @@
 
 [data-ws-plugin-part="kaak-workspace.voice-stage"] {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1180,7 +1699,7 @@
 [data-ws-plugin-part="kaak-workspace.voice-dock"] {
   z-index: 4;
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
   align-self: end;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1325,20 +1844,16 @@
 @media (max-width: 820px) {
   [data-ws-plugin-part="kaak-workspace"] {
     grid-template-columns: 86px minmax(0, 1fr);
-    grid-template-rows: 50px 126px minmax(176px, 24dvh) minmax(180px, 1fr) 122px;
+    grid-template-rows: 126px minmax(176px, 24dvh) minmax(180px, 1fr) 122px;
     height: 100dvh;
     min-height: 540px;
   }
 
-  [data-ws-plugin-part="kaak-workspace.topbar"] { padding: 0 8px; gap: 7px; }
-  [data-ws-plugin-part="kaak-workspace.brand-mark"] { flex-basis: 28px; width: 28px; height: 28px; }
-  [data-ws-plugin-part="kaak-workspace.brand-name"] { font-size: 10px; }
-  [data-ws-plugin-part="kaak-workspace.server-title"] { font-size: 10px; }
-  [data-ws-plugin-part="kaak-workspace.server-rail"] { grid-column: 1; grid-row: 2 / 6; padding: 8px 13px 96px; gap: 18px; }
+  [data-ws-plugin-part="kaak-workspace.server-rail"] { grid-column: 1; grid-row: 1 / 5; padding: 8px 13px 96px; gap: 18px; }
 
   [data-ws-plugin-part="kaak-workspace.channel-panel"] {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 30px minmax(0, 1fr);
@@ -1366,7 +1881,7 @@
 [data-ws-plugin-part="kaak-workspace"] .ws-voice-channel-join-hint{ display: none; }
   [data-ws-plugin-part="kaak-workspace.voice-stage"] {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 2;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
@@ -1393,7 +1908,7 @@
 
   [data-ws-plugin-part="kaak-workspace.conversation"] {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 3;
     grid-template-rows: 40px minmax(0, 1fr) auto;
     gap: 6px;
     padding: 0 8px 6px;
@@ -1412,7 +1927,7 @@
 
   [data-ws-plugin-part="kaak-workspace.voice-dock"] {
     grid-column: 2;
-    grid-row: 5;
+    grid-row: 4;
     align-self: stretch;
     min-height: 122px;
     grid-template-columns: minmax(0, 1fr);
@@ -1447,9 +1962,6 @@
 @media (max-width: 460px) {
   [data-ws-plugin-part="kaak-workspace"] { grid-template-columns: 86px minmax(0, 1fr); }
   [data-ws-plugin-part="kaak-workspace.identity-name"] { max-width: 43px; }
-  [data-ws-plugin-part="kaak-workspace.topbar"] { padding-inline: 5px; }
-  [data-ws-plugin-part="kaak-workspace.brand-name"] { display: none; }
-  [data-ws-plugin-part="kaak-workspace.server-title"] { max-width: 100px; }
   [data-ws-plugin-part="kaak-workspace.channel-panel"] { grid-column: 2; }
   [data-ws-plugin-part="kaak-workspace.conversation"] { grid-column: 2; }
   [data-ws-plugin-part="kaak-workspace.voice-stage"] { grid-column: 2; }
@@ -1459,17 +1971,19 @@
 @media (max-height: 620px) {
   [data-ws-plugin-part="kaak-workspace"] { min-height: 0; }
   [data-ws-plugin-part="kaak-workspace.server-rail"] { padding-top: 8px; padding-bottom: 76px; }
+  [data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-dropdown { bottom: 159px; }
+  [data-ws-plugin-part="kaak-workspace.rail-language"] .language-dropdown { bottom: 141px; }
   [data-ws-plugin-part="kaak-workspace.identity-entry"] { gap: 2px; padding-top: 7px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   [data-ws-plugin-part="kaak-workspace.identity-name"] { display: none; }
 }
 
 @media (max-width: 820px) and (max-height: 620px) {
   [data-ws-plugin-part="kaak-workspace"] {
-    grid-template-rows: 46px 104px minmax(138px, 25dvh) minmax(136px, 1fr) 122px;
+    grid-template-rows: 104px minmax(138px, 25dvh) minmax(136px, 1fr) 122px;
     min-height: 0;
   }
   [data-ws-plugin-part="kaak-workspace"]:has([data-ws-plugin-part="kaak-workspace.chat-panel-toggle"][aria-expanded="false"]) {
-    grid-template-rows: 46px 104px minmax(138px, 25dvh) 0 122px;
+    grid-template-rows: 104px minmax(138px, 25dvh) 0 122px;
   }
 }
 
@@ -3167,6 +3681,9 @@
   background: rgba(10, 11, 13, .54);
   backdrop-filter: blur(3px);
 }
+[data-ws-part="auth.password.backdrop"][data-ws-state="server-password"] {
+  background: rgba(29, 40, 34, .3);
+}
 [data-ws-part="auth.password.dialog"] {
   position: relative;
   display: flex;
@@ -3183,6 +3700,12 @@
   background: #242529;
   box-shadow: 0 18px 48px rgba(0, 0, 0, .38);
 }
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] {
+  color: #273248;
+  border-color: #e3e8ec;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(28, 46, 34, .18);
+}
 [data-ws-part="auth.password.decoration"],
 [data-ws-part="auth.password.eyebrow"],
 [data-ws-part="auth.password.lead"],
@@ -3197,6 +3720,9 @@
   font-weight: 700;
   letter-spacing: normal;
   line-height: 20px;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.title"] {
+  color: #273248;
 }
 [data-ws-part="auth.password.form"] {
   display: flex;
@@ -3216,27 +3742,37 @@
   background: #242529;
   transition: border-color .16s ease, box-shadow .16s ease;
 }
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] {
+  color: #8995a5;
+  border-color: #e3e8ec;
+  background: #fff;
+}
 [data-ws-part="auth.password.field"]:focus-within {
   border-color: #6cbf00;
   background: #242529;
   box-shadow: 0 0 0 2px rgba(108, 191, 0, .2);
 }
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"]:focus-within {
+  border-color: #77cb25;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(119, 203, 37, .16);
+}
 [data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) {
   box-sizing: border-box;
-  height: 40px;
-  min-height: 40px;
+  height: 42px;
+  min-height: 42px;
   gap: 0;
-  padding: 0 15px;
-  color: #d6d7db;
-  border: 1px solid #3b3c40;
-  border-radius: 12px;
-  background: #242529;
+  padding: 0 12px;
+  color: #8995a5;
+  border: 1px solid #e3e8ec;
+  border-radius: 11px;
+  background: #fff;
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 [data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]):focus-within {
-  border-color: #6cbf00;
-  background: #242529;
-  box-shadow: 0 0 0 2px rgba(108, 191, 0, .2);
+  border-color: #77cb25;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(119, 203, 37, .16);
 }
 [data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) > svg {
   display: none;
@@ -3246,14 +3782,22 @@
   min-width: 0;
   height: 100%;
   padding: 0;
-  color: #f0f1f3;
+  color: #273248;
   outline: none;
   border: 0;
   background: transparent;
   font-size: 13px;
 }
 [data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input::placeholder {
-  color: #777980;
+  color: #b6bec7;
+}
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input:-webkit-autofill,
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input:-webkit-autofill:hover,
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input:-webkit-autofill:focus,
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input:autofill {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #273248;
+  caret-color: #273248;
 }
 [data-ws-part="auth.password.field"] input {
   width: 100%;
@@ -3268,6 +3812,20 @@
 }
 [data-ws-part="auth.password.field"] input::placeholder {
   color: #777980;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input {
+  color: #273248;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input::placeholder {
+  color: #b6bec7;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input:-webkit-autofill,
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input:-webkit-autofill:hover,
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input:-webkit-autofill:focus,
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.field"] input:autofill {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #273248;
+  caret-color: #273248;
 }
 [data-ws-part="auth.password.error"] {
   margin: 10px 0 0;
@@ -3297,6 +3855,12 @@
 }
 [data-ws-part="auth.password.actions"] > button:first-child:hover:not(:disabled) {
   color: #f0f1f3;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.actions"] > button:first-child {
+  color: #8491a1;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] [data-ws-part="auth.password.actions"] > button:first-child:hover:not(:disabled) {
+  color: #344258;
 }
 [data-ws-part="auth.password.actions"] > button:last-child {
   box-sizing: border-box;
@@ -3340,6 +3904,13 @@
 [data-ws-part="auth.password.dialog"] > button:hover:not(:disabled) {
   color: #f0f1f3;
   background: #303137;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] > button {
+  color: #9aa5b2;
+}
+[data-ws-part="auth.password.dialog"][data-ws-state="server-password"] > button:hover:not(:disabled) {
+  color: #344258;
+  background: #f1f4f6;
 }
 [data-ws-part="auth.password.dialog"] > button > svg {
   width: 16px;

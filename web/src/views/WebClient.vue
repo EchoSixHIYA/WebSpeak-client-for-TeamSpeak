@@ -1743,6 +1743,15 @@ const skinPluginActions = {
   "voice.leaveScreenShare": () => { if (screenShareViewing.value) leaveScreenShare(); },
 };
 
+const homeConnectionStatus = computed(() => {
+  if (voiceState.connecting) return t("connecting");
+  if (voiceState.error) return localizedMessage(voiceState.error);
+  if (browserError.value) return localizedMessage(browserError.value);
+  if (!serverConfigLoading.value && !initialized.value) return t("notConfigured");
+  if (!localPersistenceAvailable) return t("localPersistenceUnavailable");
+  return "";
+});
+
 const skinPluginWidgets = {
   "voice.screen-share-start": () => h("button", {
     type: "button",
@@ -1787,6 +1796,17 @@ const skinPluginWidgets = {
     onImportIdentity: openIdentityImport,
     onExportIdentity: exportIdentity,
   }),
+  "home.connection-status": () => h("p", {
+    class: "kaak-home-status",
+    role: "status",
+    "aria-live": "polite",
+  }, homeConnectionStatus.value),
+  "home.myts-login": () => h("button", {
+    type: "button",
+    class: "kaak-myts-login",
+    "aria-label": t("mytsLogin"),
+    onClick: () => showToast(t("featureInDevelopment")),
+  }, [h("span", { class: "kaak-myts-wordmark", "aria-hidden": "true" }, "myts")]),
   "app.skin-switcher": () => h(SkinSwitcher, {
     modelValue: activeSkinId.value,
     "onUpdate:modelValue": (value: string) => { activeSkinId.value = value; },
@@ -1841,6 +1861,7 @@ const skinPluginWidgets = {
     avatarStyle,
     avatarInitial,
     isSpeaking,
+    isScreenSharing: (member: ChannelMember) => Boolean(screenShareControls.streamForMember(member)),
     showMemberActions: options?.memberActions === true,
     memberDragDrop: options?.memberDragDrop === true,
     draggedMemberId: memberControls.draggedMember.value?.id ?? null,

@@ -8,7 +8,8 @@
       "mode": "surface",
       "accessibleName": "KAAK 连接页 / Connection page",
       "permissions": [
-        "ui.surface.replace"
+        "ui.surface.replace",
+        "session.status.read"
       ],
       "actions": {},
       "root": {
@@ -16,82 +17,327 @@
         "part": "home",
         "children": [
           {
-            "tag": "header",
-            "part": "home-header",
+            "tag": "section",
+            "part": "hero",
             "children": [
               {
-                "tag": "span",
-                "part": "brand-mark",
+                "tag": "div",
+                "part": "brand",
                 "children": [
                   {
-                    "text": "K"
+                    "tag": "span",
+                    "part": "logo",
+                    "children": [
+                      {
+                        "text": "W"
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "span",
+                    "part": "brand-name",
+                    "children": [
+                      {
+                        "text": "WebSpeak"
+                      }
+                    ]
                   }
                 ]
               },
               {
-                "tag": "span",
-                "part": "brand-name",
+                "tag": "p",
+                "part": "slogan",
                 "children": [
                   {
-                    "text": "KAAK"
+                    "text": "YOUR VOICE, EVERYWHERE."
                   }
                 ]
               },
               {
-                "widget": "app.language-switcher",
-                "part": "language"
-              },
-              {
-                "widget": "app.skin-switcher",
-                "part": "skin"
+                "tag": "div",
+                "part": "hero-media",
+                "children": [
+                  {
+                    "tag": "svg",
+                    "part": "illustration",
+                    "attributes": {
+                      "viewbox": "0 0 550 510",
+                      "role": "img",
+                      "aria-label": "WebSpeak 展示插画"
+                    },
+                    "children": [
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 45,
+                          "y": 65,
+                          "width": 460,
+                          "height": 400,
+                          "rx": 80,
+                          "fill": "#b0f49b"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 90,
+                          "y": 145,
+                          "width": 370,
+                          "height": 275,
+                          "rx": 28,
+                          "fill": "#223641"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 103,
+                          "y": 157,
+                          "width": 344,
+                          "height": 250,
+                          "rx": 18,
+                          "fill": "#f7fff7"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 103,
+                          "y": 157,
+                          "width": 344,
+                          "height": 45,
+                          "rx": 18,
+                          "fill": "#e4f5e6"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 128,
+                          "cy": 178,
+                          "r": 6,
+                          "fill": "#82cd62"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 149,
+                          "cy": 178,
+                          "r": 6,
+                          "fill": "#c2e3b2"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 236,
+                          "width": 135,
+                          "height": 14,
+                          "rx": 7,
+                          "fill": "#acdca6"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 265,
+                          "width": 100,
+                          "height": 12,
+                          "rx": 6,
+                          "fill": "#d6e8d8"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 135,
+                          "y": 292,
+                          "width": 110,
+                          "height": 12,
+                          "rx": 6,
+                          "fill": "#d6e8d8"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 348,
+                          "cy": 287,
+                          "r": 54,
+                          "fill": "#7dcf4b"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M319 287v-10a29 29 0 0 1 58 0v10",
+                          "stroke": "white",
+                          "stroke-width": 10,
+                          "fill": "none",
+                          "stroke-linecap": "round"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 311,
+                          "y": 279,
+                          "width": 17,
+                          "height": 32,
+                          "rx": 8,
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 369,
+                          "y": 279,
+                          "width": 17,
+                          "height": 32,
+                          "rx": 8,
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 255,
+                          "y": 417,
+                          "width": 143,
+                          "height": 13,
+                          "rx": 6,
+                          "fill": "#233641"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 77,
+                          "cy": 348,
+                          "r": 39,
+                          "fill": "#55c3cf"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M58 342h12l14-12v37l-14-12H58z",
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M92 340q12 12 0 25",
+                          "stroke": "white",
+                          "stroke-width": 5,
+                          "fill": "none"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 457,
+                          "cy": 100,
+                          "r": 18,
+                          "fill": "#ff9b70"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M454 75v-23M478 76l15-14",
+                          "stroke": "#ff9b70",
+                          "stroke-width": 9,
+                          "fill": "none",
+                          "stroke-linecap": "round"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
           {
             "tag": "section",
-            "part": "connection-card",
+            "part": "right",
             "children": [
               {
-                "tag": "p",
-                "part": "eyebrow",
+                "tag": "div",
+                "part": "content",
                 "children": [
                   {
-                    "text": "VOICE CLIENT / 语音客户端"
-                  }
-                ]
-              },
-              {
-                "tag": "h1",
-                "part": "title",
-                "children": [
+                    "tag": "h1",
+                    "part": "welcome-title",
+                    "children": [
+                      {
+                        "text": "欢迎来到 WebSpeak"
+                      }
+                    ]
+                  },
                   {
-                    "text": "连接你的语音社区"
-                  }
-                ]
-              },
-              {
-                "tag": "p",
-                "part": "description",
-                "children": [
+                    "tag": "section",
+                    "part": "connection-card",
+                    "children": [
                   {
-                    "text": "选择 TeamSpeak 服务器，快速回到你的语音频道。"
+                    "tag": "div",
+                    "part": "card-heading",
+                    "children": [
+                      {
+                        "tag": "h2",
+                        "part": "connection-title",
+                        "children": [
+                          {
+                            "text": "连接 TeamSpeak 服务器"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "home.myts-login",
+                        "part": "myts-login"
+                      }
+                    ]
+                  },
+                      {
+                        "tag": "p",
+                        "part": "description",
+                        "children": [
+                          {
+                            "text": "无需注册账号，填写服务器信息即可加入语音"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "home.connection-form",
+                        "part": "connection-form"
+                      },
+                      {
+                        "tag": "p",
+                        "part": "note",
+                        "children": [
+                          {
+                            "text": "浏览器直连 · 无需安装 TeamSpeak 客户端"
+                          }
+                        ]
+                      },
+                      {
+                        "widget": "home.connection-status",
+                        "part": "status"
+                      }
+                    ]
                   }
                 ]
-              },
-              {
-                "widget": "home.connection-form",
-                "part": "connection-form"
               }
             ]
           },
           {
-            "tag": "footer",
-            "part": "home-footer",
-            "children": [
-              {
-                "text": "连接和身份信息由 WebSpeak 管理。"
-              }
-            ]
+            "widget": "app.language-switcher",
+            "part": "home-language"
           }
         ]
       }
@@ -180,47 +426,6 @@
         "part": "workspace",
         "children": [
           {
-            "tag": "header",
-            "part": "topbar",
-            "children": [
-              {
-                "tag": "span",
-                "part": "brand-mark",
-                "children": [
-                  {
-                    "text": "K"
-                  }
-                ]
-              },
-              {
-                "tag": "span",
-                "part": "brand-name",
-                "children": [
-                  {
-                    "text": "KAAK"
-                  }
-                ]
-              },
-              {
-                "tag": "span",
-                "part": "server-title",
-                "children": [
-                  {
-                    "text": "{{session.status.serverLabel}}"
-                  }
-                ]
-              },
-              {
-                "widget": "app.language-switcher",
-                "part": "language"
-              },
-              {
-                "widget": "app.skin-switcher",
-                "part": "skin"
-              }
-            ]
-          },
-          {
             "tag": "nav",
             "part": "server-rail",
             "attributes": {
@@ -229,86 +434,100 @@
             "children": [
               {
                 "tag": "div",
-                "part": "quick-server-item",
-                "repeat": {
-                  "path": "servers.quickList",
-                  "as": "server"
-                },
+                "part": "server-list",
                 "children": [
                   {
-                    "tag": "button",
-                    "part": "quick-server",
-                    "attributes": {
-                      "type": "button",
-                      "aria-current": "{{server.current}}",
-                      "aria-label": "切换到 {{server.label}}"
-                    },
-                    "events": {
-                      "click": "switch-server"
+                    "tag": "div",
+                    "part": "quick-server-item",
+                    "repeat": {
+                      "path": "servers.quickList",
+                      "as": "server"
                     },
                     "children": [
                       {
-                        "tag": "span",
-                        "part": "server-monogram",
+                        "tag": "button",
+                        "part": "quick-server",
                         "attributes": {
-                          "data-tone": "{{server.tone}}"
+                          "type": "button",
+                          "aria-current": "{{server.current}}",
+                          "aria-label": "切换到 {{server.label}}"
+                        },
+                        "events": {
+                          "click": "switch-server"
                         },
                         "children": [
                           {
-                            "tag": "img",
-                            "part": "server-icon",
-                            "when": {
-                              "path": "server.icon"
-                            },
-                            "attributes": {
-                              "src": "{{server.icon}}",
-                              "alt": ""
-                            }
-                          },
-                          {
                             "tag": "span",
-                            "part": "server-monogram-initial",
-                            "when": {
-                              "path": "server.icon",
-                              "equals": ""
+                            "part": "server-monogram",
+                            "attributes": {
+                              "data-tone": "{{server.tone}}"
                             },
                             "children": [
                               {
-                                "text": "{{server.monogram}}"
+                                "tag": "img",
+                                "part": "server-icon",
+                                "when": {
+                                  "path": "server.icon"
+                                },
+                                "attributes": {
+                                  "src": "{{server.icon}}",
+                                  "alt": ""
+                                }
+                              },
+                              {
+                                "tag": "span",
+                                "part": "server-monogram-initial",
+                                "when": {
+                                  "path": "server.icon",
+                                  "equals": ""
+                                },
+                                "children": [
+                                  {
+                                    "text": "{{server.monogram}}"
+                                  }
+                                ]
                               }
                             ]
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "server-kind",
-                        "when": {
-                          "path": "server.favorite",
-                          "equals": true
-                        },
-                        "children": [
+                          },
                           {
-                            "text": "收藏"
-                          }
-                        ]
-                      },
-                      {
-                        "tag": "span",
-                        "part": "server-kind",
-                        "when": {
-                          "path": "server.kind",
-                          "equals": "recent"
-                        },
-                        "children": [
+                            "tag": "span",
+                            "part": "server-kind",
+                            "when": {
+                              "path": "server.favorite",
+                              "equals": true
+                            },
+                            "children": [
+                              {
+                                "text": "收藏"
+                              }
+                            ]
+                          },
                           {
-                            "text": "最近"
+                            "tag": "span",
+                            "part": "server-kind",
+                            "when": {
+                              "path": "server.kind",
+                              "equals": "recent"
+                            },
+                            "children": [
+                              {
+                                "text": "最近"
+                              }
+                            ]
                           }
                         ]
                       }
                     ]
                   }
                 ]
+              },
+              {
+                "widget": "app.skin-switcher",
+                "part": "rail-skin"
+              },
+              {
+                "widget": "app.language-switcher",
+                "part": "rail-language"
               }
             ]
           },
@@ -451,8 +670,8 @@
                           "equals": true
                         },
                         "children": [
-                      {
-                        "text": "×"
+                          {
+                            "text": "×"
                           }
                         ]
                       },
@@ -906,13 +1125,13 @@
                 ]
               }
             ]
+          }
+        ],
+        "attributes": {
+          "data-chat-open": "{{state.chatopen}}",
+          "data-voice-group-open": "{{state.voicegroupopen}}"
+        }
       }
-    ],
-    "attributes": {
-      "data-chat-open": "{{state.chatopen}}",
-      "data-voice-group-open": "{{state.voicegroupopen}}"
-    }
-  }
     }
   ]
 }

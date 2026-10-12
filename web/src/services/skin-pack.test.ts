@@ -479,7 +479,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.79");
+  assert.equal(skin.version, "3.1.86");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -513,6 +513,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     }
     return undefined;
   }
+  assert.equal(findPart(home?.root, "home-language")?.widget, "app.language-switcher", "the KAAK connection home has a language switcher in its top corner");
+  assert.equal(findPart(voice?.root, "topbar"), undefined, "the KAAK voice surface has no top bar");
+  assert.equal(findPart(voice?.root, "rail-skin")?.widget, "app.skin-switcher", "skin selection lives in the server rail");
+  assert.equal(findPart(voice?.root, "rail-language")?.widget, "app.language-switcher", "language selection lives in the server rail");
+  assert.equal(findPart(voice?.root, "server-list")?.children?.[0]?.repeat?.path, "servers.quickList");
   assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: true, memberActions: true });
   assert.equal(findPart(voice?.root, "server-summary")?.widget, "voice.server-header");
   assert.equal(findPart(voice?.root, "server-banner")?.widget, "voice.server-banner");
@@ -586,9 +591,13 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /--skin-kaak-accent: #6cbf00;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.backdrop"\]\s*\{[^}]*background: rgba\(10, 11, 13, \.54\);/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\s*\{[^}]*width: min\(438px, calc\(100vw - 32px\)\);[^}]*min-height: 204px;[^}]*background: #242529;/);
+  assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\[data-ws-state="server-password"\]\s*\{[^}]*color: #273248;[^}]*border-color: #e3e8ec;[^}]*background: #fff;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.title"\]\s*\{[^}]*font-size: 13px;[^}]*font-weight: 700;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.field"\]\s*\{[^}]*height: 40px;[^}]*border: 1px solid #3b3c40;[^}]*border-radius: 12px;/);
-  assert.match(skin.css, /\[data-ws-part="home\.form"\] \[data-ws-part="home\.field"\]:has\(input\[type="password"\]\)\s*\{[^}]*height: 40px;[^}]*border-radius: 12px;[^}]*background: #242529;/);
+  assert.match(skin.css, /auth\.password\.dialog"\]\[data-ws-state="server-password"\][\s\S]*?auth\.password\.field"\]\s*\{[^}]*border-color: #e3e8ec;[^}]*background: #fff;/);
+  assert.match(skin.css, /auth\.password\.dialog"\]\[data-ws-state="server-password"\][\s\S]*?input:-webkit-autofill[\s\S]*?-webkit-box-shadow: 0 0 0 1000px #fff inset;/);
+  assert.match(skin.css, /\[data-ws-part="home\.form"\] \[data-ws-part="home\.field"\]:has\(input\[type="password"\]\)\s*\{[^}]*height: 42px;[^}]*border-radius: 11px;[^}]*background: #fff;/);
+  assert.match(skin.css, /home\.field"\]:has\(input\[type="password"\]\) input:-webkit-autofill[\s\S]*?-webkit-box-shadow: 0 0 0 1000px #fff inset;[\s\S]*?-webkit-text-fill-color: #273248;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.actions"\] > button:last-child\s*\{[^}]*width: 82px;[^}]*height: 36px;[^}]*background: #6cbf00;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?width: min\(282px, calc\(100% - 22px\)\);[\s\S]*?margin-bottom: 11px;[\s\S]*?border-radius: 17px;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
@@ -634,7 +643,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\.settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
   assert.match(skin.css, /\.microphone-toggle:not\(\.muted\):active,[\s\S]*?background: #60ab00;\s*border-color: #60ab00;/);
   assert.doesNotMatch(skin.css, /#58c877/);
-  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home"\] \{[^}]*font-family: var\(--skin-kaak-font\);/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home"\] \{[^}]*font-family: Arial, "Microsoft YaHei", sans-serif;/);
+  assert.match(skin.css, /\.kaak-myts-login\s*\{[^}]*width: 60px;[^}]*height: 60px;[^}]*background: transparent;[^}]*clip-path: polygon\(0 0, 100% 0, 100% 100%\);/);
+  assert.match(skin.css, /\.kaak-myts-wordmark\s*\{[^}]*color: #fff;[^}]*transform: rotate\(45deg\);/);
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #25262a/);
   assert.match(skin.css, /settings-select-option[\s\S]*?min-height: 32px/);
   assert.match(skin.css, /settings-header h2 \{\s*color: #f2f3f5;\s*font-size: 32px;\s*font-weight: 600;/);
@@ -668,9 +679,23 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /grid-template-columns: 86px 304px minmax\(280px, 1fr\) 0;/);
   assert.match(skin.css, /grid-template-columns: 86px 304px/);
   assert.match(skin.css, /minmax\(340px, min\(38vw, 520px\)\)/);
-  assert.match(skin.css, /grid-template-rows: 40px/);
+  assert.match(skin.css, /grid-template-rows: minmax\(0, 1fr\)/);
+  assert.doesNotMatch(skin.css, /kaak-workspace\.topbar/);
   assert.match(skin.css, /kaak-workspace\.server-rail"\]\s*\{[\s\S]*?--skin-kaak-rail-bg: #191a1d;[\s\S]*?--skin-kaak-rail-item-bg: #2b2d32;[\s\S]*?--skin-kaak-rail-accent: #75c900;[\s\S]*?gap: 18px;[\s\S]*?padding: 14px 0 96px;[\s\S]*?background: var\(--skin-kaak-rail-bg\);/);
   assert.match(skin.css, /kaak-workspace\.server-add"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border-radius: 18px;/);
+  assert.match(skin.css, /kaak-workspace\.rail-skin"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?flex: 0 0 58px;/);
+  assert.match(skin.css, /kaak-workspace\.rail-language"\]\s*\{[\s\S]*?order: 4;[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?flex: 0 0 58px;/);
+  assert.match(skin.css, /rail-language"\] \.language-trigger\s*\{[^}]*width: 58px;[^}]*height: 58px;[^}]*border-radius: 18px;[^}]*background: var\(--skin-kaak-rail-item-bg\);/);
+  assert.match(skin.css, /rail-language"\] \.language-trigger > \.language-current-icon\s*\{\s*display: block;[^}]*width: 24px;[^}]*height: 24px;/);
+  assert.match(skin.css, /kaak-home\.home-language"\]\s*\{[^}]*position: fixed;[^}]*top: 18px;[^}]*right: 18px;/);
+  assert.match(skin.css, /kaak-home\.home-language"\] \.language-trigger\s*\{[^}]*width: 48px;[^}]*height: 48px;[^}]*background: #fff;/);
+  assert.match(skin.css, /kaak-home\.home-language"\] \.language-trigger > \.language-current-icon\s*\{\s*display: block;/);
+  assert.doesNotMatch(skin.css, /language-trigger::before\s*\{\s*content: "文\/A";/);
+  assert.match(skin.css, /skin-add-divider"\]\s*\{\s*order: 1;/);
+  assert.match(skin.css, /kaak-workspace\.server-add"\]\s*\{\s*order: 2;/);
+  assert.match(skin.css, /kaak-workspace\.rail-skin"\]\s*\{\s*order: 3;/);
+  assert.match(skin.css, /rail-language"\] \.language-dropdown\s*\{[^}]*position: fixed;[^}]*bottom: 161px;[^}]*left: 94px;/);
+  assert.match(skin.css, /rail-skin"\] \.skin-dropdown\s*\{[^}]*position: fixed;[^}]*bottom: 179px;[^}]*left: 94px;/);
   assert.match(skin.css, /kaak-workspace\.quick-server-item"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;/);
   assert.match(skin.css, /kaak-workspace\.quick-server"\]\s*\{[\s\S]*?width: 58px;[\s\S]*?height: 58px;[\s\S]*?border: 2px solid transparent;[\s\S]*?border-radius: 18px;/);
   assert.match(skin.css, /quick-server\"\]\:hover[\s\S]*?background: #383a40;/);

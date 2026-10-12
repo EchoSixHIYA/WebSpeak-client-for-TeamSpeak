@@ -2,11 +2,13 @@
   <div
     class="modal-backdrop channel-password-backdrop"
     data-ws-part="auth.password.backdrop"
+    data-ws-state="server-password"
     @click.self="emit('cancel')"
   >
     <section
       class="channel-password-modal server-password-modal"
       data-ws-part="auth.password.dialog"
+      data-ws-state="server-password"
       ref="dialog"
       tabindex="-1"
       @keydown="onDialogKeydown"

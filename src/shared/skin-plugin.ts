@@ -42,6 +42,8 @@ export type SkinPluginPage = "home" | "voice" | "demo";
 export type SkinPluginComponentMode = "widget" | "surface";
 export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "home.connection-form",
+  "home.connection-status",
+  "home.myts-login",
   "app.skin-switcher",
   "app.language-switcher",
   "voice.server-switcher",
@@ -72,6 +74,7 @@ export interface SkinPluginWidgetOptions {
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
+  "home.connection-status": widgetPermissions("session.status.read"),
   "voice.channel-tree": widgetPermissions("session.channels.read", "session.members.read", "session.memberAvatars.read", "session.channel.join"),
   "voice.server-switcher": widgetPermissions("servers.quickList.read", "servers.quickList.switch"),
   "voice.server-header": widgetPermissions("session.status.read", "servers.quickList.read", "servers.quickList.switch"),
@@ -176,9 +179,9 @@ export const SKIN_PLUGIN_ALLOWED_ELEMENTS = Object.freeze([
 const ELEMENTS = new Set<string>(SKIN_PLUGIN_ALLOWED_ELEMENTS);
 const VOID_ELEMENTS = new Set(["br", "circle", "hr", "img", "input", "line", "path", "polyline", "rect", "wbr"]);
 const ATTRIBUTES = new Set([
-  "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",
+  "alt", "aria-current", "aria-expanded", "aria-hidden", "aria-label", "aria-pressed", "aria-selected", "autocomplete", "checked", "class", "colspan", "cx", "cy", "d", "disabled", "draggable", "fill", "height", "inputmode", "max", "maxlength", "min",
   "minlength", "multiple", "name", "open", "placeholder", "required", "role", "rows", "rowspan", "step", "stroke", "stroke-linecap", "stroke-linejoin",
-  "src", "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
+  "r", "rx", "src", "stroke-width", "tabindex", "title", "type", "value", "viewbox", "width", "x", "x1", "x2", "y", "y1", "y2",
 ]);
 const EVENTS = new Set<string>([
   "click", "dblclick", "change", "input", "submit", "keydown", "keyup", "contextmenu", "focus", "blur", "pointerdown", "pointerup",

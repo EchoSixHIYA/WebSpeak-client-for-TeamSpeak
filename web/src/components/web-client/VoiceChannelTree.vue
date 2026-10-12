@@ -19,6 +19,7 @@
       :avatar-style="avatarStyle"
       :avatar-initial="avatarInitial"
       :is-speaking="isSpeaking"
+      :is-screen-sharing="isScreenSharing"
       :show-member-actions="showMemberActions"
       :member-drag-drop="memberDragDrop"
       :dragged-member-id="draggedMemberId"
@@ -58,6 +59,7 @@ const props = defineProps<{
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => CSSProperties;
   avatarInitial: (name: string) => string;
   isSpeaking: (member: ChannelMember) => boolean;
+  isScreenSharing?: (member: ChannelMember) => boolean;
   showMemberActions?: boolean;
   memberDragDrop?: boolean;
   draggedMemberId?: number | null;

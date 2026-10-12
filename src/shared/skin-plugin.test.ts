@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   parseSkinPluginDocument,
   parseSkinPluginJson,
+  skinPluginWidgetPermissions,
   type SkinPluginDocument,
   type SkinPluginNode,
 } from "./skin-plugin.js";
@@ -181,6 +182,52 @@ test("server banner host widget only exposes public session status fields", () =
   document.components[0].permissions = ["session.status.read"];
   const parsed = parseSkinPluginDocument(document);
   assert.equal(parsed.components[0].root.children?.[0].widget, "voice.server-banner");
+});
+
+test("home connection status widget requires the public session status permission", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].page = "home";
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ widget: "home.connection-status" }] };
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  document.components[0].permissions = ["session.status.read"];
+  assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "home.connection-status");
+  assert.deepEqual(skinPluginWidgetPermissions("home.connection-status"), ["session.status.read"]);
+});
+
+test("MyTS login is a host button with no connection permission or skin action", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].page = "home";
+  document.components[0].permissions = [];
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ widget: "home.myts-login" }] };
+
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].root.children?.[0].widget, "home.myts-login");
+  assert.deepEqual(skinPluginWidgetPermissions("home.myts-login"), []);
+  assert.deepEqual(Object.keys(parsed.components[0].actions), []);
+});
+
+test("skin SVG illustrations support bounded path and circle geometry attributes", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].root = {
+    tag: "svg",
+    attributes: { viewbox: "0 0 100 100", role: "img" },
+    children: [
+      { tag: "circle", attributes: { cx: 25, cy: 30, r: 12, fill: "#b0f49b" } },
+      { tag: "path", attributes: { d: "M10 20h30v40", stroke: "white", "stroke-width": 2, fill: "none" } },
+    ],
+  };
+  const parsed = parseSkinPluginDocument(document).components[0].root;
+  assert.equal(parsed.children?.[0].attributes?.cx, 25);
+  assert.equal(parsed.children?.[1].attributes?.d, "M10 20h30v40");
+
+  document.components[0].root.children![1].attributes!.d = "x".repeat(513);
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
 });
 
 test("schema v3 host audio controls require read and control permissions while v2 remains compatible", () => {
@@ -383,8 +430,17 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(workspace);
   assert.equal(home.page, "home");
   assert.equal(home.mode, "surface");
-  assert.deepEqual(home.permissions, ["ui.surface.replace"]);
-  assert.equal(home.root.children?.[1].children?.[3].widget, "home.connection-form");
+  assert.deepEqual(home.permissions, ["ui.surface.replace", "session.status.read"]);
+  const connectionCard = home.root.children?.[1].children?.[0].children?.[1];
+  assert.equal(connectionCard?.part, "connection-card");
+  assert.equal(connectionCard?.children?.[0].part, "card-heading");
+  assert.equal(connectionCard?.children?.[0].children?.[0].part, "connection-title");
+  assert.equal(connectionCard?.children?.[0].children?.[1].widget, "home.myts-login");
+  assert.equal(connectionCard?.children?.[2].widget, "home.connection-form");
+  assert.equal(connectionCard?.children?.[4].widget, "home.connection-status");
+  const heroMedia = home.root.children?.[0].children?.[2];
+  assert.equal(heroMedia?.part, "hero-media");
+  assert.equal(heroMedia?.children?.[0].tag, "svg");
 
   assert.equal(workspace.page, "voice");
   assert.equal(workspace.mode, "surface");
