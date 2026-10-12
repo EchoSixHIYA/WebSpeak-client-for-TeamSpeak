@@ -4,7 +4,9 @@ import { registerIdentityProviderAdapter, requestIdentityProviderLogin } from ".
 
 test("identity provider login dispatches stable provider metadata only to a host adapter", async () => {
   const requests: unknown[] = [];
-  const unregister = registerIdentityProviderAdapter("example.account", (request) => requests.push(request));
+  const unregister = registerIdentityProviderAdapter("example.account", (request) => {
+    requests.push(request);
+  });
   try {
     assert.equal(await requestIdentityProviderLogin({ providerId: "unregistered", providerLabel: "Unregistered" }), false);
     assert.equal(await requestIdentityProviderLogin({ providerId: "example.account", providerLabel: "Example" }), true);
