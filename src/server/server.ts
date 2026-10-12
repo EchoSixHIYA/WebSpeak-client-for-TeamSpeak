@@ -11,7 +11,7 @@ import { resolveTeamSpeakTarget, TeamSpeakAliasLookupError } from "./teamspeak-a
 import { createAdminRouter } from "../admin/admin-router.js";
 import type { AdminService } from "../admin/admin-service.js";
 import { AdminSessionStore } from "../admin/admin-session.js";
-import { isSafeOpenTargetForPrefill, resolveSafeOpenTarget } from "../security/open-target-policy.js";
+import { isSafeOpenTargetForPrefill, resolveSafeOpenTarget, TeamSpeakTargetResolutionError } from "../security/open-target-policy.js";
 import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
@@ -222,7 +222,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       // and pass that exact IP to the voice connection to prevent DNS rebinding.
       if (!managedInvite && policy.accessMode === "open") target = await resolveSafeOpenTarget(target);
     } catch (error) {
-      response.status(400).json({ ok: false, code: error instanceof TeamSpeakAliasLookupError ? "HOST_NOT_FOUND" : "TARGET_NOT_ALLOWED" });
+      response.status(400).json({ ok: false, code: error instanceof TeamSpeakAliasLookupError || error instanceof TeamSpeakTargetResolutionError ? "HOST_NOT_FOUND" : "TARGET_NOT_ALLOWED" });
       return;
     }
 

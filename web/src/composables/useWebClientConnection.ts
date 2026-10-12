@@ -160,7 +160,7 @@ export function useWebClientConnection({
     })();
   }
 
-  function doDisconnect(): void {
+  function doDisconnect(notify = true): void {
     serverPasswordLookupAttempt += 1;
     resolvingServerPassword = false;
     attemptedServerCredential = null;
@@ -168,7 +168,7 @@ export function useWebClientConnection({
     attemptedChannelCredential = null;
     disconnect();
     selectedChannelId.value = "";
-    showToast(t("leftToast"));
+    if (notify) showToast(t("leftToast"));
   }
 
   function submitServerPassword(): void {

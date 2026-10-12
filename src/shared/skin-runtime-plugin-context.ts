@@ -47,13 +47,14 @@ interface ContextProjection {
 }
 
 const CONTEXTS: readonly ContextProjection[] = Object.freeze([
+  { path: ["chat", "status"], permission: "chat.channel.read", fields: new Set(["panelOpen", "tab", "tabLabel"]) },
   { path: ["session", "status"], permission: "session.status.read", fields: new Set(["connected", "connecting", "connectionState", "channelId", "channelName", "userName", "serverLabel"]) },
-  { path: ["audio", "status"], permission: "audio.status.read", fields: new Set(["microphoneMuted", "outputMuted"]) },
+  { path: ["audio", "status"], permission: "audio.status.read", fields: new Set(["microphoneMuted", "outputMuted", "noiseSuppressionEnabled", "accompanimentActive"]) },
   { path: ["whisper", "status"], permission: "voice.whisper.status.read", fields: new Set(["active", "targetCount"]) },
   { path: ["screenShare", "status"], permission: "voice.screenShare.status.read", fields: new Set(["active", "starting", "viewing"]) },
 ]);
 
-const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "screenSharing", "audio", "microphoneMuted", "outputMuted", "active", "starting", "viewing", "maxClientsLimited"]);
+const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "screenSharing", "audio", "microphoneMuted", "outputMuted", "noiseSuppressionEnabled", "accompanimentActive", "active", "starting", "viewing", "maxClientsLimited", "panelOpen"]);
 const NUMBER_FIELDS = new Set(["depth", "memberCount", "targetCount", "ownerClientId", "viewerCount", "maxClients"]);
 const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   id: 128,
@@ -72,6 +73,8 @@ const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   connectionState: 16,
   source: 48,
   kind: 48,
+  tab: 16,
+  tabLabel: 48,
   time: 48,
   memberCountLabel: 12,
   text: 1_024,

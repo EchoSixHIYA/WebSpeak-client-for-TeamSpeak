@@ -37,14 +37,14 @@ export function mergeQuickServers(
 ): QuickServer[] {
   const recentByAddress = new Map<string, RecentServer>();
   for (const recent of [...recentServers].sort((left, right) => right.lastConnectedAt - left.lastConnectedAt)) {
-    const key = serverKey(recent.address);
+    const key = comparableServerKey(recent.address);
     if (key && !recentByAddress.has(key)) recentByAddress.set(key, recent);
   }
 
   const result: QuickServer[] = [];
   const seen = new Set<string>();
   for (const favorite of [...favorites].sort((left, right) => left.label.localeCompare(right.label))) {
-    const key = serverKey(favorite.address);
+    const key = comparableServerKey(favorite.address);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const recent = recentByAddress.get(key);
@@ -53,7 +53,7 @@ export function mergeQuickServers(
       : isSafeQuickServerIcon(favorite.serverIcon) ? favorite.serverIcon : "";
     const savedLabel = favorite.label.trim();
     result.push({
-      id: key,
+      id: serverKey(favorite.address),
       address: favorite.address.trim(),
       label: serverName && (!savedLabel || isQuickServerAddressLabel(savedLabel, favorite.address))
         ? serverName
@@ -69,11 +69,11 @@ export function mergeQuickServers(
   }
 
   for (const recent of [...recentServers].sort((left, right) => right.lastConnectedAt - left.lastConnectedAt)) {
-    const key = serverKey(recent.address);
+    const key = comparableServerKey(recent.address);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     result.push({
-      id: key,
+      id: serverKey(recent.address),
       address: recent.address.trim(),
       label: recent.serverName?.trim() || recent.address.trim(),
       isFavorite: false,
@@ -91,4 +91,16 @@ export function mergeQuickServers(
 
 function serverKey(address: string): string {
   return address.trim().toLocaleLowerCase();
+}
+
+function comparableServerKey(address: string): string {
+  const target = splitTeamSpeakTarget(address);
+  const host = target.address.trim().toLocaleLowerCase();
+  const port = target.port.trim() || "9987";
+  return host ? `${host}:${port}` : "";
+}
+
+export function quickServerTargetsEqual(left: string, right: string): boolean {
+  const leftKey = comparableServerKey(left);
+  return Boolean(leftKey) && leftKey === comparableServerKey(right);
 }

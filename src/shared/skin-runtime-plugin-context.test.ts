@@ -24,6 +24,32 @@ test("runtime context exposes only fields covered by declared read permissions",
   assert.equal(JSON.stringify(projected).includes("secret.example"), false);
 });
 
+test("chat panel state is projected only to plugins with chat read permission", () => {
+  const context = { chat: { status: { panelOpen: true, tab: "private", tabLabel: "私聊", recipient: "not exposed" } } };
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext(["chat.channel.read"], context))), {
+    chat: { status: { panelOpen: true, tab: "private", tabLabel: "私聊" } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext([], context))), {});
+});
+
+test("audio processing and accompaniment states are projected only with audio status permission", () => {
+  const context = {
+    audio: {
+      status: {
+        microphoneMuted: false,
+        outputMuted: true,
+        noiseSuppressionEnabled: true,
+        accompanimentActive: false,
+        inputVolume: 0.75,
+      },
+    },
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext(["audio.status.read"], context))), {
+    audio: { status: { microphoneMuted: false, outputMuted: true, noiseSuppressionEnabled: true, accompanimentActive: false } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext([], context))), {});
+});
+
 test("runtime member screen-share status is separately permission-gated", () => {
   const context = {
     session: {

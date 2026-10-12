@@ -364,7 +364,7 @@
               :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
               :aria-label="t('switchToServer', { server: server.label })"
               :aria-pressed="isQuickServerTarget(server)"
-              :disabled="voiceState.connecting"
+              :disabled="voiceState.connecting && isQuickServerTarget(server)"
               :aria-disabled="!serverCanSwitch(server)"
               :title="serverCanSwitch(server) ? server.label + '\n' + server.address : t('serverSwitchRestricted')"
               @click.stop="connectQuickServer(server)"
@@ -416,7 +416,7 @@
           :data-ws-server-kind="server.isFavorite ? 'favorite' : 'recent'"
           :aria-label="t('switchToServer', { server: server.label })"
           :aria-pressed="isQuickServerTarget(server)"
-          :disabled="voiceState.connecting"
+          :disabled="voiceState.connecting && isQuickServerTarget(server)"
           :aria-disabled="!serverCanSwitch(server)"
           :title="serverCanSwitch(server) ? server.label : t('serverSwitchRestricted')"
           @click="connectQuickServer(server)"
@@ -924,7 +924,7 @@
       v-model="channelPasswordDialog.password"
       :busy="channelPasswordDialog.submitting"
       :error="channelPasswordDialog.error"
-      :submit-label="activeSkin?.id === BUILTIN_KAAK_SKIN_ID ? t('passwordDialogConfirm') : undefined"
+      :submit-label="skinMessageOverrides.passwordDialogConfirm"
       :t="t"
       @cancel="cancelChannelPassword"
       @submit="submitChannelPassword"
@@ -935,7 +935,7 @@
       v-if="serverPasswordDialog.open"
       v-model="serverPasswordDialog.password"
       :error-code="serverPasswordDialog.errorCode"
-      :submit-label="activeSkin?.id === BUILTIN_KAAK_SKIN_ID ? t('passwordDialogConfirm') : undefined"
+      :submit-label="skinMessageOverrides.passwordDialogConfirm"
       :t="t"
       @cancel="cancelFavoriteServerPassword"
       @submit="submitServerPassword"
@@ -1023,9 +1023,10 @@ import { useWebClientPublicConfig } from "../composables/useWebClientPublicConfi
 import { useWebClientServerHistory } from "../composables/useWebClientServerHistory.js";
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
-import { isQuickServerAddressLabel, type QuickServer } from "../services/quick-servers.js";
+import { isQuickServerAddressLabel, quickServerTargetsEqual, type QuickServer } from "../services/quick-servers.js";
+import { requestIdentityProviderLogin as dispatchIdentityProviderLogin } from "../services/identity-provider.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
-import { BUILTIN_KAAK_SKIN_ID, isPublicSkinEnabled } from "../services/skin-catalog.js";
+import { isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
 import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js";
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
@@ -1144,6 +1145,7 @@ const channelPasswordDialog = reactive({ open: false, channelId: "", password: "
 const serverPasswordDialog = reactive({ open: false, password: "", errorCode: "" });
 const qqModalOpen = ref(false);
 const qqJoinUrl = "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475";
+const githubRepositoryUrl = "https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak";
 const toast = ref("");
 const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
@@ -1453,11 +1455,12 @@ const showVoiceShell = computed(() => Boolean(
   || favoriteSwitchPending.value || favoriteSwitchFailed.value,
 ));
 const favoriteSwitchLabel = computed(() => quickServers.value.find((server) =>
-  server.id === currentServerTarget().toLocaleLowerCase(),
+  isQuickServerTarget(server),
 )?.label ?? currentServerTarget());
 
 function isQuickServerTarget(server: QuickServer): boolean {
-  return server.id === currentServerTarget().toLocaleLowerCase();
+  return server.id === currentServerTarget().toLocaleLowerCase()
+    || quickServerTargetsEqual(server.address, currentServerTarget());
 }
 
 function serverCanSwitch(_server: QuickServer): boolean {
@@ -1479,11 +1482,14 @@ const quickServersForDisplay = computed(() => quickServers.value.map((server) =>
 }));
 
 function connectQuickServer(server: QuickServer): void {
-  if (voiceState.connecting || (voiceState.connected && isQuickServerTarget(server))) return;
+  if ((voiceState.connecting || voiceState.connected) && isQuickServerTarget(server)) return;
   if (accessMode.value !== "open") {
     showToast(t("serverSwitchRestricted"));
     return;
   }
+  // A slow TeamSpeak handshake can leave the previous attempt pending for a
+  // long time. Stop its ticket request/socket before starting the new target.
+  if (voiceState.connecting) doDisconnect(false);
   const target = splitTeamSpeakTarget(server.address);
   serverHost.value = target.address;
   serverPort.value = target.port || DEFAULT_TEAM_SPEAK_PORT;
@@ -1581,6 +1587,17 @@ const skinPluginQuickList = computed(() => skinPluginQuickServers.project(
   t("serverSwitchRestricted"),
 ));
 const currentServerDisplayName = computed(() => {
+  // The skin/plugin projection deliberately hides names that look like an
+  // address. The host's own server header should still show TeamSpeak's
+  // configured public server name instead of a synthetic "Recent N" label.
+  const liveName = cleanServerDisplayName(voiceServerInfo.value?.name);
+  if (liveName) return liveName;
+  const savedCurrent = quickServers.value.find(isQuickServerTarget);
+  const savedName = cleanServerDisplayName(savedCurrent?.serverName);
+  const savedLabel = savedCurrent?.label.trim() ?? "";
+  return savedName || (savedCurrent && savedLabel && !isQuickServerAddressLabel(savedLabel, savedCurrent.address) ? savedLabel : "TeamSpeak");
+});
+const currentServerPluginLabel = computed(() => {
   const target = currentServerTarget();
   const liveName = safeSkinServerDisplayName(voiceServerInfo.value?.name ?? "", target);
   if (liveName) return liveName;
@@ -1588,6 +1605,10 @@ const currentServerDisplayName = computed(() => {
   const savedName = savedCurrent ? safeSkinServerDisplayName(savedCurrent.serverName ?? "", savedCurrent.address) : "";
   return savedName || skinPluginQuickList.value.find((server) => server.current)?.label || "TeamSpeak";
 });
+
+function cleanServerDisplayName(value: string | undefined): string {
+  return value?.trim().replace(/\u0000/g, "").slice(0, 160) ?? "";
+}
 const skinPluginFavorites = computed(() => skinPluginQuickList.value
   .filter((server) => server.favorite)
   .map(({ favorite: _favorite, ...server }) => server));
@@ -1615,7 +1636,7 @@ const skinPluginContext = computed(() => ({
       channelId: currentChannel.value?.id ?? "",
       channelName: currentChannelName.value,
       userName: nickname.value,
-      serverLabel: currentServerDisplayName.value,
+      serverLabel: currentServerPluginLabel.value,
     },
     channels: channelTree.value.map((item) => {
       const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
@@ -1638,6 +1659,11 @@ const skinPluginContext = computed(() => ({
   favorites: { items: skinPluginFavorites.value },
   servers: { quickList: skinPluginQuickList.value },
   chat: {
+    status: {
+      panelOpen: chat.panelOpen.value,
+      tab: chat.tab.value,
+      tabLabel: chat.tabLabel.value,
+    },
     messages: chat.visibleMessages.value.filter((message) => message.scope === "channel").map((message) => ({
       id: message.id,
       author: message.invokerName,
@@ -1651,6 +1677,8 @@ const skinPluginContext = computed(() => ({
     status: {
       microphoneMuted: microphoneMuted.value,
       outputMuted: outputMuted.value,
+      noiseSuppressionEnabled: noiseSuppressionEnabled.value,
+      accompanimentActive: accompanimentActive.value,
     },
   },
   whisper: {
@@ -1713,8 +1741,12 @@ const skinPluginActions = {
     if (!text || text.length > 1000 || text.includes("\u0000")) return;
     void sendTextMessage(text, currentChannel.value.id);
   },
+  "chat.togglePanel": () => chat.togglePanel(),
   "voice.toggleMicrophone": () => { if (voiceState.connected) toggleMicrophone(); },
   "voice.toggleOutputMute": () => { if (voiceState.connected) toggleOutputMute(); },
+  "audio.openSettings": () => { settingsOpen.value = true; },
+  "audio.toggleNoiseSuppression": () => { if (voiceState.connected) audioControls.toggleNoiseSuppression(); },
+  "audio.toggleAccompaniment": () => { if (voiceState.connected) void audioControls.toggleAccompaniment(); },
   "voice.setOutputVolume": (args: Record<string, string | number | boolean>) => {
     if (!voiceState.connected) return;
     const volume = typeof args.volume === "number" ? args.volume
@@ -1753,6 +1785,37 @@ const homeConnectionStatus = computed(() => {
 });
 
 const skinPluginWidgets = {
+  "home.server-announcement": () => h("section", {
+    "data-ws-part": "home.server-announcement",
+    "aria-label": t("serverAnnouncement"),
+  }, [
+    h("h2", { "data-ws-part": "home.server-announcement.title" }, t("serverAnnouncement")),
+    h("p", { "data-ws-part": "home.server-announcement.body" }, localizedWelcomeText.value),
+  ]),
+  "home.social-links": () => h("nav", {
+    "data-ws-part": "home.social-links",
+    "aria-label": t("communityLinks"),
+  }, [
+    h("a", {
+      href: githubRepositoryUrl,
+      target: "_blank",
+      rel: "noreferrer",
+      title: t("githubRepository"),
+      "aria-label": t("githubRepository"),
+    }, [h(Icon, { name: "github", size: 20 })]),
+    h("a", {
+      href: qqJoinUrl,
+      target: "_blank",
+      rel: "noreferrer",
+      title: t("qqGroup"),
+      "aria-label": t("qqGroup"),
+    }, [h(Icon, { name: "qq", size: 20 })]),
+    h("a", {
+      href: "/admin",
+      title: t("adminConsole"),
+      "aria-label": t("adminConsole"),
+    }, [h(Icon, { name: "settings", size: 20 })]),
+  ]),
   "voice.screen-share-start": () => h("button", {
     type: "button",
     class: "skin-runtime-screen-share-start",
@@ -1797,16 +1860,21 @@ const skinPluginWidgets = {
     onExportIdentity: exportIdentity,
   }),
   "home.connection-status": () => h("p", {
-    class: "kaak-home-status",
+    "data-ws-part": "home.connection-status",
     role: "status",
     "aria-live": "polite",
   }, homeConnectionStatus.value),
-  "home.myts-login": () => h("button", {
-    type: "button",
-    class: "kaak-myts-login",
-    "aria-label": t("mytsLogin"),
-    onClick: () => showToast(t("featureInDevelopment")),
-  }, [h("span", { class: "kaak-myts-wordmark", "aria-hidden": "true" }, "myts")]),
+  "home.identity-provider": (options?: SkinPluginWidgetOptions) => {
+    const providerId = options?.identityProviderId ?? "external";
+    const providerLabel = options?.identityProviderLabel ?? providerId;
+    return h("button", {
+      type: "button",
+      class: "ws-home-identity-provider-button",
+      "data-ws-part": "home.identity-provider.button",
+      "aria-label": t("identityProviderLogin", { provider: providerLabel }),
+      onClick: () => requestIdentityProviderLogin(providerId, providerLabel),
+    }, [h("span", { class: "ws-home-identity-provider-label", "data-ws-part": "home.identity-provider.label", "aria-hidden": "true" }, providerLabel)]);
+  },
   "app.skin-switcher": () => h(SkinSwitcher, {
     modelValue: activeSkinId.value,
     "onUpdate:modelValue": (value: string) => { activeSkinId.value = value; },
@@ -1900,25 +1968,8 @@ const skinPluginWidgets = {
     messageAvatar,
     formatTime,
   }),
-  "voice.audio-controls": (options?: SkinPluginWidgetOptions) => isMobileViewport.value
+  "voice.audio-controls": () => isMobileViewport.value
     ? h("div", { class: "mobile-voice-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
-      ...(options?.layout === "room-panel" ? [
-        h("button", {
-          type: "button",
-          class: "mobile-voice-activity",
-          "aria-label": t("voiceSettings"),
-          title: t("voiceSettings"),
-          onClick: () => { settingsOpen.value = true; },
-        }, [h(Icon, { name: "settings", size: 16 }), h("span", null, t("voiceSettings"))]),
-        h("button", {
-          type: "button",
-          class: ["mobile-voice-toggle", "mobile-noise-suppression", noiseSuppressionEnabled.value ? "active" : "inactive"],
-          "aria-label": t("noiseSuppression"),
-          title: t("noiseSuppression"),
-          "aria-pressed": noiseSuppressionEnabled.value,
-          onClick: audioControls.toggleNoiseSuppression,
-        }, [h(Icon, { name: "noise-suppression", size: 20 }), h("span", null, t("noiseSuppression"))]),
-      ] : []),
       h("button", {
         type: "button",
         class: ["mobile-voice-toggle", "mobile-microphone-toggle", microphoneMuted.value && "muted"],
@@ -1933,21 +1984,10 @@ const skinPluginWidgets = {
         "aria-pressed": !outputMuted.value,
         onClick: toggleOutputMute,
       }, [h(Icon, { name: outputMuted.value ? "volume-off" : "volume", size: 20 }), h("span", null, t("speaker"))]),
-      ...(options?.layout === "room-panel" ? [
-        h("button", {
-          type: "button",
-          class: ["mobile-voice-toggle", "mobile-accompaniment-toggle", accompanimentActive.value && "active"],
-          "aria-label": accompanimentActive.value ? t("stopAccompaniment") : t("startAccompaniment"),
-          title: accompanimentActive.value ? t("stopAccompaniment") : t("startAccompaniment"),
-          "aria-pressed": accompanimentActive.value,
-          onClick: audioControls.toggleAccompaniment,
-        }, [h(Icon, { name: "music", size: 18 })]),
-      ] : []),
     ])
     : h(AudioDock, {
       model: audioDockState,
       controls: audioControls,
-      layout: options?.layout === "room-panel" ? "room-panel" : "default",
       t,
       rangeStyle,
       onSettings: () => { settingsOpen.value = true; },
@@ -1994,6 +2034,15 @@ const skinPluginWidgets = {
     onClick: leaveVoiceWorkspace,
   }, [h(Icon, { name: "power", size: 18 }), h("span", null, t("exit"))]),
 };
+
+async function requestIdentityProviderLogin(providerId: string, providerLabel: string): Promise<void> {
+  try {
+    const handled = await dispatchIdentityProviderLogin({ providerId, providerLabel });
+    if (!handled) showToast(t("identityProviderInDevelopment", { provider: providerLabel }));
+  } catch {
+    showToast(t("identityProviderLoginFailed", { provider: providerLabel }));
+  }
+}
 
 watch(() => pokeNotifications.length, (length, previousLength) => {
   const latest = pokeNotifications[length - 1];

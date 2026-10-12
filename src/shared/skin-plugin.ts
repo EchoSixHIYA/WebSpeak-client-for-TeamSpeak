@@ -28,6 +28,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "audio.status.read": Object.freeze({ policyVersion: 1, description: "Read the user's own microphone and speaker mute states." }),
   "audio.microphone.control": Object.freeze({ policyVersion: 1, description: "Toggle the user's own microphone through WebSpeak's audio pipeline." }),
   "audio.output.control": Object.freeze({ policyVersion: 1, description: "Toggle or adjust the user's local speaker output." }),
+  "audio.settings.open": Object.freeze({ policyVersion: 1, description: "Open WebSpeak's trusted audio device and processing settings." }),
   "voice.presence.write": Object.freeze({ policyVersion: 1, description: "Set the user's own away status through the connected TeamSpeak session." }),
   "voice.whisper.control": Object.freeze({ policyVersion: 1, description: "Enable or disable the user's existing TeamSpeak whisper target selection." }),
   "voice.disconnect": Object.freeze({ policyVersion: 1, description: "Disconnect the user's current TeamSpeak voice session." }),
@@ -43,7 +44,9 @@ export type SkinPluginComponentMode = "widget" | "surface";
 export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "home.connection-form",
   "home.connection-status",
-  "home.myts-login",
+  "home.server-announcement",
+  "home.social-links",
+  "home.identity-provider",
   "app.skin-switcher",
   "app.language-switcher",
   "voice.server-switcher",
@@ -69,8 +72,12 @@ export interface SkinPluginWidgetOptions {
   memberActions?: boolean;
   /** Enable trusted host member drag-and-drop between channel-tree rows. */
   memberDragDrop?: boolean;
-  /** Select a supported host presentation for audio controls or a channel tree. */
-  layout?: "default" | "room-panel" | "server-sidebar";
+  /** Select a supported host presentation for a channel tree. */
+  layout?: "default" | "server-sidebar";
+  /** Provider identity used by the generic, UI-only home sign-in entry. */
+  identityProviderId?: string;
+  /** Provider display name used by the generic, UI-only home sign-in entry. */
+  identityProviderLabel?: string;
 }
 const widgetPermissions = (...permissions: SkinPluginPermission[]): readonly SkinPluginPermission[] => Object.freeze(permissions);
 export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostWidget, readonly SkinPluginPermission[]>> = Object.freeze({
@@ -110,8 +117,9 @@ export type SkinPluginEvent =
   | "pointerenter" | "pointerleave" | "dragstart" | "dragover" | "drop";
 export type SkinPluginAction =
   | "ui.setState" | "ui.toggleState"
-  | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage"
-  | "voice.toggleMicrophone" | "voice.toggleOutputMute" | "voice.setOutputVolume"
+  | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage" | "chat.togglePanel"
+  | "voice.toggleMicrophone" | "voice.toggleOutputMute" | "voice.setOutputVolume" | "audio.openSettings"
+  | "audio.toggleNoiseSuppression" | "audio.toggleAccompaniment"
   | "voice.disconnect" | "voice.setAway" | "voice.setWhisperActive"
   | "voice.startScreenShare" | "voice.stopScreenShare" | "voice.joinScreenShare" | "voice.leaveScreenShare";
 
@@ -192,26 +200,30 @@ const V3_EVENTS = new Set<string>([
 ]);
 const PASSIVE_EVENTS = new Set<string>(["focus", "blur", "pointerenter", "pointerleave", "dragstart", "dragover"]);
 const ACTIONS = new Set<string>([
-  "ui.setState", "ui.toggleState", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage",
-  "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
+  "ui.setState", "ui.toggleState", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage", "chat.togglePanel",
+  "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
   "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const V3_ACTIONS = new Set<string>([
-  "ui.toggleState", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "voice.disconnect", "voice.setAway",
+  "ui.toggleState", "chat.togglePanel", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway",
   "voice.setWhisperActive", "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const PERMISSIONS = new Set<string>(Object.keys(SKIN_PLUGIN_PERMISSIONS));
 const HOST_WIDGETS = new Set<string>(SKIN_PLUGIN_HOST_WIDGETS);
 const ACTION_ARGS: Record<SkinPluginAction, ReadonlySet<string>> = {
   "ui.setState": new Set(["key", "value"]),
-  "ui.toggleState": new Set(["key"]),
+  "ui.toggleState": new Set(["key", "resetKey"]),
   "voice.joinChannel": new Set(["channelId"]),
   "favorites.switch": new Set(["favoriteId"]),
   "quickServers.switch": new Set(["quickServerId"]),
   "chat.sendMessage": new Set(["text"]),
+  "chat.togglePanel": new Set([]),
   "voice.toggleMicrophone": new Set([]),
   "voice.toggleOutputMute": new Set([]),
   "voice.setOutputVolume": new Set(["volume"]),
+  "audio.openSettings": new Set([]),
+  "audio.toggleNoiseSuppression": new Set([]),
+  "audio.toggleAccompaniment": new Set([]),
   "voice.disconnect": new Set([]),
   "voice.setAway": new Set(["away", "message"]),
   "voice.setWhisperActive": new Set(["active"]),
@@ -227,9 +239,13 @@ const ACTION_PERMISSION: Record<SkinPluginAction, SkinPluginPermission | null> =
   "favorites.switch": "favorites.switch",
   "quickServers.switch": "servers.quickList.switch",
   "chat.sendMessage": "chat.channel.send",
+  "chat.togglePanel": "chat.channel.read",
   "voice.toggleMicrophone": "audio.microphone.control",
   "voice.toggleOutputMute": "audio.output.control",
   "voice.setOutputVolume": "audio.output.control",
+  "audio.openSettings": "audio.settings.open",
+  "audio.toggleNoiseSuppression": "audio.microphone.control",
+  "audio.toggleAccompaniment": "audio.output.control",
   "voice.disconnect": "voice.disconnect",
   "voice.setAway": "voice.presence.write",
   "voice.setWhisperActive": "voice.whisper.control",
@@ -265,7 +281,8 @@ const COLLECTION_FIELD_PERMISSIONS: Record<string, Partial<Record<string, SkinPl
 };
 const SESSION_STATUS_FIELDS = new Set(["connected", "connecting", "connectionState", "serverLabel", "channelId", "channelName", "userName"]);
 const CONTEXT_FIELDS: Record<string, ReadonlySet<string>> = {
-  "audio.status": new Set(["microphoneMuted", "outputMuted"]),
+  "chat.status": new Set(["panelOpen", "tab", "tabLabel"]),
+  "audio.status": new Set(["microphoneMuted", "outputMuted", "noiseSuppressionEnabled", "accompanimentActive"]),
   "screenShare.status": new Set(["active", "starting", "viewing"]),
   "whisper.status": new Set(["active", "targetCount"]),
 };
@@ -274,6 +291,7 @@ const COMPONENT_STATE_SCOPE_PATHS = new Set([
   ...Object.entries(CONTEXT_FIELDS).flatMap(([path, fields]) => Array.from(fields, (field) => `${path}.${field}`)),
 ]);
 const CONTEXT_PERMISSIONS: Record<string, SkinPluginPermission> = {
+  "chat.status": "chat.channel.read",
   "audio.status": "audio.status.read",
   "screenShare.status": "voice.screenShare.status.read",
   "whisper.status": "voice.whisper.status.read",
@@ -421,6 +439,9 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (rawAction.type === "ui.toggleState" && (typeof args.key !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/.test(args.key) || !stateKeys.has(args.key) || typeof state[args.key] !== "boolean")) {
         fail("SKIN_PLUGIN_ACTION_INVALID", "ui.toggleState requires a declared boolean local state key.");
       }
+      if (rawAction.type === "ui.toggleState" && args.resetKey !== undefined && (typeof args.resetKey !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/.test(args.resetKey) || args.resetKey === args.key || !stateKeys.has(args.resetKey) || typeof state[args.resetKey] !== "boolean")) {
+        fail("SKIN_PLUGIN_ACTION_INVALID", "ui.toggleState resetKey must name a different declared boolean local state key.");
+      }
       if (rawAction.type === "voice.joinChannel" && typeof args.channelId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "voice.joinChannel requires a channelId binding.");
       if (rawAction.type === "favorites.switch" && typeof args.favoriteId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "favorites.switch requires a favoriteId binding.");
       if (rawAction.type === "quickServers.switch" && typeof args.quickServerId !== "string") fail("SKIN_PLUGIN_ACTION_INVALID", "quickServers.switch requires a quickServerId binding.");
@@ -458,6 +479,8 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
               ? new Set(["screenShare"])
               : rawNode.widget === "voice.audio-controls"
                 ? new Set(["layout"])
+              : rawNode.widget === "home.identity-provider"
+                ? new Set(["identityProviderId", "identityProviderLabel"])
               : new Set<string>();
           if (!isRecord(rawNode.options)
             || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
@@ -466,8 +489,14 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             || (rawNode.options.memberDragDrop !== undefined && typeof rawNode.options.memberDragDrop !== "boolean")
             || (rawNode.options.layout !== undefined
               && rawNode.options.layout !== "default"
-              && rawNode.options.layout !== "room-panel"
-              && !(rawNode.widget === "voice.channel-tree" && rawNode.options.layout === "server-sidebar"))) {
+              && !(rawNode.widget === "voice.channel-tree" && rawNode.options.layout === "server-sidebar"))
+            || (rawNode.options.identityProviderId !== undefined
+              && (typeof rawNode.options.identityProviderId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(rawNode.options.identityProviderId)))
+            || (rawNode.options.identityProviderLabel !== undefined
+              && (typeof rawNode.options.identityProviderLabel !== "string"
+                || !rawNode.options.identityProviderLabel.trim()
+                || rawNode.options.identityProviderLabel.length > 64
+                || rawNode.options.identityProviderLabel !== rawNode.options.identityProviderLabel.trim()))) {
             fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "This host widget uses unsupported options.");
           }
           options = {
@@ -475,7 +504,15 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             ...(rawNode.options.memberActions !== undefined ? { memberActions: rawNode.options.memberActions } : {}),
             ...(rawNode.options.memberDragDrop !== undefined ? { memberDragDrop: rawNode.options.memberDragDrop } : {}),
             ...(rawNode.options.layout !== undefined ? { layout: rawNode.options.layout } : {}),
+            ...(rawNode.options.identityProviderId !== undefined ? { identityProviderId: rawNode.options.identityProviderId } : {}),
+            ...(rawNode.options.identityProviderLabel !== undefined ? { identityProviderLabel: rawNode.options.identityProviderLabel } : {}),
           };
+        }
+        if (rawNode.widget === "home.identity-provider"
+          && (!isRecord(rawNode.options)
+            || typeof rawNode.options.identityProviderId !== "string"
+            || typeof rawNode.options.identityProviderLabel !== "string")) {
+          fail("SKIN_PLUGIN_WIDGET_OPTIONS_INVALID", "The identity-provider widget requires a provider ID and display label.");
         }
         const requiredPermission = inputSchemaVersion >= 3 || rawNode.widget === "voice.screen-share-start"
           ? missingSkinPluginWidgetPermission(rawNode.widget as SkinPluginHostWidget, permissions, options)

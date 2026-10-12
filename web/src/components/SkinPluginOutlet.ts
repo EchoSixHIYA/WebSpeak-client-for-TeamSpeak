@@ -215,12 +215,19 @@ export default defineComponent({
       if (!definition || !isSkinPluginComponentApproved(props.skinId, props.skinVersion, component)) return;
       const args = resolveActionArgs(definition, context, state);
       if (definition.type === "ui.setState") {
-        if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && "value" in args) state[args.key] = args.value;
+        if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && "value" in args) {
+          state[args.key] = args.value;
+          refresh.value += 1;
+        }
         return;
       }
       if (definition.type === "ui.toggleState") {
         if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && typeof state[args.key] === "boolean") {
           state[args.key] = !state[args.key];
+          if (typeof args.resetKey === "string" && component.state && Object.hasOwn(component.state, args.resetKey) && typeof state[args.resetKey] === "boolean") {
+            state[args.resetKey] = false;
+          }
+          refresh.value += 1;
         }
         return;
       }

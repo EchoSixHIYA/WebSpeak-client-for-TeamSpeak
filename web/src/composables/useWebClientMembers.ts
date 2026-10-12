@@ -51,6 +51,7 @@ export function useWebClientMembers({
   const memberPointerDrag = reactive({
     member: null as ChannelMember | null,
     pointerId: null as number | null,
+    suppressNativeDragPointerId: null as number | null,
     startX: 0,
     startY: 0,
     active: false,
@@ -126,6 +127,10 @@ export function useWebClientMembers({
   }
 
   function onMemberDragStart(member: ChannelMember, event: DragEvent): void {
+    if (memberPointerDrag.suppressNativeDragPointerId !== null) {
+      event.preventDefault();
+      return;
+    }
     if (member.isSelf) {
       event.preventDefault();
       return;
@@ -139,12 +144,17 @@ export function useWebClientMembers({
   function onMemberDragEnd(): void {
     draggedMember.value = null;
     dragOverChannelId.value = "";
+    memberPointerDrag.suppressNativeDragPointerId = null;
   }
 
   function onMemberPointerDown(member: ChannelMember, event: PointerEvent): void {
     if (member.isSelf || event.button !== 0) return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest("input,button")) return;
+    if (target?.closest("input,button,select,textarea,[contenteditable=\"true\"],.member-volume")) {
+      memberPointerDrag.suppressNativeDragPointerId = event.pointerId;
+      return;
+    }
+    memberPointerDrag.suppressNativeDragPointerId = null;
     event.preventDefault();
     memberPointerDrag.member = member;
     memberPointerDrag.pointerId = event.pointerId;
@@ -176,6 +186,10 @@ export function useWebClientMembers({
   }
 
   function onMemberPointerUp(event: PointerEvent): void {
+    if (memberPointerDrag.suppressNativeDragPointerId === event.pointerId) {
+      memberPointerDrag.suppressNativeDragPointerId = null;
+      return;
+    }
     if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
     const member = memberPointerDrag.member;
     const targetChannelId = memberPointerDrag.targetChannelId;
@@ -191,6 +205,10 @@ export function useWebClientMembers({
   }
 
   function onMemberPointerCancel(event: PointerEvent): void {
+    if (memberPointerDrag.suppressNativeDragPointerId === event.pointerId) {
+      memberPointerDrag.suppressNativeDragPointerId = null;
+      return;
+    }
     if (!memberPointerDrag.member || memberPointerDrag.pointerId !== event.pointerId) return;
     const currentTarget = event.currentTarget as HTMLElement | null;
     currentTarget?.releasePointerCapture?.(event.pointerId);

@@ -51,6 +51,7 @@ export function useWebClientChat({
   t,
 }: UseWebClientChatOptions) {
   const tab = ref<WebClientChatTab>("channel");
+  const panelOpen = ref(!isMobileViewport.value);
   const privateClientId = ref(0);
   const privateConversationKey = ref("");
   const messageDraft = ref("");
@@ -95,6 +96,19 @@ export function useWebClientChat({
         lastMessage: Math.max(existing?.lastMessage ?? 0, message.timestamp),
       });
     }
+    // A newly opened private chat has no message from which to derive a tab.
+    // Keep the selected recipient visible so the first message can be sent and
+    // the empty state still has a named conversation.
+    if (tab.value === "private" && privateConversationKey.value && privateClientId.value) {
+      const selected = recipient.value;
+      const existing = byConversation.get(privateConversationKey.value);
+      byConversation.set(privateConversationKey.value, {
+        id: selected?.id ?? existing?.id ?? privateClientId.value,
+        key: privateConversationKey.value,
+        name: selected?.nickname ?? existing?.name ?? t("privateMessage"),
+        lastMessage: existing?.lastMessage ?? 0,
+      });
+    }
     return [...byConversation.values()].sort((left, right) => right.lastMessage - left.lastMessage);
   });
 
@@ -102,8 +116,9 @@ export function useWebClientChat({
     if (tab.value === "server") return messages.filter((message) => message.scope === "server");
     if (tab.value === "private") return messages.filter(message => message.scope === "private" && messageKey(message) === privateConversationKey.value);
     if (tab.value !== "channel") return [];
-    const channelId = currentChannel.value?.id;
-    return messages.filter((message) => message.scope === "channel" && (!message.targetId || message.targetId === "0" || !channelId || message.targetId === channelId));
+    const channelId = currentChannel.value?.id || selectedChannelId.value;
+    return messages.filter((message) => message.scope === "channel"
+      && (!message.targetId || message.targetId === "0" || (channelId ? message.targetId === channelId : false)));
   });
 
   const tabLabel = computed(() => tab.value === "channel" ? t("textChannel") : tab.value === "server" ? t("serverChat") : tab.value === "private" ? t("privateMessage") : t("eventLog"));
@@ -146,6 +161,7 @@ export function useWebClientChat({
 
   function openConversation(conversation: PrivateConversation): void {
     if (disposed) return;
+    panelOpen.value = true;
     privateClientId.value = conversation.id;
     privateConversationKey.value = conversation.key;
     tab.value = "private";
@@ -153,6 +169,10 @@ export function useWebClientChat({
     closeMemberMenu();
     followingLatest = true;
     scrollIfFollowing();
+  }
+
+  function togglePanel(): void {
+    panelOpen.value = !panelOpen.value;
   }
 
   async function submitMessage(): Promise<void> {
@@ -199,6 +219,9 @@ export function useWebClientChat({
     sending.value = pending.has(next);
     sendError.value = errors.get(next) ?? "";
   }, { flush: "sync" });
+  watch(isMobileViewport, (mobile) => {
+    panelOpen.value = !mobile;
+  }, { flush: "sync" });
   watch(sessionEpoch, () => {
     historyGeneration++;
     persistedMessageIds.clear();
@@ -208,6 +231,7 @@ export function useWebClientChat({
     privateClientId.value = 0;
     privateConversationKey.value = "";
     tab.value = "channel";
+    panelOpen.value = !isMobileViewport.value;
     messageDraft.value = "";
     drafts.clear();
     sending.value = false;
@@ -250,6 +274,8 @@ export function useWebClientChat({
 
   return {
     tab,
+    panelOpen,
+    togglePanel,
     privateClientId,
     privateConversationKey,
     sending, sendError, canSend, status,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeQuickServers } from "./quick-servers.js";
+import { mergeQuickServers, quickServerTargetsEqual } from "./quick-servers.js";
 
 test("quick servers put favorites first and merge matching recent connection details", () => {
   const quickServers = mergeQuickServers(
@@ -45,6 +45,26 @@ test("quick server addresses are trimmed, normalized, and empty targets are skip
   assert.equal(quickServers.length, 1);
   assert.equal(quickServers[0].id, "voice.example:9987");
   assert.equal(quickServers[0].address, "Voice.Example:9987");
+});
+
+test("a recent default-port alias does not duplicate a favorite, while a different port remains separate", () => {
+  const quickServers = mergeQuickServers(
+    [{ id: "favorite", label: "Voice", address: "voice.example" }],
+    [
+      { id: "recent-default", address: "VOICE.EXAMPLE:9987", lastConnectedAt: 3 },
+      { id: "recent-custom", address: "voice.example:9988", lastConnectedAt: 2 },
+    ],
+  );
+
+  assert.deepEqual(quickServers.map(({ address, isFavorite }) => [address, isFavorite]), [
+    ["voice.example", true],
+    ["voice.example:9988", false],
+  ]);
+});
+
+test("current server matching recognizes omitted default ports after quick-server merging", () => {
+  assert.equal(quickServerTargetsEqual("voice.example", "VOICE.EXAMPLE:9987"), true);
+  assert.equal(quickServerTargetsEqual("voice.example:9988", "voice.example:9987"), false);
 });
 
 test("server-provided name and image replace address placeholders while custom favorite names stay intact", () => {

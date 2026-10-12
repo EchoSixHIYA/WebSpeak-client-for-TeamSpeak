@@ -10,13 +10,21 @@
 
 适用页面为连接首页、语音工作区和公开演示页。管理员面板及其数据、管理 API 明确排除，不读取皮肤包。语音服务的运营、广告、陪玩、活动和商店等页面不属于语音客户端皮肤范围。
 
+### 可移植包与运行时边界
+
+`.wskin` 是皮肤完整的分发单元：样式、公开页面/组件结构、文案、布局、美术资源、插件描述及允许的本地逻辑均随包携带。皮肤任务不得为单款皮肤修改或部署核心客户端、服务端或宿主控件。作者使用已经发布的版本化 schema、公开数据字段、宿主控件和受权限保护的动作；实例通过导入同一包获得同一款皮肤。
+
+连接会话、服务端配置等动态运行时数据仍由宿主提供，并通过明确版本的公开上下文交给皮肤；TeamSpeak 网络、身份凭据和敏感行为仍由宿主保管。若通用协议缺少所有皮肤都可复用的数据或动作，应先作为独立的平台能力定义稳定字段、权限、用户激活要求、兼容策略和测试，再发布运行时；之后皮肤只在 `.wskin` 中消费已发布接口。禁止把单款皮肤的 UI 或业务判断放进宿主控件注册表。
+
+同一兼容 WebSpeak/API 版本导入相同 `.wskin` 文件时，无需实例单独部署前端改动即可使用。兼容范围由 `minAppVersion`、组件 schema 与插件 `apiVersion` 决定；实例数据、管理员设置、视口及用户授权属于运行输入，不打包进皮肤，也不应导致皮肤源码分叉。
+
 ## 2. 包格式与执行模型
 
 皮肤格式按版本区分：v1 保持视觉皮肤兼容；v2 提供有界布局 JSON；v3 使用 open-skin 清单、受控 CSS 和声明式 components.json；v4 在 open-skin 包中增加必需的 plugins.json 和插件专属 JS/Wasm/CSS/素材路径。客户端与服务端共用 v4 插件描述校验器，并检查引用文件与大小；客户端额外验证 Wasm 入口的导入/导出 ABI。生产环境只在用户按摘要授权后执行受限 Wasm；JavaScript 仍仅校验和缓存。v1/v2 的 CSS 继续拒绝布局类声明，旧包不会因升级而获得新权限；v3/v4 才允许 CSS 控制公开页面中的布局、位置、尺寸、顺序、文字排版和显隐。
 
 v3 自定义组件不是脚本插件。components.json schema v1 是既有格式；schema v2 增加 `mode: "surface"` 与宿主控件节点；schema v3 扩大自定义节点、嵌套、重复列表和声明式交互的边界，并增加映射到现有语音功能的动作。宿主仍解析固定元素/属性白名单、固定数据集合、简单绑定与有限动作，再由 Vue 创建节点。每个自定义组件根和每个有 DOM 的节点都会作为独立本地布局项，可移动、调整尺寸、改变外观或隐藏。节点指定 `part` 后使用该标识；未指定时使用树路径，树结构调整后旧的本地覆盖可能要重新设置。可操作节点保留至少 44 px 的触控目标。作者不必使用固定宿主控件目录，但 v3 仍不足以表达任意自定义 UI 逻辑和完整插件生命周期。管理员面板和演示页不能被 surface 替换。
 
-宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`app.skin-switcher`、`app.language-switcher`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。schema v3 的受保护控件会在导入时验证完整权限集合：音频控件要求 `audio.status.read`、`audio.microphone.control` 与 `audio.output.control`；聊天控件要求 `chat.channel.read` 与 `chat.channel.send`；成员卡片始终要求 `session.members.read` 与 `session.memberAvatars.read`；默认保留的屏幕共享成员操作要求 `voice.screenShare.read`、`voice.screenShare.control`，schema v3 可通过 widget 的 `options.screenShare: false` 同时隐藏共享状态和操作并移除这两项权限要求；性能卡片也可用该选项隐藏共享 WebRTC 指标；头像只在可信宿主控件内显示，不暴露给皮肤代码；屏幕共享播放器要求后两者；悄悄话控件要求 `voice.whisper.status.read` 与 `voice.whisper.control`；连接/断开控件要求 `voice.disconnect`。既有 schema v2 包仍按此前规则校验，`voice.screen-share-start` 则保留原有 `voice.screenShare.control` 要求。该控件仅限语音页；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。
+宿主控件通过固定 ID 嵌入，始终由 WebSpeak 代码运行。当前可选注册表包括 `home.connection-form`、`home.connection-status`、`home.server-announcement`、`home.social-links`、`home.identity-provider`、`app.skin-switcher`、`app.language-switcher`、`voice.server-switcher`、`voice.server-header`、`voice.server-banner`、`voice.channel-tree`、`voice.channel-panel`、`voice.member-cards`、`voice.chat-panel`、`voice.audio-controls`、`voice.screen-share-player`、`voice.screen-share-start`、`voice.whisper-controls`、`voice.performance-panel`、`voice.connection-controls` 和 `voice.disconnect-control`。作者可以声明使用已发布的通用控件，但不得为单款皮肤改写或新增宿主控件；常规页面结构和视觉应由包内组件及 CSS 负责。每个控件在同一页面最多出现一次；未知 ID 或重复的有状态控件会拒绝导入。schema v3 的受保护控件会在导入时验证完整权限集合：音频控件要求 `audio.status.read`、`audio.microphone.control` 与 `audio.output.control`；聊天控件要求 `chat.channel.read` 与 `chat.channel.send`；成员卡片始终要求 `session.members.read` 与 `session.memberAvatars.read`；默认保留的屏幕共享成员操作要求 `voice.screenShare.read`、`voice.screenShare.control`，schema v3 可通过 widget 的 `options.screenShare: false` 同时隐藏共享状态和操作并移除这两项权限要求；性能卡片也可用该选项隐藏共享 WebRTC 指标；头像只在可信宿主控件内显示，不暴露给皮肤代码；屏幕共享播放器要求后两者；悄悄话控件要求 `voice.whisper.status.read` 与 `voice.whisper.control`；连接/断开控件要求 `voice.disconnect`。既有 schema v2 包仍按此前规则校验，`voice.screen-share-start` 则保留原有 `voice.screenShare.control` 要求。该控件仅限语音页；宿主按钮在可信点击处理器内直接开始屏幕采集，以保留浏览器要求的瞬时用户激活。作者可以不用这些控件，自行绘制界面并将点击、双击等事件绑定到公开数据与受权限保护的动作。`home.identity-provider` 是通用首页身份提供方入口，schema v3 必须提供 `options.identityProviderId` 和 `options.identityProviderLabel`；用户点击后宿主向通用身份提供方分发器提交稳定的 provider ID 与仅用于显示的名称。应用代码可以通过 `registerIdentityProviderAdapter` 注册宿主适配器；皮肤只能声明入口、不能注册适配器。当前未注册 MyTS 适配器，所以该按钮仍提示开发中；这只是通用接入接口，不表示 MyTS 登录协议或认证流程已经实现。
 
 v1-v3 包不能提交 HTML 字符串、事件处理代码、JavaScript、WebAssembly、远程脚本、任意 URL、表单导航、浏览器存储访问或网络调用。v4 可携带本地 JS/Wasm/CSS；JS 仍只校验和缓存，Wasm 在生产构建中经本地摘要授权后运行一次性有界任务，并经宿主解析、渲染动态 UI。运行时支持 `ui.surface.replace`、限定的公开只读数据权限和首版宿主动作效果；投影前由宿主按插件清单过滤字段，总快照最多 48 KiB，`ui_input_read` 输入最多 64 KiB。动作效果限于可信 UI 事件触发的同一轮调用、单个动作，并复用现有动作权限与参数校验。所有版本都拒绝未知协议字段、权限、动作和数据路径；v1-v3 拒绝未知节点/属性，v4 Wasm 输出则对标签名做语法验证、拒绝具备脚本/导航/嵌入能力的标签与属性，并将自定义标签惰性渲染为普通 `div`。
 
@@ -55,7 +63,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 - chat.channel.read：当前公开文字频道中可见的消息。
 - favorites.read：收藏项名称、类型、是否当前项和随机不透明本地令牌；不提供地址或凭据。
 - servers.quickList.read：统一后的收藏和最近连接名称、当前项、分类与随机不透明本地令牌；不提供地址或凭据。
-- audio.status.read：当前用户自己的麦克风静音和输出静音状态。
+- audio.status.read：当前用户自己的麦克风/扬声器静音、噪声抑制和伴奏播放状态；不暴露音频数据。
 - voice.whisper.status.read：悄悄话开关状态与已配置目标数量。
 - voice.screenShare.status.read：当前用户自己的屏幕共享状态。
 - voice.screenShare.read：当前可见共享的名称、来源、所有者显示名、音频标记和观看人数；不提供流内容。
@@ -68,7 +76,7 @@ v4 当前运行路径已不使用 v3 固定标签/属性/状态/动作表来构�
 - chat.sendMessage 需要 chat.channel.send，只能发送到当前公开文字频道；不包括私聊。
 - ui.setState 只修改该组件短暂的本地标量状态，不需要会话权限。
 - v3 的 ui.toggleState 可切换该组件声明的布尔状态，不需要会话权限。
-- v3 可在用户明确操作时切换自己的麦克风和扬声器静音、调整本地输出音量、断开当前会话、设置自己的离开状态、启停悄悄话，以及开始/停止或加入/离开可见的屏幕共享；每项都需要对应权限，并继续走 WebSpeak 原有流程。
+- v3 可在用户明确操作时切换自己的麦克风和扬声器静音、噪声抑制与伴奏、调整本地输出音量、打开音频设置、断开当前会话、设置自己的离开状态、启停悄悄话，以及开始/停止或加入/离开可见的屏幕共享；每项都需要对应权限，并继续走 WebSpeak 原有流程。`audio.toggleNoiseSuppression` 使用 `audio.microphone.control`，`audio.toggleAccompaniment` 使用 `audio.output.control`。
 
 宿主控件节点只是把 WebSpeak 的原生界面放进皮肤布局，不向皮肤提供控件内部的数据对象。控件仍使用原来的连接、权限和用户事件检查；例如嵌入 `voice.chat-panel` 可以让用户继续使用原生聊天界面，但不会授予组件读取私聊内容的能力。
 

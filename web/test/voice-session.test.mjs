@@ -414,6 +414,40 @@ test("own messages and conversation switches reveal the latest message, unrelate
   assert.equal(chat.listElement.value.scrollTop, 800);
 });
 
+test("chat history stays scoped to its channel, server, or private conversation", async t => {
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, members: [{ id: 7, uid: "alice", nickname: "Alice" }] });
+  const chat = chatView(t, { currentChannel: ref(undefined) });
+  voice.chatMessages.push(
+    { id: "history-channel-current", scope: "channel", targetId: "1", invokerName: "Alice", message: "Current room", timestamp: 1, isHistory: true },
+    { id: "history-channel-other", scope: "channel", targetId: "2", invokerName: "Alice", message: "Other room", timestamp: 2, isHistory: true },
+    { id: "history-channel-legacy", scope: "channel", invokerName: "Alice", message: "Legacy room message", timestamp: 3, isHistory: true },
+    { id: "history-server", scope: "server", invokerName: "Alice", message: "Server message", timestamp: 4, isHistory: true },
+    { id: "history-private", scope: "private", conversationId: "7", conversationKey: "uid:alice", conversationName: "Alice", invokerName: "Alice", message: "Private message", timestamp: 5, isHistory: true },
+  );
+
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["history-channel-current", "history-channel-legacy"]);
+  chat.tab.value = "server";
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["history-server"]);
+  chat.openPrivateChat(7);
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["history-private"]);
+  assert.equal(chat.conversations.value[0].name, "Alice");
+});
+
+test("opening a first private chat creates its tab and expands a collapsed chat panel", async t => {
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, members: [{ id: 7, uid: "alice", nickname: "Alice" }] });
+  const chat = chatView(t);
+  chat.togglePanel();
+  assert.equal(chat.panelOpen.value, false);
+
+  chat.openPrivateChat(7);
+  assert.equal(chat.tab.value, "private");
+  assert.equal(chat.panelOpen.value, true);
+  assert.deepEqual(chat.conversations.value.map(conversation => conversation.name), ["Alice"]);
+  assert.equal(chat.visibleMessages.value.length, 0, "a new conversation still renders its empty state");
+});
+
 test("hidden mobile chat defers scrolling until shown and ignores zero-height scroll events", async t => {
   const section = ref("voice");
   const chat = chatView(t, { isMobileViewport: ref(true), mobileSection: section });
@@ -2441,4 +2475,77 @@ test("voice STUN configuration reaches the browser peer and resets on a legacy c
   socket.receive({ type: "connected", tsClientId: 2, webrtcAvailable: true });
   await nextTurn();
   assert.deepEqual(TestPeer.instances.at(-1).config.iceServers, []);
+});
+
+test("connecting restores browser-local chat history before it is displayed", async t => {
+  let queriedServerKey = "";
+  const records = [
+    { id: "channel-current", serverKey: "history.example:9987", conversationKey: "channel:1", messages: [
+      { id: "saved-channel", scope: "channel", targetId: "1", invokerName: "Alice", message: "Saved channel message", timestamp: 1 },
+    ] },
+    { id: "channel-other", serverKey: "history.example:9987", conversationKey: "channel:2", messages: [
+      { id: "other-channel", scope: "channel", targetId: "2", invokerName: "Alice", message: "Other channel", timestamp: 2 },
+    ] },
+    { id: "server", serverKey: "history.example:9987", conversationKey: "server", messages: [
+      { id: "saved-server", scope: "server", invokerName: "Alice", message: "Saved server message", timestamp: 3 },
+    ] },
+    { id: "private", serverKey: "history.example:9987", conversationKey: "private:uid:alice", messages: [
+      { id: "saved-private", scope: "private", conversationId: "7", conversationKey: "uid:alice", conversationName: "Alice", invokerName: "Alice", message: "Saved private message", timestamp: 4 },
+    ] },
+  ];
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+  const database = {
+    onversionchange: undefined,
+    close() {},
+    transaction() {
+      const transaction = { oncomplete: undefined };
+      return Object.assign(transaction, {
+        objectStore() {
+          return {
+            index() {
+              return {
+                getAll(serverKey) {
+                  queriedServerKey = serverKey;
+                  const request = {};
+                  queueMicrotask(() => {
+                    request.result = records.filter(record => record.serverKey === serverKey);
+                    request.onsuccess?.();
+                    transaction.oncomplete?.();
+                  });
+                  return request;
+                },
+              };
+            },
+          };
+        },
+      });
+    },
+  };
+  Object.defineProperty(globalThis, "indexedDB", {
+    configurable: true,
+    value: { open: () => {
+      const request = { result: database };
+      queueMicrotask(() => request.onsuccess?.());
+      return request;
+    } },
+  });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, "indexedDB", descriptor);
+    else Reflect.deleteProperty(globalThis, "indexedDB");
+  });
+
+  const chat = chatView(t, { serverKey: ref("history.example:9987") });
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, members: [{ id: 7, uid: "alice", nickname: "Alice" }] });
+  await nextTurn();
+  await nextTick();
+
+  assert.equal(queriedServerKey, "history.example:9987");
+  assert.deepEqual(voice.chatMessages.map(message => message.id), ["saved-channel", "other-channel", "saved-server", "saved-private"]);
+  assert.ok(voice.chatMessages.every(message => message.isHistory), "restored messages are marked so they are not written back as new traffic");
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["saved-channel"]);
+  chat.tab.value = "server";
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["saved-server"]);
+  chat.openPrivateChat(7);
+  assert.deepEqual(chat.visibleMessages.value.map(message => message.id), ["saved-private"]);
 });

@@ -4,6 +4,8 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
+Skin authors should start with the [skin development guide](./SKIN_DEVELOPMENT.md). A `.wskin` package is the portable deliverable: skin UI and assets travel with the package, while skin-only work should not require core runtime edits. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
+
 ## Live demo
 
 URL: <https://webspeak.example.invalid>

@@ -147,6 +147,27 @@ test("server list skins may display only the host-provided TeamSpeak icon image"
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
 });
 
+test("chat panel visibility is host-controlled and its toggle requires chat access", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].permissions = ["chat.channel.read"];
+  document.components[0].actions = {
+    toggle: { type: "chat.togglePanel", args: {} },
+  };
+  document.components[0].root = {
+    tag: "button",
+    attributes: { "aria-expanded": "{{chat.status.panelOpen}}" },
+    events: { click: "toggle" },
+    children: [{ text: "{{chat.status.tabLabel}}" }],
+  };
+  const parsed = parseSkinPluginDocument(document).components[0];
+  assert.equal(parsed.actions.toggle.type, "chat.togglePanel");
+  assert.equal(parsed.root.attributes?.["aria-expanded"], "{{chat.status.panelOpen}}");
+
+  document.components[0].permissions = [];
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
+});
+
 test("host widget references stay allowlisted and cannot be used on the demo page", () => {
   const unknownWidget = validDocument();
   unknownWidget.schemaVersion = 2;
@@ -197,17 +218,21 @@ test("home connection status widget requires the public session status permissio
   assert.deepEqual(skinPluginWidgetPermissions("home.connection-status"), ["session.status.read"]);
 });
 
-test("MyTS login is a host button with no connection permission or skin action", () => {
+test("generic identity-provider entry is a host button with no connection permission or skin action", () => {
   const document = validDocument();
   document.schemaVersion = 3;
   document.components[0].page = "home";
   document.components[0].permissions = [];
   document.components[0].actions = {};
-  document.components[0].root = { tag: "main", children: [{ widget: "home.myts-login" }] };
+  document.components[0].root = {
+    tag: "main",
+    children: [{ widget: "home.identity-provider", options: { identityProviderId: "myts", identityProviderLabel: "myts" } }],
+  };
 
   const parsed = parseSkinPluginDocument(document);
-  assert.equal(parsed.components[0].root.children?.[0].widget, "home.myts-login");
-  assert.deepEqual(skinPluginWidgetPermissions("home.myts-login"), []);
+  assert.equal(parsed.components[0].root.children?.[0].widget, "home.identity-provider");
+  assert.deepEqual(parsed.components[0].root.children?.[0].options, { identityProviderId: "myts", identityProviderLabel: "myts" });
+  assert.deepEqual(skinPluginWidgetPermissions("home.identity-provider"), []);
   assert.deepEqual(Object.keys(parsed.components[0].actions), []);
 });
 
@@ -241,13 +266,13 @@ test("schema v3 host audio controls require read and control permissions while v
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_PERMISSION_MISSING");
 
   document.components[0].permissions = ["audio.status.read", "audio.microphone.control", "audio.output.control"];
-  document.components[0].root.children![0] = { widget: "voice.audio-controls", options: { layout: "room-panel" } };
-  const roomPanel = parseSkinPluginDocument(document).components[0].root.children?.[0];
-  assert.equal(roomPanel?.widget, "voice.audio-controls");
-  assert.deepEqual(roomPanel?.options, { layout: "room-panel" });
+  document.components[0].root.children![0] = { widget: "voice.audio-controls" };
+  const genericAudioControls = parseSkinPluginDocument(document).components[0].root.children?.[0];
+  assert.equal(genericAudioControls?.widget, "voice.audio-controls");
+  assert.equal(genericAudioControls?.options, undefined);
 
   const invalidLayout = structuredClone(document);
-  invalidLayout.components[0].root.children![0] = { widget: "voice.audio-controls", options: { layout: "custom" } as never };
+  invalidLayout.components[0].root.children![0] = { widget: "voice.audio-controls", options: { layout: "room-panel" } as never };
   errorCode(() => parseSkinPluginDocument(invalidLayout), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 
   const legacyDocument = structuredClone(document);
@@ -267,6 +292,32 @@ test("schema v3 member cards require a separate permission to display cached pro
 
   document.components[0].permissions.push("session.memberAvatars.read");
   assert.equal(parseSkinPluginDocument(document).components[0].root.children?.[0].widget, "voice.member-cards");
+});
+
+test("generic home identity-provider widget validates provider metadata", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].page = "home";
+  document.components[0].permissions = [];
+  document.components[0].actions = {};
+  document.components[0].root = {
+    tag: "main",
+    children: [{ widget: "home.identity-provider", options: { identityProviderId: "myts", identityProviderLabel: "myts" } }],
+  };
+  const widget = parseSkinPluginDocument(document).components[0].root.children?.[0];
+  assert.equal(widget?.widget, "home.identity-provider");
+  assert.deepEqual(widget?.options, { identityProviderId: "myts", identityProviderLabel: "myts" });
+
+  const missing = structuredClone(document);
+  missing.components[0].root.children![0] = { widget: "home.identity-provider" };
+  errorCode(() => parseSkinPluginDocument(missing), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
+
+  const invalidProvider = structuredClone(document);
+  invalidProvider.components[0].root.children![0] = {
+    widget: "home.identity-provider",
+    options: { identityProviderId: "myts/login", identityProviderLabel: "myts" } as never,
+  };
+  errorCode(() => parseSkinPluginDocument(invalidProvider), "SKIN_PLUGIN_WIDGET_OPTIONS_INVALID");
 });
 
 test("schema v3 scopes local UI state only to approved public scalar context fields", () => {
@@ -431,14 +482,22 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.equal(home.page, "home");
   assert.equal(home.mode, "surface");
   assert.deepEqual(home.permissions, ["ui.surface.replace", "session.status.read"]);
+  const homeSocialLinks = home.root.children?.at(-2);
+  assert.equal(homeSocialLinks?.part, "home-social-links");
+  assert.equal(homeSocialLinks?.widget, "home.social-links");
+  assert.equal(home.root.children?.at(-1)?.part, "home-language", "social icons appear immediately to the left of the language switcher");
   const connectionCard = home.root.children?.[1].children?.[0].children?.[1];
   assert.equal(connectionCard?.part, "connection-card");
   assert.equal(connectionCard?.children?.[0].part, "card-heading");
   assert.equal(connectionCard?.children?.[0].children?.[0].part, "connection-title");
-  assert.equal(connectionCard?.children?.[0].children?.[1].widget, "home.myts-login");
+  assert.equal(connectionCard?.children?.[0].children?.[1].widget, "home.identity-provider");
+  assert.deepEqual(connectionCard?.children?.[0].children?.[1].options, { identityProviderId: "myts", identityProviderLabel: "myts" });
   assert.equal(connectionCard?.children?.[2].widget, "home.connection-form");
   assert.equal(connectionCard?.children?.[4].widget, "home.connection-status");
-  const heroMedia = home.root.children?.[0].children?.[2];
+  const serverAnnouncement = home.root.children?.[0].children?.[2];
+  assert.equal(serverAnnouncement?.part, "server-announcement");
+  assert.equal(serverAnnouncement?.widget, "home.server-announcement");
+  const heroMedia = home.root.children?.[0].children?.[3];
   assert.equal(heroMedia?.part, "hero-media");
   assert.equal(heroMedia?.children?.[0].tag, "svg");
 
@@ -451,6 +510,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(workspace.permissions.includes("session.channel.join"));
   assert.ok(workspace.permissions.includes("servers.quickList.read"));
   assert.ok(workspace.permissions.includes("servers.quickList.switch"));
+  assert.ok(workspace.permissions.includes("chat.channel.read"));
   assert.ok(workspace.permissions.includes("chat.channel.send"));
   assert.ok(workspace.permissions.includes("audio.microphone.control"));
   assert.ok(workspace.permissions.includes("voice.screenShare.control"));
@@ -458,7 +518,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   assert.ok(workspace.permissions.includes("voice.screenShare.status.read"));
   assert.equal(workspace.actions["stop-screen-share"].type, "voice.stopScreenShare");
   assert.equal(workspace.actions["join-channel"], undefined, "channel joining is handled by the trusted tree widget");
-  assert.equal(workspace.actions["send-message"].type, "chat.sendMessage");
+  assert.equal(workspace.actions["toggle-chat-panel"].type, "chat.togglePanel");
 
   const nodes: SkinPluginNode[] = [];
   const visit = (node: SkinPluginNode): void => {
@@ -466,17 +526,23 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
     node.children?.forEach(visit);
   };
   visit(workspace.root);
-  assert.ok(nodes.some((node) => node.widget === "voice.audio-controls"));
   assert.ok(nodes.some((node) => node.widget === "voice.member-cards"));
-  assert.ok(nodes.some((node) => node.widget === "voice.audio-controls" && node.options?.layout === "room-panel"));
+  assert.ok(nodes.some((node) => node.part === "desktop-room-controls" && node.tag === "div"), "the desktop audio dock is composed in the skin document");
+  assert.ok(nodes.some((node) => node.part === "desktop-room-noise-suppression" && node.events?.click === "toggle-noise-suppression"));
+  assert.ok(nodes.some((node) => node.part === "desktop-room-accompaniment" && node.events?.click === "toggle-accompaniment"));
+  assert.ok(nodes.some((node) => node.part === "mobile-room-controls" && node.tag === "div"), "the mobile room toolbar is composed in the skin document");
+  assert.ok(nodes.some((node) => node.part === "mobile-room-microphone" && node.events?.click === "toggle-microphone"));
+  assert.ok(nodes.some((node) => node.part === "mobile-room-speaker" && node.events?.click === "open-audio-settings"));
+  assert.ok(nodes.some((node) => node.part === "mobile-room-exit" && node.events?.click === "disconnect"));
   assert.ok(nodes.some((node) => node.widget === "voice.server-header"), "the server header exposes trusted search and quick switching");
   assert.ok(nodes.some((node) => node.widget === "voice.channel-tree" && node.options?.layout === "server-sidebar"), "the KAAK channel tree opts into its isolated sidebar layout");
   assert.equal(nodes.find((node) => node.part === "record-placeholder"), undefined, "the KAAK voice dock does not expose a recording control");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-start"), "the voice dock exposes WebSpeak screen sharing");
   assert.ok(nodes.some((node) => node.widget === "voice.screen-share-player"), "the voice stage keeps WebSpeak's screen-share player");
+  assert.ok(nodes.some((node) => node.widget === "voice.chat-panel"), "KAAK uses the unified host chat panel for channel, server, and private messages");
   assert.equal(nodes.find((node) => node.part === "screen-share-stop")?.events?.click, "stop-screen-share");
   assert.ok(!nodes.some((node) => node.repeat?.path === "session.members"), "member imagery stays inside the trusted host widget");
-  assert.ok(nodes.some((node) => node.tag === "input" && node.bindValue === "message"));
+  assert.ok(!nodes.some((node) => node.tag === "input" && node.bindValue === "message"), "chat input state stays in the host-owned panel");
 });
 
 test("skin plugin binds form controls only to declared local state", () => {
@@ -625,14 +691,15 @@ test("component schema v3 exposes composable interaction patterns and permission
   const document = validDocument();
   document.schemaVersion = 3;
   document.components[0].permissions = [
-    "audio.microphone.control", "audio.output.control", "audio.status.read", "voice.disconnect", "voice.presence.write",
+    "audio.microphone.control", "audio.output.control", "audio.status.read", "audio.settings.open", "voice.disconnect", "voice.presence.write",
     "voice.whisper.control", "voice.whisper.status.read", "voice.screenShare.control", "voice.screenShare.read", "voice.screenShare.status.read",
   ];
-  document.components[0].state = { menuopen: false, volume: 0.5, awaymessage: "" };
+  document.components[0].state = { menuopen: false, chatopen: true, volume: 0.5, awaymessage: "" };
   document.components[0].actions = {
-    "toggle-menu": { type: "ui.toggleState", args: { key: "menuopen" } },
+    "toggle-menu": { type: "ui.toggleState", args: { key: "menuopen", resetKey: "chatopen" } },
     microphone: { type: "voice.toggleMicrophone", args: {} },
     speaker: { type: "voice.toggleOutputMute", args: {} },
+    settings: { type: "audio.openSettings", args: {} },
     volume: { type: "voice.setOutputVolume", args: { volume: "{{state.volume}}" } },
     disconnect: { type: "voice.disconnect", args: {} },
     away: { type: "voice.setAway", args: { away: true, message: "{{state.awaymessage}}" } },
@@ -649,6 +716,7 @@ test("component schema v3 exposes composable interaction patterns and permission
       { tag: "button", events: { contextmenu: "toggle-menu", pointerenter: "toggle-menu" }, children: [{ text: "Menu" }] },
       { tag: "button", events: { click: "microphone" }, children: [{ text: "Microphone" }] },
       { tag: "button", events: { click: "speaker" }, children: [{ text: "Speaker" }] },
+      { tag: "button", events: { click: "settings" }, children: [{ text: "Audio settings" }] },
       { tag: "button", events: { click: "volume" }, children: [{ text: "Volume" }] },
       { tag: "button", events: { click: "disconnect" }, children: [{ text: "Disconnect" }] },
       { tag: "button", events: { click: "away" }, children: [{ text: "Away" }] },
@@ -665,7 +733,13 @@ test("component schema v3 exposes composable interaction patterns and permission
   assert.equal(parsed.schemaVersion, 3);
   assert.equal(parsed.components[0].root.children?.[0].events?.contextmenu, "toggle-menu");
   assert.equal(parsed.components[0].actions["join-share"].type, "voice.joinScreenShare");
-  assert.equal(parsed.components[0].root.children?.[9].repeat?.path, "screenShare.streams");
+  assert.equal(parsed.components[0].actions.settings.type, "audio.openSettings");
+  assert.equal(parsed.components[0].actions["toggle-menu"].args.resetKey, "chatopen");
+  assert.equal(parsed.components[0].root.children?.[10].repeat?.path, "screenShare.streams");
+
+  const invalidResetKey = structuredClone(document);
+  invalidResetKey.components[0].actions["toggle-menu"].args.resetKey = "missing";
+  errorCode(() => parseSkinPluginDocument(invalidResetKey), "SKIN_PLUGIN_ACTION_INVALID");
 
   const passiveVoiceControl = structuredClone(document);
   passiveVoiceControl.components[0].root.children![0].events = { pointerenter: "microphone" };
@@ -674,6 +748,10 @@ test("component schema v3 exposes composable interaction patterns and permission
   const missingPermission = structuredClone(document);
   missingPermission.components[0].permissions = missingPermission.components[0].permissions.filter((item) => item !== "audio.microphone.control");
   errorCode(() => parseSkinPluginDocument(missingPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
+
+  const missingAudioSettingsPermission = structuredClone(document);
+  missingAudioSettingsPermission.components[0].permissions = missingAudioSettingsPermission.components[0].permissions.filter((item) => item !== "audio.settings.open");
+  errorCode(() => parseSkinPluginDocument(missingAudioSettingsPermission), "SKIN_PLUGIN_PERMISSION_MISSING");
 
   const oldSchema = structuredClone(document);
   oldSchema.schemaVersion = 2;

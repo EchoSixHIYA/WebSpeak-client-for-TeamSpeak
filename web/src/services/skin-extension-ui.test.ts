@@ -65,12 +65,13 @@ test("scoped local state keeps each voice channel's chat visibility independent"
       accessibleName: "Voice workspace",
       permissions: ["session.status.read"],
       stateScope: "session.status.channelId",
-      state: { chatopen: true },
-      actions: { toggle: { type: "ui.toggleState", args: { key: "chatopen" } } },
+      state: { chatopen: true, roommenu: true },
+      actions: { toggle: { type: "ui.toggleState", args: { key: "chatopen", resetKey: "roommenu" } } },
       root: { tag: "main", children: [
         { tag: "button", attributes: { type: "button" }, events: { click: "toggle" }, children: [{ text: "Toggle chat" }] },
         { tag: "span", when: { path: "state.chatopen", equals: true }, children: [{ text: "Open" }] },
         { tag: "span", when: { path: "state.chatopen", equals: false }, children: [{ text: "Closed" }] },
+        { tag: "span", when: { path: "state.roommenu", equals: true }, children: [{ text: "Menu open" }] },
       ] },
     }],
   });
@@ -140,8 +141,10 @@ test("scoped local state keeps each voice channel's chat visibility independent"
   app.mount(host);
   await nextTick();
   assert.match(textContent(host), /Open/);
+  assert.match(textContent(host), /Menu open/);
   await toggle();
   assert.match(textContent(host), /Closed/);
+  assert.doesNotMatch(textContent(host), /Menu open/, "a page toggle can close a related transient menu");
 
   channelId.value = "voice-b";
   await nextTick();

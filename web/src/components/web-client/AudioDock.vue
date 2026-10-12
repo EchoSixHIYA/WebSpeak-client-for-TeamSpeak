@@ -1,23 +1,10 @@
 <template>
   <div
-    :class="[
-      'desktop-audio-dock',
-      { 'desktop-audio-dock-room-panel': layout === 'room-panel' },
-    ]"
+    class="desktop-audio-dock"
     data-ws-part="voice.audio-dock"
     role="toolbar"
     :aria-label="t('desktopAudioControls')"
   >
-    <button
-      v-if="layout === 'room-panel'"
-      type="button"
-      class="room-panel-audio-settings"
-      :aria-label="t('voiceSettings')"
-      :title="t('voiceSettings')"
-      aria-haspopup="dialog"
-      @click="emit('settings')"
-      ><Icon name="settings" :size="16" /><span>{{ t("voiceSettings") }}</span></button
-    >
     <div class="desktop-audio-dock-copy"
       ><strong>{{ t("desktopAudioControls") }}</strong
       ><span>{{
@@ -25,17 +12,6 @@
       }}</span></div
     >
     <div class="desktop-audio-dock-actions">
-      <button
-        v-if="layout === 'room-panel'"
-        type="button"
-        class="dock-audio-button noise-suppression-toggle"
-        :class="{ active: noiseSuppressionEnabled, inactive: !noiseSuppressionEnabled }"
-        :title="t('noiseSuppression')"
-        :aria-label="t('noiseSuppression')"
-        :aria-pressed="noiseSuppressionEnabled"
-        @click="toggleNoiseSuppression"
-        ><Icon name="noise-suppression" :size="20" /></button
-      >
       <div
         class="dock-hover-control"
         data-ws-part="voice.audio-dock.microphone"
@@ -73,18 +49,16 @@
             :aria-label="t('inputVolume')"
             @input="onInputVolume"
           />
-          <template v-if="layout === 'default'">
-            <div class="dock-panel-divider"></div>
-            <label class="dock-switch-row"
-              ><span
-                ><strong>{{ t("noiseSuppression") }}</strong></span
-              ><input
-                type="checkbox"
-                :checked="noiseSuppressionEnabled"
-                :aria-label="t('noiseSuppression')"
-                @change="onNoiseSuppressionToggle"
-            /></label>
-          </template>
+          <div class="dock-panel-divider"></div>
+          <label class="dock-switch-row"
+            ><span
+              ><strong>{{ t("noiseSuppression") }}</strong></span
+            ><input
+              type="checkbox"
+              :checked="noiseSuppressionEnabled"
+              :aria-label="t('noiseSuppression')"
+              @change="onNoiseSuppressionToggle"
+          /></label>
         </div>
       </div>
       <div
@@ -127,7 +101,6 @@
         </div>
       </div>
       <button
-        v-if="layout === 'default'"
         type="button"
         class="dock-audio-button"
         :title="t('audioSettings')"
@@ -161,12 +134,10 @@ import type { useWebClientAudioControls } from "../../composables/useWebClientAu
 const props = defineProps<{
   model: Pick<ReturnType<typeof useVoiceWebSocket>, "microphoneMuted" | "inputVolume" | "outputVolume" | "outputMuted" | "noiseSuppressionEnabled" | "accompanimentActive">;
   controls: Pick<ReturnType<typeof useWebClientAudioControls>, "toggleMicrophone" | "toggleNoiseSuppression" | "onInputVolume" | "onOutputVolume" | "onNoiseSuppressionToggle" | "toggleAccompaniment">;
-  layout?: "default" | "room-panel";
   t: (key: string) => string;
   rangeStyle: (value: number, max: number) => Record<string, string>;
 }>();
 const { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionEnabled, accompanimentActive } = props.model;
-const { toggleMicrophone, toggleNoiseSuppression, onInputVolume, onOutputVolume, onNoiseSuppressionToggle, toggleAccompaniment } = props.controls;
-const layout = props.layout ?? "default";
+const { toggleMicrophone, onInputVolume, onOutputVolume, onNoiseSuppressionToggle, toggleAccompaniment } = props.controls;
 const emit = defineEmits<{ settings: []; outputMute: [] }>();
 </script>
