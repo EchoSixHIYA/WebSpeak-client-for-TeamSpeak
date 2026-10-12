@@ -150,7 +150,7 @@ function updateStageSize(): void {
   setInlineStyle(player, "height", null);
   setInlineStyle(stage, "width", null);
   setInlineStyle(stage, "height", null);
-  setInlineStyle(stage, "aspect-ratio", "16 / 9");
+  setInlineStyle(stage, "aspect-ratio", "auto");
 }
 
 function setPlayerElementNode(element: unknown): void {

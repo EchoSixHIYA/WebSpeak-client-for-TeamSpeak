@@ -7137,7 +7137,7 @@
 :deep(.screen-share-player) {
   position: relative;
   z-index: 3;
-  width: min(100%, 1100px);
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   margin-top: 17px;
@@ -7152,9 +7152,10 @@
 :deep(.screen-share-player-stage) {
   position: relative;
   display: grid;
-  width: min(100%, 1100px);
+  width: 100%;
   max-width: 100%;
-  aspect-ratio: 16 / 9;
+  height: min(64vh, 640px);
+  min-height: 280px;
   box-sizing: border-box;
   place-items: center;
   overflow: hidden;
@@ -7418,6 +7419,8 @@
   }
   :deep(.screen-share-player-stage) {
     width: 100%;
+    height: min(58vh, 480px);
+    min-height: 220px;
   }
   :deep(.screen-share-player-viewers) {
     top: 10px;

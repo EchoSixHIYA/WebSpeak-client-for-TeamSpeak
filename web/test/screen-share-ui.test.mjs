@@ -41,19 +41,20 @@ test("a newly mounted or replaced video receives the existing stream and volume"
   } finally { f.app.unmount(); }
 });
 
-test("screen-share player keeps a fixed 16:9 stage and letterboxes other video ratios in black", async () => {
+test("screen-share player fills the content width, limits height, and letterboxes in black", async () => {
   const css = await readFile(new URL("../src/styles/web-client.css", import.meta.url), "utf8");
   const component = await readFile(new URL("../src/components/web-client/ScreenSharePlayer.vue", import.meta.url), "utf8");
   const playerRule = css.match(/:deep\(\.screen-share-player\)\s*\{([^}]*)\}/)?.[1] ?? "";
   const stageRule = css.match(/:deep\(\.screen-share-player-stage\)\s*\{([^}]*)\}/)?.[1] ?? "";
   const videoRule = css.match(/:deep\(\.screen-share-player-video\)\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.match(playerRule, /width:\s*min\(100%,\s*1100px\)/);
+  assert.match(playerRule, /width:\s*100%/);
   assert.doesNotMatch(playerRule, /width:\s*fit-content/);
-  assert.match(stageRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(stageRule, /width:\s*100%/);
+  assert.match(stageRule, /height:\s*min\(64vh,\s*640px\)/);
   assert.match(stageRule, /background:\s*#000/);
   assert.match(videoRule, /object-fit:\s*contain/);
   assert.match(videoRule, /background:\s*#000/);
-  assert.doesNotMatch(component, /video\.video(?:Width|Height)/, "source dimensions must not resize the fixed player stage");
+  assert.doesNotMatch(component, /video\.video(?:Width|Height)/, "source dimensions must not resize the player stage");
   assert.doesNotMatch(component, /ResizeObserver/, "player sizing must not create a resize-feedback loop while video starts");
   assert.match(component, /if \(playerElement\.value === next\) return;/, "stable function refs must not rewrite player styles on every render");
   assert.match(component, /if \(stageElement\.value === next\) return;/, "stable function refs must not rewrite stage styles on every render");
