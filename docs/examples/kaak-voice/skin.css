@@ -3185,6 +3185,40 @@
   background: #242529;
   box-shadow: 0 0 0 2px rgba(108, 191, 0, .2);
 }
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) {
+  box-sizing: border-box;
+  height: 40px;
+  min-height: 40px;
+  gap: 0;
+  padding: 0 15px;
+  color: #d6d7db;
+  border: 1px solid #3b3c40;
+  border-radius: 12px;
+  background: #242529;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]):focus-within {
+  border-color: #6cbf00;
+  background: #242529;
+  box-shadow: 0 0 0 2px rgba(108, 191, 0, .2);
+}
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) > svg {
+  display: none;
+}
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: #f0f1f3;
+  outline: none;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+}
+[data-ws-part="home.form"] [data-ws-part="home.field"]:has(input[type="password"]) input::placeholder {
+  color: #777980;
+}
 [data-ws-part="auth.password.field"] input {
   width: 100%;
   min-width: 0;

@@ -588,6 +588,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\[data-ws-part="auth\.password\.dialog"\]\s*\{[^}]*width: min\(438px, calc\(100vw - 32px\)\);[^}]*min-height: 204px;[^}]*background: #242529;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.title"\]\s*\{[^}]*font-size: 13px;[^}]*font-weight: 700;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.field"\]\s*\{[^}]*height: 40px;[^}]*border: 1px solid #3b3c40;[^}]*border-radius: 12px;/);
+  assert.match(skin.css, /\[data-ws-part="home\.form"\] \[data-ws-part="home\.field"\]:has\(input\[type="password"\]\)\s*\{[^}]*height: 40px;[^}]*border-radius: 12px;[^}]*background: #242529;/);
   assert.match(skin.css, /\[data-ws-part="auth\.password\.actions"\] > button:last-child\s*\{[^}]*width: 82px;[^}]*height: 36px;[^}]*background: #6cbf00;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock"\] \{[\s\S]*?width: min\(282px, calc\(100% - 22px\)\);[\s\S]*?margin-bottom: 11px;[\s\S]*?border-radius: 17px;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-actions"\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px;[\s\S]*?grid-template-rows: 29px 26px;[\s\S]*?row-gap: 21px;/);
