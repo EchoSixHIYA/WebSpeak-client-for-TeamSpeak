@@ -8,7 +8,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 ## 在线 Demo
 
-地址：<https://webspeak.example.invalid>
+地址：<https://webspeak.online>
 
 公共 Demo 位于香港，网络和负载可能不稳定。延迟、断线或暂时不可用不代表自行部署后的实际表现。
 

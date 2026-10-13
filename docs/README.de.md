@@ -8,7 +8,7 @@ Aktuelle Version: [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-Te
 
 ## Live-Demo
 
-Adresse: <https://webspeak.example.invalid>
+Adresse: <https://webspeak.online>
 
 Die öffentliche Demo läuft in Hongkong. Netzwerkbedingungen und Auslastung können instabil sein; Latenz, Verbindungsabbrüche oder kurze Ausfälle beschreiben nicht jede eigene Bereitstellung.
 
