@@ -38,14 +38,13 @@
 
 ## 文档 · Documentation
 
-- [v0.2.7 更新日志 / Release notes](./docs/README.zh-CN.md#latest-release-notes) · [English](./docs/README.en.md#latest-release-notes) · [Deutsch](./docs/README.de.md#latest-release-notes) · [Русский](./docs/README.ru.md#latest-release-notes) · [日本語](./docs/README.ja.md#latest-release-notes)
-- [简体中文](./docs/README.zh-CN.md)
-- [English](./docs/README.en.md)
-- [Deutsch](./docs/README.de.md)
-- [Русский](./docs/README.ru.md)
-- [日本語](./docs/README.ja.md)
-- [当前皮肤开发指南 / Current skin development guide](./docs/SKIN_DEVELOPMENT.md)
-- [皮肤开发 Agent Skill / Skin Development Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
+- [简体中文](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.zh-CN.md)
+- [English](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.en.md)
+- [Deutsch](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.de.md)
+- [Русский](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.ru.md)
+- [日本語](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.ja.md)
+- [皮肤开发指南 / Skin development guide](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/SKIN_DEVELOPMENT.md)
+- [皮肤开发 Agent Skill / Skin Development Agent Skill](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/.agents/skills/webspeak-skin-development/SKILL.md)
 
 ## 社区 · Community
 
