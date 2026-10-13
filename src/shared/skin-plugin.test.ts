@@ -237,6 +237,22 @@ test("home connection status widget requires the public session status permissio
   assert.deepEqual(skinPluginWidgetPermissions("home.connection-status"), ["session.status.read"]);
 });
 
+test("visitor count is a permission-free public home widget and cannot mount on other pages", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].page = "home";
+  document.components[0].permissions = [];
+  document.components[0].actions = {};
+  document.components[0].root = { tag: "main", children: [{ widget: "home.visitor-count", part: "visitors" }] };
+
+  const parsed = parseSkinPluginDocument(document);
+  assert.equal(parsed.components[0].root.children?.[0].widget, "home.visitor-count");
+  assert.deepEqual(skinPluginWidgetPermissions("home.visitor-count"), []);
+
+  document.components[0].page = "voice";
+  errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_WIDGET_INVALID");
+});
+
 test("generic identity-provider entry is a host button with no connection permission or skin action", () => {
   const document = validDocument();
   document.schemaVersion = 3;
@@ -519,6 +535,7 @@ test("KAAK v3 example declares the connection home and complete voice workspace"
   const heroMedia = home.root.children?.[0].children?.[3];
   assert.equal(heroMedia?.part, "hero-media");
   assert.equal(heroMedia?.children?.[0].tag, "svg");
+  assert.equal(heroMedia?.children?.[1].widget, "home.visitor-count");
 
   assert.equal(workspace.page, "voice");
   assert.equal(workspace.mode, "surface");

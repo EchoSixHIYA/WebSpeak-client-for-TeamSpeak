@@ -118,41 +118,11 @@
               ></div
             >
           </div>
-          <div
+          <VisitorCount
             v-if="visitorNumber !== null"
-            class="visitor-count"
-            data-ws-part="home.visitors"
-            role="status"
-            aria-live="polite"
-          >
-            <span
-              class="visitor-count-orbit"
-              aria-hidden="true"
-            ></span>
-            <span class="visitor-count-icon"
-              ><Icon
-                name="users"
-                :size="15"
-            /></span>
-            <span class="visitor-count-label">{{
-              t("visitorCount", { count: visitorNumber })
-            }}</span>
-            <span
-              v-if="visitorTotal !== null"
-              class="visitor-count-divider"
-              aria-hidden="true"
-            ></span>
-            <span
-              v-if="visitorTotal !== null"
-              class="visitor-count-total"
-              >{{ t("visitorTotal", { count: visitorTotal }) }}</span
-            >
-            <span
-              class="visitor-count-spark"
-              aria-hidden="true"
-              >✦</span
-            >
-          </div>
+            :current-label="t('visitorCount', { count: visitorNumber })"
+            :total-label="visitorTotal === null ? undefined : t('visitorTotal', { count: visitorTotal })"
+          />
         </div>
 
         <div
@@ -991,6 +961,7 @@ import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
 import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
 import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
 import VoiceServerBanner from "../components/web-client/VoiceServerBanner.vue";
+import VisitorCount from "../components/web-client/VisitorCount.vue";
 import ScreenShareSettingsDialog from "../components/web-client/ScreenShareSettingsDialog.vue";
 import ScreenSharePlayer from "../components/web-client/ScreenSharePlayer.vue";
 import AudioDock from "../components/web-client/AudioDock.vue";
@@ -1786,6 +1757,10 @@ const homeConnectionStatus = computed(() => {
 });
 
 const skinPluginWidgets = {
+  "home.visitor-count": () => visitorNumber.value === null ? null : h(VisitorCount, {
+    currentLabel: t("visitorCount", { count: visitorNumber.value }),
+    totalLabel: visitorTotal.value === null ? undefined : t("visitorTotal", { count: visitorTotal.value }),
+  }),
   "home.server-announcement": () => h("section", {
     "data-ws-part": "home.server-announcement",
     "aria-label": t("serverAnnouncement"),

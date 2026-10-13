@@ -486,7 +486,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.108");
+  assert.equal(skin.version, "3.1.115");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -496,6 +496,11 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     ["kaak-workspace", "surface"],
   ]);
   assert.ok(home?.permissions.includes("ui.surface.replace"));
+  assert.match(skin.css, /kaak-home\.home"\]\s*\{[\s\S]*?height: calc\(var\(--ws-viewport-height, 100dvh\) \/ var\(--ui-scale, 1\)\);[\s\S]*?overflow-y: auto;/, "only the explicitly named KAAK home root receives viewport layout styles");
+  assert.doesNotMatch(skin.css, /\[data-ws-plugin-part="kaak-home"\]\s*\{/, "unlabelled SVG nodes cannot inherit home root sizing rules");
+  assert.match(skin.css, /kaak-home\.right"\]\s*\{[\s\S]*?padding: 210px 28px 45px;/, "the login card keeps its existing vertical position");
+  assert.match(skin.css, /kaak-home\.hero"\]\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-rows: auto auto auto minmax\(0, 1fr\);/, "the announcement and illustration have separate rows within the left panel");
+  assert.match(skin.css, /kaak-home\.hero-media"\]\s*\{[\s\S]*?position: relative;[\s\S]*?margin: clamp\(16px, 2\.8dvh, 32px\) 6% 5%;/, "the left illustration follows the announcement with a bounded gap");
   assert.match(skin.css, /@media \(max-width: 850px\)[\s\S]*?\[data-ws-plugin-part="kaak-home\.hero"\]\s*\{\s*display: none;/, "the narrow connection home hides the green hero and screen illustration");
   assert.match(skin.css, /@media \(max-width: 850px\)[\s\S]*?\[data-ws-plugin-part="kaak-home\.welcome-title"\]\s*\{\s*display: none;/, "the narrow connection home shows only the login card");
   assert.equal(voice?.stateScope, "session.status.channelId");
@@ -531,9 +536,21 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   }
   assert.equal(findPart(home?.root, "home-language")?.widget, "app.language-switcher", "the KAAK connection home has a language switcher in its top corner");
   assert.equal(findPart(home?.root, "server-announcement")?.widget, "home.server-announcement", "the KAAK connection home displays the localized administrator announcement");
+  assert.equal(findPart(home?.root, "visitor-stats")?.widget, "home.visitor-count", "the KAAK home composes the public visitor count widget over the monitor screen");
+  assert.match(skin.css, /kaak-home\.visitor-stats"\]\s*\{[^}]*position: absolute;[^}]*top: 64%;[^}]*left: 50%;[^}]*max-width: 58%;/, "visitor statistics are contained within the monitor screen by the package");
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.hero"\]\s*\{[^}]*overflow: visible;/, "the hero does not clip the announcement as it spans the full home width");
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.server-announcement"\][^}]*width: calc\(100% - 40px\);[^}]*margin: 20px 20px 0;/, "the announcement card fills its half-width hero with 20px side margins");
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.server-announcement"\] \[data-ws-part="home\.server-announcement\.body"\]\s*\{[^}]*color: #273248;/, "the announcement uses the published semantic text part with a readable color");
+  const illustration = findPart(home?.root, "illustration");
+  assert.equal(illustration?.attributes?.viewbox, "0 0 640 480", "the KAAK illustration uses a balanced 4:3 viewBox");
+  const monitorFrame = illustration?.children?.[5];
+  const screenBackground = illustration?.children?.[6];
+  const screenHeader = illustration?.children?.[7];
+  assert.deepEqual([monitorFrame?.attributes?.x, monitorFrame?.attributes?.y, monitorFrame?.attributes?.width, monitorFrame?.attributes?.height], [120, 110, 400, 288]);
+  assert.equal(screenBackground?.attributes?.d, "M147 122h346a15 15 0 0 1 15 15v234a15 15 0 0 1-15 15H147a15 15 0 0 1-15-15V137a15 15 0 0 1 15-15Z");
+  assert.equal(screenHeader?.attributes?.d, "M147 122h346a15 15 0 0 1 15 15v31H132v-31a15 15 0 0 1 15-15Z");
+  assert.match(skin.css, /kaak-home\.hero"\]\s*\{[^}]*min-width: 0;/, "the illustration column can shrink without overlapping the adjacent home panel");
+  assert.match(skin.css, /kaak-home\.hero-media"\]\s*\{[^}]*width: auto;[^}]*min-width: 0;[^}]*margin: clamp\(16px, 2\.8dvh, 32px\) 6% 5%;/, "the monitor artwork fits between its left and right margins without clipping");
   assert.equal(findPart(home?.root, "home-social-links")?.widget, "home.social-links", "the KAAK connection home exposes icon links beside the language switcher");
   assert.equal(findPart(home?.root, "identity-provider")?.widget, "home.identity-provider");
   assert.deepEqual(findPart(home?.root, "identity-provider")?.options, { identityProviderId: "myts", identityProviderLabel: "myts" });
@@ -729,7 +746,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\.settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
   assert.match(skin.css, /\.microphone-toggle:not\(\.muted\):active,[\s\S]*?background: #60ab00;\s*border-color: #60ab00;/);
   assert.doesNotMatch(skin.css, /#58c877/);
-  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home"\] \{[^}]*font-family: Arial, "Microsoft YaHei", sans-serif;/);
+  assert.match(skin.css, /\[data-ws-plugin-part="kaak-home\.home"\] \{[^}]*font-family: Arial, "Microsoft YaHei", sans-serif;/);
   assert.match(skin.css, /\[data-ws-part="home\.identity-provider\.button"\][\s\S]*?clip-path: polygon\(0 0, 100% 0, 100% 100%\);/);
   assert.match(skin.css, /\[data-ws-part="home\.identity-provider\.label"\][\s\S]*?color: #fff;[\s\S]*?transform: rotate\(45deg\);/);
   assert.match(skin.css, /settings-select-menu[\s\S]*?background: #25262a/);

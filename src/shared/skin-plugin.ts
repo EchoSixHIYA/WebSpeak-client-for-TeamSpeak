@@ -45,6 +45,7 @@ export type SkinPluginComponentMode = "widget" | "surface";
 export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "home.connection-form",
   "home.connection-status",
+  "home.visitor-count",
   "home.server-announcement",
   "home.social-links",
   "home.identity-provider",
@@ -470,6 +471,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
       if (rawNode.widget !== undefined) {
         if (typeof rawNode.widget !== "string" || !HOST_WIDGETS.has(rawNode.widget)) fail("SKIN_PLUGIN_WIDGET_INVALID", "The component requests an unsupported host widget.");
         if (page === "demo") fail("SKIN_PLUGIN_WIDGET_INVALID", "Host widgets are available only on the home and voice client pages.");
+        if (rawNode.widget === "home.visitor-count" && page !== "home") fail("SKIN_PLUGIN_WIDGET_INVALID", "The visitor count widget is available only on the home page.");
         if (rawNode.options !== undefined && inputSchemaVersion < 3) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Host widget options require components schema version 3.");
         // Preserve existing schema v2 packages; newly authored v3 widgets must declare every
         // permission needed by the trusted host UI they embed. Screen-share start was already gated.

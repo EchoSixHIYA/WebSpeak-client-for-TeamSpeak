@@ -65,60 +65,93 @@
                     "tag": "svg",
                     "part": "illustration",
                     "attributes": {
-                      "viewbox": "0 0 550 510",
+                      "viewbox": "0 0 640 480",
                       "role": "img",
-                      "aria-label": "WebSpeak 展示插画"
+                      "aria-label": "WebSpeak voice connection illustration"
                     },
                     "children": [
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 45,
-                          "y": 65,
-                          "width": 460,
-                          "height": 400,
-                          "rx": 80,
+                          "x": 40,
+                          "y": 22,
+                          "width": 560,
+                          "height": 436,
+                          "rx": 88,
                           "fill": "#b0f49b"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M526 51v-18M549 61l13-13",
+                          "stroke": "#ff9b70",
+                          "stroke-width": 12,
+                          "fill": "none",
+                          "stroke-linecap": "round"
+                        }
+                      },
+                      {
+                        "tag": "circle",
+                        "attributes": {
+                          "cx": 526,
+                          "cy": 83,
+                          "r": 23,
+                          "fill": "#ff9b70"
                         }
                       },
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 90,
-                          "y": 145,
-                          "width": 370,
-                          "height": 275,
-                          "rx": 28,
+                          "x": 295,
+                          "y": 394,
+                          "width": 50,
+                          "height": 29,
+                          "rx": 7,
                           "fill": "#223641"
                         }
                       },
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 103,
-                          "y": 157,
-                          "width": 344,
-                          "height": 250,
-                          "rx": 18,
-                          "fill": "#f7fff7"
+                          "x": 250,
+                          "y": 418,
+                          "width": 140,
+                          "height": 16,
+                          "rx": 8,
+                          "fill": "#223641"
                         }
                       },
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 103,
-                          "y": 157,
-                          "width": 344,
-                          "height": 45,
-                          "rx": 18,
+                          "x": 120,
+                          "y": 110,
+                          "width": 400,
+                          "height": 288,
+                          "rx": 25,
+                          "fill": "#223641"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M147 122h346a15 15 0 0 1 15 15v234a15 15 0 0 1-15 15H147a15 15 0 0 1-15-15V137a15 15 0 0 1 15-15Z",
+                          "fill": "#f5fff4"
+                        }
+                      },
+                      {
+                        "tag": "path",
+                        "attributes": {
+                          "d": "M147 122h346a15 15 0 0 1 15 15v31H132v-31a15 15 0 0 1 15-15Z",
                           "fill": "#e4f5e6"
                         }
                       },
                       {
                         "tag": "circle",
                         "attributes": {
-                          "cx": 128,
-                          "cy": 178,
+                          "cx": 156,
+                          "cy": 145,
                           "r": 6,
                           "fill": "#82cd62"
                         }
@@ -126,8 +159,8 @@
                       {
                         "tag": "circle",
                         "attributes": {
-                          "cx": 149,
-                          "cy": 178,
+                          "cx": 177,
+                          "cy": 145,
                           "r": 6,
                           "fill": "#c2e3b2"
                         }
@@ -135,10 +168,10 @@
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 135,
-                          "y": 236,
-                          "width": 135,
-                          "height": 14,
+                          "x": 160,
+                          "y": 205,
+                          "width": 128,
+                          "height": 13,
                           "rx": 7,
                           "fill": "#acdca6"
                         }
@@ -146,10 +179,10 @@
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 135,
-                          "y": 265,
-                          "width": 100,
-                          "height": 12,
+                          "x": 160,
+                          "y": 233,
+                          "width": 94,
+                          "height": 11,
                           "rx": 6,
                           "fill": "#d6e8d8"
                         }
@@ -157,10 +190,21 @@
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 135,
-                          "y": 292,
-                          "width": 110,
-                          "height": 12,
+                          "x": 160,
+                          "y": 258,
+                          "width": 112,
+                          "height": 11,
+                          "rx": 6,
+                          "fill": "#d6e8d8"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 160,
+                          "y": 283,
+                          "width": 84,
+                          "height": 11,
                           "rx": 6,
                           "fill": "#d6e8d8"
                         }
@@ -168,16 +212,16 @@
                       {
                         "tag": "circle",
                         "attributes": {
-                          "cx": 348,
-                          "cy": 287,
-                          "r": 54,
-                          "fill": "#7dcf4b"
+                          "cx": 418,
+                          "cy": 250,
+                          "r": 46,
+                          "fill": "#77d33d"
                         }
                       },
                       {
                         "tag": "path",
                         "attributes": {
-                          "d": "M319 287v-10a29 29 0 0 1 58 0v10",
+                          "d": "M394 251v-10a24 24 0 0 1 48 0v10",
                           "stroke": "white",
                           "stroke-width": 10,
                           "fill": "none",
@@ -187,81 +231,55 @@
                       {
                         "tag": "rect",
                         "attributes": {
-                          "x": 311,
-                          "y": 279,
-                          "width": 17,
-                          "height": 32,
-                          "rx": 8,
-                          "fill": "white"
-                        }
-                      },
-                      {
-                        "tag": "rect",
-                        "attributes": {
-                          "x": 369,
-                          "y": 279,
-                          "width": 17,
-                          "height": 32,
-                          "rx": 8,
-                          "fill": "white"
-                        }
-                      },
-                      {
-                        "tag": "rect",
-                        "attributes": {
-                          "x": 255,
-                          "y": 417,
-                          "width": 143,
-                          "height": 13,
+                          "x": 387,
+                          "y": 246,
+                          "width": 13,
+                          "height": 27,
                           "rx": 6,
-                          "fill": "#233641"
+                          "fill": "white"
+                        }
+                      },
+                      {
+                        "tag": "rect",
+                        "attributes": {
+                          "x": 436,
+                          "y": 246,
+                          "width": 13,
+                          "height": 27,
+                          "rx": 6,
+                          "fill": "white"
                         }
                       },
                       {
                         "tag": "circle",
                         "attributes": {
-                          "cx": 77,
-                          "cy": 348,
-                          "r": 39,
+                          "cx": 99,
+                          "cy": 338,
+                          "r": 38,
                           "fill": "#55c3cf"
                         }
                       },
                       {
                         "tag": "path",
                         "attributes": {
-                          "d": "M58 342h12l14-12v37l-14-12H58z",
+                          "d": "M76 330h9l14-12v38l-14-12h-9z",
                           "fill": "white"
                         }
                       },
                       {
                         "tag": "path",
                         "attributes": {
-                          "d": "M92 340q12 12 0 25",
+                          "d": "M107 327q13 13 0 27",
                           "stroke": "white",
                           "stroke-width": 5,
                           "fill": "none"
                         }
-                      },
-                      {
-                        "tag": "circle",
-                        "attributes": {
-                          "cx": 457,
-                          "cy": 100,
-                          "r": 18,
-                          "fill": "#ff9b70"
-                        }
-                      },
-                      {
-                        "tag": "path",
-                        "attributes": {
-                          "d": "M454 75v-23M478 76l15-14",
-                          "stroke": "#ff9b70",
-                          "stroke-width": 9,
-                          "fill": "none",
-                          "stroke-linecap": "round"
-                        }
                       }
                     ]
+                  },
+                  {
+                    "widget": "home.visitor-count",
+                    "part": "visitor-stats"
                   }
                 ]
               }
