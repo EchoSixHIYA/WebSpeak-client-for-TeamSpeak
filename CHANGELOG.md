@@ -8,6 +8,7 @@
 - **连接与频道：** 支持从昵称目标连接、取消卡住的连接并切换服务器；服务器固定模式会明确提示管理员限制。修复频道树、成员列表和屏幕共享播放器在窄屏及皮肤切换时的布局问题。
 - **屏幕共享与皮肤接口：** 新增共享码率选择，按浏览器能力选择编码器并保留 AV1 回退；为皮肤开放生成邀请链接的受权限控制动作。
 - **发布架构：** 提供 Windows x64、Linux x64/ARM64、Docker amd64/arm64，以及 Android arm64-v8a、armeabi-v7a、x86_64 构建。
+- **管理后台：** 修复将内置 KAAK 皮肤设为实例默认皮肤时失败的问题。
 
 ### English
 
@@ -15,6 +16,7 @@
 - **Connections and channels:** Added nickname-based server targets, cancellation of stalled joins, and server switching, with clear administrator-restriction feedback in fixed-server mode. Fixed channel tree, member list, and screen-share player layout across narrow screens and skin changes.
 - **Screen sharing and skin API:** Added a share bitrate selector, browser-capability-based codec selection with AV1 fallback, and a permission-gated invite-link action for skins.
 - **Release architectures:** Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a, armeabi-v7a, and x86_64 builds.
+- **Admin console:** Fixed selecting the bundled KAAK skin as the instance default.
 
 ### Deutsch
 
@@ -22,6 +24,7 @@
 - **Verbindungen und Kanäle:** Serverziele über TeamSpeak-Nicknames, Abbruch hängender Verbindungsversuche und Serverwechsel; im festgelegten Servermodus werden Administratoreinschränkungen verständlich angezeigt. Layoutfehler in Kanalliste, Mitgliederbereich und Bildschirmfreigabe auf schmalen Displays und beim Skinwechsel wurden behoben.
 - **Bildschirmfreigabe und Skin-API:** Auswahl der Freigabe-Bitrate, Codec-Auswahl nach Browserfähigkeiten mit AV1-Rückfall sowie eine berechtigungsgeschützte Aktion für Einladungslinks.
 - **Build-Architekturen:** Windows x64, Linux x64/ARM64, Docker amd64/arm64 und Android arm64-v8a, armeabi-v7a sowie x86_64.
+- **Adminbereich:** Die Auswahl des mitgelieferten KAAK-Skins als Instanzstandard wurde repariert.
 
 ### Русский
 
@@ -29,6 +32,7 @@
 - **Подключения и каналы:** Подключение по псевдониму сервера TeamSpeak, отмена зависшего подключения и переключение серверов; в режиме фиксированного сервера показывается понятное сообщение об ограничениях администратора. Исправлена компоновка дерева каналов, списка участников и плеера демонстрации экрана на узких экранах и при смене скина.
 - **Демонстрация экрана и API скинов:** Добавлен выбор битрейта, выбор кодека с учётом возможностей браузера и сохранением AV1 как запасного варианта, а также действие создания приглашения с проверкой разрешений.
 - **Архитектуры сборок:** Windows x64, Linux x64/ARM64, Docker amd64/arm64 и Android arm64-v8a, armeabi-v7a, x86_64.
+- **Панель администратора:** Исправлен выбор встроенного скина KAAK в качестве скина по умолчанию.
 
 ### 日本語
 
@@ -36,6 +40,7 @@
 - **接続とチャンネル：** TeamSpeak のニックネーム指定、停止した接続の中断、サーバー切り替えに対応しました。固定サーバーモードでは管理者による制限を明示します。狭い画面やスキン切り替え時のチャンネルツリー、メンバー一覧、画面共有プレーヤーのレイアウトを修正しました。
 - **画面共有とスキン API：** 共有ビットレート選択、ブラウザー機能に応じたコーデック選択と AV1 フォールバック、権限で保護された招待リンク生成アクションを追加しました。
 - **ビルド対象：** Windows x64、Linux x64/ARM64、Docker amd64/arm64、Android arm64-v8a、armeabi-v7a、x86_64。
+- **管理画面：** 同梱の KAAK スキンをインスタンスの既定に設定できない問題を修正しました。
 
 ## [0.2.6] — 2026-10-08（相对 0.2.5 正式版）
 

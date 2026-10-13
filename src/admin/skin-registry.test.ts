@@ -87,6 +87,17 @@ test("custom skins can be enabled, disabled, and selected as the instance defaul
   assert.equal(await registry.getDefaultSkinId(), "builtin.light");
 });
 
+test("the bundled KAAK skin can be selected as the instance default without a custom installation", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-kaak-default-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+
+  await registry.setDefaultSkin("community.kaak-voice");
+
+  assert.equal(await registry.getDefaultSkinId(), "community.kaak-voice");
+  assert.deepEqual(await registry.list(), []);
+});
+
 test("server accepts validated declarative v2 layouts and rejects permissions or unregistered components", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-v2-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
@@ -373,11 +384,11 @@ test("skin registry rejects path traversal and mismatched local ZIP headers", as
   assert.deepEqual(await registry.list(), []);
 });
 
-test("the three bundled skins cannot be replaced or removed through the registry", async (context) => {
+test("the four bundled skins cannot be replaced or removed through the registry", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-builtins-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   const registry = new SkinRegistry(directory);
-  for (const id of ["builtin.light", "builtin.dark", "community.illusia-voice"]) {
+  for (const id of ["builtin.light", "builtin.dark", "community.illusia-voice", "community.kaak-voice"]) {
     await assert.rejects(registry.save(Buffer.alloc(22), id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
     await assert.rejects(registry.remove(id), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");
     await assert.rejects(registry.setEnabled(id, false), (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_BUILTIN_PROTECTED");

@@ -169,7 +169,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
-| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | 完成 KAAK 宽屏/窄屏语音皮肤，新增频道树、聊天、密码记忆和邀请链接；改进卡住连接的中断与固定模式提示；修复屏幕共享布局，增加码率和编码器选择。构建覆盖 Windows x64、Linux x64/ARM64、Docker amd64/arm64 和 Android arm64-v8a、armeabi-v7a、x86_64。 |
+| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | 完成 KAAK 宽屏/窄屏语音皮肤，新增频道树、聊天、密码记忆和邀请链接；改进卡住连接的中断与固定模式提示；修复屏幕共享布局、增加码率和编码器选择，并修复后台设置 KAAK 为默认皮肤失败。构建覆盖 Windows x64、Linux x64/ARM64、Docker amd64/arm64 和 Android arm64-v8a、armeabi-v7a、x86_64。 |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | 相对 0.2.5 大范围重构语音网关、共享协议、前端语音工作区与管理模块；修复 #6/#7/#10，完成 #9/#12 配置，并修复 PR #13 报告的既有 TS6 屏幕共享漏发现问题；改善 Opus/重连生命周期和移动端控制。提供 Windows x64、Linux x64/ARM64、Docker amd64/arm64，以及 Android arm64-v8a、armeabi-v7a、x86_64 APK。 |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | 新增 `.wskin` 皮肤系统、管理员启用/默认管理和受保护的日间/夜间/ILLUSIA 内置皮肤；移除未完成 Aurora Voice 样例，修复皮肤加载闪烁、暗色控件可读性与语音界面美术层级，并加入官方皮肤开发 Agent Skill。 |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | 新增浏览器与 TeamSpeak 6 原生客户端之间的跨端 P2P 屏幕共享；提供 STUN/外部 TURN 配置、直播播放器、观众状态、1080p/60 FPS 采集设置和 WebRTC 统计；优化屏幕共享交互并新增访客编号。 |
