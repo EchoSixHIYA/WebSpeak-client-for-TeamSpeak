@@ -71,7 +71,7 @@
       >
       <a
         class="changelog-button"
-        href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/CHANGELOG.md"
+        :href="changelogUrl"
         target="_blank"
         rel="noreferrer"
         :title="t('viewChangelog')"
@@ -112,12 +112,13 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import Icon from "../Icon.vue";
 import SkinSwitcher, { type SkinOption } from "../SkinSwitcher.vue";
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import type { Language } from "../../i18n/web-client.js";
 
-defineProps<{
+const props = defineProps<{
   brandName: string;
   appVersion: string;
   mobile: boolean;
@@ -126,6 +127,16 @@ defineProps<{
 }>();
 const language = defineModel<Language>("language", { required: true });
 const skinId = defineModel<string>("skinId", { required: true });
+const changelogFile: Record<Language, string> = {
+  zh: "README.zh-CN.md",
+  en: "README.en.md",
+  de: "README.de.md",
+  ru: "README.ru.md",
+  ja: "README.ja.md",
+};
+const changelogUrl = computed(() => {
+  return `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/${changelogFile[language.value]}#latest-release-notes`;
+});
 const emit = defineEmits<{
   openQq: [];
   skinChange: [value: string];

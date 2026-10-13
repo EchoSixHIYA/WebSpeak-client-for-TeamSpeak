@@ -38,14 +38,13 @@
 
 ## 文档 · Documentation
 
-- [0.2.7 发布说明 / Release notes](./docs/releases/v0.2.7.md)
+- [v0.2.7 更新日志 / Release notes](./docs/README.zh-CN.md#latest-release-notes) · [English](./docs/README.en.md#latest-release-notes) · [Deutsch](./docs/README.de.md#latest-release-notes) · [Русский](./docs/README.ru.md#latest-release-notes) · [日本語](./docs/README.ja.md#latest-release-notes)
 - [简体中文](./docs/README.zh-CN.md)
 - [English](./docs/README.en.md)
 - [Deutsch](./docs/README.de.md)
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
-- [皮肤开发规范 / Skin Development Guide](./docs/SKIN_DEVELOPMENT.md)
-- [更开放的皮肤系统规格与权限沙箱](./docs/OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)
+- [当前皮肤开发指南 / Current skin development guide](./docs/SKIN_DEVELOPMENT.md)
 - [皮肤开发 Agent Skill / Skin Development Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
 
 ## 社区 · Community

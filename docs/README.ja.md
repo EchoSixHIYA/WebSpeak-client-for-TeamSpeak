@@ -137,9 +137,34 @@ npm start
 
 ## 🧾 更新履歴
 
+<a id="latest-release-notes"></a>
+
+### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
+
+#### より開かれたスキンシステム
+
+- より開かれたスキン編集・実行環境を提供し、任意のコンポーネントのスタイルや配置を変更したり、ウィジェットを追加したりできるようになりました。
+- 音声パネルに入った後、同じブラウザーで管理画面を新しいウィンドウに開いてログインすると、スキンエディターが有効になります。
+- 開発例として「KAAK」スキンを同梱しました。
+- スキン開発 Agent Skill を更新しました。
+
+#### 機能強化
+
+- SRV レコードと TeamSpeak Nickname 形式のサーバーアドレス解決に対応しました。
+- 自由モードでは複数サーバーのタブを管理できます。このボタンは「固定サーバー」モードでは使用できません。
+- 画面共有にビットレート設定を追加しました。
+- 入力したチャンネルパスワードを WebSpeak がブラウザーに保存するようになりました。
+- ロックされたチャンネルの前に鍵アイコンを表示します。
+- チャット履歴を永続的に保存するようになりました。
+
+#### バグ修正
+
+- アドレス解析の不具合を修正しました。
+- 音量操作とメンバーカードのドラッグでフォーカスが競合する問題を修正しました。
+- ユーザーステータスが誤って「不明」と解析される問題を修正しました。
+
 | バージョン | 内容 |
 | --- | --- |
-| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | KAAK のレスポンシブ音声スキンを拡充し、チャンネルツリー、チャット、パスワード保存、招待リンクを追加。接続の中断と固定サーバー制限の案内を改善し、画面共有レイアウトとビットレート/コーデック設定を修正。管理画面で KAAK を既定スキンに設定できない問題も修正。Windows x64、Linux x64/ARM64、Docker amd64/arm64、Android arm64-v8a/armeabi-v7a/x86_64 を提供。 |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 0.2.5 から音声ゲートウェイ、共有プロトコル、音声ワークスペース、管理モジュールを大規模に再構成。#6/#7/#10 を修正し、#9/#12 を実装。PR #13 が報告した既存 TS6 画面共有の検出漏れも修正しました。Opus、セッションのライフサイクル、モバイル操作を改善。Windows x64、Linux x64/ARM64、Docker amd64/arm64、Android arm64-v8a/armeabi-v7a/x86_64 APK を提供。 |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | `.wskin` スキン、管理者向けの有効化/デフォルト設定、保護された昼・夜・ILLUSIA 内蔵スキンを追加。未完成の Aurora Voice サンプルを削除し、読み込み時のちらつき、ダークモードの視認性、音声画面のアートレイヤーを修正。公式スキン開発 Agent Skill も追加しました。 |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | ブラウザと TeamSpeak 6 ネイティブクライアント間のクロスプラットフォーム P2P 画面共有を追加しました。STUN/外部 TURN 設定、プレーヤーと視聴者状態、1080p/60 FPS 取得設定、WebRTC 統計に対応し、共有操作と訪問者番号も改善しました。 |
@@ -149,7 +174,6 @@ npm start
 | [v0.2.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.0) | パスワード案内、正式な中継モード、複数中継選択、接続診断を追加しました。 |
 | [v0.1.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.8) | Docker 起動を簡略化し、15秒の接続タイムアウトと継続的なネットワーク監視を追加しました。 |
 
-完全な履歴は [CHANGELOG.md](../CHANGELOG.md) を参照してください。
 
 ## ライセンス
 

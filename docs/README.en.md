@@ -4,9 +4,9 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
-Latest release: [WebSpeak 0.2.7 release notes](./releases/v0.2.7.md).
+Latest release: [read the 0.2.7 changelog on this page](#latest-release-notes).
 
-Skin authors should start with the [skin development guide](./SKIN_DEVELOPMENT.md). A `.wskin` package is the portable deliverable: skin UI and assets travel with the package, while skin-only work should not require core runtime edits. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
+Skin authors should start with the [current skin development guide](./SKIN_DEVELOPMENT.md), which combines the `.wskin` package format, current runtime APIs, permission boundaries, and authoring workflow. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
 
 ## Live demo
 
@@ -165,9 +165,34 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 ## 🧾 Changelog
 
+<a id="latest-release-notes"></a>
+
+### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
+
+#### A more open skin system
+
+- A more open skin editor and runtime now let authors customize the style and position of any component and add widgets.
+- After entering the voice panel, open a new administrator-console window in the same browser and sign in to activate the skin editor.
+- The KAAK skin is included as a development example.
+- Updated the skin development Agent Skill.
+
+#### Enhancements
+
+- Server addresses can now be resolved through SRV records and TeamSpeak Nickname entries.
+- Free mode supports managing multiple server tabs; these controls are unavailable in fixed-server mode.
+- Added a screen-share bitrate option.
+- WebSpeak now saves entered channel passwords in the browser.
+- Locked channels now show a lock icon.
+- Chat history is now stored persistently.
+
+#### Bug fixes
+
+- Fixed address parsing.
+- Fixed focus conflicts between volume controls and dragging member cards.
+- Fixed user status being incorrectly parsed as unknown.
+
 | Version | Date | Summary |
 | --- | --- | --- |
-| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | Completed the KAAK responsive voice skin with channel navigation, chat, remembered passwords and invite links; improved stalled-connection switching and fixed-mode feedback; fixed screen-share layouts, added bitrate/codec controls, and fixed setting KAAK as the admin default. Builds: Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | Relative to 0.2.5, broadly refactored gateway voice, shared protocol, frontend voice workspace, and admin modules; fixed #6/#7/#10, implemented #9/#12 settings, and fixed the existing-TS6-share discovery case reported in PR #13. Improved Opus/session lifecycles and mobile controls. Packages: Windows x64, Linux x64/ARM64, Docker amd64/arm64, and Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | Added `.wskin` skins, administrator enable/default controls, and protected Day/Night/ILLUSIA built-ins; removed the unfinished Aurora Voice sample, fixed skin-load flashes, dark-control contrast, and voice-room artwork layering, and added the official skin-development Agent Skill. |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | Added cross-platform P2P screen sharing between browsers and native TeamSpeak 6 clients; added STUN/external-TURN configuration, live player and viewer state, 1080p/60 FPS capture settings, and WebRTC statistics; refined screen-share interactions and added visitor numbering. |
@@ -182,7 +207,6 @@ Disable and save the relay configuration to remove the relay option from the wel
 | [v0.1.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4) | 2026-09-03 | Fixed WebRTC and channel chat and refined administration, logs, and mobile layouts. |
 | [v0.1.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3) | 2026-09-03 | Added bundled WebRTC, migrated the TeamSpeak SDK, and improved member synchronization and voice buffering. |
 
-See the complete history in [CHANGELOG.md](../CHANGELOG.md).
 
 ## 🚀 Deployment
 

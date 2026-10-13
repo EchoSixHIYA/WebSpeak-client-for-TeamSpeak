@@ -155,9 +155,34 @@ Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entf
 
 ## 🧾 Änderungsprotokoll
 
+<a id="latest-release-notes"></a>
+
+### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
+
+#### Offeneres Skin-System
+
+- Ein offenerer Skin-Editor und die zugehörige Laufzeit erlauben es nun, Stil und Position beliebiger Komponenten anzupassen und Widgets hinzuzufügen.
+- Öffne nach dem Wechsel in den Sprachbereich im selben Browser ein neues Fenster mit der Administrationsoberfläche und melde dich an, um den Skin-Editor zu aktivieren.
+- Der Skin „KAAK“ ist als Entwicklungsbeispiel enthalten.
+- Der Agent Skill für die Skin-Entwicklung wurde aktualisiert.
+
+#### Funktionserweiterungen
+
+- Serveradressen können nun über SRV-Einträge und TeamSpeak-Nickname-Einträge aufgelöst werden.
+- Im freien Modus lassen sich mehrere Server-Tabs verwalten; diese Schaltflächen sind im Modus „Fester Server“ nicht verfügbar.
+- Eine Option für die Bitrate der Bildschirmfreigabe wurde hinzugefügt.
+- WebSpeak speichert eingegebene Kanalpasswörter nun im Browser.
+- Gesperrte Kanäle werden mit einem Schlosssymbol angezeigt.
+- Der Chatverlauf wird nun dauerhaft gespeichert.
+
+#### Fehlerbehebungen
+
+- Fehler bei der Adressauflösung behoben.
+- Fokuskonflikte zwischen Lautstärkeregelung und dem Ziehen von Mitgliedskarten behoben.
+- Fehler behoben, durch den der Benutzerstatus fälschlich als unbekannt erkannt wurde.
+
 | Version | Datum | Zusammenfassung |
 | --- | --- | --- |
-| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | KAAK-Sprachskin mit responsiver Kanalliste, Chat, gespeicherten Passwörtern und Einladungslinks vervollständigt; Abbruch hängender Verbindungen und Hinweise im festgelegten Servermodus verbessert; Bildschirmfreigabe-Layouts sowie Bitraten- und Codec-Steuerung ergänzt und die Auswahl von KAAK als Admin-Standard repariert. Builds: Windows x64, Linux x64/ARM64, Docker amd64/arm64 und Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | Gegenüber 0.2.5 wurden Sprach-Gateway, gemeinsame Protokolle, Sprachoberfläche und Admin-Module umfassend umstrukturiert; #6/#7/#10 behoben, #9/#12 umgesetzt und der in PR #13 gemeldete Fall bereits aktiver TS6-Freigaben behoben. Opus- und Sitzungslebenszyklen sowie mobile Steuerung verbessert. Pakete: Windows x64, Linux x64/ARM64, Docker amd64/arm64 und Android arm64-v8a/armeabi-v7a/x86_64. |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | `.wskin`-Skins, Aktivierungs-/Standardverwaltung und geschützte Tages-, Nacht- und ILLUSIA-Skins ergänzt; unfertiges Aurora-Voice-Beispiel entfernt, Skin-Ladeblitze, dunkle Bedienelemente und Artwork-Ebenen im Sprachbereich korrigiert sowie offiziellen Skin-Entwicklungs-Agent-Skill hinzugefügt. |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | Plattformübergreifendes P2P-Bildschirmteilen zwischen Browsern und nativen TeamSpeak-6-Clients ergänzt; STUN-/externes-TURN-Konfiguration, Live-Player und Zuschauerstatus, Aufnahmeoptionen bis 1080p/60 FPS und WebRTC-Statistiken hinzugefügt; Bildschirmfreigabe-Interaktion verbessert und Besucherzählung ergänzt. |
@@ -172,7 +197,6 @@ Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entf
 | [v0.1.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4) | 2026-09-03 | WebRTC und Kanalchat korrigiert sowie Administration, Protokolle und Mobilansicht verbessert. |
 | [v0.1.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3) | 2026-09-03 | Integriertes WebRTC, aktualisiertes TeamSpeak-SDK und bessere Mitgliedersynchronisierung und Sprachpufferung. |
 
-Vollständige Historie: [CHANGELOG.md](../CHANGELOG.md).
 
 ## 🚀 Bereitstellung
 

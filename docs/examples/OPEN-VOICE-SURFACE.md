@@ -7,4 +7,4 @@ This is an implementation scaffold for testing the open-skin format, not a pixel
 - Source: [open-voice-surface](./open-voice-surface/)
 - Importable package: [open-voice-surface.wskin](./open-voice-surface.wskin)
 - Shared component and permission rules: [skin development guide](../SKIN_DEVELOPMENT.md)
-- Architecture and safety boundaries: [open skin spec](../OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)
+- Current runtime contract and safety boundaries: [skin development guide](../SKIN_DEVELOPMENT.md)

@@ -11,7 +11,7 @@ Develop the skin as a portable `.wskin` package. A skin task should not require 
 
 ## Workflow
 
-1. Locate the `webspeak-webclient` repository root, then read `docs/SKIN_DEVELOPMENT.md` for authoring steps and `docs/OPEN_SKIN_SYSTEM_SPEC.zh-CN.md` for current schemas, data fields, permissions, and actions. If a request needs an undocumented capability, identify the missing public contract before editing and treat that work as a separate platform change. Inspect the closest example under `docs/examples/`; do not copy unrelated product-specific content.
+1. Locate the `webspeak-webclient` repository root, then read the single current contract and workflow in `docs/SKIN_DEVELOPMENT.md`. It covers package schemas, runtime data, permissions, actions, security boundaries, and validation. If a request needs an undocumented capability, identify the missing public contract before editing and treat that work as a separate platform change. Inspect the closest example under `docs/examples/`; do not copy unrelated product-specific content.
 2. Choose the least complex supported package format that can express the request: CSS/assets for appearance, `content.json` for localized copy, `layout.json` for author defaults, `components.json` for declarative structure and supported interactions, and the documented v4 Wasm plugin path only when local logic is required. JavaScript files in a package are not executed by the current runtime.
 3. Keep all skin-authored implementation in the package. Use stable public skin parts, component schema, published context fields, existing host widgets, and permission-gated actions. Do not add a widget, data field, action, CSS hook, or branch to core code for one skin. If a reusable platform capability is missing, identify the exact contract gap and treat it as separate platform work: define a generic, versioned API and compatibility behavior first; only then use that released API from the package.
 4. Set a unique skin ID, increment its package version for changed output, and set `minAppVersion` to the lowest compatible WebSpeak runtime. Keep component schema and plugin `apiVersion` aligned with the APIs actually used. Package every referenced image, font, stylesheet, component, and plugin asset. Use only safe package-relative paths; do not depend on local machine files, remote assets, private endpoints, or instance-specific frontend code.
@@ -27,6 +27,5 @@ Develop the skin as a portable `.wskin` package. A skin task should not require 
 
 ## References
 
-- `docs/SKIN_DEVELOPMENT.md` — skin formats, package structure, CSS hooks, and QA.
-- `docs/OPEN_SKIN_SYSTEM_SPEC.zh-CN.md` — runtime/API contracts, schemas, data, permissions, and actions.
+- `docs/SKIN_DEVELOPMENT.md` — the single current reference for skin formats, runtime APIs, permissions, data, actions, CSS hooks, security, and QA.
 - `docs/examples/ILLUSIA-VOICE.md` and `docs/examples/OPEN-VOICE-SURFACE.md` — full skin and surface examples.

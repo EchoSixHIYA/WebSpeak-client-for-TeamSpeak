@@ -4,7 +4,7 @@
 
 WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户无需安装桌面客户端即可从浏览器加入频道，管理员可以在控制台管理目标服务器、访问方式和运行状态。
 
-皮肤开发请从[皮肤开发规范](./SKIN_DEVELOPMENT.md)开始；它以可移植 `.wskin` 为交付物，要求皮肤实现和素材随包分发，不为单款皮肤修改核心运行时代码。Agent 工作流见[WebSpeak Skin Development Skill](../.agents/skills/webspeak-skin-development/SKILL.md)。当前包格式与安全边界见[皮肤系统规格](./OPEN_SKIN_SYSTEM_SPEC.zh-CN.md)。
+皮肤开发请从[当前皮肤开发指南](./SKIN_DEVELOPMENT.md)开始。它整合 `.wskin` 包格式、当前运行时接口、权限边界和制作验收流程。Agent 工作流见[WebSpeak Skin Development Skill](../.agents/skills/webspeak-skin-development/SKILL.md)。
 
 ## 在线 Demo
 
@@ -12,7 +12,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 公共 Demo 位于香港，网络和负载可能不稳定。延迟、断线或暂时不可用不代表自行部署后的实际表现。
 
-最新版本：[WebSpeak 0.2.7 发布说明](./releases/v0.2.7.md)。
+最新版本：[查看本页的 0.2.7 更新日志](#latest-release-notes)。
 
 ## ✨ 特性
 
@@ -167,9 +167,34 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 ## 🧾 更新日志
 
+<a id="latest-release-notes"></a>
+
+### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
+
+#### 更开放的皮肤系统
+
+- 现在提供更开放的皮肤编辑系统与运行支持，可以自定义任意组件的样式与位置并可添加小组件。
+- 进入语音面板后，在同一个浏览器中新开并登录一个管理员后台窗口即可激活皮肤编辑器。
+- 随包提供一款“KAAK”皮肤作为开发示例。
+- 更新了皮肤开发 Agent Skill。
+
+#### 功能增强
+
+- 现在支持 SRV 和 Nickname 形式的服务器地址解析。
+- 自由模式下，允许用户进行多服务器标签管理（这些按钮在“固定服务器”的模式下不可用）。
+- 屏幕共享新增码率选项。
+- 现在 WebSpeak 会将输入过的频道密码保存到浏览器中。
+- 现在会在上锁的频道前显示带锁的图标。
+- 现在聊天记录能够持久化存储了。
+
+#### Bug 修复列表
+
+- 修复了解析 bug。
+- 修复了音量和卡片拖动争抢焦点的问题。
+- 修复了用户状态被错误地解析为未知的问题。
+
 | 版本 | 日期 | 摘要 |
 | --- | --- | --- |
-| [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) | 2026-10-13 | 完成 KAAK 宽屏/窄屏语音皮肤，新增频道树、聊天、密码记忆和邀请链接；改进卡住连接的中断与固定模式提示；修复屏幕共享布局、增加码率和编码器选择，并修复后台设置 KAAK 为默认皮肤失败。构建覆盖 Windows x64、Linux x64/ARM64、Docker amd64/arm64 和 Android arm64-v8a、armeabi-v7a、x86_64。 |
 | [v0.2.6](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.6) | 2026-10-08 | 相对 0.2.5 大范围重构语音网关、共享协议、前端语音工作区与管理模块；修复 #6/#7/#10，完成 #9/#12 配置，并修复 PR #13 报告的既有 TS6 屏幕共享漏发现问题；改善 Opus/重连生命周期和移动端控制。提供 Windows x64、Linux x64/ARM64、Docker amd64/arm64，以及 Android arm64-v8a、armeabi-v7a、x86_64 APK。 |
 | [v0.2.5](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.5) | 2026-09-27 | 新增 `.wskin` 皮肤系统、管理员启用/默认管理和受保护的日间/夜间/ILLUSIA 内置皮肤；移除未完成 Aurora Voice 样例，修复皮肤加载闪烁、暗色控件可读性与语音界面美术层级，并加入官方皮肤开发 Agent Skill。 |
 | [v0.2.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.4) | 2026-09-22 | 新增浏览器与 TeamSpeak 6 原生客户端之间的跨端 P2P 屏幕共享；提供 STUN/外部 TURN 配置、直播播放器、观众状态、1080p/60 FPS 采集设置和 WebRTC 统计；优化屏幕共享交互并新增访客编号。 |
@@ -184,7 +209,6 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 | [v0.1.4](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.4) | 2026-09-03 | 修复 WebRTC、频道聊天并优化管理页、日志和移动端布局。 |
 | [v0.1.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.1.3) | 2026-09-03 | 引入内置 WebRTC、迁移 TeamSpeak SDK 并改善成员同步和语音缓冲。 |
 
-完整记录见 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 🚀 部署方案
 
