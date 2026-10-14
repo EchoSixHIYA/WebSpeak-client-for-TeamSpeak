@@ -486,7 +486,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.115");
+  assert.equal(skin.version, "3.1.118");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const home = skin.pluginData?.components.find((component) => component.page === "home");
@@ -662,7 +662,10 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(skin.css.includes("mobile-room-return"));
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"][data-mobile-channels="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"]'), "the room menu stays hidden on the channel tree page");
   assert.ok(skin.css.includes("grid-template-columns: 86px minmax(0, 1fr)"));
-  assert.ok(skin.css.includes("inset: 0 0 0 86px"));
+  assert.match(skin.css, /kaak-workspace\.conversation.*data-chat-open="true"[\s\S]*?position: fixed;[\s\S]*?inset: 0 0 0 86px;[\s\S]*?pointer-events: auto;/, "the compact chat stays beside the interactive server rail");
+  assert.match(skin.css, /@media \(max-width: 360px\)[\s\S]*?kaak-workspace\.conversation.*data-chat-open="true"\]\s*\{\s*inset-inline-start: 70px;/, "the compact chat respects the narrower server rail on small phones");
+  assert.match(skin.css, /data-mobile-channels="true"[\s\S]*?kaak-workspace\.conversation.*data-chat-open="true"[\s\S]*?display: none;\s*pointer-events: none;/, "an open chat panel cannot cover or intercept the channel-tree page");
+  assert.match(skin.css, /modal-backdrop:has\(\[data-ws-part="voice\.audio-settings"\]\)\s*\{\s*z-index: 1000;/, "the host audio settings dialog stays above the narrow chat overlay");
   assert.match(skin.css, /kaak-workspace"\]\[data-ws-plugin-surface="voice"\]:has\([\s\S]{0,180}kaak-workspace\.voice-stage"\]\s*\{[^}]*grid-column: 1;[^}]*grid-row: 3;/, "the collapsed chat state must not push the connected narrow room into an implicit side column");
   assert.match(skin.css, /kaak-workspace\.conversation\"]\[data-chat-open="true"\]\s*\{\s*position: absolute;/);
   assert.match(skin.css, /voice-dock-actions"\] \{ grid-template-columns: minmax\(0, 1fr\) 28px 28px 36px; grid-template-rows: 29px 26px; column-gap: 6px; row-gap: 21px; \}/);
@@ -717,6 +720,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \{ grid-column: 1 \/ 4; grid-row: 1;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.voice-dock-share"\] \.skin-runtime-screen-share-start \{[\s\S]*?background: #69c000;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-settings"\][\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;/);
+  assert.match(skin.css, /desktop-room-controls"\]\s+\[data-ws-plugin-part="kaak-workspace\.desktop-room-settings"\]\s*\{[^}]*justify-self: stretch;[^}]*box-sizing: border-box;[^}]*width: 100%;[^}]*max-width: 100%;[^}]*min-width: 0;/, "the settings control fills its own grid track so its icon and label cannot escape the dock");
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-noise-suppression"\] \{ grid-column: 2; grid-row: 2; color: #fff; background: #6cbf00; \}/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-noise-suppression"\]\[aria-pressed="false"\],[\s\S]*?background: #e34848;/);
   assert.match(skin.css, /\[data-ws-plugin-part="kaak-workspace\.desktop-room-microphone"\] \{ grid-column: 3; grid-row: 2; \}/);

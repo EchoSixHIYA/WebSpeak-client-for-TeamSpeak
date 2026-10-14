@@ -2341,22 +2341,26 @@
   cursor: pointer;
 }
 [data-ws-plugin-part="kaak-workspace.desktop-room-controls"] .desktop-room-control-icon { display: block; flex: 0 0 auto; width: 18px; height: 18px; }
-[data-ws-plugin-part="kaak-workspace.desktop-room-settings"] {
+[data-ws-plugin-part="kaak-workspace.desktop-room-controls"] [data-ws-plugin-part="kaak-workspace.desktop-room-settings"] {
   display: flex;
   grid-column: 1;
   grid-row: 2;
   align-items: center;
   justify-content: flex-start;
+  justify-self: stretch;
+  box-sizing: border-box;
   gap: 8px;
-  width: auto;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  padding: 0 7px;
+  margin: 0;
+  padding: 0;
   color: #b5c6d8;
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
 }
-[data-ws-plugin-part="kaak-workspace.desktop-room-settings"] .desktop-room-control-icon {
+[data-ws-plugin-part="kaak-workspace.desktop-room-controls"] [data-ws-plugin-part="kaak-workspace.desktop-room-settings"] .desktop-room-control-icon {
   display: block;
   flex: 0 0 15px;
   width: 15px;
@@ -2368,7 +2372,7 @@
   transform: none;
   vertical-align: middle;
 }
-[data-ws-plugin-part="kaak-workspace.desktop-room-settings"] .desktop-room-control-label { display: block; line-height: 16px; white-space: nowrap; }
+[data-ws-plugin-part="kaak-workspace.desktop-room-controls"] [data-ws-plugin-part="kaak-workspace.desktop-room-settings"] .desktop-room-control-label { display: block; min-width: 0; overflow: hidden; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-noise-suppression"] { grid-column: 2; grid-row: 2; color: #fff; background: #6cbf00; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-microphone"] { grid-column: 3; grid-row: 2; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-output"] { grid-column: 4; grid-row: 2; }
@@ -2386,8 +2390,8 @@
 }
 [data-ws-plugin-part="kaak-workspace.desktop-room-noise-suppression"][aria-pressed="true"] { color: #fff; background: #6cbf00; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-accompaniment"][aria-pressed="true"] { background: #477f00; box-shadow: inset 0 0 0 1px #9be031; }
-[data-ws-plugin-part="kaak-workspace.desktop-room-settings"]:hover,
-[data-ws-plugin-part="kaak-workspace.desktop-room-settings"]:focus-visible { color: #eff0f3; background: #303238; }
+[data-ws-plugin-part="kaak-workspace.desktop-room-controls"] [data-ws-plugin-part="kaak-workspace.desktop-room-settings"]:hover,
+[data-ws-plugin-part="kaak-workspace.desktop-room-controls"] [data-ws-plugin-part="kaak-workspace.desktop-room-settings"]:focus-visible { color: #eff0f3; background: #303238; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-controls"] .desktop-room-control:hover,
 [data-ws-plugin-part="kaak-workspace.desktop-room-controls"] .desktop-room-control:focus-visible { color: #eff0f3; background: #303238; outline: none; }
 [data-ws-plugin-part="kaak-workspace.desktop-room-accompaniment"]:hover,
@@ -4506,8 +4510,6 @@
   [data-ws-plugin-part="kaak-workspace.conversation-heading"] { min-height: 48px; margin: 0; }
   [data-ws-plugin-part="kaak-workspace.chat-panel-toggle"] { pointer-events: auto; }
   [data-ws-plugin-part="kaak-workspace.chat-panel"] { min-height: 0; overflow: hidden; }
-  [data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"]:not([data-mobile-channels="true"])[data-chat-open="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"] { display: none; }
-
   /* The legacy collapsed-chat rule places the room in grid column 2. Keep the
      connected narrow room in its single-column layout in either chat state. */
   [data-ws-plugin-part="kaak-workspace"][data-ws-plugin-surface="voice"]:has(
@@ -4527,4 +4529,37 @@
   [data-ws-plugin-part="kaak-workspace.mobile-room-controls"] .mobile-room-control-caption { font-size: 10px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-card { min-height: 116px; height: 116px; }
   [data-ws-plugin-part="kaak-workspace.member-cards"] .voice-avatar { width: 60px; height: 60px; }
+}
+
+/* Keep the compact chat on the content side of the persistent server rail.
+   The room controls remain available after chat is closed, and the rail stays
+   interactive while the chat page is open. */
+@media (max-width: 820px) {
+  [data-ws-plugin-part="kaak-workspace"][data-ws-plugin-surface="voice"] [data-ws-plugin-part="kaak-workspace.conversation"][data-chat-open="true"] {
+    position: fixed;
+    z-index: 50;
+    inset: 0 0 0 86px;
+    pointer-events: auto;
+  }
+
+  [data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"][data-mobile-channels="true"] [data-ws-plugin-part="kaak-workspace.conversation"][data-chat-open="true"] {
+    display: none;
+    pointer-events: none;
+  }
+
+  [data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"][data-mobile-channels="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"],
+  [data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"]:not([data-mobile-channels="true"])[data-chat-open="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"] {
+    display: none;
+    pointer-events: none;
+  }
+
+  [data-ws-part="app"]:has([data-ws-plugin-part="kaak-workspace"][data-ws-plugin-surface="voice"]) .modal-backdrop:has([data-ws-part="voice.audio-settings"]) {
+    z-index: 1000;
+  }
+}
+
+@media (max-width: 360px) {
+  [data-ws-plugin-part="kaak-workspace"][data-ws-plugin-surface="voice"] [data-ws-plugin-part="kaak-workspace.conversation"][data-chat-open="true"] {
+    inset-inline-start: 70px;
+  }
 }
