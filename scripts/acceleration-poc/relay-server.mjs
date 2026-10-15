@@ -7,36 +7,57 @@ function endpointKey(address, port) {
   return `${address}/${port}`;
 }
 
-function isPrivateAddress(host) {
-  const family = isIP(host);
-  if (family === 4) {
-    const octets = host.split(".").map(Number);
-    return octets[0] === 10
-      || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
-      || octets[0] === 192 && octets[1] === 168
-      || octets[0] === 127
-      || octets[0] === 169 && octets[1] === 254
-      || octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127
-      || octets[0] === 0;
-  }
-  if (family === 6) {
-    const normalized = host.toLowerCase();
+/**
+ * Mirror of `isRestrictedAddress()` in `src/security/open-target-policy.ts`.
+ *
+ * The PoC ships as a plain `.mjs` file that the README documents copying to a
+ * remote host without a build step, so it cannot import the TypeScript policy.
+ * The logic is duplicated rather than shared, and
+ * `scripts/acceleration-poc/target-guard-parity.test.mjs` fails the moment the two
+ * classifications disagree, so drift is caught in CI instead of in production.
+ *
+ * Keep this an exact mirror: fail closed on anything that is not a literal
+ * public address.
+ */
+export function isRestrictedAddress(host) {
+  const version = isIP(host);
+  if (version === 4) return isRestrictedIpv4(host);
+  if (version !== 6) return true;
+
+  const normalized = host.toLowerCase();
+  if (normalized === "::" || normalized === "::1") return true;
+  if (normalized.startsWith("::ffff:")) {
     // IPv4-mapped addresses must be unwrapped before the IPv4 rules apply:
-    // ::ffff:10.0.0.1 is loopback/private traffic in IPv6 clothing.
-    if (normalized.startsWith("::ffff:")) {
-      const mapped = normalized.slice("::ffff:".length);
-      return isIP(mapped) !== 4 || isPrivateAddress(mapped);
-    }
-    return normalized === "::1"
-      || normalized === "::"
-      || normalized.startsWith("fc")
-      || normalized.startsWith("fd")
-      || normalized.startsWith("fe8")
-      || normalized.startsWith("fe9")
-      || normalized.startsWith("fea")
-      || normalized.startsWith("feb");
+    // ::ffff:10.0.0.1 is private traffic in IPv6 clothing.
+    const mapped = normalized.slice("::ffff:".length);
+    return isIP(mapped) !== 4 || isRestrictedIpv4(mapped);
   }
-  return host === "localhost" || host.endsWith(".localhost");
+  if (normalized.startsWith("::")) return true; // IPv4-compatible and other special compressed forms
+  const first = Number.parseInt(normalized.split(":", 1)[0] || "0", 16);
+  if ((first & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
+  if ((first & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+  if ((first & 0xffc0) === 0xfec0) return true; // deprecated site-local fec0::/10
+  if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
+  if (normalized.startsWith("2001:db8:")) return true; // documentation range
+  return false;
+}
+
+function isRestrictedIpv4(host) {
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [a, b, c] = parts;
+  return a === 0
+    || a === 10
+    || a === 127
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 0)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19))
+    || (a === 198 && b === 51 && c === 100)
+    || (a === 203 && b === 0 && c === 113)
+    || a >= 224;
 }
 
 async function resolveTarget(host) {
@@ -96,7 +117,7 @@ export async function createRelayServer({
       const target = await resolveTarget(request.targetHost);
       // Validate the resolved addresses, not the caller-supplied name: a DNS
       // answer can point any hostname at loopback or an internal address.
-      if (!allowPrivate && target.resolved.some((address) => isPrivateAddress(address))) {
+      if (!allowPrivate && target.resolved.some((address) => isRestrictedAddress(address))) {
         const error = { code: "PRIVATE_TARGET_BLOCKED" };
         socket.send(encodeFrame(FrameType.OPEN_ERR, frame.sessionId, 0, jsonPayload(error), token), client.port, client.address);
         cleanup(session);

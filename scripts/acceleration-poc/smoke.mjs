@@ -51,6 +51,59 @@ async function run() {
     rejectedBadToken = true;
   }
 
+  // SSRF guard: a relay started without allowPrivate must refuse every request
+  // that resolves to a non-public address, and must still serve public ones.
+  // Asserting only the happy path would let the private-address guard regress
+  // unnoticed, since the throughput relay above runs with allowPrivate: true.
+  const guardedRelay = await createRelayServer({
+    host: "127.0.0.1",
+    port: 0,
+    token: TOKEN,
+    allowPrivate: false,
+  });
+  const blockedTargets = ["127.0.0.1", "10.0.0.1", "169.254.169.254", "192.168.1.1", "::ffff:127.0.0.1"];
+  const blockedResults = [];
+  for (const targetHost of blockedTargets) {
+    let allowed = false;
+    try {
+      const tunnel = await createRelayClient({
+        relayHost: "127.0.0.1",
+        relayPort: guardedRelay.port,
+        targetHost,
+        targetPort: 9987,
+        token: TOKEN,
+        timeoutMs: 1_000,
+      });
+      tunnel.close();
+      allowed = true;
+    } catch (error) {
+      // The relay answers OPEN_ERR(PRIVATE_TARGET_BLOCKED); any other failure
+      // (timeout, bad token) would not prove the guard fired.
+      allowed = !(error instanceof Error && error.message === "PRIVATE_TARGET_BLOCKED");
+    }
+    blockedResults.push({ targetHost, blocked: !allowed });
+  }
+
+  let publicTargetAllowed = false;
+  try {
+    const tunnel = await createRelayClient({
+      relayHost: "127.0.0.1",
+      relayPort: guardedRelay.port,
+      targetHost: "8.8.8.8",
+      targetPort: 9987,
+      token: TOKEN,
+      timeoutMs: 2_000,
+    });
+    publicTargetAllowed = true;
+    tunnel.close();
+  } catch {
+    publicTargetAllowed = false;
+  }
+  guardedRelay.close();
+
+  const guardFailures = blockedResults.filter((entry) => !entry.blocked);
+  const ssrfGuardOk = guardFailures.length === 0 && publicTargetAllowed;
+
   const sender = createSocket("udp4");
   await bind(sender);
   const pending = new Map();
@@ -90,7 +143,11 @@ async function run() {
   console.log(`packets=${PACKET_COUNT} received=${received} loss=${loss.toFixed(2)}%`);
   console.log(`rtt_ms_avg=${average.toFixed(3)} p95=${Number(percentile(0.95)).toFixed(3)} max=${Number(percentile(0.99)).toFixed(3)}`);
   console.log(`bad_token_rejected=${rejectedBadToken}`);
-  if (received !== PACKET_COUNT || !rejectedBadToken) throw new Error("ACCELERATION_POC_FAILED");
+  console.log(`ssrf_guard_ok=${ssrfGuardOk} blocked=${blockedResults.filter((entry) => entry.blocked).length}/${blockedResults.length} public_target_allowed=${publicTargetAllowed}`);
+  for (const entry of blockedResults) {
+    if (!entry.blocked) console.log(`  LEAK: ${entry.targetHost} was not blocked by the private-target guard`);
+  }
+  if (received !== PACKET_COUNT || !rejectedBadToken || !ssrfGuardOk) throw new Error("ACCELERATION_POC_FAILED");
   console.log("ACCELERATION_POC_OK");
 }
 
