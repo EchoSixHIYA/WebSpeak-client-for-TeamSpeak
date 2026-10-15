@@ -40,6 +40,14 @@ export interface AccelerationRelayClient {
   readonly localHost: string;
   readonly localPort: number;
   readonly sessionId: number;
+  /**
+   * True once the tunnel has torn itself down, whether by {@link close} or on
+   * its own after a socket error, a relay OPEN_ERR/CLOSE frame, or an open
+   * timeout. Callers that route a transport through this tunnel must watch this
+   * flag: after it flips, every sendFrame() call is a silent no-op and both UDP
+   * sockets are closed, so the tunnel can never recover on its own.
+   */
+  isClosed(): boolean;
   close(): void;
 }
 
@@ -150,6 +158,7 @@ export async function createAccelerationRelayClient(
     localHost: "127.0.0.1",
     localPort: typeof address === "object" ? address.port : 0,
     sessionId,
+    isClosed: (): boolean => closed,
     close(): void {
       if (!closed && ready) {
         try { sendFrame(FrameType.CLOSE); } catch { /* best effort */ }
