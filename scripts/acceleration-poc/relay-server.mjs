@@ -16,10 +16,17 @@ function isPrivateAddress(host) {
       || octets[0] === 192 && octets[1] === 168
       || octets[0] === 127
       || octets[0] === 169 && octets[1] === 254
+      || octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127
       || octets[0] === 0;
   }
   if (family === 6) {
     const normalized = host.toLowerCase();
+    // IPv4-mapped addresses must be unwrapped before the IPv4 rules apply:
+    // ::ffff:10.0.0.1 is loopback/private traffic in IPv6 clothing.
+    if (normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice("::ffff:".length);
+      return isIP(mapped) !== 4 || isPrivateAddress(mapped);
+    }
     return normalized === "::1"
       || normalized === "::"
       || normalized.startsWith("fc")
@@ -34,11 +41,11 @@ function isPrivateAddress(host) {
 
 async function resolveTarget(host) {
   const family = isIP(host);
-  if (family) return { host, family };
+  if (family) return { host, family, resolved: [host] };
   const records = await lookup(host, { all: true, verbatim: true });
   const record = records.find((item) => item.family === 4) ?? records[0];
   if (!record) throw new Error("TARGET_DNS_EMPTY");
-  return { host: record.address, family: record.family };
+  return { host: record.address, family: record.family, resolved: records.map((item) => item.address) };
 }
 
 export async function createRelayServer({
@@ -71,11 +78,6 @@ export async function createRelayServer({
     if (!request || typeof request.targetHost !== "string" || !Number.isInteger(request.targetPort)) {
       return;
     }
-    if (!allowPrivate && (isPrivateAddress(request.targetHost) || request.targetHost === "localhost")) {
-      const error = { code: "PRIVATE_TARGET_BLOCKED" };
-      socket.send(encodeFrame(FrameType.OPEN_ERR, frame.sessionId, 0, jsonPayload(error), token), client.port, client.address);
-      return;
-    }
 
     const existing = sessions.get(frame.sessionId);
     if (existing) cleanup(existing);
@@ -92,6 +94,14 @@ export async function createRelayServer({
 
     try {
       const target = await resolveTarget(request.targetHost);
+      // Validate the resolved addresses, not the caller-supplied name: a DNS
+      // answer can point any hostname at loopback or an internal address.
+      if (!allowPrivate && target.resolved.some((address) => isPrivateAddress(address))) {
+        const error = { code: "PRIVATE_TARGET_BLOCKED" };
+        socket.send(encodeFrame(FrameType.OPEN_ERR, frame.sessionId, 0, jsonPayload(error), token), client.port, client.address);
+        cleanup(session);
+        return;
+      }
       const targetSocket = createSocket(target.family === 6 ? "udp6" : "udp4");
       session.targetSocket = targetSocket;
       targetSocket.on("message", (payload) => {
