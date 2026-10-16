@@ -114,8 +114,8 @@ function fixture() {
   // Exercise the real close path with failures at codec/track/peer boundaries.
   const resources = {
     closed: false, closePromise: null, audioTimer: null, activityTimer: undefined,
-    pendingFrames: new Map([[1, []]]), memberVolumes: new Map([[1, 1]]),
-    partialPcmByClient: new Map([[1, Buffer.alloc(2)]]), activeSpeakerIds: new Set([1]),
+    pendingFrames: new Map([[1, []], [2, []]]), memberVolumes: new Map([[1, 1], [2, 0.5]]),
+    partialPcmByClient: new Map([[1, Buffer.alloc(2)], [2, Buffer.alloc(2)]]), activeSpeakerIds: new Set([1, 2]),
     decoderByClient: new Map([
       [1, { dispose() { released.push("decoder-1"); throw new Error("Decoder failed"); } }],
       [2, { dispose() { released.push("decoder-2"); } }],
@@ -172,4 +172,27 @@ test("a rejected peer shutdown is shared without repeating partial cleanup", asy
   await assert.rejects(f.session.close(), error => error === failure);
   assert.deepEqual(f.released, ["decoder-1", "decoder-2", "encoder", "track", "peer"]);
   assert.equal(f.resources.decoderByClient.size, 0);
+});
+
+test("removeClient releases one speaker's decoder and buffered state", () => {
+  const f = fixture();
+  f.session.removeClient(1);
+  assert.deepEqual(f.released, ["decoder-1"], "only the leaving member's decoder is released");
+  assert.equal(f.resources.decoderByClient.has(1), false);
+  assert.equal(f.resources.pendingFrames.has(1), false, "a queued frame must not outlive the member");
+  assert.equal(f.resources.partialPcmByClient.has(1), false, "a partial frame must not reach the next user of that id");
+  assert.equal(f.resources.memberVolumes.has(1), false);
+  assert.equal(f.resources.activeSpeakerIds.has(1), false);
+  assert.equal(f.resources.decoderByClient.has(2), true, "another speaker keeps their decoder");
+  assert.equal(f.resources.pendingFrames.has(2), true);
+  assert.equal(f.resources.partialPcmByClient.has(2), true);
+  assert.equal(f.resources.memberVolumes.has(2), true);
+});
+
+test("removeClient is idempotent and survives a throwing decoder disposal", () => {
+  const f = fixture();
+  f.session.removeClient(1);
+  f.session.removeClient(1);
+  assert.deepEqual(f.released, ["decoder-1"], "a repeated removal must not dispose the same codec twice");
+  assert.equal(f.resources.decoderByClient.has(1), false);
 });

@@ -301,6 +301,35 @@ export class WebRtcAudioSession {
     }
   }
 
+  /**
+   * Release everything this session keeps for one speaker, and stop mixing
+   * them. Called when a member leaves, because the alternative is holding all
+   * of it until the whole WebRTC session closes:
+   *
+   * - the decoder is a native codec instance that nothing else ever releases,
+   *   so a busy channel accumulates one per client that has ever spoken;
+   * - the partial PCM buffer would be prepended to the first frame of whoever
+   *   reuses that TeamSpeak client id later, because `pushTeamSpeakVoice` keys
+   *   both the decoder and the partial buffer by client id alone;
+   * - a queued frame would still be mixed into the outgoing audio for up to
+   *   `MAX_MIXER_QUEUE_FRAMES` ticks after the member has gone.
+   */
+  removeClient(clientId: number): void {
+    // Mirrors `setMemberVolume`: TeamSpeak client ids are already in range by
+    // the time they reach here, so this only guards a future caller.
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) return;
+    this.pendingFrames.delete(clientId);
+    this.partialPcmByClient.delete(clientId);
+    this.memberVolumes.delete(clientId);
+    this.activeSpeakerIds.delete(clientId);
+    const decoder = this.decoderByClient.get(clientId);
+    if (!decoder) return;
+    // Drop the entry first, as `close()` does, so the session stops referencing
+    // the codec before calling into it.
+    this.decoderByClient.delete(clientId);
+    try { decoder.dispose(); } catch { /* the remaining state is already released */ }
+  }
+
   close(): Promise<void> {
     if (this.closePromise) return this.closePromise;
     this.closed = true;
