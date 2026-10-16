@@ -10,9 +10,10 @@ Skin authors should start with the [current skin development guide](./SKIN_DEVEL
 
 ## Live demo
 
-URL: <https://webspeak.online>
+- Shanghai: <https://shanghai.webspeak.online>
+- Hong Kong: <https://webspeak.online>
 
-The public demo is hosted in Hong Kong and its network conditions and load may be unstable. Latency, disconnections, or temporary downtime do not represent every self-hosted deployment.
+Network conditions and load may vary at either demo. Latency, disconnections, or temporary downtime do not represent every self-hosted deployment.
 
 ## ✨ Features
 
