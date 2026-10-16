@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
+import type { IncomingMessage } from "node:http";
 import pino from "pino";
-import { VoiceBridge } from "./voice-bridge.js";
+import { VoiceBridge, createTrustedProxies, resolveClientIp } from "./voice-bridge.js";
 import { JoinTicketStore } from "./join-ticket.js";
 import { createAudioFlowStats } from "./audio-stats.js";
 import { SessionAudioTransport } from "./session-audio.js";
@@ -221,4 +222,97 @@ test("an unset media override still uses a literal request host", async () => {
   Object.assign(f.entry, { webrtcPublicHost: "192.0.2.10" });
   await f.offer("legacy");
   assert.deepEqual(f.peers[0].options.publicAddresses, ["192.0.2.10"]);
+});
+
+function ipRequest(remoteAddress: string | undefined, headers: Record<string, string> = {}): IncomingMessage {
+  return { headers, socket: { remoteAddress } } as unknown as IncomingMessage;
+}
+
+test("a direct client cannot choose the address recorded for it", () => {
+  const trusted = createTrustedProxies(["127.0.0.1"]);
+  assert.equal(resolveClientIp(ipRequest("192.0.2.7", { "x-forwarded-for": "203.0.113.9" }), trusted), "192.0.2.7");
+  assert.equal(resolveClientIp(ipRequest("192.0.2.7", { "x-real-ip": "203.0.113.9" }), trusted), "192.0.2.7");
+  assert.equal(
+    resolveClientIp(ipRequest("::ffff:192.0.2.7", { "x-forwarded-for": "203.0.113.9" }), trusted),
+    "192.0.2.7",
+    "an IPv4 peer arrives in mapped form and is still the address we must record",
+  );
+});
+
+test("a trusted proxy chain is read from our side towards the client", () => {
+  const trusted = createTrustedProxies(["127.0.0.1", "::1", "10.0.0.0/8", "2001:db8::/32"]);
+  // The proxy appended the peer it accepted, so a value the client injected to
+  // its left is never the address we record.
+  assert.equal(
+    resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "203.0.113.9, 198.51.100.4" }), trusted),
+    "198.51.100.4",
+  );
+  // Both hops are trusted, so keep walking towards the client.
+  assert.equal(
+    resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "203.0.113.9, 10.1.2.3" }), trusted),
+    "203.0.113.9",
+  );
+  // The same walk over IPv6: a trusted hop, then the client.
+  assert.equal(
+    resolveClientIp(ipRequest("::1", { "x-forwarded-for": "2001:db9::9, 2001:db8::5" }), trusted),
+    "2001:db9::9",
+  );
+});
+
+test("X-Real-IP is used only for a trusted single-hop proxy", () => {
+  const trusted = createTrustedProxies(["127.0.0.1"]);
+  assert.equal(resolveClientIp(ipRequest("127.0.0.1", { "x-real-ip": "203.0.113.9" }), trusted), "203.0.113.9");
+  assert.equal(
+    resolveClientIp(ipRequest("127.0.0.1", { "x-real-ip": "198.51.100.4", "x-forwarded-for": "203.0.113.9" }), trusted),
+    "203.0.113.9",
+    "the appended chain wins over the single-value header",
+  );
+});
+
+test("an all-trusted chain reports the furthest address instead of inventing one", () => {
+  const trusted = createTrustedProxies(["127.0.0.1"]);
+  assert.equal(resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "127.0.0.1" }), trusted), "127.0.0.1");
+  assert.equal(resolveClientIp(ipRequest("127.0.0.1"), trusted), "127.0.0.1");
+  assert.equal(resolveClientIp(ipRequest(undefined), trusted), "unknown");
+});
+
+test("unparseable forwarding values are dropped rather than recorded", () => {
+  const trusted = createTrustedProxies(["127.0.0.1"]);
+  assert.equal(resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "not-an-ip" }), trusted), "127.0.0.1");
+  assert.equal(
+    resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "not-an-ip, 203.0.113.9" }), trusted),
+    "203.0.113.9",
+  );
+});
+
+test("the default trust list is loopback only", () => {
+  const trusted = createTrustedProxies(undefined);
+  assert.equal(resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": "203.0.113.9" }), trusted), "203.0.113.9");
+  assert.equal(resolveClientIp(ipRequest("::1", { "x-forwarded-for": "203.0.113.9" }), trusted), "203.0.113.9");
+  // A bridge address belongs to a proxy we have not been told about, so its
+  // headers are ignored and the connection is logged from the proxy.
+  assert.equal(resolveClientIp(ipRequest("172.17.0.1", { "x-forwarded-for": "203.0.113.9" }), trusted), "172.17.0.1");
+});
+
+test("a declared trusted proxy accepts CIDR and mapped forms", () => {
+  const cidr = createTrustedProxies(["10.0.0.0/8", "fd00::/8"]);
+  assert.equal(resolveClientIp(ipRequest("10.9.8.7", { "x-forwarded-for": "203.0.113.9" }), cidr), "203.0.113.9");
+  assert.equal(resolveClientIp(ipRequest("fd00::7", { "x-forwarded-for": "2001:db8::9" }), cidr), "2001:db8::9");
+
+  // Mapped entries are unwrapped, so they match both the plain and the
+  // mapped form of the same peer address.
+  const mapped = createTrustedProxies(["::ffff:192.0.2.1"]);
+  assert.equal(resolveClientIp(ipRequest("192.0.2.1", { "x-forwarded-for": "203.0.113.9" }), mapped), "203.0.113.9");
+  assert.equal(resolveClientIp(ipRequest("::ffff:192.0.2.1", { "x-forwarded-for": "203.0.113.9" }), mapped), "203.0.113.9");
+});
+
+test("an invalid trust list is rejected instead of silently ignored", () => {
+  for (const entry of ["not-an-ip", "10.0.0.0/33", "fd00::/129", "10.0.0.0/x", "10.0.0.0/-1"]) {
+    assert.throws(() => createTrustedProxies([entry]), /WEBSPEAK_TRUSTED_PROXIES/, entry);
+  }
+});
+
+test("trusting every address has to be asked for explicitly", () => {
+  const trusted = createTrustedProxies(["0.0.0.0/0", "::/0"]);
+  assert.equal(resolveClientIp(ipRequest("192.0.2.7", { "x-forwarded-for": "203.0.113.9" }), trusted), "203.0.113.9");
 });

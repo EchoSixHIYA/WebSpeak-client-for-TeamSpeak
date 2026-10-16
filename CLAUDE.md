@@ -138,6 +138,7 @@ Settings responses merge against the submitted snapshot instead of replacing new
 | Legacy `config.json` | One-time import of `tsHost`, `tsPort` and `tsServerPassword`; later changes do not replace database settings |
 | `WEBSPEAK_DATA_DIR` | Persistent data directory; defaults to project `data/`, while Docker uses `/data` |
 | `WEBSPEAK_SCREEN_SHARE_ICE_SERVERS` | Screen-sharing ICE configuration read at startup |
+| `WEBSPEAK_TRUSTED_PROXIES` | Comma-separated IPs/CIDRs whose `X-Forwarded-For` may be believed; defaults to loopback so a same-host reverse proxy keeps working |
 | Relay environment variables | Standalone relay mode; public gateway relay choices come from saved admin settings |
 | Browser IndexedDB and localStorage | Local identities, preferences, server history and skin state |
 
