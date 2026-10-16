@@ -11,7 +11,7 @@ import type { ServerEvent as SharedServerEvent } from "../shared/voice-models.js
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
 import { randomUUID } from "node:crypto";
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 import { identityFromString } from "@echosixhiya/teamspeak-client";
 import { TSClient, type TSClientOptions } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
@@ -43,6 +43,10 @@ export interface VoiceBridgeOptions {
   screenShareIceServers?: ScreenShareIceServer[] | (() => ScreenShareIceServer[]);
   acceleration?: ConfiguredAccelerationRelay[] | (() => ConfiguredAccelerationRelay[]);
   accelerationName?: string | (() => string | undefined);
+  // Addresses whose forwarding headers may be believed. Unset means loopback
+  // only, which covers a reverse proxy on the same host (including the
+  // published host-network container).
+  trustedProxies?: readonly string[];
 }
 
 interface VoiceBridgeDependencies {
@@ -100,6 +104,7 @@ export class VoiceBridge {
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private logger: LoggerType;
+  private readonly trustedProxies: BlockList;
 
   constructor(
     private options: VoiceBridgeOptions,
@@ -108,6 +113,7 @@ export class VoiceBridge {
     private readonly dependencies: VoiceBridgeDependencies = {},
   ) {
     this.logger = logger.child({ component: "voice-bridge" });
+    this.trustedProxies = createTrustedProxies(options.trustedProxies);
     this.screenShares = new ScreenShareCoordinator(this.entries, (entryId, message) => {
       const entry = this.entries.get(entryId);
       if (entry?.ws.readyState === WebSocket.OPEN) entry.ws.send(JSON.stringify(message));
@@ -135,7 +141,7 @@ export class VoiceBridge {
         ws.close(4006, "ACCELERATION_UNAVAILABLE");
         return;
       }
-      const clientIp = resolveClientIp(req);
+      const clientIp = resolveClientIp(req, this.trustedProxies);
       const webrtcPublicHost = resolveWebRtcPublicHost(req);
       let identity;
       try {
@@ -785,17 +791,76 @@ function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
   return undefined;
 }
 
-function resolveClientIp(request: IncomingMessage): string {
-  const candidates = [
-    firstHeader(request.headers["x-forwarded-for"])?.split(",", 1)[0],
-    firstHeader(request.headers["x-real-ip"]),
-    request.socket.remoteAddress,
-  ];
-  for (const candidate of candidates) {
-    const normalized = normalizeClientIp(candidate);
-    if (normalized) return normalized;
+// A reverse proxy on the same host reaches us over loopback, which is also what
+// the published host-network container sees. Anything else has to be declared,
+// because whoever we believe can choose the address we record.
+const DEFAULT_TRUSTED_PROXIES = ["127.0.0.1", "::1"];
+
+/** Build the matcher that decides whether forwarding headers may be believed. */
+export function createTrustedProxies(entries: readonly string[] | undefined): BlockList {
+  const list = new BlockList();
+  const effective = entries?.length ? entries : DEFAULT_TRUSTED_PROXIES;
+  for (const entry of effective) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const separator = trimmed.indexOf("/");
+    const address = normalizeClientIp(separator === -1 ? trimmed : trimmed.slice(0, separator));
+    const family = address ? isIP(address) : 0;
+    if (!address || (family !== 4 && family !== 6)) {
+      throw new Error(`Invalid WEBSPEAK_TRUSTED_PROXIES entry: ${entry}`);
+    }
+    if (separator === -1) {
+      list.addAddress(address, family === 4 ? "ipv4" : "ipv6");
+      continue;
+    }
+    const prefixText = trimmed.slice(separator + 1);
+    const prefix = Number(prefixText);
+    if (!/^\d+$/.test(prefixText) || prefix > (family === 4 ? 32 : 128)) {
+      throw new Error(`Invalid WEBSPEAK_TRUSTED_PROXIES prefix: ${entry}`);
+    }
+    list.addSubnet(address, prefix, family === 4 ? "ipv4" : "ipv6");
   }
-  return "unknown";
+  return list;
+}
+
+function isTrustedProxy(address: string, trustedProxies: BlockList): boolean {
+  const family = isIP(address);
+  if (family !== 4 && family !== 6) return false;
+  return trustedProxies.check(address, family === 4 ? "ipv4" : "ipv6");
+}
+
+/**
+ * Address to record for a connection. Each proxy appends the peer it accepted,
+ * so the chain is read from the hop nearest to us towards the client, and the
+ * first address we do not trust is the client. Forwarding headers received
+ * directly from an untrusted peer are ignored entirely: that peer can write
+ * anything, and whatever we return is shown as the source in the admin
+ * connection log.
+ */
+export function resolveClientIp(request: IncomingMessage, trustedProxies: BlockList): string {
+  const direct = normalizeClientIp(request.socket.remoteAddress);
+  if (!direct || !isTrustedProxy(direct, trustedProxies)) return direct ?? "unknown";
+
+  const forwarded = firstHeader(request.headers["x-forwarded-for"]);
+  const hops: string[] = [];
+  if (forwarded) {
+    for (const candidate of forwarded.split(",")) {
+      const hop = normalizeClientIp(candidate);
+      if (hop) hops.push(hop);
+    }
+    hops.reverse();
+  }
+  for (const hop of hops) {
+    if (!isTrustedProxy(hop, trustedProxies)) return hop;
+  }
+  if (!hops.length) {
+    // A single-hop proxy may be configured to send only X-Real-IP.
+    const realIp = normalizeClientIp(firstHeader(request.headers["x-real-ip"]));
+    if (realIp && !isTrustedProxy(realIp, trustedProxies)) return realIp;
+  }
+  // Every address we can see belongs to a proxy we trust. Report the furthest
+  // one instead of inventing a client address that was never forwarded.
+  return hops.length ? hops[hops.length - 1]! : direct;
 }
 
 function normalizeClientIp(value: string | undefined): string | undefined {

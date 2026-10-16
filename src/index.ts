@@ -58,6 +58,7 @@ async function main() {
     certDir: hasCert ? CERT_DIR : undefined,
     voiceBridgeOptions: {
       joinTickets,
+      trustedProxies: readTrustedProxies(process.env.WEBSPEAK_TRUSTED_PROXIES),
       webRtc: () => adminService.getWebRtcAudioOptions(),
       screenShareIceServers: () => SCREEN_SHARE_ICE_SERVERS,
       // The public gateway only uses the relay configuration explicitly
@@ -128,6 +129,11 @@ function parsePort(value: string | undefined, fallback: number): number {
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
+}
+
+function readTrustedProxies(value: string | undefined): string[] | undefined {
+  const entries = value?.split(/[\s,]+/).filter(Boolean) ?? [];
+  return entries.length ? entries : undefined;
 }
 
 function readScreenShareIceServers(value: string | undefined): ScreenShareIceServer[] {
