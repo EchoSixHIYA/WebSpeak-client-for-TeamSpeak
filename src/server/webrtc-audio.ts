@@ -41,6 +41,9 @@ export interface WebRtcAudioOptions {
   udpPortRange?: [number, number];
 }
 
+/** The mixer only encodes; per-speaker decoders are created separately below. */
+type MixerEncoder = Pick<OpusEncoder, "encode" | "dispose">;
+
 export interface WebRtcAudioSessionOptions {
   connectionId: string;
   publicAddresses?: string[];
@@ -49,6 +52,8 @@ export interface WebRtcAudioSessionOptions {
   publicHost?: string;
   udpPortRange?: [number, number];
   logger: LoggerType;
+  /** Mirrors `VoiceBridgeDependencies.createEncoder`; production uses `@discordjs/opus`. */
+  createEncoder?: () => MixerEncoder;
   microphoneMuted?: boolean;
   accompanimentActive?: boolean;
   onVoiceFrame: (data: Buffer, codec: 4 | 5) => void;
@@ -104,7 +109,7 @@ export class WebRtcAudioSession {
   private readonly opusPayloadTypes = new Set<number>();
   private audioTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly activityTimer: ReturnType<typeof setInterval>;
-  private encoder: OpusEncoder | null;
+  private encoder: MixerEncoder | null;
   private sequenceNumber = randomInt(0, 65_536);
   private timestamp = randomInt(0, 0x1_0000_0000) >>> 0;
   private readonly ssrc = randomInt(1, 0x1_0000_0000) >>> 0;
@@ -193,14 +198,19 @@ export class WebRtcAudioSession {
       this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not prepare WebRTC output track");
     });
 
+    const createEncoder = options.createEncoder ?? (() => new OpusEncoder(AUDIO_SAMPLE_RATE, 1));
     try {
-      this.encoder = new OpusEncoder(AUDIO_SAMPLE_RATE, 1);
+      this.encoder = createEncoder();
     } catch (error: unknown) {
       this.encoder = null;
       this.logger.error({ err: error instanceof Error ? error.message : String(error) }, "Could not create WebRTC mixer encoder");
     }
     if (!this.encoder) {
+      // The constructor never returns, so the caller cannot clean up after us:
+      // its `peer` handle stays null and `peer?.close()` is a no-op. Roll the
+      // half-built peer back here instead of stranding it on the floor.
       this.outgoingTrack.stop();
+      void this.peer.close().catch(() => { /* rollback is best effort */ });
       throw new Error("WebRTC Opus codec is unavailable");
     }
 
