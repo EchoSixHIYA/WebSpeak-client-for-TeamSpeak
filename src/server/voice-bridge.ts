@@ -235,6 +235,7 @@ export class VoiceBridge {
       try {
         entry.audioTransport = new SessionAudioTransport({
           audio: entry.audio, socket: ws, client: tsClient,
+          logger: this.logger.child({ component: "session-audio", entryId }),
           isCurrent: () => this.entries.get(entryId) === entry,
           isReady: () => tsReady && session.state === "connected",
           selfId: () => entry!.events?.selfId ?? 0,

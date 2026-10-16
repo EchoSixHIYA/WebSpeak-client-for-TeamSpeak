@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SessionAudioTransport } from "./session-audio.js";
 import { createAudioFlowStats } from "./audio-stats.js";
+import type { Logger as LoggerType } from "../logger.js";
 import type { ServerMessage } from "../shared/server-messages.js";
 import type { TSVoiceData } from "./ts-client.js";
 
@@ -13,6 +14,14 @@ function fixture() {
   const encoded: Buffer[] = [];
   const forwarded: Array<{ data: Buffer; codec: number; targets?: number[] }> = [];
   const notices: ServerMessage[] = [];
+  const warnings: Array<Record<string, unknown>> = [];
+  const logger: LoggerType = {
+    debug: () => {},
+    info: () => {},
+    error: () => {},
+    warn: (objOrMsg: Record<string, unknown> | string) => { if (typeof objOrMsg !== "string") warnings.push(objOrMsg); },
+    child: () => logger,
+  };
   const socket = { readyState: 1 as 0 | 1 | 2 | 3, bufferedAmount: 0, send: (packet: Buffer) => { packets.push(packet); } };
   const client = {
     sendVoice: (data: Buffer, codec: number) => { forwarded.push({ data, codec }); },
@@ -23,12 +32,12 @@ function fixture() {
     dispose() { state.disposed++; },
   };
   const transport = new SessionAudioTransport({
-    audio, socket, client, isCurrent: () => state.current, isReady: () => state.ready,
+    audio, socket, client, logger, isCurrent: () => state.current, isReady: () => state.ready,
     selfId: () => 1, peer: () => state.peer, whisperTargets: () => state.targets,
     sendJson: message => { notices.push(message); },
   }, encoder, () => state.now);
   const remote = (clientId = 513) => ({ clientId, codec: 4, data: Buffer.from([11, 12, 13]) });
-  return { transport, audio, state, socket, client, encoder, packets, encoded, forwarded, notices, remote };
+  return { transport, audio, state, socket, client, encoder, packets, encoded, forwarded, notices, warnings, remote };
 }
 
 test("PCM framing preserves codec, whisper routing and timing counters", () => {
@@ -49,17 +58,43 @@ test("PCM framing preserves codec, whisper routing and timing counters", () => {
 test("invalid PCM is rejected and reconnecting sessions do not encode audio", () => {
   const f = fixture();
   f.transport.receivePcm(Buffer.alloc(1_919));
+  f.state.now = 5_000;
   f.transport.receivePcm(Buffer.alloc(1_921));
   assert.equal(f.notices.length, 2);
   assert.deepEqual(f.notices[0], { type: "error", error: { code: "INVALID_AUDIO_FRAME", message: "音频帧格式无效", recoverable: false } });
+  assert.deepEqual(f.notices[1], f.notices[0]);
   f.state.ready = false;
+  f.state.now = 10_000;
+  f.transport.receivePcm(Buffer.alloc(1_919));
+  assert.equal(f.notices.length, 2, "a frame the route discards must not be reported as malformed");
+  assert.equal(f.warnings.length, 2, "a frame the route discards must not reach the operator log");
   f.transport.receivePcm(Buffer.alloc(1_920));
   f.transport.receiveWebRtc(Buffer.from([1]), 4);
   f.transport.receiveTeamSpeak(f.remote());
-  assert.equal(f.audio.ingressDroppedFrames, 3);
+  assert.equal(f.audio.ingressDroppedFrames, 4);
   assert.equal(f.encoded.length, 0);
   assert.equal(f.forwarded.length, 0);
   assert.equal(f.packets.length, 0);
+});
+
+test("repeated malformed frames are counted in full but reported once per window", () => {
+  const f = fixture();
+  for (const now of [0, 1, 4_999, 5_000]) { f.state.now = now; f.transport.receivePcm(Buffer.alloc(1_919)); }
+  assert.equal(f.audio.ingressDroppedFrames, 4, "every discarded frame still reaches the flow counters");
+  assert.equal(f.notices.length, 2, "the browser sees one error per window, not one per frame");
+  assert.deepEqual(f.warnings, [
+    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: 1_920, droppedFrames: 1 },
+    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: 1_920, droppedFrames: 4 },
+  ], "operators get the same rate-limited view through the logger");
+});
+
+test("an encoder failure and a malformed frame do not suppress each other", t => {
+  const f = fixture();
+  t.mock.method(f.encoder, "encode", () => { throw new Error("Codec failed"); });
+  f.transport.receivePcm(Buffer.alloc(1_919));
+  f.transport.receivePcm(Buffer.alloc(1_920));
+  assert.deepEqual(f.notices.map(message => message.type), ["error", "audioError"]);
+  t.mock.restoreAll();
 });
 
 test("WebRTC ingress excludes queued PCM and fallback re-enables PCM", () => {
