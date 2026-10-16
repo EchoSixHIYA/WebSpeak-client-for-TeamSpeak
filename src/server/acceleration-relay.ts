@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createSocket } from "node:dgram";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
+import { isRestrictedAddress } from "../security/open-target-policy.js";
 
 const MAGIC = Buffer.from("WSAT");
 const VERSION = 1;
@@ -35,6 +36,8 @@ export interface AccelerationTarget {
   host: string;
   port: number;
 }
+
+type AddressLookup = (hostname: string) => Promise<{ address: string; family: number }[]>;
 
 export interface AccelerationRelayClient {
   readonly localHost: string;
@@ -174,6 +177,7 @@ export async function createAccelerationRelayServer({
   token,
   allowPrivate = false,
   idleTimeoutMs = 30_000,
+  lookupAddresses = (hostname) => lookup(hostname, { all: true, verbatim: true }),
   onError = (error) => { console.error(`[acceleration-relay] socket error: ${error.message}`); },
 }: {
   host?: string;
@@ -181,6 +185,7 @@ export async function createAccelerationRelayServer({
   token: string;
   allowPrivate?: boolean;
   idleTimeoutMs?: number;
+  lookupAddresses?: AddressLookup;
   onError?: (error: Error) => void;
 }): Promise<{ host: string; port: number; close(): void }> {
   if (!token || token.length < 16) throw new Error("Acceleration relay token must contain at least 16 characters");
@@ -232,7 +237,7 @@ export async function createAccelerationRelayServer({
     if (!frame || !verifyFrame(frame, token)) return;
     const client = { address: rinfo.address, port: rinfo.port };
     if (frame.type === FrameType.OPEN) {
-      void openRelaySession(frame, client, socket, sessions, token, allowPrivate, send, cleanup);
+      void openRelaySession(frame, client, socket, sessions, token, allowPrivate, send, cleanup, lookupAddresses);
       return;
     }
     const session = sessions.get(frame.sessionId);
@@ -292,20 +297,27 @@ async function openRelaySession(
   allowPrivate: boolean,
   send: (session: RelaySession, type: FrameType, payload?: Buffer) => void,
   cleanup: (session: RelaySession) => void,
+  lookupAddresses: AddressLookup,
 ): Promise<void> {
   const request = parseJson(frame.payload);
   if (!request || typeof request.targetHost !== "string" || !Number.isInteger(request.targetPort)) return;
   const targetPort = request.targetPort as number;
-  if (!allowPrivate && isPrivateAddress(request.targetHost)) {
-    socket.send(encodeFrame(FrameType.OPEN_ERR, frame.sessionId, 0, jsonPayload({ code: "PRIVATE_TARGET_BLOCKED" }), token), client.port, client.address);
-    return;
-  }
   const previous = sessions.get(frame.sessionId);
   if (previous) cleanup(previous);
   const session: RelaySession = { id: frame.sessionId, client, targetSocket: null, outSequence: 1, lastActivity: Date.now(), closed: false };
   sessions.set(session.id, session);
   try {
-    const target = await resolveTarget(request.targetHost);
+    const target = await resolveTarget(request.targetHost, lookupAddresses);
+    // The private-target check must run on the resolved addresses, never on the
+    // caller-supplied name: a DNS answer can map any hostname onto loopback or
+    // an internal address after a string-only check has already passed. Every
+    // address in the answer set is checked so a mixed public/private response
+    // cannot be used to reach an internal host.
+    if (!allowPrivate && target.resolved.some((address) => isRestrictedAddress(address))) {
+      cleanup(session);
+      socket.send(encodeFrame(FrameType.OPEN_ERR, frame.sessionId, 0, jsonPayload({ code: "PRIVATE_TARGET_BLOCKED" }), token), client.port, client.address);
+      return;
+    }
     const targetSocket = createSocket(target.family === 6 ? "udp6" : "udp4");
     session.targetSocket = targetSocket;
     targetSocket.on("message", (payload) => { session.lastActivity = Date.now(); send(session, FrameType.DATA, payload); });
@@ -380,26 +392,13 @@ function parseJson(payload: Buffer): Record<string, unknown> | null {
   } catch { return null; }
 }
 
-function isPrivateAddress(host: string): boolean {
+async function resolveTarget(host: string, lookupAddresses: AddressLookup): Promise<{ host: string; family: number; resolved: string[] }> {
   const family = isIP(host);
-  if (family === 4) {
-    const parts = host.split(".").map(Number);
-    return parts[0] === 10 || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168) || parts[0] === 127 || (parts[0] === 169 && parts[1] === 254) || parts[0] === 0;
-  }
-  if (family === 6) {
-    const normalized = host.toLocaleLowerCase();
-    return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb");
-  }
-  return host === "localhost" || host.endsWith(".localhost");
-}
-
-async function resolveTarget(host: string): Promise<{ host: string; family: number }> {
-  const family = isIP(host);
-  if (family) return { host, family };
-  const records = await lookup(host, { all: true, verbatim: true });
+  if (family) return { host, family, resolved: [host] };
+  const records = await lookupAddresses(host);
   const record = records.find((item) => item.family === 4) ?? records[0];
   if (!record) throw new Error("TARGET_DNS_EMPTY");
-  return { host: record.address, family: record.family };
+  return { host: record.address, family: record.family, resolved: records.map((item) => item.address) };
 }
 
 function asError(error: unknown): Error { return error instanceof Error ? error : new Error(String(error)); }
