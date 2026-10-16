@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseServerMessage, parseScreenShareStream, parseVoiceAudioBridgeStats, type ServerMessage } from "./server-messages.js";
+import { SCREEN_SHARE_LEGACY_AVATAR_BUDGET } from "./screen-share.js";
 
 const stream = {
   streamId: "stream-1", source: "browser" as const, ownerPeerId: "owner", ownerClientId: 1,
@@ -126,4 +127,25 @@ test("screen share viewers carry a client id and still accept a legacy inline av
   // Out-of-range ids are dropped rather than forwarded.
   assert.equal(viewers[2]?.clientId, undefined);
   assert.equal(viewers[3]?.clientId, undefined);
+});
+
+test("legacy inline avatars are bounded in total, not merely per entry", () => {
+  const avatar = `data:image/png;base64,${"A".repeat(128 * 1024 - 22)}`;
+  const message = parseServerMessage({
+    type: "screenShareList",
+    streams: [{
+      streamId: "s", ownerPeerId: "owner",
+      viewers: Array.from({ length: 8 }, (_, index) => ({ peerId: `v${index}`, nickname: `n${index}`, avatar })),
+    }],
+  });
+  assert.ok(message?.type === "screenShareList");
+  const viewers = message.streams[0]?.viewers ?? [];
+  assert.equal(viewers.length, 8, "entries are kept even when their avatar is dropped");
+  const accepted = viewers.reduce((total, viewer) => total + (viewer.avatar?.length ?? 0), 0);
+  assert.ok(
+    accepted <= SCREEN_SHARE_LEGACY_AVATAR_BUDGET,
+    `accepted avatar bytes must stay within the roster budget, got ${accepted}`,
+  );
+  assert.ok(accepted > 0, "the legacy path still renders the leading avatars");
+  assert.ok(viewers.some(viewer => viewer.avatar === undefined), "entries past the budget must fall back to a local lookup");
 });

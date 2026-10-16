@@ -1,5 +1,5 @@
 import type { ChannelMember, ChannelInfo, ServerEvent, VoiceAudioBridgeStats } from "./voice-models.js";
-import { normalizeScreenShareIceServers, parseScreenShareSignal, type ScreenShareIceServer, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
+import { normalizeScreenShareIceServers, parseScreenShareSignal, SCREEN_SHARE_LEGACY_AVATAR_BUDGET, type ScreenShareIceServer, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
 
 import { normalizeVoiceStunServer } from "./voice-ice.js";
 import { isSessionDescription, type SessionDescription } from "./webrtc.js";
@@ -100,12 +100,22 @@ export function parseVoiceAudioBridgeStats(value: unknown): VoiceAudioBridgeStat
 
 export function parseScreenShareViewers(raw: unknown): ScreenShareViewerDescription[] {
   if (!Array.isArray(raw)) return [];
+  let avatarBudget = SCREEN_SHARE_LEGACY_AVATAR_BUDGET;
   return raw.filter((viewer): viewer is RecordValue & { peerId: string; nickname: string } => isRecord(viewer) && text(viewer.peerId) && text(viewer.nickname))
-    .slice(0, 64).map(viewer => ({
-      peerId: viewer.peerId.slice(0, 128), nickname: viewer.nickname.slice(0, 120),
-      ...(clientId(viewer.clientId) ? { clientId: viewer.clientId } : {}),
-      ...(text(viewer.avatar) && viewer.avatar.length <= 128 * 1024 ? { avatar: viewer.avatar } : {}),
-    }));
+    .slice(0, 64).map(viewer => {
+      // Client ids replaced inline avatars, so this only serves older gateways.
+      // Bound the roster's total avatar bytes, not just each entry: the
+      // per-entry cap alone still allows 64 x 128 KiB per broadcast.
+      const avatar = text(viewer.avatar) && viewer.avatar.length <= 128 * 1024 && viewer.avatar.length <= avatarBudget
+        ? viewer.avatar
+        : undefined;
+      if (avatar) avatarBudget -= avatar.length;
+      return {
+        peerId: viewer.peerId.slice(0, 128), nickname: viewer.nickname.slice(0, 120),
+        ...(clientId(viewer.clientId) ? { clientId: viewer.clientId } : {}),
+        ...(avatar ? { avatar } : {}),
+      };
+    });
 }
 
 /** Defaults preserve stream descriptions sent by older gateway versions. */

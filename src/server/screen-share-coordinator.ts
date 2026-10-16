@@ -255,13 +255,27 @@ export class ScreenShareCoordinator {
     return {
       type: "screenShareViewerCount",
       streamId: stream.streamId,
-      viewerCount: stream.viewerCount,
+      // Derive the count from the same call as the roster so the announced
+      // number can never disagree with the entries actually listed.
+      viewerCount: this.screenShareViewerCount(stream),
       viewers: this.describeScreenViewers(stream),
     };
   }
 
   private screenShareViewerCount(stream: ScreenStreamRecord): number {
+    this.pruneStaleViewers(stream);
     return stream.viewerEntryIds.size + stream.nativeViewerClids.size;
+  }
+
+  /**
+   * Drop viewer entries whose participant is gone. A client can disappear from
+   * the entry map without passing through the leave path, and a lingering id
+   * inflates the announced count while the roster silently omits it.
+   */
+  private pruneStaleViewers(stream: ScreenStreamRecord): void {
+    for (const entryId of [...stream.viewerEntryIds.keys()]) {
+      if (!this.entries.has(entryId)) stream.viewerEntryIds.delete(entryId);
+    }
   }
 
   private broadcastScreenMessage(stream: ScreenStreamRecord, message: ServerMessage, excludeEntryId?: string): void {

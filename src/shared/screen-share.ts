@@ -78,6 +78,14 @@ export type ScreenSharePeerSignal =
       kind: "close";
   };
 
+/**
+ * Ceiling on the total inline avatar bytes a client accepts from a legacy
+ * gateway for one viewer roster. Current gateways send client ids instead of
+ * avatars, so this bounds only the compatibility path; a per-entry limit alone
+ * would still admit 64 x 128 KiB in a single broadcast.
+ */
+export const SCREEN_SHARE_LEGACY_AVATAR_BUDGET = 256 * 1024;
+
 export interface ScreenShareViewerDescription {
   peerId: string;
   nickname: string;

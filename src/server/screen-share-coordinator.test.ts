@@ -392,3 +392,31 @@ test("the viewer roster references members by client id instead of inlining avat
     assert.equal("avatar" in viewer, false, "the roster must not inline avatars");
   }
 });
+
+test("a viewer whose entry disappeared no longer inflates the announced count", () => {
+  const f = fixture();
+  const owner = f.participant("owner", 1);
+  const streamId = f.start(owner);
+  const live = f.participant("live", 2);
+  const gone = f.participant("gone", 3);
+  f.handle(live, { type: "screenShareJoin", streamId });
+  f.handle(gone, { type: "screenShareJoin", streamId });
+
+  const before = f.messages
+    .filter(({ to, message }) => to === owner.id && message.type === "screenShareViewerCount")
+    .at(-1)?.message;
+  assert.ok(before?.type === "screenShareViewerCount");
+  assert.equal(before.viewerCount, 2);
+
+  // The entry disappears without passing through the coordinator's leave path.
+  f.entries.delete(gone.id);
+  const later = f.participant("later", 4);
+  f.handle(later, { type: "screenShareJoin", streamId });
+
+  const after = f.messages
+    .filter(({ to, message }) => to === owner.id && message.type === "screenShareViewerCount")
+    .at(-1)?.message;
+  assert.ok(after?.type === "screenShareViewerCount");
+  assert.equal(after.viewers?.length, 2, "only viewers that still exist are listed");
+  assert.equal(after.viewerCount, 2, "the announced count must match the listed viewers");
+});
