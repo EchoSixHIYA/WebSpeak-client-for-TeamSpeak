@@ -173,3 +173,31 @@ test("a rejected peer shutdown is shared without repeating partial cleanup", asy
   assert.deepEqual(f.released, ["decoder-1", "decoder-2", "encoder", "track", "peer"]);
   assert.equal(f.resources.decoderByClient.size, 0);
 });
+
+test("an unavailable mixer encoder closes the half-built peer before the constructor throws", () => {
+  // The constructor never returns when the codec is missing, so the caller's
+  // `peer?.close()` is a no-op. Instrument the prototype to observe that the
+  // rollback happens inside the constructor instead. Count distinct peers:
+  // werift re-enters close() on the same instance while tearing ICE down.
+  const originalClose = RTCPeerConnection.prototype.close;
+  const closedPeers = new Set<RTCPeerConnection>();
+  RTCPeerConnection.prototype.close = function patchedClose(this: RTCPeerConnection): Promise<void> {
+    closedPeers.add(this);
+    return originalClose.call(this);
+  };
+  try {
+    assert.throws(
+      () => new WebRtcAudioSession({
+        connectionId: "encoder-unavailable",
+        logger: pino({ enabled: false }),
+        createEncoder: () => { throw new Error("Opus codec is unavailable"); },
+        onVoiceFrame() {},
+        onVoiceActivity() {},
+      }),
+      /WebRTC Opus codec is unavailable/,
+    );
+  } finally {
+    RTCPeerConnection.prototype.close = originalClose;
+  }
+  assert.equal(closedPeers.size, 1, "the constructor must roll back the peer it already created");
+});
