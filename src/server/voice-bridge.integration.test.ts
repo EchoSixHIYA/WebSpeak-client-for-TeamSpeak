@@ -85,6 +85,26 @@ async function fixture(t: TestContext, overrides: {
   return { bridge, sdk, socket, messages, entries, wss };
 }
 
+function messageTypes(messages: Array<{ data: Buffer; binary: boolean }>): string[] {
+  return messages
+    .filter(message => !message.binary)
+    .map(message => (JSON.parse(message.data.toString()) as { type: string }).type);
+}
+
+function waitForMessage<T extends Record<string, unknown>>(socket: WebSocket, type: string): Promise<T> {
+  return new Promise(resolve => {
+    socket.on("message", (data, binary) => {
+      if (binary) return;
+      const message = JSON.parse(data.toString()) as { type?: string };
+      if (message.type === type) resolve(message as unknown as T);
+    });
+  });
+}
+
+// The native Opus codec is unavailable in some environments. These tests only
+// exercise gateway wiring, so the encoder is stubbed out.
+const stubEncoder = () => ({ encode: () => Buffer.alloc(0), dispose: () => {} });
+
 test("a TeamSpeak constructor failure releases the admitted gateway slot", { timeout: 5_000 }, async t => {
   const f = await fixture(t, { createTeamSpeakClient() { throw new Error("Identity initialization failed"); } });
   if (f.socket.readyState !== WebSocket.CLOSED) await once(f.socket, "close");
@@ -124,6 +144,77 @@ test("server identity lookup waits until the directory sync publishes the connec
   assert.ok(publishedTypes.indexOf("serverInfo") > publishedTypes.indexOf("connected"));
   assert.equal(f.sdk.serverInfoCalls, 1);
   assert.equal(f.sdk.serverPresentationCalls, 1);
+  assert.ok(f.bridge.getActiveCount() > 0);
+});
+
+test("a TeamSpeak drop before the directory sync fails the connection instead of stalling", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, {
+    waitForFirstMessage: false,
+    createEncoder: stubEncoder,
+    configureSdk(sdk) { sdk.emitDirectorySnapshotOnConnect = false; },
+  });
+  while (!f.sdk.connectCalls) await nextTurn();
+  await nextTurn();
+
+  // The session is past authentication, but `connected` was never published.
+  assert.deepEqual(messageTypes(f.messages), []);
+
+  const failure = waitForMessage<{ code: string }>(f.socket, "connectionFailed");
+  f.sdk.emit("disconnected");
+  assert.ok((await failure).code.length > 0);
+  await nextTurn();
+  assert.equal(f.bridge.getActiveCount(), 0);
+});
+
+test("a kick before the directory sync is reported instead of leaving the session alive", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, {
+    waitForFirstMessage: false,
+    createEncoder: stubEncoder,
+    configureSdk(sdk) { sdk.emitDirectorySnapshotOnConnect = false; },
+  });
+  while (!f.sdk.connectCalls) await nextTurn();
+  await nextTurn();
+  assert.deepEqual(messageTypes(f.messages), []);
+
+  const failure = waitForMessage<{ code: string; detail?: string }>(f.socket, "connectionFailed");
+  f.sdk.emit("kicked", normalizeTeamSpeakKickedReason("Removed by operator", 4));
+  const message = await failure;
+  assert.equal(message.code, "KICKED");
+  assert.match(message.detail ?? "", /Removed by operator/);
+  await nextTurn();
+  assert.equal(f.bridge.getActiveCount(), 0);
+});
+
+test("a drop during a reconnect handshake resumes recovery instead of stalling in syncing", { timeout: 15_000 }, async t => {
+  const f = await fixture(t, {
+    createEncoder: stubEncoder,
+    configureSdk(sdk) {
+      let connects = 0;
+      sdk.connect = async () => {
+        sdk.connectCalls += 1;
+        sdk.disconnected = false;
+        connects += 1;
+        // Only the first handshake publishes the directory, so the reconnect
+        // attempt parks in `syncing` the way a slow server would.
+        if (connects === 1) sdk.emit("directorySnapshot", sdk.directory);
+      };
+    },
+  });
+  assert.ok(messageTypes(f.messages).includes("connected"));
+
+  const firstReconnect = waitForMessage<{ attempt: number }>(f.socket, "reconnecting");
+  f.sdk.emit("disconnected");
+  assert.equal((await firstReconnect).attempt, 1);
+
+  // Wait for the retry handshake to reach `syncing` without republishing `connected`.
+  while (f.sdk.connectCalls < 2) await nextTurn();
+  await nextTurn();
+  await nextTurn();
+  assert.ok(!messageTypes(f.messages).includes("reconnected"));
+
+  const secondReconnect = waitForMessage<{ attempt: number }>(f.socket, "reconnecting");
+  f.sdk.emit("disconnected");
+  assert.equal((await secondReconnect).attempt, 2);
   assert.ok(f.bridge.getActiveCount() > 0);
 });
 
