@@ -233,11 +233,20 @@ export class ScreenShareCoordinator {
       .filter((entry): entry is ScreenShareParticipant => Boolean(entry))
       .slice(0, 64)
       .map((entry) => {
-        const avatar = entry.members.get(entry.tsClient.getClientId())?.avatar;
+        // Send the client id, not the avatar: receivers already hold member
+        // avatars from the directory, and this roster is rebroadcast to the
+        // whole channel on every join and leave. Inlining avatars here scales
+        // with (viewers x avatar size x channel members) per event.
+        let clientId: number | undefined;
+        try {
+          clientId = entry.tsClient.getClientId();
+        } catch {
+          clientId = undefined;
+        }
         return {
           peerId: entry.screenPeerId,
           nickname: entry.nickname,
-          ...(avatar && avatar.length <= 128 * 1024 ? { avatar } : {}),
+          ...(typeof clientId === "number" && clientId > 0 ? { clientId } : {}),
         };
       });
   }

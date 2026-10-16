@@ -357,3 +357,38 @@ test("native removal notification and acknowledgement publish only one viewer-le
   assert.equal(f.list(owner)[0]?.viewerCount, 0);
   assert.equal(f.messages.filter(({ message }) => message.type === "screenShareViewerLeft").length, 1);
 });
+
+test("the viewer roster references members by client id instead of inlining avatars", () => {
+  const f = fixture();
+  const owner = f.participant("owner", 1);
+  const streamId = f.start(owner);
+  // Give every viewer the largest avatar the gateway will still accept.
+  const avatar = `data:image/png;base64,${"A".repeat(128 * 1024 - 22)}`;
+  const viewers = Array.from({ length: 8 }, (_, index) => {
+    const clientId = index + 2;
+    const viewer = f.participant(`viewer-${index}`, clientId);
+    const member = viewer.members.get(clientId);
+    assert.ok(member);
+    member.avatar = avatar;
+    f.handle(viewer, { type: "screenShareJoin", streamId });
+    return { viewer, clientId };
+  });
+  const roster = f.messages
+    .filter(({ to, message }) => to === owner.id && message.type === "screenShareViewerCount")
+    .at(-1)?.message;
+  assert.ok(roster?.type === "screenShareViewerCount");
+  const rosterViewers = roster.viewers ?? [];
+  assert.equal(rosterViewers.length, viewers.length);
+  // Eight 128 KiB avatars would be ~1 MB. The roster is rebroadcast to the whole
+  // channel on every join/leave, so it must not scale with avatar size at all.
+  const bytes = Buffer.byteLength(JSON.stringify(roster));
+  assert.ok(bytes < 16 * 1024, `roster payload must stay small regardless of avatars, got ${bytes} bytes`);
+  assert.deepEqual(
+    rosterViewers.map(viewer => viewer.clientId).sort((left, right) => left! - right!),
+    viewers.map(({ clientId }) => clientId).sort((left, right) => left - right),
+    "each roster entry must carry the TeamSpeak client id so the client can resolve the avatar locally",
+  );
+  for (const viewer of rosterViewers) {
+    assert.equal("avatar" in viewer, false, "the roster must not inline avatars");
+  }
+});

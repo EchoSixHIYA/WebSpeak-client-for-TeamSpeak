@@ -15,7 +15,7 @@ before(async () => {
   ({ default: VoiceChannelTree } = await vite.ssrLoadModule("/src/components/web-client/VoiceChannelTree.vue"));
 });
 after(async () => { await vite?.close(); });
-function mount(t, initialStream = null) {
+function mount(t, initialStream = null, memberAvatar = () => "") {
   const listeners = new Set(), starts = [], storage = new Map(); let exits = 0, ui;
   class Element {}
   class Video extends Element { srcObject = null; volume = 1; plays = 0; async play() { this.plays++; } }
@@ -26,7 +26,7 @@ function mount(t, initialStream = null) {
     t.after(() => { if (original) Object.defineProperty(globalThis, key, original); else delete globalThis[key]; });
   }
   const viewing = shallowRef(true), stream = shallowRef(initialStream), volume = shallowRef(.4), streams = [];
-  const app = renderer.createApp({ setup() { ui = useWebClientScreenShare({ streams, viewing, viewingStreamId: shallowRef("s"), remoteStream: stream, remoteVolume: volume, error: shallowRef(""), errorCode: shallowRef(""), startScreenShare: async (...args) => starts.push(args), joinScreenShare() {}, leaveScreenShare() {}, nickname: shallowRef("Self"), avatarStyle: () => ({}), t: key => key }); return () => null; } });
+  const app = renderer.createApp({ setup() { ui = useWebClientScreenShare({ streams, viewing, viewingStreamId: shallowRef("s"), remoteStream: stream, remoteVolume: volume, error: shallowRef(""), errorCode: shallowRef(""), startScreenShare: async (...args) => starts.push(args), joinScreenShare() {}, leaveScreenShare() {}, nickname: shallowRef("Self"), avatarStyle: () => ({}), memberAvatar, t: key => key }); return () => null; } });
   app.mount({});
   return { ui, app, doc, viewing, stream, volume, streams, starts, storage, listeners, exits: () => exits, video: () => markRaw(new Video()), player: () => markRaw(new Element()) };
 }
@@ -96,6 +96,32 @@ test("known screen owner IDs cannot fall back to another member with the same ni
     f.streams[0] = { streamId: "legacy", ownerPeerId: "unknown", ownerNickname: "Same", source: "browser" };
     assert.equal(f.ui.streamForMember({ id: 8, nickname: "Same" }).streamId, "legacy");
   } finally { f.app.unmount(); }
+});
+
+test("viewers resolve their avatar locally from a client id instead of the roster payload", async t => {
+  // `streams` is a plain array, so `viewers` (a computed) caches its first read:
+  // each scenario needs its own mount.
+  async function avatarFor(viewer, memberAvatar = () => "") {
+    const f = mount(t, null, memberAvatar);
+    try {
+      f.streams[0] = { streamId: "s", viewers: [viewer] };
+      await nextTick();
+      assert.equal(f.ui.viewers.value.length, 1);
+      return f.ui.viewers.value[0].avatar;
+    } finally { f.app.unmount(); }
+  }
+  // Current gateway: the roster carries a client id and the avatar comes from the directory.
+  assert.equal(
+    await avatarFor({ peerId: "v", nickname: "Visitor", clientId: 42 }, clientId => (clientId === 42 ? "data:image/png;base64,LOCAL" : "")),
+    "data:image/png;base64,LOCAL",
+  );
+  // Legacy gateway: the inline avatar still renders.
+  assert.equal(
+    await avatarFor({ peerId: "v", nickname: "Visitor", avatar: "data:image/png;base64,LEGACY" }),
+    "data:image/png;base64,LEGACY",
+  );
+  // Unknown member: degrades to the initial instead of throwing.
+  assert.equal(await avatarFor({ peerId: "v", nickname: "Visitor", clientId: 99 }), "");
 });
 
 test("member cards detect and expose a remote share without depending on local share status", async () => {

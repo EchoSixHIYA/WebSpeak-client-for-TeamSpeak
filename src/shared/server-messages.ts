@@ -103,6 +103,7 @@ export function parseScreenShareViewers(raw: unknown): ScreenShareViewerDescript
   return raw.filter((viewer): viewer is RecordValue & { peerId: string; nickname: string } => isRecord(viewer) && text(viewer.peerId) && text(viewer.nickname))
     .slice(0, 64).map(viewer => ({
       peerId: viewer.peerId.slice(0, 128), nickname: viewer.nickname.slice(0, 120),
+      ...(clientId(viewer.clientId) ? { clientId: viewer.clientId } : {}),
       ...(text(viewer.avatar) && viewer.avatar.length <= 128 * 1024 ? { avatar: viewer.avatar } : {}),
     }));
 }

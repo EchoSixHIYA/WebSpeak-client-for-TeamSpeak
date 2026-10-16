@@ -1313,6 +1313,7 @@ const screenShareControls = useWebClientScreenShare({
   leaveScreenShare,
   nickname,
   avatarStyle,
+  memberAvatar: memberAvatarById,
   t,
 });
 const { settingsOpen: screenShareSettingsOpen, errorText: screenShareErrorText } = screenShareControls;
@@ -2188,6 +2189,10 @@ function avatarStyle(name: string, isSelf = false, avatar = "") {
     background: fallback || avatarColors[Math.abs(hash) % avatarColors.length],
     ...(avatar ? { backgroundImage: `url("${avatar}")`, backgroundPosition: "center", backgroundSize: "cover" } : {}),
   };
+}
+
+function memberAvatarById(clientId: number): string {
+  return members.find((candidate) => candidate.id === clientId)?.avatar ?? "";
 }
 
 function messageAvatar(message: ChatMessage): string {

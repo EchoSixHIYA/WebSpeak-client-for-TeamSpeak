@@ -101,3 +101,29 @@ test("legacy screen streams receive defaults and untrusted viewer data is bounde
   assert.equal(message.streams[0]?.viewers[0]?.nickname.length, 120);
   assert.equal(parseScreenShareStream({ streamId: "s", ownerPeerId: [] }), null);
 });
+
+test("screen share viewers carry a client id and still accept a legacy inline avatar", () => {
+  const message = parseServerMessage({
+    type: "screenShareList",
+    streams: [{
+      streamId: "s", ownerPeerId: "owner",
+      viewers: [
+        { peerId: "v1", nickname: "One", clientId: 42 },
+        { peerId: "v2", nickname: "Two", avatar: "data:image/png;base64,AAAA" },
+        { peerId: "v3", nickname: "Three", clientId: -1 },
+        { peerId: "v4", nickname: "Four", clientId: 70_000 },
+      ],
+    }],
+  });
+  assert.ok(message?.type === "screenShareList");
+  const viewers = message.streams[0]?.viewers ?? [];
+  assert.equal(viewers.length, 4);
+  assert.equal(viewers[0]?.clientId, 42);
+  assert.equal("avatar" in viewers[0]!, false);
+  // An older gateway still inlines the avatar; keep honouring it.
+  assert.equal(viewers[1]?.avatar, "data:image/png;base64,AAAA");
+  assert.equal(viewers[1]?.clientId, undefined);
+  // Out-of-range ids are dropped rather than forwarded.
+  assert.equal(viewers[2]?.clientId, undefined);
+  assert.equal(viewers[3]?.clientId, undefined);
+});
