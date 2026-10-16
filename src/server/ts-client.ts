@@ -127,6 +127,25 @@ export class TSClient extends EventEmitter {
     this.identity = options.identity ?? generateIdentity(8);
   }
 
+  /**
+   * Discards an acceleration tunnel that closed itself (socket error, relay
+   * OPEN_ERR/CLOSE, or open timeout) together with the adapter and SDK client
+   * bound to its now-dead local port, so the next connect() builds all three
+   * from scratch. A closed tunnel silently drops every frame, so reusing the
+   * adapter would make reconnection fail forever without an error.
+   */
+  private dropStaleAccelerationTransport(): void {
+    if (!this.accelerationClient?.isClosed()) return;
+    const staleAdapter = this.adapter;
+    // Detach before teardown: every SDK listener bails when it no longer owns
+    // this.client, so a late "disconnected" from the stale transport cannot
+    // re-enter connect() through the reconnect path.
+    this.accelerationClient = null;
+    this.adapter = null;
+    this.client = null;
+    try { void staleAdapter?.disconnect().catch(() => undefined); } catch { /* already gone */ }
+  }
+
   async connect(): Promise<void> {
     this.connectionGeneration++;
     this.inputState = { muted: false, accompaniment: false };
@@ -135,6 +154,12 @@ export class TSClient extends EventEmitter {
     this.selfLeaveReasonId = null;
     this.channelCapacities.clear();
     this.channelPasswordProtection.clear();
+    // A relay tunnel that tore itself down (socket error, OPEN_ERR/CLOSE frame,
+    // open timeout) reports nothing and no-ops every send, while adapter and
+    // client still look reusable. Reconnecting through the dead local port would
+    // silently fail forever, so drop the whole stack and let the block below
+    // build a fresh tunnel plus adapter.
+    this.dropStaleAccelerationTransport();
     if (!this.adapter || !this.client) {
       let transportTarget = this.options.target;
       if (this.options.acceleration && !this.accelerationClient) {

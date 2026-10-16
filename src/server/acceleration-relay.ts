@@ -43,6 +43,14 @@ export interface AccelerationRelayClient {
   readonly localHost: string;
   readonly localPort: number;
   readonly sessionId: number;
+  /**
+   * True once the tunnel has torn itself down, whether by {@link close} or on
+   * its own after a socket error, a relay OPEN_ERR/CLOSE frame, or an open
+   * timeout. Callers that route a transport through this tunnel must watch this
+   * flag: after it flips, every sendFrame() call is a silent no-op and both UDP
+   * sockets are closed, so the tunnel can never recover on its own.
+   */
+  isClosed(): boolean;
   close(): void;
 }
 
@@ -153,6 +161,7 @@ export async function createAccelerationRelayClient(
     localHost: "127.0.0.1",
     localPort: typeof address === "object" ? address.port : 0,
     sessionId,
+    isClosed: (): boolean => closed,
     close(): void {
       if (!closed && ready) {
         try { sendFrame(FrameType.CLOSE); } catch { /* best effort */ }
@@ -169,6 +178,7 @@ export async function createAccelerationRelayServer({
   allowPrivate = false,
   idleTimeoutMs = 30_000,
   lookupAddresses = (hostname) => lookup(hostname, { all: true, verbatim: true }),
+  onError = (error) => { console.error(`[acceleration-relay] socket error: ${error.message}`); },
 }: {
   host?: string;
   port?: number;
@@ -176,11 +186,15 @@ export async function createAccelerationRelayServer({
   allowPrivate?: boolean;
   idleTimeoutMs?: number;
   lookupAddresses?: AddressLookup;
+  onError?: (error: Error) => void;
 }): Promise<{ host: string; port: number; close(): void }> {
   if (!token || token.length < 16) throw new Error("Acceleration relay token must contain at least 16 characters");
   const socket = createSocket(isIP(host) === 6 ? "udp6" : "udp4");
   const sessions = new Map<number, RelaySession>();
   let closed = false;
+  let started = false;
+  let sweep: ReturnType<typeof setInterval> | null = null;
+  let rejectStartup: ((error: Error) => void) | null = null;
 
   const send = (session: RelaySession, type: FrameType, payload: Buffer<ArrayBufferLike> = Buffer.alloc(0)): void => {
     if (closed) return;
@@ -193,6 +207,31 @@ export async function createAccelerationRelayServer({
     session.targetSocket?.close();
   };
 
+  const shutdown = (): void => {
+    if (closed) return;
+    closed = true;
+    if (sweep) clearInterval(sweep);
+    sweep = null;
+    for (const session of sessions.values()) cleanup(session);
+    try { socket.close(); } catch { /* never bound, or already closed */ }
+  };
+
+  // A listener throwing here is an uncaught exception: it escapes EventEmitter.emit
+  // and terminates the whole process, and because the throw aborts the remaining
+  // listeners it also stops the startup promise below from ever settling. Report the
+  // failure instead — a startup error rejects the returned promise, a later one tears
+  // the relay down — so callers can handle it rather than crash.
+  socket.on("error", (error) => {
+    if (!started) {
+      const reject = rejectStartup;
+      rejectStartup = null;
+      shutdown();
+      reject?.(asError(error));
+      return;
+    }
+    shutdown();
+    onError(asError(error));
+  });
   socket.on("message", (packet, rinfo) => {
     const frame = decodeFrame(packet);
     if (!frame || !verifyFrame(frame, token)) return;
@@ -208,35 +247,35 @@ export async function createAccelerationRelayServer({
     else if (frame.type === FrameType.PING) send(session, FrameType.PONG);
     else if (frame.type === FrameType.CLOSE) { send(session, FrameType.CLOSE); cleanup(session); }
   });
-  socket.on("error", (error) => {
-    for (const session of sessions.values()) cleanup(session);
-    if (!closed) throw error;
-  });
 
-  const sweep = setInterval(() => {
+  sweep = setInterval(() => {
     const now = Date.now();
     for (const session of sessions.values()) if (now - session.lastActivity > idleTimeoutMs) cleanup(session);
   }, Math.max(1000, Math.min(idleTimeoutMs, 5000)));
   sweep.unref?.();
 
-  await new Promise<void>((resolve, reject) => {
-    const onError = (error: Error) => { socket.off("listening", onListening); reject(error); };
-    const onListening = () => { socket.off("error", onError); resolve(); };
-    socket.once("error", onError);
-    socket.once("listening", onListening);
-    socket.bind({ address: host, port });
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      rejectStartup = reject;
+      socket.once("listening", () => {
+        started = true;
+        rejectStartup = null;
+        resolve();
+      });
+      socket.bind({ address: host, port });
+    });
+  } catch (error) {
+    // A synchronous bind failure (for example an unusable address) never emits
+    // "error", so release the socket and the sweep interval here too.
+    rejectStartup = null;
+    shutdown();
+    throw error;
+  }
   const address = socket.address();
   return {
     host,
     port: typeof address === "object" ? address.port : port,
-    close(): void {
-      if (closed) return;
-      closed = true;
-      clearInterval(sweep);
-      for (const session of sessions.values()) cleanup(session);
-      socket.close();
-    },
+    close: shutdown,
   };
 }
 

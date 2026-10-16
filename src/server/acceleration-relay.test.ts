@@ -59,7 +59,7 @@ function openTarget(server: { host: string; port: number }, targetHost: string, 
   });
 }
 
-async function startRelay(options: { allowPrivate?: boolean; lookupAddresses?: () => Promise<{ address: string; family: number }[]> }) {
+async function startRelay(options: { allowPrivate?: boolean; lookupAddresses?: () => Promise<{ address: string; family: number }[]> } = {}) {
   return await createAccelerationRelayServer({ host: "127.0.0.1", port: 0, token: TOKEN, ...options });
 }
 
@@ -136,4 +136,42 @@ test("a public target still opens a relay session", async () => {
   } finally {
     server.close();
   }
+});
+
+test("a bind failure rejects startup instead of throwing out of the error listener", async () => {
+  // Regression: the socket error listener ended with `throw error`, which escaped
+  // EventEmitter.emit, became an uncaught exception, and killed the process. It
+  // also aborted the remaining listeners, so this call never settled at all.
+  const server = await startRelay({});
+  try {
+    await assert.rejects(
+      () => createAccelerationRelayServer({ host: "127.0.0.1", port: server.port, token: TOKEN }),
+      (error: NodeJS.ErrnoException) => error.code === "EADDRINUSE",
+    );
+  } finally {
+    server.close();
+  }
+});
+
+test("a failed startup leaves the surviving relay serving traffic", async () => {
+  // The thrown error used to take the whole process down with it; the relay that
+  // did bind must stay usable.
+  const server = await startRelay({});
+  try {
+    await assert.rejects(() => createAccelerationRelayServer({ host: "127.0.0.1", port: server.port, token: TOKEN }));
+    const reply = await openTarget(server, "8.8.8.8");
+    assert.equal(reply.type, FrameType.OPEN_OK);
+  } finally {
+    server.close();
+  }
+});
+
+test("closing a relay is idempotent after a failed sibling startup", async () => {
+  const server = await startRelay({});
+  // A failed startup already tore its own socket down, so nothing leaks and the
+  // surviving relay still closes cleanly when close() runs more than once.
+  const failed = await createAccelerationRelayServer({ host: "127.0.0.1", port: server.port, token: TOKEN }).catch(() => null);
+  assert.equal(failed, null);
+  server.close();
+  server.close();
 });

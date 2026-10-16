@@ -410,3 +410,47 @@ for (const [name, payload] of retiredEvents) {
     assert.equal(observed.length, 1);
   });
 }
+
+interface RelayFixtureState {
+  accelerationClient: { isClosed(): boolean; close(): void } | null;
+  adapter: { disconnect(): Promise<void> } | null;
+  client: SdkStub | null;
+  dropStaleAccelerationTransport(): void;
+}
+
+function relayFixture(tunnelClosed: boolean) {
+  const client = new TSClient({
+    target: { host: "voice.example.invalid", port: 9987 },
+    nickname: "Test",
+    acceleration: { relayHost: "127.0.0.1", relayPort: 39087, token: "test-acceleration-relay-token" },
+  }, pino({ enabled: false }));
+  let disconnectCalls = 0;
+  let closeCalls = 0;
+  const state = client as unknown as RelayFixtureState;
+  state.accelerationClient = {
+    isClosed: () => tunnelClosed,
+    close: () => { closeCalls++; },
+  };
+  state.adapter = { disconnect: async () => { disconnectCalls++; } };
+  state.client = new SdkStub();
+  return { client, state, counts: () => ({ disconnectCalls, closeCalls }) };
+}
+
+test("a self-closed relay tunnel is dropped with its adapter so connect() rebuilds both", () => {
+  // Regression: reconnecting reused the adapter bound to the dead tunnel's local
+  // port. Every frame the tunnel sent was a silent no-op, so auto-reconnect
+  // could never recover and nothing reported an error.
+  const f = relayFixture(true);
+  f.state.dropStaleAccelerationTransport();
+  assert.equal(f.state.accelerationClient, null, "the dead tunnel must not be reused");
+  assert.equal(f.state.adapter, null, "the adapter bound to the dead local port must be dropped");
+  assert.equal(f.state.client, null, "the SDK client for the dead transport must be dropped");
+});
+
+test("a live relay tunnel survives the reconnect guard untouched", () => {
+  const f = relayFixture(false);
+  f.state.dropStaleAccelerationTransport();
+  assert.notEqual(f.state.accelerationClient, null, "an open tunnel stays usable");
+  assert.notEqual(f.state.adapter, null, "an open tunnel's adapter stays usable");
+  assert.notEqual(f.state.client, null, "an open tunnel's SDK client stays usable");
+});
