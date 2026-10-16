@@ -233,11 +233,20 @@ export class ScreenShareCoordinator {
       .filter((entry): entry is ScreenShareParticipant => Boolean(entry))
       .slice(0, 64)
       .map((entry) => {
-        const avatar = entry.members.get(entry.tsClient.getClientId())?.avatar;
+        // Send the client id, not the avatar: receivers already hold member
+        // avatars from the directory, and this roster is rebroadcast to the
+        // whole channel on every join and leave. Inlining avatars here scales
+        // with (viewers x avatar size x channel members) per event.
+        let clientId: number | undefined;
+        try {
+          clientId = entry.tsClient.getClientId();
+        } catch {
+          clientId = undefined;
+        }
         return {
           peerId: entry.screenPeerId,
           nickname: entry.nickname,
-          ...(avatar && avatar.length <= 128 * 1024 ? { avatar } : {}),
+          ...(typeof clientId === "number" && clientId > 0 ? { clientId } : {}),
         };
       });
   }
@@ -246,13 +255,27 @@ export class ScreenShareCoordinator {
     return {
       type: "screenShareViewerCount",
       streamId: stream.streamId,
-      viewerCount: stream.viewerCount,
+      // Derive the count from the same call as the roster so the announced
+      // number can never disagree with the entries actually listed.
+      viewerCount: this.screenShareViewerCount(stream),
       viewers: this.describeScreenViewers(stream),
     };
   }
 
   private screenShareViewerCount(stream: ScreenStreamRecord): number {
+    this.pruneStaleViewers(stream);
     return stream.viewerEntryIds.size + stream.nativeViewerClids.size;
+  }
+
+  /**
+   * Drop viewer entries whose participant is gone. A client can disappear from
+   * the entry map without passing through the leave path, and a lingering id
+   * inflates the announced count while the roster silently omits it.
+   */
+  private pruneStaleViewers(stream: ScreenStreamRecord): void {
+    for (const entryId of [...stream.viewerEntryIds.keys()]) {
+      if (!this.entries.has(entryId)) stream.viewerEntryIds.delete(entryId);
+    }
   }
 
   private broadcastScreenMessage(stream: ScreenStreamRecord, message: ServerMessage, excludeEntryId?: string): void {

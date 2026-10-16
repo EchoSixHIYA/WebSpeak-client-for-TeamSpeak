@@ -31,6 +31,8 @@ interface UseWebClientScreenShareOptions {
   leaveScreenShare: () => void;
   nickname: Ref<string>;
   avatarStyle: (name: string, isSelf?: boolean, avatar?: string) => Record<string, string>;
+  /** Resolves a member's avatar from the local directory by TeamSpeak client id. */
+  memberAvatar: (clientId: number) => string;
   t: (key: string) => string;
 }
 
@@ -47,6 +49,7 @@ export function useWebClientScreenShare({
   leaveScreenShare,
   nickname,
   avatarStyle,
+  memberAvatar,
   t,
 }: UseWebClientScreenShareOptions) {
   const videoElement = ref<HTMLVideoElement | null>(null);
@@ -74,7 +77,15 @@ export function useWebClientScreenShare({
   const bitratePreset = ref<ScreenShareBitratePreset>(bitrateOptions.some((option) => option.value === storedBitrate) ? storedBitrate! : "auto");
   const settingsOpen = ref(false);
   const activeStream = computed<ScreenShareStream | null>(() => streams.find((stream) => stream.streamId === viewingStreamId.value) ?? null);
-  const viewers = computed(() => activeStream.value?.viewers.slice(-5) ?? []);
+  const viewers = computed(() =>
+    (activeStream.value?.viewers.slice(-5) ?? []).map(viewer => ({
+      ...viewer,
+      // The gateway sends a client id; resolve the avatar from the directory the
+      // client already holds instead of shipping the image in every roster
+      // update. An older gateway may still include the avatar inline.
+      avatar: viewer.avatar ?? (typeof viewer.clientId === "number" ? memberAvatar(viewer.clientId) : ""),
+    })),
+  );
   const viewerCount = computed(() => activeStream.value?.viewerCount ?? activeStream.value?.viewers.length ?? 0);
   const ownerName = computed(() => activeStream.value?.ownerNickname ?? t("screenShare"));
   const errorText = computed(() => errorCode.value === "SCREEN_SHARE_NATIVE_BRIDGE_REQUIRED" ? t("screenShareNativeUnavailable") : error.value);
