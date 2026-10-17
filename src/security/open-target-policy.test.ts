@@ -86,3 +86,14 @@ test("open-mode target prefill fails closed when DNS validation stalls", async (
   });
   assert.equal(result, false);
 });
+
+test("expanded IPv6 spellings of loopback and private addresses are rejected as open targets", async () => {
+  for (const host of ["0:0:0:0:0:0:0:1", "0::1", "0:0:0:0:0:ffff:a00:1", "0:0:0:0:0:ffff:7f00:1", "64:ff9b::a00:1"]) {
+    assert.equal(isRestrictedAddress(host), true, host);
+    await assert.rejects(resolveSafeOpenTarget({ host, port: 9987 }), host);
+  }
+  assert.deepEqual(await resolveSafeOpenTarget({ host: "2001:4860:4860:0:0:0:0:8888", port: 9987 }), {
+    host: "2001:4860:4860:0:0:0:0:8888",
+    port: 9987,
+  });
+});

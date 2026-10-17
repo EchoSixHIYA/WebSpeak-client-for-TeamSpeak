@@ -216,3 +216,23 @@ test("invalid SDK speaker IDs and codecs cannot throw while packing the header",
   assert.equal(f.audio.egressDroppedFrames, 6);
   assert.equal(f.packets.length, 0);
 });
+
+test("PCM sent faster than real time is dropped without throttling a real-time stream", () => {
+  const paced = fixture();
+  for (let i = 0; i < 500; i++) { paced.state.now = i * 20; paced.transport.receivePcm(Buffer.alloc(1_920)); }
+  assert.equal(paced.forwarded.length, 500);
+  assert.equal(paced.audio.ingressDroppedFrames, 0);
+
+  // A one-second stall followed by its backlog still gets through in full.
+  const stalled = fixture();
+  stalled.state.now = 1_000;
+  for (let i = 0; i < 50; i++) stalled.transport.receivePcm(Buffer.alloc(1_920));
+  assert.equal(stalled.forwarded.length, 50);
+
+  const flood = fixture();
+  for (let i = 0; i < 1_000; i++) flood.transport.receivePcm(Buffer.alloc(1_920));
+  assert.ok(flood.forwarded.length < 100, `forwarded ${flood.forwarded.length} flooded frames`);
+  assert.equal(flood.audio.ingressDroppedFrames, 1_000 - flood.forwarded.length);
+  assert.equal(flood.warnings.filter(warning => warning.code === "AUDIO_RATE_EXCEEDED").length, 1);
+  assert.equal(flood.notices.length, 0, "rate drops are not reported to the browser as malformed audio");
+});

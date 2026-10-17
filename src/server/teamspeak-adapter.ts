@@ -152,7 +152,7 @@ export class TeamSpeakAdapter {
 }
 
 export function detectTeamSpeakProtocol(versionText: string): TeamSpeakProtocol | null {
-  const text = versionText.trim().toLocaleLowerCase();
+  const text = versionText.trim().toLowerCase();
   if (/teamspeak\s*6|(?:^|\D)6\.\d+/.test(text)) return "ts6";
   if (/teamspeak\s*3|(?:^|\D)3\.\d+/.test(text)) return "ts3";
   return null;

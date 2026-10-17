@@ -47,6 +47,15 @@ export class AdminSessionStore {
     response.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "strict", secure, path: "/" });
   }
 
+  /** End every session except the requester's, e.g. after the password changes. */
+  revokeOthers(request: Request): void {
+    const token = readCookie(request.headers.cookie, COOKIE_NAME);
+    const keep = token ? hashToken(token) : null;
+    for (const key of this.sessions.keys()) {
+      if (key !== keep) this.sessions.delete(key);
+    }
+  }
+
   clear(): void {
     this.sessions.clear();
   }

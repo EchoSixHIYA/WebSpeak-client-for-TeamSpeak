@@ -60,6 +60,23 @@ const CASES = [
   ["::ffff:127.0.0.1", true],
   ["::ffff:10.0.0.1", true],
   ["::ffff:8.8.8.8", false],
+  ["0:0:0:0:0:ffff:808:808", false],
+  ["2001:4860:4860:0:0:0:0:8888", false],
+  // Expanded and partially compressed spellings must classify like their canonical form.
+  ["0:0:0:0:0:0:0:1", true],
+  ["0::1", true],
+  ["0:0:0:0:0:0:0:0", true],
+  ["0:0:0:0:0:ffff:7f00:1", true],
+  ["0:0:0:0:0:ffff:a00:1", true],
+  ["0::ffff:10.0.0.1", true],
+  ["::127.0.0.1", true],
+  ["fe80::1%1", true],
+  // Translation prefixes that embed an arbitrary IPv4 destination.
+  ["64:ff9b::7f00:1", true],
+  ["64:ff9b::808:808", true],
+  ["2002:7f00:1::", true],
+  ["2001:0:4136:e378::1", true],
+  ["100::1", true],
   // Anything that is not a literal address fails closed.
   ["localhost", true],
   ["public.example.invalid", true],
