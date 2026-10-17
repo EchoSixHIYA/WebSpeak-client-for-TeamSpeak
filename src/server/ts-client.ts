@@ -629,9 +629,7 @@ export class TSClient extends EventEmitter {
   }
 
   getChannelId(): bigint {
-    if (!this.client) return 0n;
-    const sdkClient = this.client as unknown as { channelID?: () => bigint };
-    return sdkClient.channelID?.() ?? 0n;
+    return this.client?.channelID() ?? 0n;
   }
 
   isConnected(): boolean {

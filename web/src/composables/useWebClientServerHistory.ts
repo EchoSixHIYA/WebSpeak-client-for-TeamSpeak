@@ -184,5 +184,5 @@ export function useWebClientServerHistory({
 }
 
 function serverKey(address: string): string {
-  return address.trim().toLocaleLowerCase();
+  return address.trim().toLowerCase();
 }

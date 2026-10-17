@@ -37,6 +37,8 @@ export interface AdminRouterOptions {
   logFile?: string;
   skinRegistry?: SkinRegistry;
   startedAt: number;
+  /** Rate-limit key for a request; the gateway believes forwarding headers from trusted proxies only. */
+  clientIp?: (request: Request) => string;
 }
 
 export function createAdminRouter(options: AdminRouterOptions): Router {
@@ -68,7 +70,7 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       response.status(409).json({ ok: false, code: "NOT_INITIALIZED" });
       return;
     }
-    const peer = request.socket.remoteAddress ?? "unknown";
+    const peer = options.clientIp?.(request) ?? request.socket.remoteAddress ?? "unknown";
     const retryAfterMs = limiter.retryAfterMs(peer);
     if (retryAfterMs > 0) {
       response.setHeader("Retry-After", String(Math.ceil(retryAfterMs / 1000)));
@@ -78,8 +80,10 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     const body = asRecord(request.body);
     const username = readString(body, "username", 64).trim();
     const password = readOptionalString(body, "password", 1024);
+    // Count the attempt before the slow password hash. Otherwise concurrent
+    // requests all pass the check above before any failure is recorded.
+    const delayMs = limiter.recordFailure(peer);
     if (!await options.service.verifyPassword(username, password)) {
-      const delayMs = limiter.recordFailure(peer);
       await waitFor(delayMs);
       options.service.database.addAudit("ADMIN_LOGIN_FAILED");
       logger.warn("Administrator login failed");
@@ -96,6 +100,9 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     try {
       const body = asRecord(request.body);
       await options.service.changePassword(readString(body, "newPassword", 1024));
+      // A session opened with the old (often default) password would otherwise
+      // gain full access the moment the change lifts PASSWORD_CHANGE_REQUIRED.
+      options.sessions.revokeOthers(request);
       response.json({ ok: true, mustChangePassword: false });
     } catch (error: unknown) {
       sendAdminError(response, error);

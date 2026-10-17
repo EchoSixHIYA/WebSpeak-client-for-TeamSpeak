@@ -12,6 +12,11 @@ const MAX_BUFFERED_BYTES = 4_096;
 // frame: the reply is roughly 100x the offending payload, and the browser only
 // ever shows the first one because it writes the same error string.
 const AUDIO_ISSUE_REPORT_MS = 5_000;
+// Real capture produces 50 frames per second. Allow one second of burst after
+// a network stall and 20% sustained headroom; anything faster is a client
+// forcing synchronous Opus encodes and TeamSpeak sends, so the excess is dropped.
+const PCM_BURST_FRAMES = 50;
+const PCM_FRAMES_PER_MS = 60 / 1_000;
 
 export interface VoiceEncoder {
   encode(frame: Buffer): Buffer;
@@ -39,6 +44,8 @@ export class SessionAudioTransport {
   /** Last report time per audio fault code; see `shouldReportAudioIssue`. */
   private readonly reportedAt = new Map<string, number>();
   private readonly logger: LoggerType | null;
+  private pcmTokens = PCM_BURST_FRAMES;
+  private pcmRefilledAt: number | null = null;
 
   constructor(private readonly options: SessionAudioOptions, encoder: VoiceEncoder, private readonly clock: () => number = Date.now) {
     this.encoder = encoder;
@@ -114,6 +121,17 @@ export class SessionAudioTransport {
     } catch { /* the socket may have closed while reporting the failure */ }
   }
 
+  private takePcmToken(): boolean {
+    const now = this.clock();
+    if (this.pcmRefilledAt !== null) {
+      this.pcmTokens = Math.min(PCM_BURST_FRAMES, this.pcmTokens + Math.max(0, now - this.pcmRefilledAt) * PCM_FRAMES_PER_MS);
+    }
+    this.pcmRefilledAt = now;
+    if (this.pcmTokens < 1) return false;
+    this.pcmTokens -= 1;
+    return true;
+  }
+
   receivePcm(frame: Buffer): void {
     if (!this.isCurrent()) return;
     const stats = this.options.audio;
@@ -125,6 +143,13 @@ export class SessionAudioTransport {
     if (frame.length !== AUDIO_FRAME_BYTES) {
       stats.ingressDroppedFrames++;
       this.reportInvalidFrame(frame.length);
+      return;
+    }
+    if (!this.takePcmToken()) {
+      stats.ingressDroppedFrames++;
+      if (this.shouldReportAudioIssue("AUDIO_RATE_EXCEEDED")) {
+        this.logger?.warn({ code: "AUDIO_RATE_EXCEEDED", droppedFrames: stats.ingressDroppedFrames }, "Discarded browser audio sent faster than real time");
+      }
       return;
     }
     this.recordIngress();

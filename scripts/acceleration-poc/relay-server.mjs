@@ -24,22 +24,53 @@ export function isRestrictedAddress(host) {
   if (version === 4) return isRestrictedIpv4(host);
   if (version !== 6) return true;
 
-  const normalized = host.toLowerCase();
-  if (normalized === "::" || normalized === "::1") return true;
-  if (normalized.startsWith("::ffff:")) {
+  // Classify the expanded groups, never the spelling: 0:0:0:0:0:0:0:1 and
+  // 0::ffff:a00:1 are loopback and 10.0.0.1 just like their compressed forms.
+  const groups = expandIpv6(host);
+  if (!groups) return true;
+  const [g0, g1, g2, g3, g4, g5, g6, g7] = groups;
+  if (g0 === 0) {
+    // ::/16 holds loopback, unspecified, IPv4-compatible and translated forms.
     // IPv4-mapped addresses must be unwrapped before the IPv4 rules apply:
     // ::ffff:10.0.0.1 is private traffic in IPv6 clothing.
-    const mapped = normalized.slice("::ffff:".length);
-    return isIP(mapped) !== 4 || isRestrictedIpv4(mapped);
+    if (g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
+      return isRestrictedIpv4(`${g6 >> 8}.${g6 & 0xff}.${g7 >> 8}.${g7 & 0xff}`);
+    }
+    return true;
   }
-  if (normalized.startsWith("::")) return true; // IPv4-compatible and other special compressed forms
-  const first = Number.parseInt(normalized.split(":", 1)[0] || "0", 16);
-  if ((first & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
-  if ((first & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
-  if ((first & 0xffc0) === 0xfec0) return true; // deprecated site-local fec0::/10
-  if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
-  if (normalized.startsWith("2001:db8:")) return true; // documentation range
+  if (g0 === 0x64 && g1 === 0xff9b) return true; // NAT64 64:ff9b::/96 and 64:ff9b:1::/48 embed arbitrary IPv4
+  if (g0 === 0x100 && g1 === 0 && g2 === 0 && g3 === 0) return true; // discard-only 100::/64
+  if (g0 === 0x2001 && g1 === 0) return true; // Teredo 2001::/32 embeds arbitrary IPv4
+  if (g0 === 0x2001 && g1 === 0xdb8) return true; // documentation 2001:db8::/32
+  if (g0 === 0x2002) return true; // 6to4 2002::/16 embeds arbitrary IPv4
+  if ((g0 & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
+  if ((g0 & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+  if ((g0 & 0xffc0) === 0xfec0) return true; // deprecated site-local fec0::/10
+  if ((g0 & 0xff00) === 0xff00) return true; // multicast ff00::/8
   return false;
+}
+
+/** Expand an address already accepted by isIP() into its eight 16-bit groups. */
+function expandIpv6(address) {
+  let text = address.toLowerCase();
+  const zone = text.indexOf("%");
+  if (zone >= 0) text = text.slice(0, zone);
+  const lastColon = text.lastIndexOf(":");
+  const tail = text.slice(lastColon + 1);
+  if (tail.includes(".")) {
+    if (isIP(tail) !== 4) return null;
+    const [a, b, c, d] = tail.split(".").map(Number);
+    text = `${text.slice(0, lastColon + 1)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...rest];
+  if (groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+  return groups.map((group) => Number.parseInt(group, 16));
 }
 
 function isRestrictedIpv4(host) {

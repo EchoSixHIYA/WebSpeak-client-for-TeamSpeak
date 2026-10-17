@@ -121,3 +121,51 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
   await api.logout();
   assert.equal((await api.session()).authenticated, false);
 });
+
+test("concurrent admin login failures cannot outrun the attempt limit, which is keyed by the resolved client", async t => {
+  const service = {
+    isInitialized: () => true,
+    isPasswordChangeRequired: () => false,
+    // Model the slow scrypt verification that concurrent attempts used to race.
+    verifyPassword: async () => { await new Promise(resolve => setTimeout(resolve, 50)); return false; },
+    database: { addAudit() {} },
+  } as unknown as AdminService;
+  const app = express();
+  app.use(express.json());
+  app.use("/api/admin", createAdminRouter({
+    service, sessions: new AdminSessionStore(), logger, getActiveSessions: () => 0, getPeakSessions: () => 0, startedAt: Date.now(),
+    clientIp: request => request.header("x-test-client") ?? "unknown",
+  }));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>(resolve => server.once("listening", resolve));
+  t.after(() => { server.closeAllConnections(); return new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); });
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const origin = `http://127.0.0.1:${address.port}`;
+  const login = (client: string) => fetch(`${origin}/api/admin/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin, "x-test-client": client },
+    body: JSON.stringify({ username: "admin", password: "wrong-password" }),
+  }).then(response => response.status);
+
+  const statuses = await Promise.all(Array.from({ length: 12 }, () => login("203.0.113.9")));
+  assert.equal(statuses.filter(status => status === 401).length, 5);
+  assert.equal(statuses.filter(status => status === 429).length, 7);
+  // Another visitor behind the same proxy keeps an independent budget.
+  assert.equal(await login("198.51.100.4"), 401);
+});
+
+test("changing the admin password ends every other admin session", () => {
+  const sessions = new AdminSessionStore();
+  const login = () => {
+    let token = "";
+    sessions.create({ cookie: (_name: string, value: string) => { token = value; } } as never, false);
+    return { headers: { cookie: `webspeak_admin=${token}` } } as never;
+  };
+  const current = login();
+  const earlier = login();
+  assert.ok(sessions.get(current) && sessions.get(earlier));
+  sessions.revokeOthers(current);
+  assert.ok(sessions.get(current), "the requester stays signed in");
+  assert.equal(sessions.get(earlier), null);
+});
