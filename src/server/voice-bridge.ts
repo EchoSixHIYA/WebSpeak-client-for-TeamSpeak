@@ -475,7 +475,7 @@ export class VoiceBridge {
         sendJson, addEvent: addServerEvent, onDirectoryReady: sendInitialState,
         onClientLeave: id => {
           this.screenShares.onClientLeave(entry!, id);
-          entry!.webrtc?.setMemberVolume(id, 1);
+          entry!.webrtc?.removeClient(id);
         },
         onClientMove: (id, channelId) => this.screenShares.onClientMove(entry!, id, channelId),
         onNotification: notification => this.screenShares.handleNotification(entry!, notification),

@@ -201,3 +201,35 @@ test("an unavailable mixer encoder closes the half-built peer before the constru
   }
   assert.equal(closedPeers.size, 1, "the constructor must roll back the peer it already created");
 });
+
+test("removeClient releases only the leaving speaker's decoder and buffered state", () => {
+  const f = fixture();
+  f.resources.pendingFrames.set(2, []);
+  f.resources.memberVolumes.set(2, 0.5);
+  f.resources.partialPcmByClient.set(2, Buffer.alloc(2));
+  f.resources.activeSpeakerIds.add(2);
+
+  f.session.removeClient(1);
+
+  assert.deepEqual(f.released, ["decoder-1"]);
+  assert.equal(f.resources.decoderByClient.has(1), false);
+  assert.equal(f.resources.pendingFrames.has(1), false);
+  assert.equal(f.resources.partialPcmByClient.has(1), false);
+  assert.equal(f.resources.memberVolumes.has(1), false);
+  assert.equal(f.resources.activeSpeakerIds.has(1), false);
+  assert.equal(f.resources.decoderByClient.has(2), true);
+  assert.equal(f.resources.pendingFrames.has(2), true);
+  assert.equal(f.resources.partialPcmByClient.has(2), true);
+  assert.equal(f.resources.memberVolumes.has(2), true);
+  assert.equal(f.resources.activeSpeakerIds.has(2), true);
+});
+
+test("removeClient is idempotent and tolerates a throwing decoder disposal", () => {
+  const f = fixture();
+
+  f.session.removeClient(1);
+  f.session.removeClient(1);
+
+  assert.deepEqual(f.released, ["decoder-1"]);
+  assert.equal(f.resources.decoderByClient.has(1), false);
+});

@@ -17,7 +17,7 @@ Netzwerkbedingungen und Auslastung können bei beiden Demos schwanken; Latenz, V
 
 | Funktion | Beschreibung |
 | --- | --- |
-| TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Zielprotokoll automatisch. |
+| TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Zielprotokoll anhand der gemeldeten Version automatisch. |
 | Plattformübergreifendes P2P-Bildschirmteilen | Browsernutzer und native TeamSpeak-6-Clients können die Bildschirmfreigabe gegenseitig starten und ansehen; WebRTC/ICE überträgt Medien direkt, WebSpeak leitet nur die Signalisierung weiter. |
 | IPv6-Ziele | IPv6-TeamSpeak-Ziele und über DNS aufgelöste IPv6-Adressen werden standardmäßig unterstützt. |
 | Kanäle und Mitglieder | Kanalstruktur und aktuelle Mitglieder anzeigen und Kanäle wechseln. |
@@ -32,6 +32,15 @@ Netzwerkbedingungen und Auslastung können bei beiden Demos schwanken; Latenz, V
 | Skins | Geschützte Tages-, Nacht- und ILLUSIA-Skins sowie instanzverwaltete `.wskin`-Designs mit Aktivierungs- und Standardauswahl im Adminbereich. |
 | Oberfläche | Chinesische, englische, deutsche, russische und japanische Oberfläche sowie responsive Desktop-/Mobilansicht. |
 | Selbsthosting | Daten bleiben beim Betreiber; Pakete für Windows x64 und Linux x64/ARM64, Docker für amd64/arm64 und Android-APKs für arm64-v8a, armeabi-v7a und x86_64. |
+
+## TeamSpeak-Versionskompatibilität
+
+WebSpeak verwendet das TeamSpeak-Clientprotokoll statt ServerQuery oder WebQuery; Query-Zugangsdaten sind daher nicht erforderlich.
+
+- **TeamSpeak 3**: Die Erkennung wertet die führende `3.x`-Versionsnummer aus. Ältere Serverversionen sollten in der jeweiligen Umgebung geprüft werden, da nicht jede historische Version separat getestet wurde.
+- **TeamSpeak 6**: Unterstützt, einschließlich Bildschirmfreigabe mit nativen TeamSpeak-6-Clients.
+- **Automatische Erkennung**: Das Gateway liest die `version`-Antwort des Servers und hält das erkannte Protokoll in der Verbindungsdiagnose fest.
+- Die zugrunde liegende [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js)-Bibliothek unterstützt auch TeamSpeak 5; WebSpeak zielt jedoch auf TeamSpeak 3 und 6.
 
 ## 🖼️ Screenshots
 

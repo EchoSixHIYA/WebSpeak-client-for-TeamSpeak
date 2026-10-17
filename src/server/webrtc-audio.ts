@@ -441,6 +441,18 @@ export class WebRtcAudioSession {
     else this.memberVolumes.set(clientId, normalized);
   }
 
+  removeClient(clientId: number): void {
+    if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) return;
+    this.pendingFrames.delete(clientId);
+    this.partialPcmByClient.delete(clientId);
+    this.memberVolumes.delete(clientId);
+    this.activeSpeakerIds.delete(clientId);
+    const decoder = this.decoderByClient.get(clientId);
+    if (!decoder) return;
+    this.decoderByClient.delete(clientId);
+    try { decoder.dispose(); } catch { /* continue after codec cleanup failures */ }
+  }
+
   private calculateRms(pcm: Buffer): number {
     let sum = 0;
     let samples = 0;
