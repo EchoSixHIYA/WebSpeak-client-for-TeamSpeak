@@ -8,6 +8,7 @@ import { createWebRtcTransport } from "../voice/webrtc-transport.js";
 import { createVoiceConnection } from "../voice/connection.js";
 import { createVoiceCommands } from "../voice/commands.js";
 import { createVoiceSessionState } from "../voice/session-state.js";
+import { applySavedMemberVolumes } from "../voice/member-volume-preferences.js";
 import { createAudioDiagnostics, type AudioPermission, type VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
 export type { AudioPermission, BrowserVoiceAudioStats, VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
 import type { SinkAudioElement } from "../voice/webrtc-playback.js";
@@ -412,11 +413,10 @@ export function useVoiceWebSocket() {
   }
 
   function syncKnownMemberVolumes(): void {
-    for (const member of members) {
-      if (!member.uid) continue;
-      const saved = storedVolumesByUid[member.uid];
-      if (saved !== undefined) volumes[member.id] = Math.max(0, Math.min(4, saved));
-    }
+    const updatedIds = applySavedMemberVolumes(members, storedVolumesByUid, volumes);
+    if (!updatedIds.length) return;
+    for (const clientId of updatedIds) remotePlayback.updateVolume(clientId);
+    syncWebRtcMemberVolumes();
   }
 
   const audioPreferencesReady = loadLocalPreferences().then((preferences) => {

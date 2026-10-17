@@ -27,14 +27,15 @@
   visibility: hidden;
 }
 
-.rail-avatar,
-.server-avatar,
-.profile-avatar,
-.dock-avatar,
-.mini-avatar,
-.favorite-server-avatar {
-  -webkit-user-select: none;
-  user-select: none;
+:global(html[data-ws-route="webclient"] .web-client .rail-avatar),
+:global(html[data-ws-route="webclient"] .web-client .server-avatar),
+:global(html[data-ws-route="webclient"] .web-client .profile-avatar),
+:global(html[data-ws-route="webclient"] .web-client .dock-avatar),
+:global(html[data-ws-route="webclient"] .web-client .mini-avatar),
+:global(html[data-ws-route="webclient"] .web-client .favorite-server-avatar),
+:global(html[data-ws-route="webclient"] .web-client [data-ws-part$=".avatar"]) {
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 :deep(.voice-avatar),
