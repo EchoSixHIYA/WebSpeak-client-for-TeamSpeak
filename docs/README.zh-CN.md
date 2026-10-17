@@ -19,7 +19,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 | 能力 | 说明 |
 | --- | --- |
-| TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并自动探测目标服务器协议。 |
+| TeamSpeak 兼容 | 支持 TeamSpeak 3（3.x 全系列）与 TeamSpeak 6，并自动探测目标服务器协议。 |
 | 跨端 P2P 屏幕共享 | 支持浏览器用户与 TeamSpeak 6 原生客户端互相发起和观看屏幕共享；媒体优先通过 WebRTC/ICE 直连，WebSpeak 仅转发协商信令。 |
 | IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标和域名解析出的 IPv6 地址。 |
 | 频道与成员 | 浏览频道树、查看实时成员状态并切换频道。 |
@@ -34,6 +34,16 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 | 皮肤 | 提供日间、夜间和 ILLUSIA 三款受保护皮肤，并支持实例自定义 `.wskin` 外观与管理员默认/启用管理。 |
 | 界面体验 | 提供中文、English、Deutsch、Русский、日本語及响应式桌面/移动布局。 |
 | 自托管 | 数据由部署者保存，支持 Docker amd64/arm64、Windows x64、Linux x64/ARM64 服务端包和 Android 客户端。 |
+
+## TeamSpeak 版本兼容性
+
+WebSpeak 通过标准的 TeamSpeak **客户端协议**连接（即原生客户端使用的同一套 UDP 语音与控制命令），不使用 ServerQuery / WebQuery，因此无需查询凭据。
+
+- **TeamSpeak 3**：支持 3.x 全系列服务器。客户端协议在 3.x 各版本间保持稳定，因此旧版 3.x 服务器也可连接；主动测试主要覆盖当前 3.13.x 版本。
+- **TeamSpeak 6**：支持，包括与 TeamSpeak 6 原生客户端之间的跨端屏幕共享。
+- **自动探测**：网关通过 `version` 命令自动识别目标服务器协议并记录到连接诊断，无需手动选择协议。
+
+底层 [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) 同时支持 TeamSpeak 5 协议，但 WebSpeak 仅以 TeamSpeak 3 与 TeamSpeak 6 作为官方支持目标。
 
 ## 🖼️ 界面截图
 

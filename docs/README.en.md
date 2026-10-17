@@ -19,7 +19,7 @@ Network conditions and load may vary at either demo. Latency, disconnections, or
 
 | Capability | Description |
 | --- | --- |
-| TeamSpeak compatibility | Supports TeamSpeak 3 and TeamSpeak 6 and automatically detects the target protocol. |
+| TeamSpeak compatibility | Supports TeamSpeak 3 (the 3.x server line) and TeamSpeak 6, with automatic target protocol detection. |
 | Cross-platform P2P screen sharing | Browser users and native TeamSpeak 6 clients can start and watch each other's screen shares; WebRTC/ICE carries media directly while WebSpeak relays negotiation signaling only. |
 | IPv6 targets | IPv6 TeamSpeak targets and IPv6 addresses resolved from hostnames are supported by default. |
 | Channels and members | Browse the channel tree, see live member states, and switch channels. |
@@ -34,6 +34,16 @@ Network conditions and load may vary at either demo. Latency, disconnections, or
 | Skins | Protected Day, Night, and ILLUSIA skins, plus instance-managed `.wskin` appearances with administrator enable/default controls. |
 | User experience | Chinese, English, German, Russian, and Japanese UI with responsive desktop/mobile layouts. |
 | Self-hosting | Data stays with the operator; packages include Windows x64 and Linux x64/ARM64, Docker supports amd64/arm64, and Android APKs target arm64-v8a, armeabi-v7a, and x86_64. |
+
+## TeamSpeak version compatibility
+
+WebSpeak connects through the standard TeamSpeak **client protocol** — the same UDP voice and control commands a native client uses — not ServerQuery or WebQuery, so no query credentials are required.
+
+- **TeamSpeak 3**: supported across the 3.x server line. The client protocol is stable between 3.x releases, so older 3.x servers work as well as the current 3.13.x line; active testing targets recent 3.13.x releases.
+- **TeamSpeak 6**: supported, including cross-platform screen sharing with native TeamSpeak 6 clients.
+- **Auto-detection**: the gateway identifies the target server's protocol from the `version` command and records it in the connection diagnostics; no manual protocol selection is needed.
+
+The underlying [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) library also speaks the TeamSpeak 5 protocol, but WebSpeak only targets TeamSpeak 3 and TeamSpeak 6 for support.
 
 ## 🖼️ Screenshots
 
