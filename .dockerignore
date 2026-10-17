@@ -20,3 +20,8 @@ config.json
 .env
 .env.*
 *.log
+
+# Documentation and local assets are not needed to build the image.
+docs
+image.png
+group-chat.png
