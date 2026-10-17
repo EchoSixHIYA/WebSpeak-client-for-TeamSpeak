@@ -486,9 +486,17 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.118");
+  assert.equal(skin.version, "3.1.121");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
+  const baseMessages = skin.contentData?.locales["zh-CN"]?.messages ?? {};
+  for (const locale of ["zh-CN", "en", "de", "ru", "ja"]) {
+    assert.deepEqual(
+      Object.keys(skin.contentData?.locales[locale]?.messages ?? {}).sort(),
+      Object.keys(baseMessages).sort(),
+      `KAAK provides the same complete message set for ${locale}`,
+    );
+  }
   const home = skin.pluginData?.components.find((component) => component.page === "home");
   const voice = skin.pluginData?.components.find((component) => component.page === "voice");
   assert.deepEqual(skin.pluginData?.components.map((component) => [component.id, component.mode]), [
@@ -534,6 +542,12 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
     }
     return undefined;
   }
+  assert.equal(home?.name, "{{skin.messages.kaakHomeComponentName}}");
+  assert.equal(home?.accessibleName, "{{skin.messages.kaakHomeAccessibleName}}");
+  assert.equal(findPart(home?.root, "welcome-title")?.children?.[0]?.text, "{{skin.messages.kaakWelcomeTitle}}");
+  assert.equal(voice?.name, "{{skin.messages.kaakVoiceComponentName}}");
+  assert.equal(voice?.accessibleName, "{{skin.messages.kaakVoiceAccessibleName}}");
+  assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "{{skin.messages.kaakVoiceRoomAccessibleName}}");
   assert.equal(findPart(home?.root, "home-language")?.widget, "app.language-switcher", "the KAAK connection home has a language switcher in its top corner");
   assert.equal(findPart(home?.root, "server-announcement")?.widget, "home.server-announcement", "the KAAK connection home displays the localized administrator announcement");
   assert.equal(findPart(home?.root, "visitor-stats")?.widget, "home.visitor-count", "the KAAK home composes the public visitor count widget over the monitor screen");
@@ -619,7 +633,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(chatExpand?.children?.[0]?.text, "#");
   const voiceStageInvite = findPart(voice?.root, "voice-stage-invite");
   assert.equal(voiceStageInvite?.events?.click, "copy-invite-link");
-  assert.equal(voiceStageInvite?.attributes?.["aria-label"], "复制邀请链接 / Copy invite link");
+  assert.equal(voiceStageInvite?.attributes?.["aria-label"], "{{skin.messages.kaakCopyInviteLink}}");
   assert.equal(findPart(voice?.root, "chat-panel")?.widget, "voice.chat-panel");
   assert.deepEqual(findPart(voice?.root, "chat-panel")?.when, { path: "chat.status.panelOpen", equals: true });
   assert.equal(voice?.root.attributes?.["data-chat-open"], "{{chat.status.panelOpen}}");
@@ -646,13 +660,13 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.equal(findPart(voiceStageHeading, "voice-stage-capacity")?.children?.[0]?.text, "/{{stagechannel.maxClients}}");
   assert.equal(findPart(voice?.root, "channel-count"), undefined, "real member counts come from the host-owned channel tree");
   assert.equal(findPart(voice?.root, "channel-voice-member"), undefined, "avatar resources stay inside trusted host UI");
-  assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "语音房间 / Voice room");
+  assert.equal(findPart(voice?.root, "voice-stage")?.attributes?.["aria-label"], "{{skin.messages.kaakVoiceRoomAccessibleName}}");
   assert.equal(findPart(voice?.root, "member-cards")?.widget, "voice.member-cards");
   assert.deepEqual(findPart(voice?.root, "member-cards")?.options, { screenShare: true, memberActions: true });
   assert.equal(findPart(voice?.root, "member-list"), undefined);
   assert.equal(findPart(voice?.root, "screen-share-player")?.widget, "voice.screen-share-player");
   assert.equal(findPart(voice?.root, "performance-panel")?.widget, "voice.performance-panel");
-  assert.deepEqual(findPart(voice?.root, "performance-panel")?.options, { screenShare: false });
+  assert.equal(findPart(voice?.root, "performance-panel")?.options?.screenShare, undefined, "KAAK should show screen-share transport stats in the host panel");
   assert.equal(findPart(voice?.root, "chat-input"), undefined, "KAAK uses the host-owned unified chat composer");
   assert.ok(skin.css.includes("data-session-connected=\"true\""));
   assert.ok(skin.css.includes("[data-ws-plugin-part=\"kaak-workspace.workspace\"][data-session-connected=\"true\"]:not([data-mobile-channels=\"true\"])"));
@@ -766,7 +780,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.match(skin.css, /settings-select:hover:not\(:disabled\) \{\s*border-color: #6cbf00;/);
   assert.match(skin.css, /voice\.audio-settings"] \.settings-select-menu \{[\s\S]*?padding: 8px;[\s\S]*?border-radius: 12px;[\s\S]*?background: #25262a;[\s\S]*?box-shadow: 0 2px 8px rgba\(0, 0, 0, \.32\);/);
   assert.match(skin.css, /settings-select:focus-visible \{\s*border-color: #6cbf00;\s*box-shadow: 0 0 0 3px #6cbf001a;/);
-  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-option \{[\s\S]*?height: 32px;[\s\S]*?margin-bottom: 2px;[\s\S]*?padding-inline: 8px;[\s\S]*?border-radius: 8px;/);
+  assert.match(skin.css, /voice\.audio-settings"] \.settings-select-option \{[\s\S]*?height: auto;[\s\S]*?min-height: 32px;[\s\S]*?padding: 6px 8px;[\s\S]*?line-height: 1\.45;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: normal;[\s\S]*?border-radius: 8px;/);
   assert.match(skin.css, /settings-select\[aria-expanded="true"\] \.settings-select-chevron::before \{\s*transform: rotate\(225deg\);/);
   assert.match(skin.css, /settings-select-option:hover \{ background: #ffffff0f; \}/);
   assert.match(skin.css, /voice\.audio-settings\"] \.settings-range::-webkit-slider-thumb \{\s*width: 16px;\s*height: 16px;\s*margin-top: -6px;/);

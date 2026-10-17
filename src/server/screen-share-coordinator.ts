@@ -46,8 +46,8 @@ export class ScreenShareCoordinator {
 
   constructor(
     private readonly entries: ReadonlyMap<string, ScreenShareParticipant>,
-    private readonly sendToEntry: (entryId: string, message: ServerMessage) => void,
-    private readonly logger: Pick<Logger, "debug" | "warn">,
+    private readonly sendToEntry: (entryId: string, message: ServerMessage) => boolean,
+    private readonly logger: Pick<Logger, "debug" | "info" | "warn">,
   ) {}
 
   handleMessage(
@@ -84,6 +84,13 @@ export class ScreenShareCoordinator {
         nativeViewerClids: new Set(),
       };
       this.screenStreams.set(screenStreamKey(stream.targetKey, stream.streamId), stream);
+      this.logger.info({
+        entryId: entry.id,
+        target: formatTeamSpeakTarget(entry.target),
+        streamId: stream.streamId,
+        ownerClientId: stream.ownerClientId ?? null,
+        channelId: String(stream.channelId),
+      }, "Started browser screen-share stream and requested TeamSpeak publication");
       sendJson({ type: "screenShareStarted", requestId: message.requestId, stream: this.describeScreenStream(stream), owner: true });
       this.broadcastScreenMessage(stream, {
         type: "screenShareStarted",
@@ -96,10 +103,30 @@ export class ScreenShareCoordinator {
 
     const stream = this.screenStreams.get(screenStreamKey(teamSpeakTargetKey(entry.target), message.streamId));
     if (!stream) {
+      if (message.type === "screenShareSignal") {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          streamId: message.streamId,
+          targetPeerId: message.targetPeerId,
+          signalKind: message.signal.kind,
+        }, "Dropped screen-share signaling for an unknown stream");
+      }
       sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_NOT_FOUND", message: "屏幕共享已结束或不存在" });
       return;
     }
     if (stream.targetKey !== teamSpeakTargetKey(entry.target) || stream.channelId !== entry.tsClient.getChannelId()) {
+      if (message.type === "screenShareSignal") {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          streamId: stream.streamId,
+          targetPeerId: message.targetPeerId,
+          signalKind: message.signal.kind,
+          sameTarget: stream.targetKey === teamSpeakTargetKey(entry.target),
+          sameChannel: stream.channelId === entry.tsClient.getChannelId(),
+        }, "Dropped screen-share signaling because the stream target changed");
+      }
       sendJson({ type: "screenShareError", requestId: "requestId" in message ? message.requestId : undefined, code: "SCREEN_SHARE_TARGET_MISMATCH", message: "屏幕共享不属于当前服务器或频道" });
       return;
     }
@@ -337,6 +364,14 @@ export class ScreenShareCoordinator {
     signal: ScreenSharePeerSignal,
     sendJson: (message: ServerMessage) => void,
   ): void {
+    this.logger.info({
+      entryId: entry.id,
+      target: formatTeamSpeakTarget(entry.target),
+      streamId: stream.streamId,
+      targetPeerId,
+      source: stream.source,
+      signalKind: signal.kind,
+    }, "Received browser screen-share signaling");
     if (stream.source === "teamspeak") {
       if (!stream.viewerEntryIds.has(entry.id) || targetPeerId !== stream.ownerPeerId) {
         sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FORBIDDEN", message: "无权发送该屏幕共享信令" });
@@ -364,6 +399,14 @@ export class ScreenShareCoordinator {
         json: JSON.stringify(payload),
       })).catch((error: unknown) => {
         sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FAILED", message: error instanceof Error ? error.message : "屏幕共享信令发送失败" });
+        this.logger.warn({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          streamId: stream.streamId,
+          targetPeerId,
+          signalKind: signal.kind,
+          errorName: error instanceof Error ? error.name : "unknown",
+        }, "Could not forward browser screen-share signaling to TeamSpeak source");
       });
       return;
     }
@@ -372,6 +415,16 @@ export class ScreenShareCoordinator {
       const viewerClid = parseNativeViewerPeerId(targetPeerId);
       const publisher = stream.teamSpeakPublisherEntryId ? this.entries.get(stream.teamSpeakPublisherEntryId) : undefined;
       if (!viewerClid || !publisher || !stream.teamSpeakStreamId || !stream.nativeViewerClids.has(viewerClid)) {
+        this.logger.info({
+          entryId: entry.id,
+          streamId: stream.streamId,
+          teamSpeakStreamId: stream.teamSpeakStreamId,
+          targetPeerId,
+          viewerClid: viewerClid ?? null,
+          publisherAvailable: Boolean(publisher),
+          viewerRegistered: viewerClid ? stream.nativeViewerClids.has(viewerClid) : false,
+          signalKind: signal.kind,
+        }, "Dropped browser screen-share signaling because the TeamSpeak viewer was not ready");
         sendJson({ type: "screenShareError", code: "SCREEN_SHARE_PEER_NOT_FOUND", message: "TeamSpeak 观看者已离开" });
         return;
       }
@@ -417,8 +470,23 @@ export class ScreenShareCoordinator {
       } else {
         return;
       }
-      void publisher.tsClient.sendProtocolCommand(command).catch((error: unknown) => {
+      const signalContext = {
+        entryId: entry.id,
+        target: formatTeamSpeakTarget(entry.target),
+        streamId: stream.streamId,
+        teamSpeakStreamId: stream.teamSpeakStreamId,
+        viewerClid,
+        signalKind: signal.kind,
+      };
+      this.logger.info(signalContext, "Forwarding browser screen-share signaling to TeamSpeak viewer");
+      void publisher.tsClient.sendProtocolCommand(command).then(() => {
+        this.logger.info(signalContext, "Forwarded browser screen-share signaling to TeamSpeak viewer");
+      }).catch((error: unknown) => {
         sendJson({ type: "screenShareError", code: "SCREEN_SHARE_SIGNAL_FAILED", message: error instanceof Error ? error.message : "屏幕共享信令发送失败" });
+        this.logger.warn({
+          ...signalContext,
+          errorName: error instanceof Error ? error.name : "unknown",
+        }, "Could not forward browser screen-share signaling to TeamSpeak viewer");
       });
       return;
     }
@@ -456,6 +524,11 @@ export class ScreenShareCoordinator {
         viewer_limit: "0",
         audio: stream.audio ? "1" : "0",
       }));
+      this.logger.info({
+        entryId: entry.id,
+        target: formatTeamSpeakTarget(entry.target),
+        streamId: stream.streamId,
+      }, "TeamSpeak accepted browser screen-share publication request");
     } catch (error: unknown) {
       this.logger.warn({
         target: formatTeamSpeakTarget(entry.target),
@@ -555,33 +628,81 @@ export class ScreenShareCoordinator {
   }
 
   handleNotification(entry: ScreenShareParticipant, notification: TSRawNotification): void {
-    if (this.entries.get(entry.id) !== entry) return;
+    if (this.entries.get(entry.id) !== entry) {
+      if (["notifyjoinstreamrequest", "notifystreamstarted", "notifystreaminfo", "notifyrespondjoinstreamrequest", "notifystreamsignaling"].includes(notification.name)) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+        }, "Ignored screen-share notification from a stale TeamSpeak connection");
+      }
+      return;
+    }
     const params = notification.params;
     if (notification.name === "notifyjoinstreamrequest") {
       const streamId = params.id || params.stream_id;
       const viewerClientId = parseNumber(params.clid);
-      if (!streamId || !viewerClientId) return;
+      if (!streamId || !viewerClientId) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          hasStreamId: Boolean(streamId),
+          hasViewerClientId: Boolean(viewerClientId),
+        }, "Ignored TeamSpeak screen-share join request with incomplete identifiers");
+        return;
+      }
       const targetKey = teamSpeakTargetKey(entry.target);
-      const stream = [...this.screenStreams.values()].find((candidate) => candidate.targetKey === targetKey
+      const activeBrowserStreams = [...this.screenStreams.values()].filter((candidate) => candidate.targetKey === targetKey
         && candidate.source === "browser"
-        && candidate.teamSpeakPublisherEntryId === entry.id
-        && candidate.teamSpeakStreamId === streamId);
-      if (!stream) return;
+        && candidate.teamSpeakPublisherEntryId === entry.id);
+      const stream = activeBrowserStreams.find((candidate) => candidate.teamSpeakStreamId === streamId);
+      if (!stream) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          teamSpeakStreamId: streamId,
+          viewerClientId,
+          activeBrowserStreamIds: activeBrowserStreams.map((candidate) => candidate.teamSpeakStreamId ?? null),
+        }, "TeamSpeak screen-share join request did not match an active browser stream");
+        return;
+      }
+      const alreadyRegistered = stream.nativeViewerClids.has(viewerClientId);
       stream.nativeViewerClids.add(viewerClientId);
       stream.viewerCount = this.screenShareViewerCount(stream);
-      this.sendToEntry(stream.ownerEntryId, {
+      const deliveredToBrowser = this.sendToEntry(stream.ownerEntryId, {
         type: "screenShareNativeViewerJoined",
         streamId: stream.streamId,
         viewerPeerId: nativeViewerPeerId(viewerClientId),
         viewerClientId,
       });
+      this.logger.info({
+        entryId: entry.id,
+        ownerEntryId: stream.ownerEntryId,
+        target: formatTeamSpeakTarget(entry.target),
+        streamId: stream.streamId,
+        teamSpeakStreamId: streamId,
+        viewerClientId,
+        duplicateRequest: alreadyRegistered,
+        deliveredToBrowser,
+      }, deliveredToBrowser
+        ? "Forwarded TeamSpeak screen-share join request to browser owner"
+        : "Could not forward TeamSpeak screen-share join request because browser WebSocket is unavailable");
       this.broadcastScreenMessage(stream, this.screenShareViewerCountMessage(stream));
       return;
     }
     if (notification.name === "notifystreamstarted" || notification.name === "notifystreaminfo") {
       const streamId = params.id || params.stream_id;
       const sourceClientId = parseNumber(params.clid);
-      if (!streamId || !sourceClientId) return;
+      if (!streamId || !sourceClientId) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+          hasStreamId: Boolean(streamId),
+          hasSourceClientId: Boolean(sourceClientId),
+        }, "Ignored TeamSpeak screen-stream notification with incomplete identifiers");
+        return;
+      }
       const targetKey = teamSpeakTargetKey(entry.target);
       const publisherEntry = [...this.entries.values()].find((candidate) => candidate.target
         && teamSpeakTargetKey(candidate.target) === targetKey
@@ -594,9 +715,26 @@ export class ScreenShareCoordinator {
         : undefined;
       if (browserStream) {
         browserStream.teamSpeakStreamId = streamId;
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          streamId: browserStream.streamId,
+          teamSpeakStreamId: streamId,
+          sourceClientId,
+        }, "Linked TeamSpeak publication to browser screen-share stream");
         return;
       }
       if (publisherEntry) {
+        this.logger.info({
+          entryId: entry.id,
+          publisherEntryId: publisherEntry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          teamSpeakStreamId: streamId,
+          sourceClientId,
+          activeBrowserStreamIds: [...this.screenStreams.values()]
+            .filter((candidate) => candidate.targetKey === targetKey && candidate.source === "browser" && candidate.teamSpeakPublisherEntryId === publisherEntry.id)
+            .map((candidate) => candidate.teamSpeakStreamId ?? null),
+        }, "TeamSpeak screen-stream notification did not match the browser publisher stream");
         // A delayed setup acknowledgement can arrive after the browser stopped.
         // A gateway-owned publication is never a second native source.
         void publisherEntry.tsClient.sendProtocolCommand(buildTeamSpeakCommand("stopstream", { id: streamId, reason: "1" })).catch(() => undefined);
@@ -701,7 +839,15 @@ export class ScreenShareCoordinator {
     }
     if (notification.name === "notifyrespondjoinstreamrequest" || notification.name === "notifystreamsignaling") {
       const streamId = params.id || params.stream_id;
-      if (!streamId) return;
+      if (!streamId) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+          hasStreamId: false,
+        }, "Ignored TeamSpeak screen-share signaling without a stream id");
+        return;
+      }
       const targetKey = teamSpeakTargetKey(entry.target);
       const browserStream = notification.name === "notifystreamsignaling"
         ? [...this.screenStreams.values()].find((candidate) => candidate.targetKey === targetKey
@@ -711,28 +857,104 @@ export class ScreenShareCoordinator {
         : undefined;
       if (browserStream) {
         const viewerClientId = parseNumber(params.clid);
-        if (!viewerClientId || !browserStream.nativeViewerClids.has(viewerClientId)) return;
+        if (!viewerClientId || !browserStream.nativeViewerClids.has(viewerClientId)) {
+          this.logger.info({
+            entryId: entry.id,
+            target: formatTeamSpeakTarget(entry.target),
+            notification: notification.name,
+            teamSpeakStreamId: streamId,
+            viewerClientId: viewerClientId ?? null,
+            viewerRegistered: viewerClientId ? browserStream.nativeViewerClids.has(viewerClientId) : false,
+          }, "Ignored TeamSpeak signaling for an unregistered browser-share viewer");
+          return;
+        }
         const payload = parseStreamSignalPayload(params.json || params.data || "");
-        if (!payload) return;
+        if (!payload) {
+          this.logger.info({
+            entryId: entry.id,
+            target: formatTeamSpeakTarget(entry.target),
+            notification: notification.name,
+            teamSpeakStreamId: streamId,
+            viewerClientId,
+            hasSignalPayload: Boolean(params.json || params.data),
+          }, "Ignored unparseable TeamSpeak browser-share signaling payload");
+          return;
+        }
         const signal = toBrowserScreenSignal(payload);
-        if (!signal) return;
-        this.sendToEntry(browserStream.ownerEntryId, {
+        if (!signal) {
+          this.logger.info({
+            entryId: entry.id,
+            target: formatTeamSpeakTarget(entry.target),
+            notification: notification.name,
+            teamSpeakStreamId: streamId,
+            viewerClientId,
+            signalKind: payload.cmd,
+          }, "Ignored unsupported TeamSpeak browser-share signaling kind");
+          return;
+        }
+        const deliveredToBrowser = this.sendToEntry(browserStream.ownerEntryId, {
           type: "screenShareSignal",
           streamId: browserStream.streamId,
           fromPeerId: nativeViewerPeerId(viewerClientId),
           signal,
         });
+        this.logger.info({
+          entryId: entry.id,
+          ownerEntryId: browserStream.ownerEntryId,
+          target: formatTeamSpeakTarget(entry.target),
+          streamId: browserStream.streamId,
+          teamSpeakStreamId: streamId,
+          viewerClientId,
+          signalKind: signal.kind,
+          deliveredToBrowser,
+        }, deliveredToBrowser
+          ? "Forwarded TeamSpeak screen-share signaling to browser owner"
+          : "Could not forward TeamSpeak screen-share signaling because browser WebSocket is unavailable");
         return;
       }
       const stream = this.screenStreams.get(screenStreamKey(targetKey, streamId));
-      if (!stream || stream.source !== "teamspeak" || !stream.viewerEntryIds.has(entry.id)) return;
+      if (!stream || stream.source !== "teamspeak" || !stream.viewerEntryIds.has(entry.id)) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+          teamSpeakStreamId: streamId,
+          knownStreamSource: stream?.source ?? null,
+          viewerJoined: stream?.viewerEntryIds.has(entry.id) ?? false,
+        }, "Ignored TeamSpeak signaling that did not match an active native stream viewer");
+        return;
+      }
       const payload = notification.name === "notifyrespondjoinstreamrequest"
         ? { cmd: "offer", args: { offer: params.offer || "" } }
         : parseStreamSignalPayload(params.json || params.data || "");
-      if (!payload) return;
+      if (!payload) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+          teamSpeakStreamId: streamId,
+          hasSignalPayload: Boolean(params.json || params.data || params.offer),
+        }, "Ignored unparseable TeamSpeak native-share signaling payload");
+        return;
+      }
       const signal = toBrowserScreenSignal(payload);
-      if (!signal) return;
+      if (!signal) {
+        this.logger.info({
+          entryId: entry.id,
+          target: formatTeamSpeakTarget(entry.target),
+          notification: notification.name,
+          teamSpeakStreamId: streamId,
+          signalKind: payload.cmd,
+        }, "Ignored unsupported TeamSpeak native-share signaling kind");
+        return;
+      }
       this.sendToEntry(entry.id, { type: "screenShareSignal", streamId, fromPeerId: stream.ownerPeerId, signal });
+      this.logger.info({
+        entryId: entry.id,
+        target: formatTeamSpeakTarget(entry.target),
+        streamId,
+        signalKind: signal.kind,
+      }, "Forwarded TeamSpeak native-share signaling to browser viewer");
     }
   }
 

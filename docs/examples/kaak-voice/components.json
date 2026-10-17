@@ -3,10 +3,10 @@
   "components": [
     {
       "id": "kaak-home",
-      "name": "KAAK connection home",
+      "name": "{{skin.messages.kaakHomeComponentName}}",
       "page": "home",
       "mode": "surface",
-      "accessibleName": "KAAK 连接页 / Connection page",
+      "accessibleName": "{{skin.messages.kaakHomeAccessibleName}}",
       "permissions": [
         "ui.surface.replace",
         "session.status.read"
@@ -49,7 +49,7 @@
                 "part": "slogan",
                 "children": [
                   {
-                    "text": "YOUR VOICE, EVERYWHERE."
+                    "text": "{{skin.messages.kaakTagline}}"
                   }
                 ]
               },
@@ -67,7 +67,7 @@
                     "attributes": {
                       "viewbox": "0 0 640 480",
                       "role": "img",
-                      "aria-label": "WebSpeak voice connection illustration"
+                      "aria-label": "{{skin.messages.kaakHomeIllustrationAlt}}"
                     },
                     "children": [
                       {
@@ -298,7 +298,7 @@
                     "part": "welcome-title",
                     "children": [
                       {
-                        "text": "欢迎来到 WebSpeak"
+                        "text": "{{skin.messages.kaakWelcomeTitle}}"
                       }
                     ]
                   },
@@ -315,7 +315,7 @@
                             "part": "connection-title",
                             "children": [
                               {
-                                "text": "连接 TeamSpeak 服务器"
+                                "text": "{{skin.messages.kaakConnectTitle}}"
                               }
                             ]
                           },
@@ -334,7 +334,7 @@
                         "part": "description",
                         "children": [
                           {
-                            "text": "无需注册账号，填写服务器信息即可加入语音"
+                            "text": "{{skin.messages.kaakConnectDescription}}"
                           }
                         ]
                       },
@@ -347,7 +347,7 @@
                         "part": "note",
                         "children": [
                           {
-                            "text": "浏览器直连 · 无需安装 TeamSpeak 客户端"
+                            "text": "{{skin.messages.kaakBrowserDirect}}"
                           }
                         ]
                       },
@@ -374,10 +374,10 @@
     },
     {
       "id": "kaak-workspace",
-      "name": "KAAK voice workspace",
+      "name": "{{skin.messages.kaakVoiceComponentName}}",
       "page": "voice",
       "mode": "surface",
-      "accessibleName": "KAAK 语音工作区 / Voice workspace",
+      "accessibleName": "{{skin.messages.kaakVoiceAccessibleName}}",
       "stateScope": "session.status.channelId",
       "permissions": [
         "ui.surface.replace",
@@ -480,7 +480,7 @@
             "tag": "nav",
             "part": "server-rail",
             "attributes": {
-              "aria-label": "收藏与历史服务器 / Favorites and history"
+              "aria-label": "{{skin.messages.kaakFavoritesAndHistory}}"
             },
             "children": [
               {
@@ -549,7 +549,7 @@
                             },
                             "children": [
                               {
-                                "text": "收藏"
+                                "text": "{{skin.messages.kaakFavorites}}"
                               }
                             ]
                           },
@@ -562,7 +562,7 @@
                             },
                             "children": [
                               {
-                                "text": "最近"
+                                "text": "{{skin.messages.kaakRecent}}"
                               }
                             ]
                           }
@@ -586,7 +586,7 @@
             "tag": "header",
             "part": "mobile-room-topbar",
             "attributes": {
-              "aria-label": "语音房间控制"
+              "aria-label": "{{skin.messages.kaakVoiceRoomControls}}"
             },
             "children": [
               {
@@ -594,7 +594,7 @@
                 "part": "mobile-room-back",
                 "attributes": {
                   "type": "button",
-                  "aria-label": "返回频道树，不断开语音"
+                  "aria-label": "{{skin.messages.kaakReturnChannelsNoDisconnect}}"
                 },
                 "events": {
                   "click": "toggle-mobile-page"
@@ -630,7 +630,7 @@
                 "part": "mobile-room-mode",
                 "children": [
                   {
-                    "text": "语音感应"
+                    "text": "{{skin.messages.kaakVoiceRoom}}"
                   }
                 ]
               },
@@ -640,7 +640,7 @@
                 "attributes": {
                   "type": "button",
                   "aria-expanded": "{{state.roommenu}}",
-                  "aria-label": "更多语音功能"
+                  "aria-label": "{{skin.messages.kaakMoreVoiceActions}}"
                 },
                 "events": {
                   "click": "toggle-room-menu"
@@ -706,7 +706,7 @@
             },
             "attributes": {
               "role": "menu",
-              "aria-label": "更多语音功能"
+              "aria-label": "{{skin.messages.kaakMoreVoiceActions}}"
             },
             "children": [
               {
@@ -715,14 +715,14 @@
                 "attributes": {
                   "type": "button",
                   "role": "menuitem",
-                  "aria-label": "打开聊天记录"
+                  "aria-label": "{{skin.messages.kaakOpenChatHistory}}"
                 },
                 "events": {
                   "click": "toggle-chat-panel"
                 },
                 "children": [
                   {
-                    "text": "聊天记录"
+                    "text": "{{skin.messages.kaakChatHistory}}"
                   }
                 ]
               },
@@ -732,14 +732,14 @@
                 "attributes": {
                   "type": "button",
                   "role": "menuitem",
-                  "aria-label": "复制邀请链接 / Copy invite link"
+                  "aria-label": "{{skin.messages.kaakCopyInviteLink}}"
                 },
                 "events": {
                   "click": "copy-invite-link"
                 },
                 "children": [
                   {
-                    "text": "复制邀请链接 / Copy invite link"
+                    "text": "{{skin.messages.kaakCopyInviteLink}}"
                   }
                 ]
               },
@@ -755,7 +755,7 @@
                 },
                 "children": [
                   {
-                    "text": "关闭菜单"
+                    "text": "{{skin.messages.kaakCloseMenu}}"
                   }
                 ]
               }
@@ -765,7 +765,7 @@
             "tag": "section",
             "part": "mobile-room-head",
             "attributes": {
-              "aria-label": "当前语音频道"
+              "aria-label": "{{skin.messages.kaakCurrentVoiceChannel}}"
             },
             "children": [
               {
@@ -814,7 +814,7 @@
                             "part": "mobile-room-connection-label",
                             "children": [
                               {
-                                "text": "TeamSpeak · 已加入语音"
+                                "text": "{{skin.messages.kaakVoiceConnected}}"
                               }
                             ]
                           },
@@ -851,7 +851,7 @@
             "tag": "aside",
             "part": "channel-panel",
             "attributes": {
-              "aria-label": "服务器频道 / Server channels"
+              "aria-label": "{{skin.messages.kaakServerChannels}}"
             },
             "children": [
               {
@@ -866,7 +866,7 @@
                 "tag": "nav",
                 "part": "channel-list",
                 "attributes": {
-                  "aria-label": "频道 / Channels"
+                  "aria-label": "{{skin.messages.kaakChannels}}"
                 },
                 "children": [
                   {
@@ -875,7 +875,7 @@
                     "attributes": {
                       "type": "button",
                       "aria-expanded": "{{state.voicegroupopen}}",
-                      "aria-label": "展开或收起语音分组 / Toggle voice group"
+                      "aria-label": "{{skin.messages.kaakToggleVoiceGroup}}"
                     },
                     "events": {
                       "click": "toggle-voice-group"
@@ -898,7 +898,7 @@
                         "part": "voice-group-name",
                         "children": [
                           {
-                            "text": "语音分组"
+                            "text": "{{skin.messages.kaakVoiceGroup}}"
                           }
                         ]
                       }
@@ -936,7 +936,7 @@
                 },
                 "attributes": {
                   "type": "button",
-                  "aria-label": "返回当前语音房间"
+                  "aria-label": "{{skin.messages.kaakReturnVoiceRoom}}"
                 },
                 "events": {
                   "click": "toggle-mobile-page"
@@ -959,7 +959,7 @@
                     "part": "mobile-room-return-copy",
                     "children": [
                       {
-                        "text": "语音已连接 · 点击返回房间"
+                        "text": "{{skin.messages.kaakReturnVoiceRoomConnected}}"
                       }
                     ]
                   },
@@ -992,7 +992,7 @@
             "tag": "section",
             "part": "conversation",
             "attributes": {
-              "aria-label": "聊天 / Chat",
+              "aria-label": "{{skin.messages.kaakChat}}",
               "data-chat-open": "{{chat.status.panelOpen}}"
             },
             "children": [
@@ -1015,7 +1015,7 @@
                     "attributes": {
                       "type": "button",
                       "aria-expanded": "{{chat.status.panelOpen}}",
-                      "aria-label": "收起或展开聊天面板 / Toggle chat panel"
+                      "aria-label": "{{skin.messages.kaakToggleChatPanel}}"
                     },
                     "events": {
                       "click": "toggle-chat-panel"
@@ -1065,7 +1065,7 @@
             "tag": "aside",
             "part": "voice-stage",
             "attributes": {
-              "aria-label": "语音房间 / Voice room"
+              "aria-label": "{{skin.messages.kaakVoiceRoomAccessibleName}}"
             },
             "children": [
               {
@@ -1089,7 +1089,7 @@
                         "part": "mobile-channel-back",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "返回频道树"
+                          "aria-label": "{{skin.messages.kaakBackToChannels}}"
                         },
                         "events": {
                           "click": "toggle-mobile-page"
@@ -1125,7 +1125,7 @@
                         "tag": "span",
                         "part": "voice-stage-member-count",
                         "attributes": {
-                          "aria-label": "频道成员数 / Channel member count"
+                          "aria-label": "{{skin.messages.kaakChannelMemberCount}}"
                         },
                         "children": [
                           {
@@ -1152,8 +1152,8 @@
                         "className": "voice-stage-invite",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "复制邀请链接 / Copy invite link",
-                          "title": "复制邀请链接 / Copy invite link"
+                          "aria-label": "{{skin.messages.kaakCopyInviteLink}}",
+                          "title": "{{skin.messages.kaakCopyInviteLink}}"
                         },
                         "events": {
                           "click": "copy-invite-link"
@@ -1200,7 +1200,7 @@
                         "attributes": {
                           "type": "button",
                           "aria-expanded": "{{chat.status.panelOpen}}",
-                          "aria-label": "展开聊天面板 / Expand chat panel"
+                          "aria-label": "{{skin.messages.kaakExpandChatPanel}}"
                         },
                         "events": {
                           "click": "toggle-chat-panel"
@@ -1233,7 +1233,7 @@
             "tag": "footer",
             "part": "voice-dock",
             "attributes": {
-              "aria-label": "语音控制 / Voice controls"
+              "aria-label": "{{skin.messages.kaakVoiceControls}}"
             },
             "children": [
               {
@@ -1260,24 +1260,21 @@
                   },
                   {
                     "widget": "voice.performance-panel",
-                    "part": "performance-panel",
-                    "options": {
-                      "screenShare": false
-                    }
+                    "part": "performance-panel"
                   },
                   {
                     "tag": "button",
                     "part": "disconnect-control",
                     "attributes": {
                       "type": "button",
-                      "aria-label": "断开语音"
+                      "aria-label": "{{skin.messages.kaakDisconnectVoice}}"
                     },
                     "events": {
                       "click": "disconnect"
                     },
                     "children": [
                       {
-                        "text": "离开"
+                        "text": "{{skin.messages.kaakLeaveVoice}}"
                       }
                     ]
                   }
@@ -1308,14 +1305,14 @@
                         },
                         "attributes": {
                           "type": "button",
-                          "aria-label": "停止屏幕共享"
+                          "aria-label": "{{skin.messages.kaakStopScreenShare}}"
                         },
                         "events": {
                           "click": "stop-screen-share"
                         },
                         "children": [
                           {
-                            "text": "停止屏幕共享"
+                            "text": "{{skin.messages.kaakStopScreenShare}}"
                           }
                         ]
                       }
@@ -1327,7 +1324,7 @@
                     "className": "desktop-room-controls",
                     "attributes": {
                       "role": "toolbar",
-                      "aria-label": "语音设置 / Audio controls"
+                      "aria-label": "{{skin.messages.kaakAudioControls}}"
                     },
                     "children": [
                       {
@@ -1336,8 +1333,8 @@
                         "className": "desktop-room-control desktop-room-settings",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "语音设置 / Audio settings",
-                          "title": "语音设置 / Audio settings"
+                          "aria-label": "{{skin.messages.kaakAudioSettings}}",
+                          "title": "{{skin.messages.kaakAudioSettings}}"
                         },
                         "events": {
                           "click": "open-audio-settings"
@@ -1377,7 +1374,7 @@
                             "className": "desktop-room-control-label",
                             "children": [
                               {
-                                "text": "语音设置"
+                                "text": "{{skin.messages.kaakAudioSettingsShort}}"
                               }
                             ]
                           }
@@ -1389,8 +1386,8 @@
                         "className": "desktop-room-control desktop-room-noise-suppression",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "噪声抑制 / Noise suppression",
-                          "title": "噪声抑制 / Noise suppression",
+                          "aria-label": "{{skin.messages.kaakNoiseSuppression}}",
+                          "title": "{{skin.messages.kaakNoiseSuppression}}",
                           "aria-pressed": "{{audio.status.noiseSuppressionEnabled}}"
                         },
                         "events": {
@@ -1440,8 +1437,8 @@
                         "className": "desktop-room-control desktop-room-microphone",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "麦克风 / Microphone",
-                          "title": "麦克风 / Microphone",
+                          "aria-label": "{{skin.messages.kaakMicrophone}}",
+                          "title": "{{skin.messages.kaakMicrophone}}",
                           "aria-pressed": "{{audio.status.microphoneMuted}}"
                         },
                         "events": {
@@ -1507,8 +1504,8 @@
                         "className": "desktop-room-control desktop-room-output",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "扬声器静音 / Speaker mute",
-                          "title": "扬声器静音 / Speaker mute",
+                          "aria-label": "{{skin.messages.kaakSpeakerMute}}",
+                          "title": "{{skin.messages.kaakSpeakerMute}}",
                           "aria-pressed": "{{audio.status.outputMuted}}"
                         },
                         "events": {
@@ -1566,8 +1563,8 @@
                         "className": "desktop-room-control desktop-room-accompaniment",
                         "attributes": {
                           "type": "button",
-                          "aria-label": "伴奏 / Accompaniment",
-                          "title": "伴奏 / Accompaniment",
+                          "aria-label": "{{skin.messages.kaakAccompaniment}}",
+                          "title": "{{skin.messages.kaakAccompaniment}}",
                           "aria-pressed": "{{audio.status.accompanimentActive}}"
                         },
                         "events": {
@@ -1625,7 +1622,7 @@
                 "className": "mobile-room-controls",
                 "attributes": {
                   "role": "toolbar",
-                  "aria-label": "语音控制"
+                  "aria-label": "{{skin.messages.kaakVoiceControls}}"
                 },
                 "children": [
                   {
@@ -1634,10 +1631,10 @@
                     "className": "mobile-room-control mobile-room-microphone",
                     "attributes": {
                       "type": "button",
-                      "aria-label": "麦克风",
+                      "aria-label": "{{skin.messages.kaakMicrophone}}",
                       "aria-pressed": "{{audio.status.microphoneMuted}}",
                       "data-muted": "{{audio.status.microphoneMuted}}",
-                      "title": "麦克风"
+                      "title": "{{skin.messages.kaakMicrophone}}"
                     },
                     "events": {
                       "click": "toggle-microphone"
@@ -1711,7 +1708,7 @@
                         },
                         "children": [
                           {
-                            "text": "闭麦"
+                            "text": "{{skin.messages.kaakMuteMicrophone}}"
                           }
                         ]
                       },
@@ -1724,7 +1721,7 @@
                         },
                         "children": [
                           {
-                            "text": "开麦"
+                            "text": "{{skin.messages.kaakUnmuteMicrophone}}"
                           }
                         ]
                       }
@@ -1736,10 +1733,10 @@
                     "className": "mobile-room-control mobile-room-deafen",
                     "attributes": {
                       "type": "button",
-                      "aria-label": "耳机静音",
+                      "aria-label": "{{skin.messages.kaakMuteOutput}}",
                       "aria-pressed": "{{audio.status.outputMuted}}",
                       "data-muted": "{{audio.status.outputMuted}}",
-                      "title": "耳机静音"
+                      "title": "{{skin.messages.kaakMuteOutput}}"
                     },
                     "events": {
                       "click": "toggle-output-mute"
@@ -1799,7 +1796,7 @@
                         },
                         "children": [
                           {
-                            "text": "静音"
+                            "text": "{{skin.messages.kaakMute}}"
                           }
                         ]
                       },
@@ -1812,7 +1809,7 @@
                         },
                         "children": [
                           {
-                            "text": "恢复"
+                            "text": "{{skin.messages.kaakUnmute}}"
                           }
                         ]
                       }
@@ -1824,8 +1821,8 @@
                     "className": "mobile-room-control mobile-room-speaker",
                     "attributes": {
                       "type": "button",
-                      "aria-label": "扬声器",
-                      "title": "扬声器"
+                      "aria-label": "{{skin.messages.kaakSpeaker}}",
+                      "title": "{{skin.messages.kaakSpeaker}}"
                     },
                     "events": {
                       "click": "open-audio-settings"
@@ -1867,7 +1864,7 @@
                         "className": "mobile-room-control-caption",
                         "children": [
                           {
-                            "text": "扬声器"
+                            "text": "{{skin.messages.kaakSpeaker}}"
                           }
                         ]
                       }
@@ -1883,8 +1880,8 @@
                     },
                     "attributes": {
                       "type": "button",
-                      "aria-label": "屏幕共享",
-                      "title": "屏幕共享",
+                      "aria-label": "{{skin.messages.kaakScreenShare}}",
+                      "title": "{{skin.messages.kaakScreenShare}}",
                       "aria-pressed": false
                     },
                     "events": {
@@ -1937,7 +1934,7 @@
                         "className": "mobile-room-control-caption",
                         "children": [
                           {
-                            "text": "屏幕共享"
+                            "text": "{{skin.messages.kaakScreenShare}}"
                           }
                         ]
                       }
@@ -1953,8 +1950,8 @@
                     },
                     "attributes": {
                       "type": "button",
-                      "aria-label": "停止屏幕共享",
-                      "title": "停止屏幕共享",
+                      "aria-label": "{{skin.messages.kaakStopScreenShare}}",
+                      "title": "{{skin.messages.kaakStopScreenShare}}",
                       "aria-pressed": true
                     },
                     "events": {
@@ -2007,7 +2004,7 @@
                         "className": "mobile-room-control-caption",
                         "children": [
                           {
-                            "text": "屏幕共享"
+                            "text": "{{skin.messages.kaakScreenShare}}"
                           }
                         ]
                       }
@@ -2019,8 +2016,8 @@
                     "className": "mobile-room-control mobile-room-exit",
                     "attributes": {
                       "type": "button",
-                      "aria-label": "退出",
-                      "title": "退出"
+                      "aria-label": "{{skin.messages.kaakLeaveVoice}}",
+                      "title": "{{skin.messages.kaakLeaveVoice}}"
                     },
                     "events": {
                       "click": "disconnect"
@@ -2062,7 +2059,7 @@
                         "className": "mobile-room-control-caption",
                         "children": [
                           {
-                            "text": "退出"
+                            "text": "{{skin.messages.kaakLeaveVoice}}"
                           }
                         ]
                       }
@@ -2080,7 +2077,7 @@
             },
             "attributes": {
               "role": "group",
-              "aria-label": "当前 TeamSpeak 身份"
+              "aria-label": "{{skin.messages.kaakCurrentIdentity}}"
             },
             "children": [
               {
@@ -2099,7 +2096,7 @@
                     },
                     "attributes": {
                       "role": "img",
-                      "aria-label": "在线"
+                      "aria-label": "{{skin.messages.kaakOnline}}"
                     }
                   }
                 ]

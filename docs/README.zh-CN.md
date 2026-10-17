@@ -13,7 +13,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 演示站点的网络和负载可能不稳定；延迟、断线或暂时不可用不代表自行部署后的实际表现。
 
-最新版本：[查看本页的 0.2.7 更新日志](#latest-release-notes)。
+最新版本：[查看本页的 0.2.8 更新日志](#latest-release-notes)。
 
 ## ✨ 特性
 
@@ -169,6 +169,19 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 ## 🧾 更新日志
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
+
+#### 屏幕共享与连接稳定性
+
+- 修复网页与 TeamSpeak 原生客户端之间屏幕共享的协商和视频轨道处理问题。
+- 改善快速切换频道时的队列处理，减少客户端状态错乱。
+- 修复部分皮肤组件内容和 KAAK 皮肤多语言显示问题。
+
+#### 界面改进
+
+- 音频设备名称会完整显示；空间不足时自动换行，便于区分名称较长的设备。
+- 修复头像占位文字被意外选中的问题。
 
 ### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
 

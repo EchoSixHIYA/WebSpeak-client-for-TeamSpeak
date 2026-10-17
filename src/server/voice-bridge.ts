@@ -116,7 +116,23 @@ export class VoiceBridge {
     this.trustedProxies = createTrustedProxies(options.trustedProxies);
     this.screenShares = new ScreenShareCoordinator(this.entries, (entryId, message) => {
       const entry = this.entries.get(entryId);
-      if (entry?.ws.readyState === WebSocket.OPEN) entry.ws.send(JSON.stringify(message));
+      if (entry?.ws.readyState === WebSocket.OPEN) {
+        try {
+          entry.ws.send(JSON.stringify(message));
+          return true;
+        } catch (error: unknown) {
+          this.logger.warn({
+            entryId,
+            messageType: message.type,
+            errorName: error instanceof Error ? error.name : "unknown",
+          }, "Could not send screen-share message to browser");
+          return false;
+        }
+      }
+      if (message.type === "screenShareNativeViewerJoined" || (message.type === "screenShareSignal" && message.signal.kind !== "iceCandidate")) {
+        this.logger.info({ entryId, messageType: message.type, readyState: entry?.ws.readyState ?? null }, "Dropped screen-share message because browser WebSocket is unavailable");
+      }
+      return false;
     }, this.logger);
   }
 

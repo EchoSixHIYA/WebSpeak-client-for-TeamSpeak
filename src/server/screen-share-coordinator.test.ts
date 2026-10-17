@@ -4,16 +4,26 @@ import { setImmediate as nextTurn } from "node:timers/promises";
 import { ScreenShareCoordinator, type ScreenShareParticipant } from "./screen-share-coordinator.js";
 import { parseServerMessage, type ServerMessage } from "../shared/server-messages.js";
 import type { ScreenShareClientMessage } from "../shared/screen-share.js";
+import type { Logger } from "../logger.js";
 
 function fixture() {
   const entries = new Map<string, ScreenShareParticipant>();
   const messages: Array<{ to: string; message: ServerMessage }> = [];
   const commands: Array<{ from: string; command: string }> = [];
+  const logs: Array<{ context: Record<string, unknown>; message: string }> = [];
   const send = (to: string, message: ServerMessage) => {
     assert.ok(parseServerMessage(JSON.parse(JSON.stringify(message))), `invalid message: ${message.type}`);
     messages.push({ to, message });
+    return true;
   };
-  const coordinator = new ScreenShareCoordinator(entries, send, { debug() {}, warn() {} });
+  const debug = ((contextOrMessage: Record<string, unknown> | string, message?: string) => {
+    logs.push({ context: typeof contextOrMessage === "string" ? {} : contextOrMessage, message: message ?? contextOrMessage.toString() });
+  }) as Logger["debug"];
+  const info = ((contextOrMessage: Record<string, unknown> | string, message?: string) => {
+    logs.push({ context: typeof contextOrMessage === "string" ? {} : contextOrMessage, message: message ?? contextOrMessage.toString() });
+  }) as Logger["info"];
+  const warn = (() => {}) as Logger["warn"];
+  const coordinator = new ScreenShareCoordinator(entries, send, { debug, info, warn });
   function participant(id: string, clientId: number, channel = 1n, host = "first.example") {
     const entry: ScreenShareParticipant = {
       id, nickname: id, screenPeerId: `peer-${id}`, target: { host, port: 9987 }, members: new Map([[clientId, {}]]),
@@ -41,7 +51,7 @@ function fixture() {
     assert.ok(share);
     return share.streamId;
   }
-  return { entries, messages, commands, coordinator, participant, handle, list, start };
+  return { entries, messages, commands, logs, coordinator, participant, handle, list, start };
 }
 
 test("sharing is isolated by server and channel, and only its owner can stop it", () => {
@@ -78,6 +88,43 @@ test("signaling permits owner-viewer pairs but rejects viewer-to-viewer injectio
   f.handle(left, { type: "screenShareSignal", streamId, targetPeerId: owner.screenPeerId, signal: { kind: "offer", sdp: "offer" } });
   assert.equal(f.messages.at(-1)?.to, owner.id);
   assert.equal(f.messages.at(-1)?.message.type, "screenShareSignal");
+});
+
+test("screen-share diagnostics trace the native viewer handshake without logging SDP or ICE contents", async () => {
+  const f = fixture();
+  const owner = f.participant("owner", 1);
+  const streamId = f.start(owner);
+  f.coordinator.handleNotification(owner, { name: "notifystreamstarted", params: { id: "ts-stream-1", clid: "1" } });
+
+  f.coordinator.handleNotification(owner, { name: "notifyjoinstreamrequest", params: { id: "wrong-stream", clid: "17" } });
+  f.coordinator.handleNotification(owner, { name: "notifyjoinstreamrequest", params: { id: "ts-stream-1", clid: "17" } });
+  assert.ok(f.messages.some(({ to, message }) => to === owner.id && message.type === "screenShareNativeViewerJoined"));
+
+  f.handle(owner, {
+    type: "screenShareSignal",
+    streamId,
+    targetPeerId: "ts-viewer-17",
+    signal: { kind: "offer", sdp: "private-sdp-marker" },
+  });
+  f.coordinator.handleNotification(owner, {
+    name: "notifystreamsignaling",
+    params: { id: "ts-stream-1", clid: "17", json: JSON.stringify({ cmd: "answer", args: { answer: "private-answer-marker" } }) },
+  });
+  f.coordinator.handleNotification(owner, {
+    name: "notifystreamsignaling",
+    params: { id: "ts-stream-1", clid: "17", json: JSON.stringify({ cmd: "iceCandidate", args: { sdp: "private-candidate-marker", mid: "video", mLine: 0 } }) },
+  });
+  await nextTurn();
+
+  assert.ok(f.logs.some(({ message }) => message === "TeamSpeak screen-share join request did not match an active browser stream"));
+  assert.ok(f.logs.some(({ message }) => message === "Forwarded TeamSpeak screen-share join request to browser owner"));
+  assert.ok(f.logs.some(({ message, context }) => message === "Forwarded browser screen-share signaling to TeamSpeak viewer" && context.signalKind === "offer"));
+  assert.ok(f.logs.some(({ message, context }) => message === "Forwarded TeamSpeak screen-share signaling to browser owner" && context.signalKind === "answer"));
+  assert.ok(f.logs.some(({ message, context }) => message === "Forwarded TeamSpeak screen-share signaling to browser owner" && context.signalKind === "iceCandidate"));
+  const serializedLogs = JSON.stringify(f.logs);
+  assert.equal(serializedLogs.includes("private-sdp-marker"), false);
+  assert.equal(serializedLogs.includes("private-answer-marker"), false);
+  assert.equal(serializedLogs.includes("private-candidate-marker"), false);
 });
 
 test("another member moving channels cannot stop the owner's share or evict its viewer", () => {

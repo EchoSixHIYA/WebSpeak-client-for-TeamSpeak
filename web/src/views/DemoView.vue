@@ -69,6 +69,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import SkinSwitcher, { type SkinOption } from "../components/SkinSwitcher.vue";
 import { saveLocalPreferences } from "../services/local-persistence.js";
+import { resolveSkinMessages } from "../services/skin-content.js";
 import { BUILTIN_ILLUSIA_SKIN_ID, isPublicSkinEnabled } from "../services/skin-catalog.js";
 import { BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN } from "../services/skin-runtime.js";
 import { usePublicSkin } from "../composables/usePublicSkin.js";
@@ -105,6 +106,7 @@ const copy = computed(() => {
   }
   return result;
 });
+const skinMessages = computed(() => resolveSkinMessages(activeSkin.value?.contentData, language.value));
 const selectedChannelId = ref("quiet");
 const activeTab = ref<Tab>("channel");
 const speakingId = ref("illusia");
@@ -139,6 +141,7 @@ function sendMessage() { const text = draft.value.trim(); if (!text) return; mes
 function avatarStyle(name: string) { let hash = 0; for (const char of name) hash = char.charCodeAt(0) + ((hash << 5) - hash); const colors = ["#168f83", "#7b9ed0", "#b99070", "#8b78b9"]; return { background: colors[Math.abs(hash) % colors.length] }; }
 
 const skinPluginContext = computed(() => ({
+  skin: { locale: language.value, messages: skinMessages.value },
   session: {
     status: { connected: true, connecting: false, channelId: selectedChannel.value.id, channelName: selectedChannel.value.name, userName: "illusia" },
     channels: channels.map((channel, depth) => ({ id: channel.id, name: channel.name, parentId: "", depth, memberCount: channel.members.length, current: channel.id === selectedChannel.value.id })),

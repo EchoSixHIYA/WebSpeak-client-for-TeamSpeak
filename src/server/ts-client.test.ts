@@ -108,6 +108,35 @@ test("server icons use the TeamSpeak file transfer path and enforce the download
   assert.equal(f.sdk.downloaded, 1);
 });
 
+test("rapid channel switches wait for each TeamSpeak acknowledgement", async () => {
+  const f = fixture();
+  const firstAck = deferred<void>();
+  const switchCommands: string[] = [];
+  let activeSwitches = 0;
+  let maxActiveSwitches = 0;
+  f.sdk.inputUpdate = async command => {
+    if (!command.startsWith("clientmove ")) return;
+    switchCommands.push(command);
+    activeSwitches += 1;
+    maxActiveSwitches = Math.max(maxActiveSwitches, activeSwitches);
+    if (switchCommands.length === 1) await firstAck.promise;
+    activeSwitches -= 1;
+  };
+
+  const first = f.client.switchChannel(10n);
+  const second = f.client.switchChannel(20n);
+  await nextTurn();
+  assert.equal(switchCommands.length, 1, "the second clientmove waits until the first is acknowledged");
+  assert.equal(maxActiveSwitches, 1, "only one channel move can be active on the session");
+
+  firstAck.resolve();
+  await Promise.all([first, second]);
+  assert.equal(switchCommands.length, 2);
+  assert.match(switchCommands[0], /cid=10(?:\s|$)/);
+  assert.match(switchCommands[1], /cid=20(?:\s|$)/);
+  assert.equal(maxActiveSwitches, 1);
+});
+
 test("stream cleanup flood retries back off and stop after two retries", async t => {
   const f = fixture();
   t.mock.timers.enable({ apis: ["setTimeout"] });

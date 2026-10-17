@@ -1003,6 +1003,7 @@ import { applyTheme, getStoredTheme, type ThemeMode } from "../services/theme.js
 import { createScreenWakeLockController, getScreenWakeLockApi, type ScreenWakeLockController, type ScreenWakeLockSnapshot } from "../services/screen-wake-lock.js";
 import { createMobileAwayController, type MobileAwayController } from "../services/mobile-away.js";
 import { createSkinPluginQuickServerProjection, safeSkinServerDisplayName } from "../services/skin-plugin-context.js";
+import { resolveSkinMessages } from "../services/skin-content.js";
 import { loadSkinPluginAuthoringDocument } from "../services/skin-plugin-authoring.js";
 import type { SkinPluginDocument, SkinPluginWidgetOptions } from "../../../src/shared/skin-plugin.js";
 import { combineTeamSpeakTarget, DEFAULT_TEAM_SPEAK_PORT, isValidTeamSpeakPort, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
@@ -1147,7 +1148,7 @@ watch(activeSkin, () => {
   skinPluginSurfaceActive.value = false;
   skinRuntimePluginSurfaceActive.value = false;
 }, { flush: "sync" });
-const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value, language.value));
+const skinMessageOverrides = computed(() => resolveSkinMessages(activeSkin.value?.contentData, language.value));
 const { t: translate, localizedMessage, localizedAudioNotice, visibleErrorCode } = useWebClientI18n(language);
 function t(key: string, variables: Record<string, string | number> = {}) {
   const template = skinMessageOverrides.value[key];
@@ -1600,6 +1601,10 @@ const skinPluginMembers = computed(() => memberChannels.value.flatMap((item) => 
 })));
 
 const skinPluginContext = computed(() => ({
+  skin: {
+    locale: language.value,
+    messages: skinMessageOverrides.value,
+  },
   session: {
     status: {
       connected: voiceState.connected,
@@ -2230,15 +2235,6 @@ function resolveSkinHomeCopy(skin: InstalledSkin | null, locale: Language): Skin
   return result;
 }
 
-function resolveSkinMessages(skin: InstalledSkin | null, locale: Language): Record<string, string> {
-  const content = skin?.contentData;
-  if (!content) return {};
-  const fullLocale = locale === "zh" ? "zh-CN" : locale === "en" ? "en-US" : locale === "de" ? "de-DE" : locale === "ru" ? "ru-RU" : "ja-JP";
-  const candidates = [...new Set([content.defaultLocale, locale, fullLocale])];
-  const result: Record<string, string> = {};
-  for (const candidate of candidates) Object.assign(result, content.locales[candidate]?.messages ?? {});
-  return result;
-}
 </script>
 
 <style scoped src="../styles/web-client.css"></style>

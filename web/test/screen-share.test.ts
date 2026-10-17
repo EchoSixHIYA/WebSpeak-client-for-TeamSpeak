@@ -162,7 +162,7 @@ test("ICE configuration belongs to each controller independently", async () => {
   } finally { second.stopTransport(false); }
 });
 
-test("screen share codecs are ordered H.264, AV1, then VP8 independent of browser order", async () => {
+test("browser viewers prefer H.264, AV1, then VP8 independent of browser order", async () => {
   const codecs = [
     { mimeType: "video/vp8", clockRate: 90_000 },
     { mimeType: "video/rtx", clockRate: 90_000, sdpFmtpLine: "apt=96" },
@@ -178,6 +178,34 @@ test("screen share codecs are ordered H.264, AV1, then VP8 independent of browse
     "video/h264",
     "video/av1",
     "video/vp8",
+    "video/rtx",
+  ]);
+});
+
+test("native TeamSpeak viewers prefer VP8 for decoder compatibility", async () => {
+  const codecs = [
+    { mimeType: "video/h264", clockRate: 90_000, sdpFmtpLine: "packetization-mode=1;profile-level-id=42e01f" },
+    { mimeType: "video/rtx", clockRate: 90_000, sdpFmtpLine: "apt=96" },
+    { mimeType: "video/av1", clockRate: 90_000 },
+    { mimeType: "video/vp8", clockRate: 90_000 },
+  ] satisfies RTCRtpCodecCapability[];
+  replaceGlobal("RTCRtpSender", { getCapabilities: () => ({ codecs }) });
+
+  await controller.api.startScreenShare();
+  const requestId = sent.at(-1)?.requestId;
+  controller.handleMessage({
+    type: "screenShareStarted",
+    owner: true,
+    requestId,
+    stream: { ...remote, streamId: "local", ownerPeerId: "local-owner" },
+  });
+  controller.handleMessage({ type: "screenShareNativeViewerJoined", streamId: "local", viewerPeerId: "ts-viewer-7" });
+  await nextTurn();
+
+  assert.deepEqual(Peer.instances[0]?.codecPreferences.map((codec) => codec.mimeType), [
+    "video/vp8",
+    "video/h264",
+    "video/av1",
     "video/rtx",
   ]);
 });

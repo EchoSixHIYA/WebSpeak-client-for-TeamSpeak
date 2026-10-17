@@ -183,6 +183,14 @@ export default defineComponent({
     function resolvePath(path: string, context: SafeContext, state: Record<string, Scalar>): unknown {
       const normalized = path.replace(/^\{\{\s*|\s*\}\}$/g, "");
       const parts = normalized.split(".");
+      if (parts[0] === "skin" && parts[1] === "messages" && parts.length >= 3) {
+        const skin = context.skin;
+        if (!skin || typeof skin !== "object" || !("messages" in skin)) return undefined;
+        const messages = (skin as { messages?: unknown }).messages;
+        if (!messages || typeof messages !== "object") return undefined;
+        const key = parts.slice(2).join(".");
+        return Object.prototype.hasOwnProperty.call(messages, key) ? (messages as Record<string, unknown>)[key] : undefined;
+      }
       let value: unknown = parts[0] === "state" ? state : context;
       const start = parts[0] === "state" ? 1 : 0;
       for (let index = start; index < parts.length; index += 1) {
@@ -295,7 +303,7 @@ export default defineComponent({
           "data-ws-plugin-widget": node.widget,
           "data-ws-plugin-part": node.part ? `${component.id}.${node.part}` : component.id,
           "data-ws-part": layoutPart(component, node, nodePath),
-          "aria-label": component.accessibleName,
+          "aria-label": interpolate(component.accessibleName, context, state),
         }, [widget(node.options)]);
       }
       if (!node.tag) {
@@ -430,17 +438,20 @@ export default defineComponent({
     onUnmounted(() => assetUrls.clear());
 
     return () => {
-      const nodes: VNodeChild[] = renderedComponents.value.map((component) => h("div", {
-        key: `${props.skinId}:${component.id}`,
-        class: ["ws-plugin-component", component.mode === "surface" && "ws-plugin-surface"],
-        "data-ws-plugin-component": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
-        "data-ws-plugin-name": component.name,
-        "data-ws-plugin-part": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
-        "data-ws-part": `skin.${component.page}.${layoutComponentPath(component)}`,
-        ...(props.componentNamespace ? { "data-ws-runtime-plugin": props.componentNamespace } : {}),
-        ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
-        "aria-label": component.accessibleName,
-      }, [renderNode(component, component.root, props.data, localState(component, props.data), { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]));
+      const nodes: VNodeChild[] = renderedComponents.value.map((component) => {
+        const state = localState(component, props.data);
+        return h("div", {
+          key: `${props.skinId}:${component.id}`,
+          class: ["ws-plugin-component", component.mode === "surface" && "ws-plugin-surface"],
+          "data-ws-plugin-component": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
+          "data-ws-plugin-name": interpolate(component.name, props.data, state),
+          "data-ws-plugin-part": props.componentNamespace ? `${props.componentNamespace}.${component.id}` : component.id,
+          "data-ws-part": `skin.${component.page}.${layoutComponentPath(component)}`,
+          ...(props.componentNamespace ? { "data-ws-runtime-plugin": props.componentNamespace } : {}),
+          ...(component.mode === "surface" ? { "data-ws-plugin-surface": component.page } : {}),
+          "aria-label": interpolate(component.accessibleName, props.data, state),
+        }, [renderNode(component, component.root, props.data, state, { remaining: SKIN_PLUGIN_RENDER_NODE_LIMIT })]);
+      });
       const hasPermissions = matchingComponents.value.some((component) => component.permissions.length > 0);
       const showConsent = (PROMPT_FOR_SKIN_PERMISSIONS && pendingApproval.value.length > 0) || manageOpen.value;
       const accessToggle = hasPermissions && editorMode.isEnabled.value ? h(Teleport, { to: "body" }, [h("button", {
@@ -474,7 +485,7 @@ export default defineComponent({
           h("h2", { id: "ws-plugin-consent-title" }, "皮肤组件权限 / Skin component access"),
           h("p", null, "此皮肤包含会读取公开语音界面数据或请求宿主动作的组件。只有你批准的组件才会启用。/ This skin requests limited access for its components. Only approved components will run."),
           ...requested.map((component) => h("div", { class: "ws-plugin-consent-item", key: component.id }, [
-            h("strong", null, component.name),
+            h("strong", null, interpolate(component.name, props.data, localState(component, props.data))),
             h("ul", null, component.permissions.map((permission) => h("li", { key: permission }, permissionLabel(permission)))),
           ])),
           h("p", { class: "ws-plugin-consent-note" }, "页面可以替换公开客户端外观；内置控件仍由 WebSpeak 处理。皮肤不能运行脚本、访问网络或存储，也不能读取连接地址、密码和身份材料。/ A surface can replace the public client UI while built-in controls remain host-owned. Skins cannot run code, access network or storage, or read connection targets, passwords, or identity material."),

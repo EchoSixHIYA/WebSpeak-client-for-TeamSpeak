@@ -20,9 +20,14 @@ export function placeAudioDeviceMenu(
   anchor: AudioDeviceMenuAnchor,
   viewport: { width: number; height: number },
   naturalMenuHeight: number,
+  naturalMenuWidth = anchor.width,
 ): AudioDeviceMenuPlacement {
   const insetX = Math.min(VIEWPORT_INSET, Math.max(0, viewport.width / 2));
-  const width = Math.min(Math.max(0, anchor.width), Math.max(0, viewport.width - insetX * 2));
+  const availableWidth = Math.max(0, viewport.width - insetX * 2);
+  const desiredWidth = Number.isFinite(naturalMenuWidth)
+    ? Math.max(anchor.width, naturalMenuWidth)
+    : anchor.width;
+  const width = Math.min(Math.max(0, desiredWidth), availableWidth);
   const left = Math.max(insetX, Math.min(anchor.left, viewport.width - insetX - width));
   const fullHeight = Math.min(MAX_MENU_HEIGHT, Number.isFinite(naturalMenuHeight) ? Math.max(0, naturalMenuHeight) : 0);
   const below = Math.max(0, viewport.height - VIEWPORT_INSET - anchor.bottom - MENU_GAP);

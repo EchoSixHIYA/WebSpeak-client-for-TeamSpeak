@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 
-最新リリース：[v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7)。
+最新リリース：[v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8)。
 
 | 観点 | 説明 |
 | --- | --- |
@@ -139,6 +139,19 @@ npm start
 ## 🧾 更新履歴
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
+
+#### 画面共有と接続の安定性
+
+- ブラウザーと TeamSpeak ネイティブクライアント間の画面共有で、接続ネゴシエーションと映像トラックの処理を修正しました。
+- チャンネルをすばやく切り替えた際の処理を改善し、クライアント状態の不整合を減らしました。
+- 一部スキンコンポーネントの内容表示と KAAK の多言語表示を修正しました。
+
+#### インターフェースの改善
+
+- 音声デバイス名を省略せず表示し、幅が足りない場合は折り返して、長い名前を判別しやすくしました。
+- アバターの代替テキストが誤って選択される問題を修正しました。
 
 ### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
 

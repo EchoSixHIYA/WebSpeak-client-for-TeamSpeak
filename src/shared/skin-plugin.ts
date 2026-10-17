@@ -331,6 +331,8 @@ function bindingPermissions(value: string, aliases: ReadonlyMap<string, string>,
       if (path.length !== 2 || !stateKeys.has(path[1])) fail("SKIN_PLUGIN_BINDING_INVALID", "A state binding must reference a declared local state key.");
       continue;
     }
+    if (path[0] === "skin" && path[1] === "locale" && path.length === 2) continue;
+    if (path[0] === "skin" && path[1] === "messages" && path.length >= 3) continue;
     const aliasCollection = aliases.get(path[0]);
     if (aliasCollection) {
       if (path.length !== 2 || !COLLECTION_FIELDS[aliasCollection]?.has(path[1])) fail("SKIN_PLUGIN_BINDING_INVALID", "A repeated item binding references an unsupported public field.");

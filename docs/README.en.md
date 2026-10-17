@@ -4,7 +4,7 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
-Latest release: [read the 0.2.7 changelog on this page](#latest-release-notes).
+Latest release: [read the 0.2.8 changelog on this page](#latest-release-notes).
 
 Skin authors should start with the [current skin development guide](./SKIN_DEVELOPMENT.md), which combines the `.wskin` package format, current runtime APIs, permission boundaries, and authoring workflow. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
 
@@ -167,6 +167,19 @@ Disable and save the relay configuration to remove the relay option from the wel
 ## 🧾 Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
+
+#### Screen sharing and connection reliability
+
+- Fixed negotiation and video-track handling for screen sharing between browsers and native TeamSpeak clients.
+- Improved handling of rapid channel switches to reduce inconsistent client state.
+- Fixed content rendering in some skin components and localization in the KAAK skin.
+
+#### Interface improvements
+
+- Audio device names now display in full and wrap when space is limited, making long names easier to distinguish.
+- Fixed avatar fallback text being selected unintentionally.
 
 ### [v0.2.7](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.7) · 2026-10-13
 

@@ -27,6 +27,25 @@
   visibility: hidden;
 }
 
+.rail-avatar,
+.server-avatar,
+.profile-avatar,
+.dock-avatar,
+.mini-avatar,
+.favorite-server-avatar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:deep(.voice-avatar),
+:deep(.member-avatar),
+:deep(.message-avatar),
+:deep(.screen-share-player-viewer-avatar),
+:deep(.ws-voice-channel-member-avatar) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .join-page {
   min-height: 100dvh;
   display: flex;
@@ -3210,10 +3229,12 @@
 }
 
 :deep(.settings-select-label) {
+  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 :deep(.settings-select-chevron) {
@@ -3235,6 +3256,8 @@
   position: fixed;
   z-index: 24;
   box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   margin: 0;
   padding: 4px 0;
   overflow-x: hidden;
@@ -3248,10 +3271,13 @@
 }
 
 :deep(.settings-select-option) {
-  display: flex;
-  align-items: center;
+  display: block;
+  box-sizing: border-box;
   min-height: 32px;
   padding: 0 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
   cursor: pointer;
   transition: background-color .12s ease;
 }

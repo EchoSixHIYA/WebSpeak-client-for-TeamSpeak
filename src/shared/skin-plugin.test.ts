@@ -147,6 +147,25 @@ test("server list skins may display only the host-provided TeamSpeak icon image"
   errorCode(() => parseSkinPluginDocument(document), "SKIN_PLUGIN_ATTRIBUTE_INVALID");
 });
 
+test("skin-owned localization messages are available without adding host permissions", () => {
+  const document = validDocument();
+  document.schemaVersion = 3;
+  document.components[0].name = "{{skin.messages.demo.title}}";
+  document.components[0].accessibleName = "{{skin.messages.accessibleName}}";
+  document.components[0].permissions = [];
+  document.components[0].actions = {};
+  document.components[0].root = {
+    tag: "section",
+    attributes: { "aria-label": "{{skin.messages.demo.accessibility.label}}" },
+    children: [{ text: "{{skin.messages.demo.greeting}}" }],
+  };
+
+  const component = parseSkinPluginDocument(document).components[0];
+  assert.equal(component.name, "{{skin.messages.demo.title}}");
+  assert.equal(component.accessibleName, "{{skin.messages.accessibleName}}");
+  assert.equal(component.root.children?.[0].text, "{{skin.messages.demo.greeting}}");
+});
+
 test("chat panel visibility is host-controlled and its toggle requires chat access", () => {
   const document = validDocument();
   document.schemaVersion = 3;

@@ -112,6 +112,7 @@ export class TSClient extends EventEmitter {
   private inputState = { muted: false, accompaniment: false };
   private syncedInputMuted: boolean | null = null;
   private inputStateQueue: Promise<void> = Promise.resolve();
+  private channelSwitchQueue: Promise<void> = Promise.resolve();
   private preferredChannelId = 0n;
   private accelerationClient: AccelerationRelayClient | null = null;
   private readonly channelCapacities = new Map<bigint, ChannelCapacity>();
@@ -553,9 +554,24 @@ export class TSClient extends EventEmitter {
   }
 
   async switchChannel(channelId: bigint, password?: string): Promise<void> {
-    if (!this.client || !this.connected) return;
-    await tsClientMove(this.client, this.clientId, channelId, password);
-    this.preferredChannelId = channelId;
+    const client = this.client;
+    if (!client) throw new Error("TeamSpeak session is not ready");
+    const clientId = this.clientId;
+    const generation = this.connectionGeneration;
+    const isCurrent = () => client !== null && this.client === client && this.connected && this.connectionGeneration === generation;
+    const move = async () => {
+      if (!isCurrent()) throw new Error("TeamSpeak session is not ready");
+      await tsClientMove(client, clientId, channelId, password);
+      if (!isCurrent()) throw new Error("TeamSpeak session changed while switching channels");
+      this.preferredChannelId = channelId;
+    };
+
+    // Rapid clicks used to issue overlapping clientmove commands. The SDK and
+    // TeamSpeak server both treat these as stateful session operations, so wait
+    // for each acknowledgement before sending the next move.
+    const operation = this.channelSwitchQueue.then(move, move);
+    this.channelSwitchQueue = operation.catch(() => undefined);
+    return operation;
   }
 
   /** Move another visible TeamSpeak client; the server enforces both move powers. */

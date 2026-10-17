@@ -96,15 +96,31 @@ function updateMenuPosition(): void {
   const menuElement = menu.value;
   if (!rect || !menuElement || typeof window === "undefined") return;
 
+  // Measure the menu at its content width first. The viewport cap lets long
+  // device names wrap only when the full label cannot fit on screen.
+  const maxWidth = Math.max(0, window.innerWidth - 16);
+  const minWidth = Math.min(rect.width, maxWidth);
+  menuElement.style.width = "max-content";
+  menuElement.style.minWidth = `${minWidth}px`;
+  menuElement.style.maxWidth = `${maxWidth}px`;
+  const naturalMenuWidth = menuElement.getBoundingClientRect().width;
+
   const computedStyle = window.getComputedStyle(menuElement);
   const borderHeight = Number.parseFloat(computedStyle.borderTopWidth || "0") + Number.parseFloat(computedStyle.borderBottomWidth || "0");
   const naturalMenuHeight = menuElement.scrollHeight + (Number.isFinite(borderHeight) ? borderHeight : 0);
-  const placement = placeAudioDeviceMenu(rect, { width: window.innerWidth, height: window.innerHeight }, naturalMenuHeight);
+  const placement = placeAudioDeviceMenu(
+    rect,
+    { width: window.innerWidth, height: window.innerHeight },
+    naturalMenuHeight,
+    naturalMenuWidth,
+  );
 
   menuStyle.value = {
     top: `${placement.top}px`,
     left: `${placement.left}px`,
     width: `${placement.width}px`,
+    minWidth: `${minWidth}px`,
+    maxWidth: `${maxWidth}px`,
     maxHeight: `${placement.maxHeight}px`,
   };
 }

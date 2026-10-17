@@ -3047,13 +3047,15 @@
   min-height: 40px;
 }
 [data-ws-part="voice.audio-settings"] .settings-select-option {
-  height: 32px;
+  height: auto;
   min-height: 32px;
   margin-bottom: 2px;
-  padding-inline: 8px;
+  padding: 6px 8px;
   color: #e6eaf0;
   font-size: 14px;
-  line-height: 32px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
   border-radius: 8px;
 }
 [data-ws-part="voice.audio-settings"] .settings-select-option:last-child { margin-bottom: 0; }

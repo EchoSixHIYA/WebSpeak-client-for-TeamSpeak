@@ -34,6 +34,30 @@ test("device menu width stays inside narrow viewport bounds", () => {
   );
 });
 
+test("device menu grows to fit long device labels when there is room", () => {
+  assert.deepEqual(
+    placeAudioDeviceMenu(
+      { top: 20, bottom: 40, left: 40, width: 180 },
+      { width: 1280, height: 720 },
+      120,
+      420,
+    ),
+    { top: 44, left: 40, width: 420, maxHeight: 120 },
+  );
+});
+
+test("device menu caps long labels to the viewport and allows them to wrap", () => {
+  assert.deepEqual(
+    placeAudioDeviceMenu(
+      { top: 20, bottom: 40, left: 200, width: 90 },
+      { width: 300, height: 720 },
+      320,
+      600,
+    ),
+    { top: 44, left: 8, width: 284, maxHeight: 240 },
+  );
+});
+
 test("device menu preserves the skin-defined natural height for short lists", () => {
   assert.deepEqual(
     placeAudioDeviceMenu({ top: 80, bottom: 120, left: 40, width: 280 }, { width: 1280, height: 720 }, 84),

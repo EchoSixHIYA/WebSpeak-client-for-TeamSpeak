@@ -3,6 +3,13 @@ import { parseScreenShareStream, parseScreenShareViewers, type ServerMessage } f
 import { normalizeScreenShareIceServers, type ScreenShareIceServer, type ScreenShareClientMessage, type ScreenShareStreamDescription as ScreenShareStream, type ScreenSharePeerSignal as ScreenShareSignal } from "../../../src/shared/screen-share.js";
 
 const SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS = 15_000;
+const SCREEN_SHARE_DIAGNOSTICS_ENABLED = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("debugScreenShare") === "1";
+
+function traceScreenShare(event: string, details: Record<string, string | number | boolean | null> = {}): void {
+  if (!SCREEN_SHARE_DIAGNOSTICS_ENABLED) return;
+  console.info("[WebSpeak screen-share]", { event, ...details });
+}
 
 export interface ScreenShareOutputSettings {
   maxWidth?: number;
@@ -78,13 +85,21 @@ export function createScreenShareController(transport: ScreenShareTransport) {
   const screenSharePendingIce = new Map<string, RTCIceCandidateInit[]>();
   const screenSharePeerStreams = new Map<string, MediaStream>();
   const screenSharePeerTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const screenShareLoggedIcePeers = new Set<string>();
   let screenShareRequestSequence = 0;
   let screenSharePendingStartId = "";
   let screenShareStartCancelled = false;
   let screenShareStartGeneration = 0;
 
   function sendScreenShareMessage(message: ScreenShareClientMessage): void {
-    if (transport.isOpen()) transport.send(message);
+    if (transport.isOpen()) {
+      transport.send(message);
+      if (message.type === "screenShareSignal" && message.signal.kind !== "iceCandidate") {
+        traceScreenShare("signal-sent", { streamId: message.streamId, peerId: message.targetPeerId, signalKind: message.signal.kind });
+      }
+    } else if (message.type === "screenShareSignal") {
+      traceScreenShare("signal-dropped-transport-closed", { streamId: message.streamId, peerId: message.targetPeerId, signalKind: message.signal.kind });
+    }
   }
 
   type ScreenShareStatsRecord = Record<string, unknown>;
@@ -247,6 +262,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     screenSharePeerTimers.set(peerId, setTimeout(() => {
       screenSharePeerTimers.delete(peerId);
       if (!screenSharePeers.has(peerId)) return;
+      traceScreenShare("negotiation-timeout", { peerId });
       failScreenSharePeer(peerId, "屏幕共享直连协商超时，请确认双方网络允许浏览器直连");
     }, SCREEN_SHARE_NEGOTIATION_TIMEOUT_MS));
   }
@@ -258,6 +274,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     screenSharePeerRoles.delete(peerId);
     screenShareStatsPrevious.delete(peerId);
     screenSharePendingIce.delete(peerId);
+    screenShareLoggedIcePeers.delete(peerId);
     screenSharePeerStreams.get(peerId)?.getTracks().forEach(track => track.stop());
     screenSharePeerStreams.delete(peerId);
     if (peer) {
@@ -289,6 +306,11 @@ export function createScreenShareController(transport: ScreenShareTransport) {
   function failScreenSharePeer(peerId: string, message?: string): void {
     const viewingStream = screenShareStreams.find((stream) => stream.streamId === screenShareViewingStreamId.value && stream.ownerPeerId === peerId);
     if (viewingStream) sendScreenShareMessage({ type: "screenShareLeave", streamId: viewingStream.streamId });
+    traceScreenShare("peer-failed", {
+      peerId,
+      streamId: viewingStream?.streamId ?? screenShareStreams.find((stream) => stream.streamId === screenShareActiveStreamId.value)?.streamId ?? null,
+      message: message ?? null,
+    });
     closeScreenSharePeer(peerId);
     if (viewingStream) {
       screenShareViewingStreamId.value = "";
@@ -303,13 +325,26 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     // STUN discovers server-reflexive candidates; it does not carry media.
     // TURN is accepted only when explicitly configured by the deployment, and
     // would use that external TURN service rather than the WebSpeak gateway.
-    const peer = new RTCPeerConnection({ iceServers: screenShareIceServers });
+    let peer: RTCPeerConnection;
+    try {
+      peer = new RTCPeerConnection({ iceServers: screenShareIceServers });
+    } catch (error: unknown) {
+      traceScreenShare("peer-create-failed", { streamId, peerId, role, errorName: error instanceof Error ? error.name : "unknown" });
+      throw error;
+    }
     screenSharePeers.set(peerId, peer);
     screenSharePeerRoles.set(peerId, role);
     startScreenShareStatsPolling();
+    traceScreenShare("peer-created", { streamId, peerId, role });
     if (role === "owner") {
-      for (const track of screenShareLocalStream?.getTracks() ?? []) {
+      // Match TeamSpeak's screen-share offer shape: video is MID 0, optional
+      // audio follows it, and a publisher only sends media.
+      const localTracks = [...(screenShareLocalStream?.getTracks() ?? [])];
+      localTracks.sort((left, right) => left.kind === right.kind ? 0 : left.kind === "video" ? -1 : 1);
+      for (const track of localTracks) {
         const sender = peer.addTrack(track, screenShareLocalStream!);
+        const transceiver = peer.getTransceivers().find((candidate) => candidate.sender === sender);
+        if (transceiver) transceiver.direction = "sendonly";
         if (track.kind === "video") void configureScreenShareVideoSender(sender, track);
       }
     } else {
@@ -317,10 +352,18 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
       if (stream?.audio) peer.addTransceiver("audio", { direction: "recvonly" });
     }
-    preferScreenShareCodecs(peer);
+    // TeamSpeak's native receiver logs show that its decoder rejects the
+    // H.264 constrained-baseline profile advertised by browsers. Prefer the
+    // universally supported VP8 profile for browser-to-native peers, while
+    // keeping the higher-quality codec order for browser-to-browser sharing.
+    preferScreenShareCodecs(peer, role === "owner" && peerId.startsWith("ts-viewer-"));
     peer.onicecandidate = (event) => {
       if (!isCurrentPeer(peerId, peer) || !event.candidate) return;
       const candidate = event.candidate;
+      if (!screenShareLoggedIcePeers.has(peerId)) {
+        screenShareLoggedIcePeers.add(peerId);
+        traceScreenShare("first-ice-candidate-sent", { streamId, peerId, role });
+      }
       sendScreenShareMessage({
         type: "screenShareSignal",
         streamId,
@@ -335,6 +378,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     };
     peer.ontrack = (event) => {
       if (!isCurrentPeer(peerId, peer) || role !== "viewer") return;
+      traceScreenShare("remote-track-received", { streamId, peerId, role, kind: event.track.kind, readyState: event.track.readyState });
       clearScreenSharePeerTimer(peerId);
       const remote = event.streams[0] ?? screenSharePeerStreams.get(peerId) ?? new MediaStream();
       if (!event.streams[0]) remote.addTrack(event.track);
@@ -343,6 +387,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     };
     peer.onconnectionstatechange = () => {
       if (!isCurrentPeer(peerId, peer)) return;
+      traceScreenShare("connection-state", { streamId, peerId, role, state: peer.connectionState });
       // `completed` belongs to RTCIceConnectionState, not the aggregate
       // RTCPeerConnection.connectionState. Treating it as a connection state
       // both trips the type checker and can hide the actual failed/closed
@@ -353,6 +398,10 @@ export function createScreenShareController(transport: ScreenShareTransport) {
         failScreenSharePeer(peerId);
       }
       if (peer.connectionState === "closed" && screenSharePeers.get(peerId) === peer) closeScreenSharePeer(peerId);
+    };
+    peer.oniceconnectionstatechange = () => {
+      if (!isCurrentPeer(peerId, peer)) return;
+      traceScreenShare("ice-connection-state", { streamId, peerId, role, state: peer.iceConnectionState });
     };
     return peer;
   }
@@ -411,14 +460,17 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     }
   }
 
-  function preferScreenShareCodecs(peer: RTCPeerConnection): void {
+  function preferScreenShareCodecs(peer: RTCPeerConnection, preferNativeCompatibility = false): void {
     const transceiver = peer.getTransceivers().find((candidate) => candidate.sender.track?.kind === "video" || candidate.receiver.track?.kind === "video");
     const capabilities = typeof RTCRtpSender !== "undefined" ? RTCRtpSender.getCapabilities?.("video") : null;
     if (!transceiver?.setCodecPreferences || !capabilities?.codecs?.length) return;
-    // Prefer H.264/AV1 for screen content: both compress text/UI far better
-    // than VP8 at the bitrates typical of relayed screen shares. VP8 stays as
-    // a fallback when neither is available.
-    const preferred = ["video/h264", "video/av1", "video/vp8"].flatMap((mimeType) =>
+    // Prefer H.264/AV1 for browser peers. TeamSpeak's native receiver logs
+    // show that its decoder rejects the browser H.264 profile, so put VP8
+    // first when the viewer is a native TeamSpeak client.
+    const codecOrder = preferNativeCompatibility
+      ? ["video/vp8", "video/h264", "video/av1"]
+      : ["video/h264", "video/av1", "video/vp8"];
+    const preferred = codecOrder.flatMap((mimeType) =>
       capabilities.codecs.filter((codec) => codec.mimeType.toLowerCase() === mimeType),
     );
     if (!preferred.length) return;
@@ -465,7 +517,18 @@ export function createScreenShareController(transport: ScreenShareTransport) {
 
   async function startNativeScreenShareViewer(streamId: string, peerId: string): Promise<void> {
     const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
-    if (!stream || stream.source !== "browser" || screenShareActiveStreamId.value !== streamId || stream.ownerPeerId !== screenShareLocalPeerId()) return;
+    if (!stream || stream.source !== "browser" || screenShareActiveStreamId.value !== streamId || stream.ownerPeerId !== screenShareLocalPeerId()) {
+      traceScreenShare("native-viewer-request-ignored", {
+        streamId,
+        peerId,
+        streamFound: Boolean(stream),
+        streamSource: stream?.source ?? null,
+        activeStreamMatches: screenShareActiveStreamId.value === streamId,
+        ownerMatchesLocalPeer: stream?.ownerPeerId === screenShareLocalPeerId(),
+      });
+      return;
+    }
+    traceScreenShare("native-viewer-request-accepted", { streamId, peerId });
     closeScreenSharePeer(peerId);
     const peer = createScreenSharePeer(streamId, peerId, "owner");
     try {
@@ -474,20 +537,26 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       await peer.setLocalDescription(offer);
       if (!isCurrentPeer(peerId, peer)) return;
       armScreenSharePeerTimer(peerId);
+      traceScreenShare("native-viewer-offer-ready", { streamId, peerId });
       sendScreenShareMessage({
         type: "screenShareSignal",
         streamId,
         targetPeerId: peerId,
         signal: { kind: "offer", sdp: peer.localDescription?.sdp ?? offer.sdp ?? "" },
       });
-    } catch {
+    } catch (error: unknown) {
+      traceScreenShare("native-viewer-offer-failed", { streamId, peerId, errorName: error instanceof Error ? error.name : "unknown" });
       if (isCurrentPeer(peerId, peer)) failScreenSharePeer(peerId, "无法为 TeamSpeak 观看端创建屏幕共享直连");
     }
   }
 
   async function handleScreenShareSignal(streamId: string, fromPeerId: string, signal: ScreenShareSignal): Promise<void> {
+    traceScreenShare("signal-received", { streamId, peerId: fromPeerId, signalKind: signal.kind });
     const stream = screenShareStreams.find((candidate) => candidate.streamId === streamId);
-    if (!stream) return;
+    if (!stream) {
+      traceScreenShare("signal-ignored-stream-not-found", { streamId, peerId: fromPeerId, signalKind: signal.kind });
+      return;
+    }
     if (signal.kind === "close") {
       closeScreenSharePeer(fromPeerId);
       if (screenShareViewingStreamId.value === streamId) {
@@ -764,12 +833,24 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       }
       case "screenShareNativeViewerJoined":
         if (typeof msg.streamId === "string" && typeof msg.viewerPeerId === "string") {
+          traceScreenShare("native-viewer-joined-event", { streamId: msg.streamId, peerId: msg.viewerPeerId });
           void startNativeScreenShareViewer(msg.streamId, msg.viewerPeerId);
+        } else {
+          traceScreenShare("native-viewer-joined-event-invalid", {
+            hasStreamId: typeof msg.streamId === "string",
+            hasPeerId: typeof msg.viewerPeerId === "string",
+          });
         }
         break;
       case "screenShareSignal":
         if (typeof msg.streamId === "string" && typeof msg.fromPeerId === "string" && msg.signal) {
           void handleScreenShareSignal(msg.streamId, msg.fromPeerId, msg.signal as ScreenShareSignal);
+        } else {
+          traceScreenShare("signal-event-invalid", {
+            hasStreamId: typeof msg.streamId === "string",
+            hasPeerId: typeof msg.fromPeerId === "string",
+            hasSignal: Boolean(msg.signal),
+          });
         }
         break;
       case "screenShareViewerLeft":

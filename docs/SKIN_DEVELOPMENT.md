@@ -261,6 +261,8 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 `content.json` 完全可选。WebSpeak 自带中文、英语、德语、俄语和日语的基础内容，因此纯美术皮肤无需复制翻译文件。若希望为皮肤定制部分文案，可按 locale 覆盖连接首页内容和公开界面文案；未定义的语言、字段或翻译键会回退到 WebSpeak 内容，不要求皮肤重复提供整套文字。当前允许 1–20 个 locale，locale 写作 `en`、`zh-CN`、`ja-JP` 等形式。`defaultLocale` 必须指向一个已定义的 locale。示例：
 
+声明式 `components.json` 也可以显示皮肤自己的多语言文案。文本节点、字符串属性，以及组件 `name` / `accessibleName` 可使用 `{{skin.messages.<key>}}` 绑定。WebSpeak 会把皮肤 `content.json` 中 `defaultLocale`、当前语言代码和完整语言代码的 `messages` 合并到 `skin.messages`，当前语言内容覆盖默认文案；这个绑定适用于首页、语音页和 Demo 页的声明式组件。没有匹配的 key 会显示为空字符串，因此组件引用的 key 应在默认语言中提供。该本地化路径只提供皮肤包自身的文案，不会扩展 Wasm 插件的权限化运行时数据。
+
 ```json
 {
   "defaultLocale": "en",
