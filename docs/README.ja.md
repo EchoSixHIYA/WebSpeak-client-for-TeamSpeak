@@ -23,7 +23,7 @@
 
 | 機能 | 説明 |
 | --- | --- |
-| TeamSpeak | TeamSpeak 3 / 6 に対応し、対象プロトコルを自動検出します。 |
+| TeamSpeak | TeamSpeak 3 / 6 に対応し、サーバーのバージョンから対象プロトコルを自動検出します。 |
 | クロスプラットフォーム P2P 画面共有 | ブラウザユーザーと TeamSpeak 6 ネイティブクライアントが互いに画面共有を開始・視聴できます。メディアは WebRTC/ICE で直接送信し、WebSpeak はシグナリングだけを中継します。 |
 | IPv6 | IPv6 の接続先と DNS から解決された IPv6 アドレスに標準対応します。 |
 | チャンネルとメンバー | チャンネルツリー、リアルタイムのメンバー状態、チャンネル移動。 |
@@ -38,6 +38,15 @@
 | スキン | 保護された昼・夜・ILLUSIA スキンに加え、管理者が有効化とデフォルトを管理するインスタンス `.wskin` に対応。 |
 | インターフェース | 中文、English、Deutsch、Русский、日本語、レスポンシブ表示。 |
 | デプロイ | Windows x64、Linux x64/ARM64 パッケージ、Docker amd64/arm64、Android arm64-v8a・armeabi-v7a・x86_64 APK。 |
+
+## TeamSpeak のバージョン互換性
+
+WebSpeak は ServerQuery / WebQuery ではなく、標準の TeamSpeak クライアントプロトコルで接続するため、Query の認証情報は不要です。
+
+- **TeamSpeak 3**: 先頭の `3.x` バージョンを使ってプロトコルを判定します。すべての旧バージョンを個別に検証しているわけではないため、古いサーバーは実際の環境で確認してください。
+- **TeamSpeak 6**: 対応しています。TeamSpeak 6 ネイティブクライアントとの画面共有も可能です。
+- **自動検出**: ゲートウェイはサーバーの `version` 応答を読み取り、接続診断に判定結果を記録します。
+- [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) ライブラリは TeamSpeak 5 も扱えますが、WebSpeak の対象は TeamSpeak 3 と 6 です。
 
 ## 🖼️ インターフェースのスクリーンショット
 

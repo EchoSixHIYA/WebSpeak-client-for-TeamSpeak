@@ -153,7 +153,13 @@ export class TeamSpeakAdapter {
 
 export function detectTeamSpeakProtocol(versionText: string): TeamSpeakProtocol | null {
   const text = versionText.trim().toLowerCase();
-  if (/teamspeak\s*6|(?:^|\D)6\.\d+/.test(text)) return "ts6";
-  if (/teamspeak\s*3|(?:^|\D)3\.\d+/.test(text)) return "ts3";
+  // The `version` command starts with the server version, optionally preceded
+  // by the product name. Match only that leading major version: scanning the
+  // whole string mistakes TeamSpeak 3.6.7 for TeamSpeak 6.
+  const match = /^(?:teamspeak\s*)?(\d+)/.exec(text);
+  if (!match) return null;
+  const major = Number(match[1]);
+  if (major === 6) return "ts6";
+  if (major === 3) return "ts3";
   return null;
 }
