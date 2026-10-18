@@ -48,6 +48,8 @@ test("screen-share player fills the content width, limits height, and letterboxe
   const playerRule = css.match(/:deep\(\.screen-share-player\)\s*\{([^}]*)\}/)?.[1] ?? "";
   const stageRule = css.match(/:deep\(\.screen-share-player-stage\)\s*\{([^}]*)\}/)?.[1] ?? "";
   const videoRule = css.match(/:deep\(\.screen-share-player-video\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  const fullscreenRule = css.match(/:deep\(\.screen-share-player:fullscreen\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  const fullscreenStageRule = css.match(/:deep\(\.screen-share-player:fullscreen \.screen-share-player-stage\)\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.match(playerRule, /width:\s*100%/);
   assert.doesNotMatch(playerRule, /width:\s*fit-content/);
   assert.match(stageRule, /width:\s*100%/);
@@ -55,6 +57,14 @@ test("screen-share player fills the content width, limits height, and letterboxe
   assert.match(stageRule, /background:\s*#000/);
   assert.match(videoRule, /object-fit:\s*contain/);
   assert.match(videoRule, /background:\s*#000/);
+  assert.match(fullscreenRule, /position:\s*fixed/);
+  assert.match(fullscreenRule, /inset:\s*0/);
+  assert.match(fullscreenRule, /height:\s*100dvh/);
+  assert.match(fullscreenRule, /background:\s*#000/);
+  assert.match(fullscreenStageRule, /height:\s*100%/);
+  assert.match(fullscreenStageRule, /min-height:\s*0/);
+  assert.match(component, /document\.addEventListener\("fullscreenchange", updateStageSize\)/);
+  assert.match(component, /document\.fullscreenElement === player/);
   assert.doesNotMatch(component, /video\.video(?:Width|Height)/, "source dimensions must not resize the player stage");
   assert.doesNotMatch(component, /ResizeObserver/, "player sizing must not create a resize-feedback loop while video starts");
   assert.match(component, /if \(playerElement\.value === next\) return;/, "stable function refs must not rewrite player styles on every render");

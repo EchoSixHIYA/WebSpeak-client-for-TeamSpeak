@@ -138,18 +138,35 @@ function updateStageSize(): void {
   const stage = stageElement.value;
   const player = playerElement.value ?? stage?.parentElement ?? null;
   if (!stage || !player) return;
-  if (screenShareFullscreen.value) {
+  // Read the browser's fullscreen element directly. The Vue state is updated
+  // by a separate fullscreenchange listener and can lag the layout transition.
+  if (typeof document !== "undefined" && document.fullscreenElement === player) {
+    const fullscreenHeight = typeof CSS !== "undefined" && CSS.supports("height", "100dvh") ? "100dvh" : "100vh";
+    setInlineStyle(player, "position", "fixed");
+    setInlineStyle(player, "inset", "0");
     setInlineStyle(player, "width", "100vw");
-    setInlineStyle(player, "height", "100vh");
+    setInlineStyle(player, "height", fullscreenHeight);
+    setInlineStyle(player, "max-width", "none");
+    setInlineStyle(player, "max-height", "none");
+    setInlineStyle(player, "margin", "0");
     setInlineStyle(stage, "width", "100%");
     setInlineStyle(stage, "height", "100%");
+    setInlineStyle(stage, "min-height", "0");
+    setInlineStyle(stage, "max-height", "none");
     setInlineStyle(stage, "aspect-ratio", "auto");
     return;
   }
+  setInlineStyle(player, "position", null);
+  setInlineStyle(player, "inset", null);
   setInlineStyle(player, "width", null);
   setInlineStyle(player, "height", null);
+  setInlineStyle(player, "max-width", null);
+  setInlineStyle(player, "max-height", null);
+  setInlineStyle(player, "margin", null);
   setInlineStyle(stage, "width", null);
   setInlineStyle(stage, "height", null);
+  setInlineStyle(stage, "min-height", null);
+  setInlineStyle(stage, "max-height", null);
   setInlineStyle(stage, "aspect-ratio", "auto");
 }
 
@@ -168,9 +185,13 @@ function setStageElement(element: unknown): void {
   updateStageSize();
 }
 
-onMounted(() => window.addEventListener("resize", updateStageSize));
+onMounted(() => {
+  window.addEventListener("resize", updateStageSize);
+  document.addEventListener("fullscreenchange", updateStageSize);
+});
 watch(screenShareFullscreen, updateStageSize);
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateStageSize);
+  document.removeEventListener("fullscreenchange", updateStageSize);
 });
 </script>
