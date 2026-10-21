@@ -55,6 +55,19 @@
       @restore-skin="switchToBuiltIn"
     />
     <!-- Connection / welcome screen -->
+    <aside
+      v-if="kookWorkspace.active.value && !voiceState.connected && !favoriteServerDialogOpen && !serverPasswordDialog.open"
+      class="kook-connection-status"
+      data-ws-part="voice.connection-status"
+      role="status"
+    >
+      <span>{{ voiceState.connecting || voiceState.reconnecting ? t('connecting') : localizedMessage(voiceState.error) || t('voiceHealthDisconnected') }}</span>
+      <button
+        type="button"
+        :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting || voiceState.reconnecting"
+        @click="doConnect"
+      >{{ t('reconnectNow') }}</button>
+    </aside>
     <section
       v-if="!showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       class="join-page"
@@ -995,6 +1008,7 @@ import { useWebClientServerHistory } from "../composables/useWebClientServerHist
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
 import { isQuickServerAddressLabel, quickServerTargetsEqual, type QuickServer } from "../services/quick-servers.js";
+import { useKookWorkspace } from "../composables/useKookWorkspace.js";
 import { requestIdentityProviderLogin as dispatchIdentityProviderLogin } from "../services/identity-provider.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
@@ -1165,6 +1179,7 @@ const {
 } = useWebClientIdentity({ identityMaterial, rememberIdentity, t, showToast });
 const {
   quickServers,
+  recentServers,
   isFavorite,
   loadSavedServers,
   recordCurrentServer,
@@ -1423,7 +1438,12 @@ const {
   t,
 });
 
+const kookWorkspace = useKookWorkspace({
+  skinId: activeSkinId,
+  connected: computed(() => voiceState.connected),
+});
 const showVoiceShell = computed(() => Boolean(
+  kookWorkspace.active.value ||
   voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
   || favoriteSwitchPending.value || favoriteSwitchFailed.value,
 ));
@@ -1455,6 +1475,7 @@ const quickServersForDisplay = computed(() => quickServers.value.map((server) =>
 }));
 
 function connectQuickServer(server: QuickServer): void {
+  if (serverConfigLoading.value || !identityReady.value) return;
   if ((voiceState.connecting || voiceState.connected) && isQuickServerTarget(server)) return;
   if (accessMode.value !== "open") {
     showToast(t("serverSwitchRestricted"));
@@ -1483,8 +1504,11 @@ function beginFavoriteConnection(): void {
   favoriteSwitchPending.value = true;
   favoriteSwitchFailed.value = false;
   favoriteSwitchError.value = "";
+  if (!canJoin.value) {
+    failFavoriteConnection(t("quickConnectFailed"));
+    return;
+  }
   doConnect();
-  if (!voiceState.connecting && !voiceState.connected) failFavoriteConnection(t("quickConnectFailed"));
 }
 
 function failFavoriteConnection(message: string): void {
@@ -1514,12 +1538,12 @@ function openFavoriteServerDialog(): void {
     showToast(t("serverFeatureAdminDisabled"));
     return;
   }
-  if (!showVoiceShell.value || voiceState.connecting || favoriteDialogBusy.value) return;
+  if (!showVoiceShell.value || serverConfigLoading.value || !identityReady.value || voiceState.connecting || favoriteDialogBusy.value) return;
   favoriteServerDialogOpen.value = true;
 }
 
 async function submitFavoriteServerDraft(draft: FavoriteServerDraft): Promise<void> {
-  if (favoriteDialogBusy.value || voiceState.connecting || accessMode.value !== "open") return;
+  if (favoriteDialogBusy.value || serverConfigLoading.value || !identityReady.value || voiceState.connecting || accessMode.value !== "open") return;
   const port = draft.port || DEFAULT_TEAM_SPEAK_PORT;
   if (!draft.address || !draft.nickname || !isValidTeamSpeakPort(port)) {
     showToast(t("quickConnectFailed"));
@@ -2102,10 +2126,15 @@ onMounted(() => {
   // The selected skin is applied to this public root, never to the admin DOM.
   applyTheme(themeMode.value);
   browserError.value = checkSupport() ?? "";
-  void loadPublicConfig();
-  void initializeSkin();
-  void loadLocalPreferences().then((preferences) => {
+  void Promise.all([loadPublicConfig(), initializeSkin(), loadSavedServers(), loadLocalPreferences()]).then(([, , , preferences]) => {
     if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de" || preferences.language === "ru" || preferences.language === "ja")) language.value = preferences.language;
+    if (!nickname.value.trim() && preferences.lastNickname) nickname.value = preferences.lastNickname;
+    kookWorkspace.restore(preferences, recentServers.value);
+    const hasInvite = ["invite", "server", "target", "tsHost", "tsPort", "channel"].some((key) => query.has(key));
+    if (kookWorkspace.active.value && !hasInvite && accessMode.value === "open" && !voiceState.connected && !voiceState.connecting) {
+      const latest = recentServers.value[0];
+      if (latest) selectLocalServer(latest.address, latest.nickname, latest.lastChannelHint?.name);
+    }
   });
   void restoreIdentity(async () => {
     const stored = await loadStoredIdentity();
@@ -2113,7 +2142,6 @@ onMounted(() => {
   }).finally(() => {
     identityReady.value = true;
   });
-  void loadSavedServers();
   deviceChangeHandler = () => { void refreshAudioDevices().catch(() => undefined); };
   navigator.mediaDevices?.addEventListener("devicechange", deviceChangeHandler);
   viewportMediaQuery = window.matchMedia("(max-width: 740px)");
@@ -2162,6 +2190,7 @@ async function clearBrowserData(): Promise<void> {
   resetIdentityOperations();
   publicSkin.cancel();
   await clearStoredLocalData();
+  kookWorkspace.reset();
   for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:theme", "webspeak:active-skin", "webspeak:skin-choice", "webspeak:input-device", "webspeak:output-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
   await publicSkin.reset();
   identityMaterial.value = "";

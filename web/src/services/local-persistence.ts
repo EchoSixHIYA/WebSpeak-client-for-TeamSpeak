@@ -154,6 +154,7 @@ export interface LocalPreferences {
   outputVolume?: number;
   notificationVolume?: number;
   lastNickname?: string;
+  hasConnected?: boolean;
   inputDeviceId?: string;
   volumesByUid?: Record<string, number>;
 }
