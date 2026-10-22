@@ -1,14 +1,17 @@
 import { computed, ref, watch, type Ref } from "vue";
-import { BUILTIN_KAAK_SKIN_ID } from "../services/skin-catalog.js";
+import { BUILTIN_DISCORD_SKIN_ID, BUILTIN_KAAK_SKIN_ID } from "../services/skin-catalog.js";
 import { saveLocalPreferences, type LocalPreferences, type RecentServer } from "../services/local-persistence.js";
 
-/** Keep the KOOK workspace available after the first successful connection. */
+/** Skins whose voice workspace stays open for returning users. */
+const PERSISTENT_WORKSPACE_SKINS = new Set([BUILTIN_KAAK_SKIN_ID, BUILTIN_DISCORD_SKIN_ID]);
+
+/** Keep the KOOK and Discord workspaces available after the first successful connection. */
 export function useKookWorkspace(options: {
   skinId: Readonly<Ref<string>>;
   connected: Readonly<Ref<boolean>>;
 }) {
   const hasConnected = ref(false);
-  const active = computed(() => options.skinId.value === BUILTIN_KAAK_SKIN_ID
+  const active = computed(() => PERSISTENT_WORKSPACE_SKINS.has(options.skinId.value)
     && hasConnected.value);
 
   watch(options.connected, (connected) => {

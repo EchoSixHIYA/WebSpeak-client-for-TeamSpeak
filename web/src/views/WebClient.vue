@@ -270,51 +270,316 @@
           >{{ t("clearLocalData") }}</button
         ><span class="footer-separator">·</span><span>{{ t("browserSupport") }}</span>
       </footer>
-
-      <!-- QQ community modal -->
-      <div
-        v-if="qqModalOpen"
-        class="modal-backdrop qq-modal-backdrop"
-        @click.self="qqModalOpen = false"
-      >
-        <section
-          class="qq-modal-card"
-          data-ws-part="home.community-dialog"
-          role="dialog"
-          aria-modal="true"
-          :aria-labelledby="'qq-group-title'"
-        >
-          <button
-            type="button"
-            class="qq-modal-close"
-            :aria-label="t('close')"
-            :title="t('close')"
-            @click="qqModalOpen = false"
-            ><Icon
-              name="close"
-              :size="19"
-          /></button>
-          <div class="qq-modal-heading"
-            ><span class="card-kicker">{{ t("qqGroup") }}</span
-            ><h2 id="qq-group-title">{{ t("qqGroup") }}</h2></div
-          >
-          <img
-            class="qq-qr-image"
-            src="/qq-group-qr.jpg"
-            :alt="t('qqGroupQrAlt')"
-          />
-          <p class="qq-direct-join">{{ t("qqJoinDirect") }}</p>
-          <a
-            class="qq-join-link"
-            :href="qqJoinUrl"
-            :aria-label="t('joinQqGroup')"
-            target="_blank"
-            rel="noreferrer"
-            >{{ qqJoinUrl }}</a
-          >
-        </section>
-      </div>
     </section>
+
+    <!-- Discord desktop-client replica shell (builtin.discord, desktop only) -->
+    <div
+      v-else-if="showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive && activeSkinId === 'builtin.discord' && !isMobileViewport"
+      :class="['app-shell', 'discord-app-shell', { 'discord-chat-closed': !showDiscordChat }]"
+      data-ws-part="voice.shell"
+      @click="memberMenu = null"
+    >
+      <!-- 1. Server rail -->
+      <nav class="dc-rail" data-ws-part="voice.favorite-servers.rail" :aria-label="t('quickServers')">
+        <div class="dc-rail-list">
+          <div
+            v-for="server in quickServersForDisplay"
+            :key="server.id"
+            :class="['dc-rail-item', { active: isQuickServerTarget(server) }]"
+            data-ws-part="voice.favorite-servers.rail.item"
+            :data-ws-state="server.isFavorite ? 'favorite' : 'recent'"
+          >
+            <span class="dc-rail-pill" aria-hidden="true"></span>
+            <button
+              type="button"
+              :class="['dc-rail-icon', 'dc-rail-server', { active: isQuickServerTarget(server) }]"
+              data-ws-part="voice.favorite-servers.server"
+              :data-ws-state="isQuickServerTarget(server) ? 'current' : 'idle'"
+              :aria-label="t('switchToServer', { server: server.label })"
+              :aria-pressed="isQuickServerTarget(server)"
+              :disabled="voiceState.connecting && isQuickServerTarget(server)"
+              :aria-disabled="!serverCanSwitch(server)"
+              @click.stop="connectQuickServer(server)"
+            >
+              <span class="dc-rail-avatar" :style="server.serverIcon ? undefined : avatarStyle(server.label)"><img v-if="server.serverIcon" :src="server.serverIcon" alt="" aria-hidden="true" /><template v-else>{{ avatarInitial(server.serverName || server.label) }}</template></span>
+            </button>
+            <span class="dc-rail-tooltip" role="tooltip"><strong>{{ server.label }}</strong><small>{{ serverCanSwitch(server) ? server.address : t('serverSwitchRestricted') }}</small></span>
+            <button
+              type="button"
+              :class="['dc-rail-fav', { active: server.isFavorite }]"
+              data-ws-part="voice.favorite-servers.favorite-toggle"
+              :data-ws-state="server.isFavorite ? 'saved' : 'unsaved'"
+              :aria-label="server.isFavorite ? t('removeFavoriteForServer', { server: server.label }) : t('saveFavoriteForServer', { server: server.label })"
+              :title="server.isFavorite ? t('removeFavorite') : t('saveFavorite')"
+              :aria-pressed="server.isFavorite"
+              @click.stop="toggleQuickFavorite(server)"
+            ><Icon name="star" :size="10" /></button>
+          </div>
+        </div>
+        <div class="dc-rail-item">
+          <button type="button" class="dc-rail-icon dc-rail-action" data-ws-part="voice.favorite-servers.add" :title="t('addFavoriteServer')" :aria-label="t('addFavoriteServer')" @click.stop="openFavoriteServerDialog">
+            <Icon name="plus" :size="22" />
+          </button>
+        </div>
+      </nav>
+
+      <!-- 2. Channel sidebar -->
+      <aside class="dc-sidebar" data-ws-part="voice.member-panel">
+        <header class="dc-server-header">
+          <strong :title="currentServerDisplayName">{{ currentServerDisplayName }}</strong>
+          <button
+            v-if="accessMode === 'open'"
+            type="button"
+            :class="['dc-header-icon', { active: isFavorite }]"
+            data-ws-part="voice.favorite-servers.current-toggle"
+            :title="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+            :aria-label="t(isFavorite ? 'removeFavorite' : 'saveFavorite')"
+            :aria-pressed="isFavorite"
+            @click.stop="toggleFavorite"
+          ><Icon name="star" :size="16" /></button>
+          <button type="button" class="dc-header-icon" :title="t('copyInvite')" :aria-label="t('copyInvite')" @click.stop="doShare"><Icon name="users" :size="18" /></button>
+        </header>
+
+        <div class="dc-sidebar-scroll">
+          <div class="dc-category">
+            <Icon name="chevron-down" :size="12" />
+            <span>{{ t('voiceChannels') }}</span>
+          </div>
+          <VoiceChannelTree
+            :channels="channelTree"
+            :current-channel-id="currentChannel?.id"
+            :query="channelTreeSearchQuery"
+            layout="default"
+            :avatar-style="avatarStyle"
+            :avatar-initial="avatarInitial"
+            :is-speaking="isSpeaking"
+            :is-screen-sharing="(m) => Boolean(screenShareControls.streamForMember(m))"
+            :show-member-actions="true"
+            :member-drag-drop="true"
+            :dragged-member-id="memberControls.draggedMember.value?.id ?? null"
+            :drag-over-channel-id="memberControls.dragOverChannelId.value"
+            :t="t"
+            @join="selectChannel"
+            @member-context-menu="({ member, event }) => openMemberMenu(member, event)"
+            @member-drag-start="({ member, event }) => memberControls.onMemberDragStart(member, event)"
+            @member-drag-end="memberControls.onMemberDragEnd()"
+            @channel-drag-over="({ channel, event }) => memberControls.onChannelDragOver(channel, event)"
+            @channel-drag-leave="({ channel, event }) => memberControls.onChannelDragLeave(channel, event)"
+            @channel-drop="({ channel, event }) => memberControls.onChannelDrop(channel, event)"
+          />
+        </div>
+
+        <!-- Voice connected panel -->
+        <section v-if="voiceState.connected" class="dc-connected">
+          <div class="dc-connected-row">
+            <div class="dc-connected-copy">
+              <strong><Icon name="waveform" :size="16" />{{ t('discordVoiceConnected') }}</strong>
+              <small :title="`${currentChannelName} / ${currentServerDisplayName}`">{{ currentChannelName }} / {{ currentServerDisplayName }}</small>
+            </div>
+            <VoicePerformancePanel
+              class="dc-performance"
+              :model="performance"
+              :screen-share-web-rtc-stats="screenShareWebRtcStats"
+              :t="t"
+            />
+            <button type="button" class="dc-connected-icon dc-disconnect" :title="t('exit')" :aria-label="t('exit')" @click.stop="leaveVoiceWorkspace"><Icon name="power" :size="18" /></button>
+          </div>
+          <div class="dc-connected-actions">
+            <button
+              type="button"
+              :class="{ active: screenShareActive }"
+              :title="screenShareActive ? t('stopScreenShare') : t('startScreenShare')"
+              :aria-label="screenShareActive ? t('stopScreenShare') : t('startScreenShare')"
+              :aria-pressed="screenShareActive"
+              @click.stop="screenShareActive ? stopScreenShare() : (screenShareSettingsOpen = true)"
+            ><Icon name="monitor" :size="18" /></button>
+            <button
+              type="button"
+              :class="{ active: accompanimentActive }"
+              :title="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')"
+              :aria-label="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')"
+              :aria-pressed="accompanimentActive"
+              @click.stop="audioControls.toggleAccompaniment()"
+            ><Icon name="music" :size="18" /></button>
+            <button type="button" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click.stop="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+            <button type="button" :title="t('copyInvite')" :aria-label="t('copyInvite')" @click.stop="doShare"><Icon name="share" :size="18" /></button>
+          </div>
+        </section>
+
+        <!-- User bar -->
+        <div class="dc-user-bar" data-ws-part="voice.audio-dock">
+          <button type="button" class="dc-user-info" :title="away ? t('online') : t('away')" :aria-pressed="away" @click.stop="memberControls.toggleAway()">
+            <span class="dc-user-avatar">
+              <i :style="avatarStyle(nickname, true)">{{ avatarInitial(nickname) }}</i>
+              <span :class="['dc-status-dot', { away }]"></span>
+            </span>
+            <span class="dc-user-text">
+              <strong>{{ nickname }}</strong>
+              <small>{{ away ? t('away') : t('online') }}</small>
+            </span>
+          </button>
+          <div class="dc-user-actions">
+            <div class="dc-hover-control" data-ws-part="voice.audio-dock.microphone">
+              <button
+                type="button"
+                :class="['dc-user-btn', { muted: microphoneMuted }]"
+                :title="microphoneMuted ? t('unmuteMic') : t('muteMic')"
+                :aria-label="microphoneMuted ? t('microphoneMuted') : t('microphoneActive')"
+                :aria-pressed="!microphoneMuted"
+                aria-haspopup="dialog"
+                @click.stop="toggleMicrophone"
+              ><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" /></button>
+              <div class="dc-hover-panel" role="dialog" :aria-label="t('microphone')" @click.stop>
+                <div class="dc-slider-heading"><span>{{ t('inputVolume') }}</span><strong>{{ Math.round(inputVolume * 100) }}%</strong></div>
+                <input class="dc-slider" type="range" min="0" max="100" :value="inputVolume * 100" :style="rangeStyle(inputVolume, 1)" :aria-label="t('inputVolume')" @input="audioControls.onInputVolume" />
+                <div class="dc-panel-divider"></div>
+                <label class="dc-switch-row"><span>{{ t('noiseSuppression') }}</span><input type="checkbox" :checked="noiseSuppressionEnabled" :aria-label="t('noiseSuppression')" @change="audioControls.onNoiseSuppressionToggle" /></label>
+              </div>
+            </div>
+            <div class="dc-hover-control" data-ws-part="voice.audio-dock.output">
+              <button
+                type="button"
+                :class="['dc-user-btn', { muted: outputMuted }]"
+                :title="outputMuted ? t('unmuteOutput') : t('muteOutput')"
+                :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')"
+                :aria-pressed="!outputMuted"
+                aria-haspopup="dialog"
+                @click.stop="toggleOutputMute"
+              ><Icon :name="outputMuted ? 'volume-off' : 'headset'" :size="18" /></button>
+              <div class="dc-hover-panel" role="dialog" :aria-label="t('overallVolume')" @click.stop>
+                <div class="dc-slider-heading"><span>{{ t('overallVolume') }}</span><strong>{{ Math.round(outputVolume * 100) }}%</strong></div>
+                <input class="dc-slider" type="range" min="0" max="100" :value="outputVolume * 100" :style="rangeStyle(outputVolume, 1)" :aria-label="t('overallVolume')" @input="audioControls.onOutputVolume" />
+              </div>
+            </div>
+            <button type="button" class="dc-user-btn" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click.stop="settingsOpen = true"><Icon name="settings" :size="18" /></button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 3. Central voice and video stage -->
+      <section ref="discordStageElement" :class="['dc-stage', { 'dc-stage-fullscreen': discordStageFullscreen }]" data-ws-part="voice.workspace">
+        <header class="dc-stage-header" data-ws-part="voice.header">
+          <div class="dc-stage-title">
+            <Icon name="volume" :size="20" />
+            <h2>{{ currentChannelName }}</h2>
+          </div>
+          <div class="dc-stage-header-actions">
+            <SkinSwitcher v-model="activeSkinId" class="workspace-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
+            <LanguageSwitcher v-model="language" class="workspace-language" :menu-label="t('languageMenu')" @change="persistLanguage" />
+            <button
+              type="button"
+              :class="['dc-stage-icon', { active: showDiscordChat }]"
+              :title="showDiscordChat ? t('discordHideChat') : t('discordShowChat')"
+              :aria-label="showDiscordChat ? t('discordHideChat') : t('discordShowChat')"
+              :aria-pressed="showDiscordChat"
+              @click.stop="showDiscordChat = !showDiscordChat"
+            ><Icon name="message" :size="20" /></button>
+          </div>
+        </header>
+
+        <div class="dc-stage-notices">
+          <div v-if="favoriteSwitchPending || favoriteSwitchFailed" :class="['favorite-switch-banner', { failed: favoriteSwitchFailed }]" data-ws-part="voice.favorite-servers.switch-status" :data-ws-state="favoriteSwitchFailed ? 'failed' : 'connecting'" role="status" aria-live="polite">
+            <span class="favorite-switch-indicator"><Icon :name="favoriteSwitchFailed ? 'info' : 'server'" :size="17" /></span>
+            <span class="favorite-switch-copy">
+              <strong>{{ favoriteSwitchFailed ? t('favoriteConnectionFailed', { server: favoriteSwitchLabel }) : t('favoriteSwitching', { server: favoriteSwitchLabel }) }}</strong>
+              <small v-if="favoriteSwitchPending">{{ t('connecting') }}</small>
+              <small v-else>{{ favoriteSwitchError || t('quickConnectFailed') }}</small>
+            </span>
+            <button v-if="favoriteSwitchFailed" type="button" @click="leaveVoiceWorkspace">{{ t('back') }}</button>
+          </div>
+          <div v-if="voiceState.reconnecting || voiceState.reconnectFailed" :class="['reconnect-banner', { failed: voiceState.reconnectFailed }]" data-ws-part="voice.connection-status" role="status">
+            <div class="reconnect-copy"><strong>{{ voiceState.reconnectFailed ? t('reconnectFailed') : t('connectionInterrupted') }}</strong><span v-if="voiceState.reconnecting">{{ t('reconnectingAttempt', { attempt: voiceState.reconnectAttempt }) }}</span><span v-else>{{ localizedMessage(voiceState.error) }}</span></div>
+            <div class="reconnect-actions"><button v-if="voiceState.reconnectFailed" type="button" class="secondary-button" @click="reconnectMobile">{{ t('reconnectNow') }}</button><button type="button" class="text-button" @click="leaveVoiceWorkspace">{{ t('back') }}</button></div>
+          </div>
+          <div v-if="voiceState.audioNotice" class="reconnect-banner degraded" data-ws-part="voice.audio-status" role="status"><div class="reconnect-copy"><strong>{{ t('audioStatus') }}</strong><span>{{ localizedAudioNotice(voiceState.audioNoticeCode, voiceState.audioNotice) }}</span></div></div>
+          <div v-for="poke in visiblePokes" :key="poke.id" class="poke-banner" data-ws-part="voice.poke" role="status"><Icon name="bell" :size="17" /><span><strong>{{ poke.invokerName }}</strong> {{ t('pokedYou') }}<small v-if="poke.message">：{{ poke.message }}</small></span><button type="button" :aria-label="t('close')" @click="dismissPoke(poke.id)"><Icon name="close" :size="15" /></button></div>
+          <div v-if="screenShareError" class="screen-share-inline-error" data-ws-part="voice.screen-share-error" role="status"><Icon name="info" :size="15" /> <span>{{ screenShareErrorText }}</span></div>
+        </div>
+        <div class="dc-stage-canvas" data-ws-part="voice.activity">
+          <ScreenSharePlayer
+            v-if="screenShareViewing"
+            :model="screenShareControls"
+            :screen-share-remote-stream="screenShareRemoteStream"
+            :screen-share-remote-volume="screenShareRemoteVolume"
+            :screen-share-error="screenShareError"
+            :leave-screen-share="leaveScreenShare"
+            :avatar-initial="avatarInitial"
+            :t="t"
+          />
+          <div v-else class="dc-stage-grid">
+            <VoiceMemberCards
+              :current-members="currentMembers"
+              :is-mobile-viewport="false"
+              :show-screen-share="true"
+              :sharing="memberSharingState"
+              :controls="screenShareControls"
+              :is-speaking="isSpeaking"
+              :avatar-style="avatarStyle"
+              :avatar-initial="avatarInitial"
+              :t="t"
+              @member-actions="openMemberActions"
+              @stop-share="stopScreenShare"
+            />
+            <button v-if="voiceState.connected && currentMembers.length <= 1" type="button" class="dc-invite-tile" @click.stop="doShare">
+              <span class="dc-invite-tile-icon"><Icon name="users" :size="28" /></span>
+              <strong>{{ t('discordInviteToVoice') }}</strong>
+            </button>
+          </div>
+          <WhisperControls
+            v-if="whisperTargetIds.size"
+            :targets="whisperTargets"
+            :active="whisperActive"
+            :enabled="true"
+            :controls="audioControls"
+            :t="t"
+            @clear="clearWhisperTargets"
+          />
+        </div>
+
+        <footer class="dc-stage-controls">
+          <div class="dc-stage-controls-side">
+            <button type="button" class="dc-stage-btn subtle" :title="t('discordInviteToVoice')" :aria-label="t('discordInviteToVoice')" @click.stop="doShare"><Icon name="users" :size="20" /></button>
+          </div>
+          <div class="dc-stage-controls-main">
+            <div class="dc-stage-pill">
+              <button type="button" :class="['dc-stage-btn', { danger: microphoneMuted }]" :title="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-label="microphoneMuted ? t('unmuteMic') : t('muteMic')" :aria-pressed="!microphoneMuted" @click.stop="toggleMicrophone"><Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="20" /></button>
+              <button type="button" :class="['dc-stage-btn', { danger: outputMuted }]" :title="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-label="outputMuted ? t('unmuteOutput') : t('muteOutput')" :aria-pressed="!outputMuted" @click.stop="toggleOutputMute"><Icon :name="outputMuted ? 'volume-off' : 'headset'" :size="20" /></button>
+            </div>
+            <div class="dc-stage-pill">
+              <button type="button" :class="['dc-stage-btn', { active: screenShareActive || screenShareStarting }]" :title="screenShareActive ? t('stopScreenShare') : t('startScreenShare')" :aria-label="screenShareActive ? t('stopScreenShare') : t('startScreenShare')" :aria-pressed="screenShareActive" @click.stop="screenShareActive ? stopScreenShare() : (screenShareSettingsOpen = true)"><Icon name="monitor" :size="20" /></button>
+              <button type="button" :class="['dc-stage-btn', { active: accompanimentActive }]" :title="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-label="accompanimentActive ? t('stopAccompaniment') : t('startAccompaniment')" :aria-pressed="accompanimentActive" @click.stop="audioControls.toggleAccompaniment()"><Icon name="music" :size="20" /></button>
+              <button type="button" class="dc-stage-btn" :title="t('audioSettings')" :aria-label="t('audioSettings')" @click.stop="settingsOpen = true"><Icon name="settings" :size="20" /></button>
+            </div>
+            <button type="button" class="dc-stage-btn hangup" :title="t('exit')" :aria-label="t('exit')" @click.stop="leaveVoiceWorkspace"><Icon name="power" :size="22" /></button>
+          </div>
+          <div class="dc-stage-controls-side end">
+            <button type="button" class="dc-stage-btn subtle" :title="discordStageFullscreen ? t('discordExitFullscreen') : t('discordFullscreen')" :aria-label="discordStageFullscreen ? t('discordExitFullscreen') : t('discordFullscreen')" @click.stop="toggleDiscordStageFullscreen"><Icon :name="discordStageFullscreen ? 'fullscreen-exit' : 'fullscreen'" :size="20" /></button>
+          </div>
+        </footer>
+      </section>
+
+      <!-- 4. Right column: channel text chat -->
+      <aside v-if="showDiscordChat" class="dc-chat" @click.stop>
+        <header class="dc-chat-header">
+          <div class="dc-chat-title">
+            <Icon name="message" :size="18" />
+            <strong>{{ currentChannelName }}</strong>
+          </div>
+          <button type="button" class="dc-stage-icon" :title="t('discordHideChat')" :aria-label="t('discordHideChat')" @click="showDiscordChat = false"><Icon name="close" :size="18" /></button>
+        </header>
+        <ChatPanel
+          :model="chat"
+          :t="t"
+          :current-channel-name="currentChannelName"
+          :mobile-hidden="false"
+          :server-events="serverEvents"
+          :avatar-style="avatarStyle"
+          :avatar-initial="avatarInitial"
+          :message-avatar="messageAvatar"
+          :format-time="formatTime"
+        />
+      </aside>
+    </div>
 
     <!-- Connected application shell -->
     <div
@@ -890,6 +1155,50 @@
       @close="screenShareSettingsOpen = false"
     />
 
+    <!-- QQ community modal -->
+    <div
+      v-if="qqModalOpen"
+      class="modal-backdrop qq-modal-backdrop"
+      @click.self="qqModalOpen = false"
+    >
+      <section
+        class="qq-modal-card"
+        data-ws-part="home.community-dialog"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="'qq-group-title'"
+      >
+        <button
+          type="button"
+          class="qq-modal-close"
+          :aria-label="t('close')"
+          :title="t('close')"
+          @click="qqModalOpen = false"
+          ><Icon
+            name="close"
+            :size="19"
+        /></button>
+        <div class="qq-modal-heading"
+          ><span class="card-kicker">{{ t("qqGroup") }}</span
+          ><h2 id="qq-group-title">{{ t("qqGroup") }}</h2></div
+        >
+        <img
+          class="qq-qr-image"
+          src="/qq-group-qr.jpg"
+          :alt="t('qqGroupQrAlt')"
+        />
+        <p class="qq-direct-join">{{ t("qqJoinDirect") }}</p>
+        <a
+          class="qq-join-link"
+          :href="qqJoinUrl"
+          :aria-label="t('joinQqGroup')"
+          target="_blank"
+          rel="noreferrer"
+          >{{ qqJoinUrl }}</a
+        >
+      </section>
+    </div>
+
     <MemberActionsMenu
       :model="memberControls"
       :is-mobile-viewport="isMobileViewport"
@@ -1137,6 +1446,22 @@ const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(window.matchMedia("(max-width: 740px)").matches);
+// Discord shell: text chat starts collapsed, matching the native voice view.
+const showDiscordChat = ref(false);
+const discordStageElement = ref<HTMLElement | null>(null);
+const discordStageFullscreen = ref(false);
+function syncDiscordStageFullscreen(): void {
+  discordStageFullscreen.value = Boolean(discordStageElement.value) && document.fullscreenElement === discordStageElement.value;
+}
+async function toggleDiscordStageFullscreen(): Promise<void> {
+  try {
+    if (discordStageFullscreen.value) await document.exitFullscreen();
+    else await discordStageElement.value?.requestFullscreen();
+  } catch {
+    // Fullscreen is optional; a rejected request leaves the current layout.
+  }
+  syncDiscordStageFullscreen();
+}
 let mobileAwayController: MobileAwayController | undefined;
 const shouldKeepScreenAwake = computed(() => isMobileViewport.value && (voiceState.connected || voiceState.connecting || voiceState.reconnecting));
 const screenWakeLockState = ref<ScreenWakeLockSnapshot>({ supported: false, enabled: false, active: false, requesting: false, unavailable: false });
@@ -2152,8 +2477,10 @@ onMounted(() => {
   };
   viewportChangeHandler();
   viewportMediaQuery.addEventListener?.("change", viewportChangeHandler);
+  document.addEventListener("fullscreenchange", syncDiscordStageFullscreen);
 });
 onUnmounted(() => {
+  document.removeEventListener("fullscreenchange", syncDiscordStageFullscreen);
   mobileAwayController?.dispose();
   screenWakeLockController?.dispose();
   stopViewportObservation?.();

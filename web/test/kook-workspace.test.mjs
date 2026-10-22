@@ -55,6 +55,14 @@ test("other skins retain their original flow and switching back restores KOOK", 
   assert.equal(workspace.active.value, true);
 });
 
+test("the Discord skin also keeps returning users in the workspace", t => {
+  const workspace = mount(t);
+  workspace.restore({ schemaVersion: 1, hasConnected: true }, []);
+  workspace.skinId.value = "builtin.discord";
+  assert.equal(workspace.active.value, true);
+  assert.equal(workspace.connected.value, false);
+});
+
 test("a saved nickname alone is not evidence of a successful connection", t => {
   const workspace = mount(t);
   workspace.restore({ schemaVersion: 1, lastNickname: "Previous failed attempt" }, []);
