@@ -74,6 +74,16 @@ v3 保留安全的标准元素和属性白名单；组件可通过完整页面 s
 
 仓库地址限定为 `https://github.com/owner/repository`。索引最多 50 项；索引最大 128 KiB，单个 `skin.json` 最大 16 KiB，归档最大 20 MiB，下载有超时限制。商店不执行皮肤构建脚本，也不从仓库加载未打入归档的资源。
 
+### 工作区接口 v1（WebSpeak 0.2.8 当前运行时）
+
+v3/v4 开放皮肤可在 `manifest.json` 中声明 `"workspace": { "apiVersion": 1, "mode": "persistent" }`。未声明时保留原先的首页流程。该通用接口不识别皮肤 ID，也不授予额外网络或存储权限；皮肤包本身不能读写此偏好。旧运行时不认识该字段或权限时会拒绝导入，不能仅凭应用版本号认定支持；使用它的包需要 `minAppVersion: "0.2.8"` 及工作区接口 v1。
+
+首次使用仍显示连接表单；只有成功连接才记录 `hasConnected`。旧的成功连接历史会迁移为已使用状态，只有昵称或失败尝试不算。启用此策略的皮肤在主动断开或刷新回访后仍进入工作区，但不会自动连接、采集麦克风或切换服务器。普通回访可由宿主恢复最近目标；显式邀请、目标或频道链接优先。切换到未声明策略的皮肤恢复其原有流程，清除本地数据会重置此记录。
+
+可信控件 `voice.connection-status` 需要 `session.status.read` 与 `voice.connect`，显示本地化的连接/失败状态、可编辑昵称与重连按钮；忙碌时禁用重复提交，服务器密码和新增服务器对话框仍由宿主管理。公开部件为 `voice.connection-status`、`voice.connection-status.message`、`voice.connection-status.nickname`、`voice.connection-status.nickname.input`、`voice.connection-status.reconnect`。皮肤负责这些部件的位置、响应式布局和外观。
+
+声明式动作 `voice.connect` 使用同名权限且不接受参数；它只在明确可信点击后连接宿主当前选定的目标，不能携带地址、密码、身份材料、邀请令牌或自动执行。服务器配置和身份未就绪、正在连接/重连、已经连接或对话框尚待处理时，宿主拒绝重复发起。它和既有的 `quickServers.switch`、服务器栏加号共用宿主连接流程；异步读取浏览器已保存密码不会被误判为连接失败。
+
 ## 包结构
 
 `.wskin` 是标准 ZIP 容器，推荐把下列文件直接放在 ZIP 根目录：

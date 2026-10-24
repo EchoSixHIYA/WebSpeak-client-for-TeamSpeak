@@ -106,3 +106,19 @@ test("channel selection falls back to the normal switch when no local password e
   assert.equal(calls[0][0], "42");
   assert.equal(calls[0][1], "");
 });
+
+
+test("saved-password lookup stays pending without duplicate connects and cancellation retires it", async t => {
+  const { connection, connecting, connectCalls } = mount(t);
+  connection.doConnect();
+  connection.doConnect();
+  // IndexedDB lookup is async; an idle transport at this point is not a failure.
+  assert.equal(connecting.value, false);
+  assert.equal(connectCalls.length, 0);
+  await nextTurn();
+  assert.equal(connectCalls.length, 1);
+  connection.doConnect();
+  connection.doDisconnect(false);
+  await nextTurn();
+  assert.equal(connectCalls.length, 1);
+});

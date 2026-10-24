@@ -1,3 +1,4 @@
+import { parseSkinWorkspacePolicy, type SkinWorkspacePolicy } from "../../../src/shared/skin-workspace.js";
 import { unzipSync } from "fflate";
 import { compileSkinCss as compileSharedSkinCss, rewriteSkinCssAssets, SkinCssValidationError } from "../../../src/shared/skin-css.js";
 
@@ -38,6 +39,7 @@ export interface SkinManifest {
   content?: string;
   components?: string;
   plugins?: string;
+  workspace?: SkinWorkspacePolicy;
   minAppVersion: string;
   preview?: string;
 }
@@ -405,7 +407,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
   if (schemaVersion >= 2) {
     const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
-    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); }
+    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); fields.add("workspace"); }
     if (schemaVersion === 4) fields.add("plugins");
     const unknown = Object.keys(raw).find((key) => !fields.has(key));
     if (unknown) throw new SkinPackError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
@@ -428,6 +430,9 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined || raw.components !== undefined || raw.plugins !== undefined)) {
     throw new SkinPackError("Version 1 skin packages cannot declare layout or plugin fields.", "SKIN_SCHEMA_VERSION");
   }
+  let workspace: SkinWorkspacePolicy | undefined;
+  try { workspace = parseSkinWorkspacePolicy(raw.workspace, schemaVersion); }
+  catch (error) { throw new SkinPackError(error instanceof Error ? error.message : "Invalid workspace policy.", "SKIN_MANIFEST_INVALID"); }
   const id = stringField("id", 80)!;
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(id) || id.startsWith("builtin.")) throw new SkinPackError("Skin IDs must be unique lowercase IDs and cannot use the reserved builtin. prefix.", "SKIN_ID_INVALID");
   const entry = stringField("entry", 120)!;
@@ -461,6 +466,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
     components,
     plugins,
     minAppVersion,
+    ...(workspace ? { workspace } : {}),
     preview,
   };
 }

@@ -32,6 +32,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "audio.settings.open": Object.freeze({ policyVersion: 1, description: "Open WebSpeak's trusted audio device and processing settings." }),
   "voice.presence.write": Object.freeze({ policyVersion: 1, description: "Set the user's own away status through the connected TeamSpeak session." }),
   "voice.whisper.control": Object.freeze({ policyVersion: 1, description: "Enable or disable the user's existing TeamSpeak whisper target selection." }),
+  "voice.connect": Object.freeze({ policyVersion: 1, description: "Connect to the host-selected TeamSpeak target after an explicit user action; the skin cannot provide addresses or credentials." }),
   "voice.disconnect": Object.freeze({ policyVersion: 1, description: "Disconnect the user's current TeamSpeak voice session." }),
   "voice.whisper.status.read": Object.freeze({ policyVersion: 1, description: "Read whether whisper is active and how many existing targets are selected." }),
   "voice.screenShare.status.read": Object.freeze({ policyVersion: 1, description: "Read the user's own screen-share state." }),
@@ -63,6 +64,7 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.screen-share-start",
   "voice.whisper-controls",
   "voice.performance-panel",
+  "voice.connection-status",
   "voice.connection-controls",
   "voice.disconnect-control",
 ] as const);
@@ -90,6 +92,7 @@ export const SKIN_PLUGIN_HOST_WIDGET_PERMISSIONS: Partial<Record<SkinPluginHostW
   "voice.server-banner": widgetPermissions("session.status.read"),
   "voice.audio-controls": widgetPermissions("audio.status.read", "audio.microphone.control", "audio.output.control"),
   "voice.chat-panel": widgetPermissions("chat.channel.read", "chat.channel.send"),
+  "voice.connection-status": widgetPermissions("session.status.read", "voice.connect"),
   "voice.connection-controls": widgetPermissions("voice.disconnect"),
   "voice.disconnect-control": widgetPermissions("voice.disconnect"),
   "voice.member-cards": widgetPermissions("session.members.read", "session.memberAvatars.read", "voice.screenShare.read", "voice.screenShare.control"),
@@ -123,7 +126,7 @@ export type SkinPluginAction =
   | "voice.joinChannel" | "favorites.switch" | "quickServers.switch" | "chat.sendMessage" | "chat.togglePanel"
   | "voice.toggleMicrophone" | "voice.toggleOutputMute" | "voice.setOutputVolume" | "audio.openSettings"
   | "audio.toggleNoiseSuppression" | "audio.toggleAccompaniment"
-  | "voice.disconnect" | "voice.setAway" | "voice.setWhisperActive"
+  | "voice.connect" | "voice.disconnect" | "voice.setAway" | "voice.setWhisperActive"
   | "voice.startScreenShare" | "voice.stopScreenShare" | "voice.joinScreenShare" | "voice.leaveScreenShare";
 
 export interface SkinPluginActionDefinition {
@@ -204,11 +207,11 @@ const V3_EVENTS = new Set<string>([
 const PASSIVE_EVENTS = new Set<string>(["focus", "blur", "pointerenter", "pointerleave", "dragstart", "dragover"]);
 const ACTIONS = new Set<string>([
   "ui.setState", "ui.toggleState", "session.copyInviteLink", "voice.joinChannel", "favorites.switch", "quickServers.switch", "chat.sendMessage", "chat.togglePanel",
-  "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
+  "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.connect", "voice.disconnect", "voice.setAway", "voice.setWhisperActive",
   "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const V3_ACTIONS = new Set<string>([
-  "ui.toggleState", "session.copyInviteLink", "chat.togglePanel", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.disconnect", "voice.setAway",
+  "ui.toggleState", "session.copyInviteLink", "chat.togglePanel", "voice.toggleMicrophone", "voice.toggleOutputMute", "voice.setOutputVolume", "audio.openSettings", "audio.toggleNoiseSuppression", "audio.toggleAccompaniment", "voice.connect", "voice.disconnect", "voice.setAway",
   "voice.setWhisperActive", "voice.startScreenShare", "voice.stopScreenShare", "voice.joinScreenShare", "voice.leaveScreenShare",
 ]);
 const PERMISSIONS = new Set<string>(Object.keys(SKIN_PLUGIN_PERMISSIONS));
@@ -228,6 +231,7 @@ const ACTION_ARGS: Record<SkinPluginAction, ReadonlySet<string>> = {
   "audio.openSettings": new Set([]),
   "audio.toggleNoiseSuppression": new Set([]),
   "audio.toggleAccompaniment": new Set([]),
+  "voice.connect": new Set([]),
   "voice.disconnect": new Set([]),
   "voice.setAway": new Set(["away", "message"]),
   "voice.setWhisperActive": new Set(["active"]),
@@ -251,6 +255,7 @@ const ACTION_PERMISSION: Record<SkinPluginAction, SkinPluginPermission | null> =
   "audio.openSettings": "audio.settings.open",
   "audio.toggleNoiseSuppression": "audio.microphone.control",
   "audio.toggleAccompaniment": "audio.output.control",
+  "voice.connect": "voice.connect",
   "voice.disconnect": "voice.disconnect",
   "voice.setAway": "voice.presence.write",
   "voice.setWhisperActive": "voice.whisper.control",
