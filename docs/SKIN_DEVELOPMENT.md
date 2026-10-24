@@ -189,6 +189,10 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 申请 `session.channels.read` 的 `session.channels` 列表还提供 `memberCount`、两位数显示用的 `memberCountLabel`、`maxClients` 和 `maxClientsLimited`。后两个字段仅在 TeamSpeak 返回有效上限数据时出现；`maxClientsLimited: false` 表示频道不限人数。它们与频道树一起属于公开只读数据，不会授予服务器写入能力。
 
+频道显示接口增补（0.2.8）：同一权限下新增 `displayName`、`isSpacer`、`spacerAlignment` 与 `spacerStyle`，声明式 v3 和 Wasm v4 均可读取。`name` 始终保留服务器原名，`displayName` 仅对永久、顶层且名称以 `[spacer…]`、`[lspacer…]`、`[cspacer…]`、`[rspacer…]` 或 `[*spacer…]` 开头的频道移除前缀（大小写不敏感，省略或自定义标识均可）。分隔栏的 `spacerAlignment` 为 `left`、`center`、`right` 或 `repeat`；`spacerStyle` 为 `text`、`solid`、`dashed`、`dotted`、`dash-dot` 或 `dash-dot-dot`，五种线型对应 `___`、`---`、`...`、`-.-`、`-..`。普通频道的 `displayName` 等于 `name`、`isSpacer: false`、两个格式字段为空字符串。旧运行时可能不含新增字段；兼容包应回退到 `name`，不能只凭相同的 0.2.8 版本号推断字段存在。分隔栏仍为真实 TS 频道，不增加加入限制，不隐藏其中的成员或子频道；管理编辑继续使用原名。
+
+宿主 `voice.channel-tree` 与 `voice.channel-panel` 自动使用上述显示规则；分隔栏隐藏普通频道图标和人数，不显示空成员提示。新增稳定部件 `voice.channel-spacer`，提供 `data-alignment` 与 `data-spacer-style` 属性；频道树行 `voice.channel-tree.row` 和成员面板标题 `voice.channel-group.heading` 在分隔栏上提供 `data-spacer="true"`。颜色和字体继承皮肤，文字及重复填充在可用宽度内裁剪，空文本保留分隔间距。皮肤无需新增权限或修改传输逻辑。
+
 ```json
 {
   "schemaVersion": 2,

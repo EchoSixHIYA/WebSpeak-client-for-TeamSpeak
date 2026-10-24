@@ -10,7 +10,7 @@ const identity = generateIdentitySync(8);
 const uid = "AAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 function channel(id = 1): Channel {
   return { id: asChannelID(BigInt(id)), parentID: asChannelID(0n), order: asChannelID(0n), name: "Lobby",
-    description: "", hasPassword: true, maxClients: 12, isMaxClientsUnlimited: false } as Channel;
+    description: "", hasPassword: true, isPermanent: true, maxClients: 12, isMaxClientsUnlimited: false } as Channel;
 }
 function member(id = 1): ClientEntry {
   return { id: asClientID(id), nickname: `Member ${id}`, uid: asUID(uid), channelID: asChannelID(1n), type: 0,
@@ -43,7 +43,7 @@ function fixture() {
 test("ordinary-client directories and avatar metadata use the live view without list permissions", async () => {
   const { sdk, native } = fixture();
   assert.deepEqual(await sdk.listDirectoryChannels(), [{ id: 1n, parentID: 0n, order: 0n, name: "Lobby", description: "",
-    passwordProtected: true, maxClients: 12, maxClientsLimited: true }]);
+    passwordProtected: true, isPermanent: true, maxClients: 12, maxClientsLimited: true }]);
   assert.deepEqual(await sdk.listDirectoryClients(), [{ id: 1, nickname: "Member 1", uid, channelID: 1n, type: 0,
     serverGroups: [], away: true, awayMessage: "Away", inputMuted: true, outputMuted: false, channelCommander: true }]);
   assert.deepEqual(await sdk.getClientAvatarMetadata(1), { uid, cacheKey: "avatar-hash", path: `/${avatarFileName(uid)}` });
@@ -62,11 +62,13 @@ test("live-view snapshots include channel edits and remove clients that went out
   assert.equal(snapshots.length, 1, "an unchanged revision does not duplicate the directory");
   assert.equal(snapshots[0]?.complete, true);
   native.view.clients.clear();
-  native.view.channels.set(asChannelID(1n), { ...channel(), name: "Renamed", hasPassword: false, maxClients: 20 });
+  native.view.channels.set(asChannelID(1n), { ...channel(), name: "Renamed", hasPassword: false, isPermanent: false, maxClients: 20 });
   native.view.revision++;
   native.emit("viewChanged");
   assert.equal(snapshots.at(-1)?.channels[0]?.name, "Renamed");
   assert.equal(snapshots.at(-1)?.channels[0]?.passwordProtected, false);
+  assert.equal(snapshots[0]?.channels[0]?.isPermanent, true);
+  assert.equal(snapshots.at(-1)?.channels[0]?.isPermanent, false);
   assert.equal(snapshots.at(-1)?.channels[0]?.maxClients, 20);
   assert.deepEqual(snapshots.at(-1)?.clients, []);
   assert.equal(snapshots[0]?.clients.length, 1, "earlier snapshots stay independent");

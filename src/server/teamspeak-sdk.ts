@@ -48,6 +48,7 @@ export interface DirectoryChannelInfo {
   name: string;
   description: string;
   passwordProtected?: boolean;
+  isPermanent?: boolean;
   maxClients?: number;
   maxClientsLimited?: boolean;
 }
@@ -315,6 +316,7 @@ function toDirectoryChannel(channel: Channel): DirectoryChannelInfo {
     name: channel.name,
     description: channel.description,
     passwordProtected: channel.hasPassword,
+    ...(typeof channel.isPermanent === "boolean" ? { isPermanent: channel.isPermanent } : {}),
     ...(Number.isInteger(channel.maxClients) && channel.maxClients >= 0 && channel.maxClients <= 65_535
       && typeof channel.isMaxClientsUnlimited === "boolean"
       ? { maxClients: channel.maxClients, maxClientsLimited: !channel.isMaxClientsUnlimited }

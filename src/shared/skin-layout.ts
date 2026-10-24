@@ -192,6 +192,7 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.breadcrumbs",
   "voice.channel-group",
   "voice.channel-group.heading",
+  "voice.channel-spacer",
   "voice.channel-group.members",
   "voice.channel-tree.avatar",
   "voice.channel-tree.branch",

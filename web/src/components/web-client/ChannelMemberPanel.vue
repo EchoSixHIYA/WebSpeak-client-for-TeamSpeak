@@ -60,16 +60,19 @@
         <button
           class="member-channel-heading"
           data-ws-part="voice.channel-group.heading"
+          :data-spacer="getChannelSpacer(channelItem) ? 'true' : undefined"
           :data-ws-state="channelItem.id === currentChannelId ? 'current' : 'idle'"
           :title="t('switchChannel')"
           @click="emit('selectChannel', channelItem)"
         >
           <Icon
+            v-if="!getChannelSpacer(channelItem)"
             :name="channelItem.passwordProtected ? 'lock' : 'speaker'"
             :size="16"
           />
-          <span>{{ channelItem.name }}</span>
-          <small>{{ channelItem.members.length }}</small>
+          <ChannelSpacer v-if="getChannelSpacer(channelItem)" :spacer="getChannelSpacer(channelItem)!" />
+          <span v-else>{{ channelItem.name }}</span>
+          <small v-if="!getChannelSpacer(channelItem)">{{ channelItem.members.length }}</small>
         </button>
         <div
           v-if="channelItem.members.length"
@@ -170,7 +173,7 @@
           </div>
         </div>
         <div
-          v-else
+          v-else-if="!getChannelSpacer(channelItem)"
           class="channel-no-members"
           >{{ t("noMembersInChannel") }}</div
         >
@@ -188,6 +191,8 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import Icon from "../Icon.vue";
+import ChannelSpacer from "./ChannelSpacer.vue";
+import { getChannelSpacer } from "../../../../src/shared/channel-spacer.js";
 import { memberPresenceKey } from "../../services/member-presence.js";
 import type { TreeChannel } from "../../composables/useWebClientChannels.js";
 import type { useWebClientMembers } from "../../composables/useWebClientMembers.js";

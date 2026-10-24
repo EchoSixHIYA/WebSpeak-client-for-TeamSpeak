@@ -27,6 +27,19 @@ function surfaceDocument(): SkinPluginDocument {
   };
 }
 
+test("declarative skins can read channel spacer presentation without new permissions", () => {
+  const document = {
+    schemaVersion: 3,
+    components: [{ id: "channel-labels", name: "Channel labels", page: "voice", accessibleName: "Channel labels", permissions: ["session.channels.read"], actions: {},
+      root: { tag: "div", repeat: { path: "session.channels", as: "channel" }, children: [
+        { tag: "span", children: [{ text: "{{channel.displayName}} {{channel.spacerAlignment}} {{channel.spacerStyle}}" }], when: { path: "channel.isSpacer", equals: true } },
+      ] },
+    }],
+  };
+  assert.doesNotThrow(() => parseSkinPluginDocument(document));
+  assert.throws(() => parseSkinPluginDocument({ ...document, components: [{ ...document.components[0], permissions: [] }] }));
+});
+
 test("page replacement stays disabled until local approval and returns to the host after revocation", () => {
   const storage = new Map<string, string>();
   const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");

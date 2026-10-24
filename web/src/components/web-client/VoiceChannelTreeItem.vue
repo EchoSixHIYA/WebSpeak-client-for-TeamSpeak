@@ -16,7 +16,7 @@
         type="button"
         class="ws-voice-channel-expander"
         data-ws-part="voice.channel-tree.expander"
-        :aria-label="`${expanded ? '收起' : '展开'} ${node.channel.name} / ${expanded ? 'Collapse' : 'Expand'} channel`"
+        :aria-label="`${expanded ? '收起' : '展开'} ${displayName} / ${expanded ? 'Collapse' : 'Expand'} channel`"
         :aria-expanded="expanded"
         @click.stop="emit('toggle', node.channel.id)"
       ><Icon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" /></button>
@@ -24,8 +24,9 @@
         type="button"
         class="ws-voice-channel-row"
         data-ws-part="voice.channel-tree.row"
+        :data-spacer="spacer ? 'true' : undefined"
         :data-drag-over="memberDragDrop && dragOverChannelId === node.channel.id ? 'true' : undefined"
-        :title="`双击或按 Enter 加入 ${node.channel.name} / Double-click or press Enter to join${node.channel.passwordProtected ? ' · 需要频道密码 / Channel password required' : ''}`"
+        :title="`双击或按 Enter 加入 ${displayName} / Double-click or press Enter to join${node.channel.passwordProtected ? ' · 需要频道密码 / Channel password required' : ''}`"
         :data-password-protected="node.channel.passwordProtected ? 'true' : undefined"
         @click="emit('select', node.channel.id)"
         @dblclick.stop.prevent="join"
@@ -35,15 +36,17 @@
         @drop="handleChannelDrop($event)"
       >
         <Icon
+          v-if="!spacer"
           class="ws-voice-channel-type"
           data-ws-part="voice.channel-tree.icon"
           :name="node.channel.passwordProtected ? 'lock' : 'speaker'"
           :data-password-protected="node.channel.passwordProtected ? 'true' : 'false'"
           :size="14"
         />
-        <span class="ws-voice-channel-name" data-ws-part="voice.channel-tree.name">{{ node.channel.name }}</span>
-        <span v-if="selected && !current" class="ws-voice-channel-join-hint" data-ws-part="voice.channel-tree.join-hint">双击加入</span>
-        <span class="ws-voice-channel-count" data-ws-part="voice.channel-tree.count">
+        <ChannelSpacer v-if="spacer" :spacer="spacer" />
+        <span v-else class="ws-voice-channel-name" data-ws-part="voice.channel-tree.name">{{ node.channel.name }}</span>
+        <span v-if="!spacer && selected && !current" class="ws-voice-channel-join-hint" data-ws-part="voice.channel-tree.join-hint">双击加入</span>
+        <span v-if="!spacer" class="ws-voice-channel-count" data-ws-part="voice.channel-tree.count">
           {{ memberCount }}<template v-if="node.channel.maxClientsLimited && typeof node.channel.maxClients === 'number'">/{{ node.channel.maxClients }}</template>
         </span>
       </button>
@@ -230,6 +233,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import Icon from "../Icon.vue";
+import ChannelSpacer from "./ChannelSpacer.vue";
+import { channelDisplayName, getChannelSpacer } from "../../../../src/shared/channel-spacer.js";
 import type { ChannelMember } from "../../composables/useVoiceWebSocket.js";
 import type { TreeChannel } from "../../composables/useWebClientChannels.js";
 import type { VoiceChannelTreeNode } from "../../services/voice-channel-tree.js";
@@ -267,6 +272,8 @@ const emit = defineEmits<{
 }>();
 
 const expanded = computed(() => props.expandedIds.has(props.node.channel.id));
+const spacer = computed(() => getChannelSpacer(props.node.channel));
+const displayName = computed(() => channelDisplayName(props.node.channel));
 const hasChildren = computed(() => props.node.children.length > 0);
 const hasContents = computed(() => hasChildren.value || props.node.channel.members.length > 0);
 const isExpandable = computed(() => props.layout === "server-sidebar" ? hasChildren.value : hasContents.value);

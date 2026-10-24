@@ -1,5 +1,6 @@
 import { computed, watch, type Ref } from "vue";
 import type { ChannelInfo, ChannelMember } from "./useVoiceWebSocket.js";
+import { channelDisplayName } from "../../../src/shared/channel-spacer.js";
 
 export interface TreeChannel extends ChannelInfo {
   depth: number;
@@ -108,7 +109,7 @@ export function useWebClientChannels({
     if (fromSelf) return fromSelf;
     return channelTree.value.find((item) => item.name === channelName.value) ?? channelTree.value[0];
   });
-  const currentChannelName = computed(() => (currentChannel.value?.name ?? channelName.value) || t("voiceLobby"));
+  const currentChannelName = computed(() => (currentChannel.value ? channelDisplayName(currentChannel.value) : channelName.value) || t("voiceLobby"));
   const currentChannelDescription = computed(() => currentChannel.value?.description ?? "");
   const currentMembers = computed<ChannelMember[]>(() => {
     const source = currentChannel.value ? currentChannel.value.members : members;

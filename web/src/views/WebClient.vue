@@ -972,6 +972,7 @@ import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
 import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
+import { channelDisplayName, getChannelSpacer } from "../../../src/shared/channel-spacer.js";
 import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
 import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
 import VoiceServerBanner from "../components/web-client/VoiceServerBanner.vue";
@@ -1649,9 +1650,14 @@ const skinPluginContext = computed(() => ({
     },
     channels: channelTree.value.map((item) => {
       const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
+      const spacer = getChannelSpacer(item);
       return {
         id: item.id,
         name: item.name,
+        displayName: channelDisplayName(item),
+        isSpacer: Boolean(spacer),
+        spacerAlignment: spacer?.alignment ?? "",
+        spacerStyle: spacer?.style ?? "",
         parentId: item.parentID,
         depth: item.depth,
         memberCount: item.members.length,

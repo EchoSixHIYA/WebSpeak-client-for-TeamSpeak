@@ -9,6 +9,20 @@ const directory = (): TSDirectorySnapshot => ({
   clients: [{ id: 2, channelID: 1n, nickname: "Member", uid: "uid-2", type: 0, serverGroups: [], away: true, inputMuted: true }],
 });
 
+test("permanent channel flags survive the gateway wire, without guessing omitted flags", () => {
+  const source = directory();
+  source.channels[0] = { ...source.channels[0], name: "[cspacer0]Section", isPermanent: true };
+  source.channels[1] = { ...source.channels[1], isPermanent: false };
+  const channels = mapChannelTree(source);
+  const message = parseServerMessage(JSON.parse(JSON.stringify({ type: "channelList", channels })));
+  assert.ok(message?.type === "channelList");
+  assert.equal(message.channels[0].name, "[cspacer0]Section");
+  assert.equal(message.channels[0].isPermanent, true);
+  assert.equal(message.channels[1].isPermanent, false);
+  assert.equal(Object.hasOwn(mapChannelTree(directory())[0], "isPermanent"), false);
+  assert.equal(parseServerMessage({ type: "channelList", channels: [{ ...channels[0], isPermanent: "true" }] }), null);
+});
+
 test("self restoration uses the connected channel before a snapshot or requested channel", () => {
   const source = directory();
   const result = normalizeDirectorySnapshot(source, 2, 18446744073709551615n, "Self", "Lobby");

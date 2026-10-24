@@ -26,7 +26,7 @@ interface CollectionProjection {
 }
 
 const COLLECTIONS: readonly CollectionProjection[] = Object.freeze([
-  { path: ["session", "channels"], permission: "session.channels.read", fields: new Set(["id", "name", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]), maxItems: 128 },
+  { path: ["session", "channels"], permission: "session.channels.read", fields: new Set(["id", "name", "displayName", "isSpacer", "spacerAlignment", "spacerStyle", "parentId", "depth", "memberCount", "memberCountLabel", "maxClients", "maxClientsLimited", "current"]), maxItems: 128 },
   {
     path: ["session", "members"],
     permission: "session.members.read",
@@ -54,7 +54,7 @@ const CONTEXTS: readonly ContextProjection[] = Object.freeze([
   { path: ["screenShare", "status"], permission: "voice.screenShare.status.read", fields: new Set(["active", "starting", "viewing"]) },
 ]);
 
-const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "screenSharing", "audio", "microphoneMuted", "outputMuted", "noiseSuppressionEnabled", "accompanimentActive", "active", "starting", "viewing", "maxClientsLimited", "panelOpen"]);
+const BOOLEAN_FIELDS = new Set(["connected", "connecting", "current", "favorite", "speaking", "self", "screenSharing", "audio", "microphoneMuted", "outputMuted", "noiseSuppressionEnabled", "accompanimentActive", "active", "starting", "viewing", "maxClientsLimited", "panelOpen", "isSpacer"]);
 const NUMBER_FIELDS = new Set(["depth", "memberCount", "targetCount", "ownerClientId", "viewerCount", "maxClients"]);
 const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   id: 128,
@@ -63,6 +63,9 @@ const TEXT_LIMITS: Readonly<Record<string, number>> = Object.freeze({
   channelId: 128,
   parentId: 128,
   name: 160,
+  displayName: 160,
+  spacerAlignment: 8,
+  spacerStyle: 12,
   label: 160,
   channelName: 160,
   userName: 160,

@@ -5,6 +5,15 @@ import {
   SKIN_RUNTIME_PLUGIN_CONTEXT_LIMIT_BYTES,
 } from "./skin-runtime-plugin-context.js";
 
+test("channel spacer metadata is available to custom skins only with channel read permission", () => {
+  const item = { id: "4", name: "[cspacer0]Section", displayName: "Section", isSpacer: true, spacerAlignment: "center", spacerStyle: "text", secret: "hidden" };
+  const context = { session: { channels: [item] } };
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext([], context))), {});
+  assert.deepEqual(JSON.parse(JSON.stringify(projectSkinRuntimePluginContext(["session.channels.read"], context))), {
+    session: { channels: [{ id: "4", name: item.name, displayName: "Section", isSpacer: true, spacerAlignment: "center", spacerStyle: "text" }] },
+  });
+});
+
 test("runtime context exposes only fields covered by declared read permissions", () => {
   const projected = projectSkinRuntimePluginContext(["session.channels.read"], {
     session: {

@@ -6,15 +6,54 @@ import vue from "@vitejs/plugin-vue";
 import { createServer } from "vite";
 import { createRenderer, createSSRApp, nextTick, shallowRef, markRaw } from "vue";
 import { renderToString } from "@vue/server-renderer";
-let vite, useWebClientScreenShare, VoiceMemberCards, VoiceChannelTree;
+let vite, useWebClientScreenShare, VoiceMemberCards, VoiceChannelTree, ChannelMemberPanel;
 const renderer = createRenderer({ createComment: text => ({ text }), createText: text => ({ text }), createElement: () => ({}), insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {}, parentNode: () => null, nextSibling: () => null });
 before(async () => {
   vite = await createServer({ configFile: false, plugins: [vue()], root: fileURLToPath(new URL("../", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
   ({ useWebClientScreenShare } = await vite.ssrLoadModule("/src/composables/useWebClientScreenShare.ts"));
   ({ default: VoiceMemberCards } = await vite.ssrLoadModule("/src/components/web-client/VoiceMemberCards.vue"));
   ({ default: VoiceChannelTree } = await vite.ssrLoadModule("/src/components/web-client/VoiceChannelTree.vue"));
+  ({ default: ChannelMemberPanel } = await vite.ssrLoadModule("/src/components/web-client/ChannelMemberPanel.vue"));
 });
 after(async () => { await vite?.close(); });
+
+test("both tree layouts render spacer labels without channel icons/counts, and preserve children and members", async () => {
+  const channels = [
+    { id: "1", parentID: "0", depth: 0, name: "[cspacer0]🏔 后山 🏔", isPermanent: true, members: [{ id: 7, nickname: "Visible member" }] },
+    { id: "2", parentID: "1", depth: 1, name: "[cspacer1]Nested ordinary", isPermanent: true, members: [] },
+    { id: "3", parentID: "0", depth: 0, name: "[*spacer3]★", isPermanent: true, members: [] },
+    { id: "4", parentID: "0", depth: 0, name: "[cspacer4]", isPermanent: true, members: [] },
+    { id: "5", parentID: "0", depth: 0, name: "[cspacer5]<img src=x onerror=alert(1)>", isPermanent: true, members: [] },
+  ];
+  for (const layout of ["default", "server-sidebar"]) {
+    const html = await renderToString(createSSRApp(VoiceChannelTree, {
+      channels, layout, avatarStyle: () => ({}), avatarInitial: name => name[0], isSpeaking: () => false, t: key => key,
+    }));
+    assert.equal((html.match(/data-ws-part="voice.channel-spacer"/g) ?? []).length, 4);
+    assert.equal((html.match(/data-ws-part="voice.channel-tree.icon"/g) ?? []).length, 1);
+    assert.equal((html.match(/data-ws-part="voice.channel-tree.count"/g) ?? []).length, 1);
+    assert.match(html, /Visible member/);
+    assert.match(html, /\[cspacer1\]Nested ordinary/);
+    assert.doesNotMatch(html, /\[cspacer0\]|\[\*spacer3\]|\[cspacer4\]|<img/);
+    assert.match(html, /&lt;img/);
+  }
+});
+
+test("the standard member panel uses the same spacer display and hides only empty spacer hints", async () => {
+  const html = await renderToString(createSSRApp(ChannelMemberPanel, {
+    model: { memberDisplayName: member => member.nickname, isSpeaking: () => false }, query: "",
+    filteredMemberChannels: [
+      { id: "1", parentID: "0", depth: 0, name: "[rspacer0]右侧标题", isPermanent: true, members: [] },
+      { id: "2", parentID: "0", depth: 0, name: "Ordinary", members: [] },
+    ],
+    mobileVisible: true, isMobileViewport: false, volumes: {}, avatarStyle: () => ({}), avatarInitial: name => name[0], rangeStyle: () => ({}), t: key => key,
+  }));
+  assert.match(html, /data-alignment="right"/);
+  assert.match(html, /右侧标题/);
+  assert.doesNotMatch(html, /\[rspacer0\]/);
+  assert.equal((html.match(/noMembersInChannel/g) ?? []).length, 1);
+});
+
 function mount(t, initialStream = null, memberAvatar = () => "") {
   const listeners = new Set(), starts = [], storage = new Map(); let exits = 0, ui;
   class Element {}
