@@ -25,6 +25,8 @@ export interface ChannelInfo {
   maxClientsLimited?: boolean;
   /** TeamSpeak's public channel flag; absent when the connected server omits it. */
   passwordProtected?: boolean;
+  /** Required to recognize TeamSpeak's permanent, root-level spacer channels. */
+  isPermanent?: boolean;
   members?: ChannelMember[];
 }
 

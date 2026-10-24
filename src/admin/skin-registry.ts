@@ -1,3 +1,4 @@
+import { parseSkinWorkspacePolicy, type SkinWorkspacePolicy } from "../shared/skin-workspace.js";
 import type { SkinCatalogEntry as SharedSkinCatalogEntry } from "../shared/skin-catalog.js";
 import { compileSkinCss, SkinCssValidationError, type SkinCssSchemaVersion } from "../shared/skin-css.js";
 import { parseSkinLayoutJson } from "../shared/skin-layout.js";
@@ -58,6 +59,7 @@ type ParsedSkinManifest = Omit<SkinCatalogEntry, "installedAt" | "previewUrl" | 
   content?: string;
   components?: string;
   plugins?: string;
+  workspace?: SkinWorkspacePolicy;
   preview?: string;
 };
 
@@ -214,7 +216,7 @@ async function writeAtomicJson(filename: string, value: unknown): Promise<void> 
   }
 }
 
-function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: ParsedSkinManifest; previewBytes?: Buffer; previewMime?: string } {
+export function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: ParsedSkinManifest; previewBytes?: Buffer; previewMime?: string } {
   const entries = inspectArchive(bytes);
   const regularEntries = entries.filter((entry) => !entry.isDirectory);
   const rootPrefix = singleRootPrefix(regularEntries.map((entry) => entry.path));
@@ -472,7 +474,7 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) throw new SkinRegistryError("The skin schema version or ID is unsupported.", "SKIN_SCHEMA_VERSION");
   if (schemaVersion >= 2) {
     const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
-    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); }
+    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); fields.add("workspace"); }
     if (schemaVersion === 4) fields.add("plugins");
     const unknown = Object.keys(value).find((key) => !fields.has(key));
     if (unknown) throw new SkinRegistryError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
@@ -482,6 +484,9 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
     if (typeof item !== "string" || !item.trim() || item.length > max) throw new SkinRegistryError(`manifest.json has an invalid ${key} field.`, "SKIN_MANIFEST_INVALID");
     return item.trim();
   };
+  let workspace: SkinWorkspacePolicy | undefined;
+  try { workspace = parseSkinWorkspacePolicy(value.workspace, schemaVersion); }
+  catch (error) { throw new SkinRegistryError(error instanceof Error ? error.message : "Invalid workspace policy.", "SKIN_MANIFEST_INVALID"); }
   const id = read("id", 80);
   if (!isSafeSkinId(id)) throw new SkinRegistryError("The skin schema version or ID is unsupported.", "SKIN_SCHEMA_VERSION");
   if (schemaVersion === 2 && (value.packageType !== "layout-skin" || !Array.isArray(value.permissions) || value.permissions.length !== 0)) {
@@ -507,7 +512,7 @@ function parseManifest(bytes: Buffer): ParsedSkinManifest {
   const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(components ? [components] : []), ...(plugins ? [plugins] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
   if (new Set(declaredFiles).size !== declaredFiles.length) throw new SkinRegistryError("Manifest files must use separate package paths.", "SKIN_MANIFEST_INVALID");
   const description = readOptional("description", 400);
-  return { schemaVersion, ...(schemaVersion === 2 ? { packageType: "layout-skin" as const } : schemaVersion >= 3 ? { packageType: "open-skin" as const } : {}), id, name: read("name", 80), version, author: read("author", 80), license: read("license", 80), minAppVersion, entry, ...(layout ? { layout } : {}), ...(content ? { content } : {}), ...(components ? { components } : {}), ...(plugins ? { plugins } : {}), ...(preview ? { preview } : {}), ...(description ? { description } : {}) };
+  return { schemaVersion, ...(workspace ? { workspace } : {}), ...(schemaVersion === 2 ? { packageType: "layout-skin" as const } : schemaVersion >= 3 ? { packageType: "open-skin" as const } : {}), id, name: read("name", 80), version, author: read("author", 80), license: read("license", 80), minAppVersion, entry, ...(layout ? { layout } : {}), ...(content ? { content } : {}), ...(components ? { components } : {}), ...(plugins ? { plugins } : {}), ...(preview ? { preview } : {}), ...(description ? { description } : {}) };
 }
 
 function singleRootPrefix(paths: string[]): string {

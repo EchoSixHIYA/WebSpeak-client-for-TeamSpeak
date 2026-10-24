@@ -944,6 +944,7 @@ export function useVoiceWebSocket() {
       RATE_LIMITED: "请求过于频繁，请稍后重试",
       TARGET_NOT_ALLOWED: "此 TeamSpeak 服务器地址不允许连接",
       ACCELERATION_UNAVAILABLE: "当前中继加速不可用，请关闭加速或联系管理员",
+      VOICE_GATEWAY_UNAVAILABLE: "中继语音网关暂不可连接，请检查管理员配置与 HTTPS 证书",
       INVALID_NICKNAME: "请输入有效的昵称",
       INVITE_INVALID: "邀请链接已失效或已被撤销",
       REQUEST_TIMEOUT: "等待 WebSpeak 网关响应超时，请检查网络后重试",

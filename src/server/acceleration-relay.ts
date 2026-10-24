@@ -30,6 +30,8 @@ export interface AccelerationRelayOptions {
 export interface ConfiguredAccelerationRelay extends AccelerationRelayOptions {
   id: string;
   name: string;
+  /** HTTPS origin of the WebSpeak voice gateway on this relay node. */
+  voiceEndpoint?: string;
 }
 
 export interface AccelerationTarget {

@@ -41,12 +41,23 @@
 
 ## TeamSpeak のバージョン互換性
 
-WebSpeak は ServerQuery / WebQuery ではなく、標準の TeamSpeak クライアントプロトコルで接続するため、Query の認証情報は不要です。
+音声接続には標準の TeamSpeak クライアントプロトコルを使い、Query の認証情報は不要です。任意の TS 管理機能では、別途 WebQuery / ServerQuery の認証情報を使用します。
 
 - **TeamSpeak 3**: 先頭の `3.x` バージョンを使ってプロトコルを判定します。すべての旧バージョンを個別に検証しているわけではないため、古いサーバーは実際の環境で確認してください。
 - **TeamSpeak 6**: 対応しています。TeamSpeak 6 ネイティブクライアントとの画面共有も可能です。
 - **自動検出**: ゲートウェイはサーバーの `version` 応答を読み取り、接続診断に判定結果を記録します。
-- [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) ライブラリは TeamSpeak 5 も扱えますが、WebSpeak の対象は TeamSpeak 3 と 6 です。
+- ゲートウェイは上流 SDK 1.0 の [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) を使用し、WebSpeak は TeamSpeak 3 と 6 を対象とします。
+
+## 任意の TeamSpeak 管理
+
+WebSpeak 管理画面と音声接続は、この機能に依存しません。固定サーバーモードで `/admin/ts-admin` を開き、TS 管理用の接続を設定します。
+
+1. TS サーバーで WebQuery を有効にし、権限のある TS 管理者に API キーを作成してもらいます。WebQuery の HTTP/HTTPS URL とキーを入力します。WebSpeak のサイトではなく、TS Query サービスの URL です。TS3（3.12 以降）と TS6 に対応します。
+2. 仮想サーバー ID `0` は固定接続先の音声ポートから選択します。制限付きキーでは許可された ID を入力してください。読み取りキーでは閲覧ができ、変更には書き込み可能なスコープと対応する TS 権限が必要です。
+3. ServerQuery SSH、または TS3 の ServerQuery TCP も選べます。Query ホスト（空欄は固定接続先）、ポート、ユーザー名、パスワードを入力し、SSH では信頼できるホストキーのフィンガープリントも指定します。OS への SSH ログインではありません。TCP は暗号化されないため信頼できるネットワークで使用します。HTTPS 証明書はゲートウェイで信頼されている必要があります。
+4. 保存して接続または更新します。サーバー設定、チャンネル管理、メンバーの移動・退出・ID による BAN、グループ割り当て、BAN 解除に対応します。操作には確認が必要で、TS が権限を検証します。リストは手動更新します。
+
+認証情報はサーバーで暗号化され、API から返されません。データベースと `master.key` を一緒にバックアップしてください。管理接続の失敗は WebSpeak 管理画面や音声に影響しません。UID による BAN で同じゲートウェイ IP を使う他のユーザーへの影響を避けます。
 
 ## 🖼️ インターフェースのスクリーンショット
 
@@ -121,7 +132,6 @@ docker compose up -d
 
 ```bash
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build
@@ -131,7 +141,7 @@ npm start
 
 ## ⚠️ 要件と注意
 
-- ソースからのビルドには Node.js `>=22.5` が必要です。Docker と Release には必要な実行環境が含まれます。
+- ソースからのビルドには Node.js `>=22.12` が必要です。Docker と Release には必要な実行環境が含まれます。
 - WebRTC に対応した最新の Chrome、Edge などを使用してください。マイクとウィンドウ音声には通常 HTTPS が必要です。
 - WebSpeak のホストから TeamSpeak に到達できる必要があります。標準音声ポートは `9987` です。
 - Web サービスは `3040/TCP` を使用します。公開時は HTTPS と WebSocket をリバースプロキシ経由で公開してください。
@@ -223,9 +233,11 @@ Docker 起動を簡略化し、15秒の接続タイムアウトと継続的な�
 
 WebSpeak は [GNU Affero General Public License v3.0 only](../LICENSE) の下で公開されています。
 
-## 最近マージされた貢献
+## 貢献者と主な貢献
 
-- GitHub のマージ記録に基づく一覧です。上のバージョン概要には、各リリースに実際に含まれる変更のみを記載しています。
-- [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) でブラウザのエラー翻訳を改善し、[PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) で拡大縮小、フローティングレイアウト、ホームのフッターを修正。
+上流 SDK の作者、マージ済みの GitHub PR、および独立配布のスキンパッケージへ移植された原作の貢献を記載しています。
+
+- [HoneyBBQ](https://github.com/HoneyBBQ) — 上流 SDK [teamspeak-js（`@honeybbq/teamspeak`）](https://github.com/HoneyBBQ/teamspeak-js) の作者。WebSpeak の TeamSpeak プロトコル通信を支えるクライアントライブラリを提供。
+- [LainHE](https://github.com/LainHE) — [マージ済み PR #2、#8、#28、#31–#35、#37、#38、#40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE)。ブラウザのエラー翻訳、拡大縮小とホームのレイアウト、画面共有のビットレートと視聴者アバター、中継先の検証と再接続、信頼済みプロキシの扱い、接続失敗の通知、音声エラー報告、WebRTC 失敗時のリソース解放を改善。
 - [TimmySheep](https://github.com/TimmySheep) — [マージ済み PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)。既存 TS6 共有の検出、画面比率、モバイル音声・画面点灯・スキンメニュー、ID のチャンネル設定、PWA/テーマ、チャット履歴、メンバー音声状態、マイク権限などに貢献。
-- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) で TeamSpeak の登録済みニックネームによる接続に対応し、設定・お気に入り・招待リンクにニックネームの接続先を保持。
+- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) で TeamSpeak の登録済みニックネーム接続と接続先の保持に対応し、[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) で初回接続後の KAAK ワークスペース保持と再接続を改善。[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) と [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) では Discord スキンの原作デザインと実装を提供（コミット名義 **yumi**）。その後、WebSpeak プロジェクトが[独立配布の `.wskin` スキン](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)へ移植。

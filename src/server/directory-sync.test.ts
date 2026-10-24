@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DirectoryClientInfo, DirectorySnapshot } from "@echosixhiya/teamspeak-client";
+import type { DirectoryClientInfo, DirectorySnapshot } from "./teamspeak-sdk.js";
 import { DirectorySynchronizer } from "./directory-sync.js";
 
 function member(id: number, channelID = 1n, overrides: Partial<DirectoryClientInfo> = {}): DirectoryClientInfo {
@@ -29,6 +29,15 @@ test("partial snapshots retain earlier clients and state omitted by a later snap
   directory.applySnapshot(snapshot(member(1, 1n, { inputMuted: true }), member(2)));
   directory.applySnapshot(snapshot(member(1, 2n), member(3)));
   assert.deepEqual(directory.getSnapshot()?.clients, [member(1, 2n, { inputMuted: true }), member(2), member(3)]);
+});
+
+test("complete SDK views remove unsubscribed clients instead of retaining them as partial welcome data", () => {
+  const directory = new DirectorySynchronizer();
+  directory.applySnapshot({ ...snapshot(member(1), member(2)), complete: true });
+  directory.applySnapshot({ ...snapshot(member(1, 1n, { inputMuted: true })), complete: true });
+  assert.deepEqual(directory.getSnapshot()?.clients, [member(1, 1n, { inputMuted: true })]);
+  directory.applySnapshot({ ...snapshot(member(1), member(2, 2n)), complete: true });
+  assert.deepEqual(directory.getSnapshot()?.clients.map(client => client.id), [1, 2]);
 });
 
 test("a stale partial snapshot cannot bring back a departed client before an explicit rejoin", () => {

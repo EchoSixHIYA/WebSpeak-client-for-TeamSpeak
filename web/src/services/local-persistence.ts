@@ -154,6 +154,7 @@ export interface LocalPreferences {
   outputVolume?: number;
   notificationVolume?: number;
   lastNickname?: string;
+  /** Successful voice connection history, independent of the selected skin. */
   hasConnected?: boolean;
   inputDeviceId?: string;
   volumesByUid?: Record<string, number>;

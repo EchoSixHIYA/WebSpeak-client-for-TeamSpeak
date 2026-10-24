@@ -395,6 +395,7 @@
         "audio.microphone.control",
         "audio.output.control",
         "audio.settings.open",
+        "voice.connect",
         "voice.disconnect",
         "voice.screenShare.status.read",
         "voice.screenShare.read",
@@ -501,7 +502,8 @@
                         "attributes": {
                           "type": "button",
                           "aria-current": "{{server.current}}",
-                          "aria-label": "切换到 {{server.label}}"
+                          "aria-label": "{{server.switchTitle}}",
+                          "title": "{{server.switchTitle}}"
                         },
                         "events": {
                           "click": "switch-server"
@@ -579,6 +581,10 @@
               {
                 "widget": "app.language-switcher",
                 "part": "rail-language"
+              },
+              {
+                "widget": "home.social-links",
+                "part": "rail-links"
               }
             ]
           },
@@ -861,6 +867,10 @@
               {
                 "widget": "voice.server-banner",
                 "part": "server-banner"
+              },
+              {
+                "widget": "voice.connection-status",
+                "part": "connection-status"
               },
               {
                 "tag": "nav",

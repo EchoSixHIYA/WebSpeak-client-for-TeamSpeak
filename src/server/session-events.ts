@@ -1,4 +1,4 @@
-import type { ClientInfo } from "@echosixhiya/teamspeak-client";
+import type { ClientInfo } from "./teamspeak-sdk.js";
 import type { EventEmitter } from "node:events";
 import type { WebSpeakError } from "../errors.js";
 import type { ChannelInfo, ChannelMember } from "../shared/voice-models.js";

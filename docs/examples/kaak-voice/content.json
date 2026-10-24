@@ -61,7 +61,11 @@
         "kaakScreenShare": "屏幕共享",
         "kaakLeaveVoice": "退出",
         "kaakCurrentIdentity": "当前 TeamSpeak 身份",
-        "kaakOnline": "在线"
+        "kaakOnline": "在线",
+        "githubRepository": "Webspeak项目Github",
+        "qqGroup": "WebSpeak项目QQ群",
+        "adminConsole": "管理控制台",
+        "communityLinks": "社区与管理入口"
       }
     },
     "en": {
@@ -124,7 +128,11 @@
         "kaakScreenShare": "Screen share",
         "kaakLeaveVoice": "Leave",
         "kaakCurrentIdentity": "Current TeamSpeak identity",
-        "kaakOnline": "Online"
+        "kaakOnline": "Online",
+        "githubRepository": "WebSpeak project GitHub",
+        "qqGroup": "WebSpeak project QQ group",
+        "adminConsole": "Admin console",
+        "communityLinks": "Community and administration"
       }
     },
     "de": {
@@ -187,7 +195,11 @@
         "kaakScreenShare": "Bildschirm teilen",
         "kaakLeaveVoice": "Verlassen",
         "kaakCurrentIdentity": "Aktuelle TeamSpeak-Identität",
-        "kaakOnline": "Online"
+        "kaakOnline": "Online",
+        "githubRepository": "GitHub-Repository des WebSpeak-Projekts",
+        "qqGroup": "QQ-Gruppe des WebSpeak-Projekts",
+        "adminConsole": "Administrationskonsole",
+        "communityLinks": "Community und Verwaltung"
       }
     },
     "ru": {
@@ -250,7 +262,11 @@
         "kaakScreenShare": "Демонстрация экрана",
         "kaakLeaveVoice": "Выйти",
         "kaakCurrentIdentity": "Текущая личность TeamSpeak",
-        "kaakOnline": "В сети"
+        "kaakOnline": "В сети",
+        "githubRepository": "GitHub проекта WebSpeak",
+        "qqGroup": "Группа QQ проекта WebSpeak",
+        "adminConsole": "Панель администратора",
+        "communityLinks": "Сообщество и управление"
       }
     },
     "ja": {
@@ -313,7 +329,11 @@
         "kaakScreenShare": "画面共有",
         "kaakLeaveVoice": "退出",
         "kaakCurrentIdentity": "現在の TeamSpeak ID",
-        "kaakOnline": "オンライン"
+        "kaakOnline": "オンライン",
+        "githubRepository": "WebSpeak プロジェクトの GitHub",
+        "qqGroup": "WebSpeak プロジェクトの QQ グループ",
+        "adminConsole": "管理コンソール",
+        "communityLinks": "コミュニティと管理"
       }
     }
   }

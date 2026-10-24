@@ -1,38 +1,16 @@
 <template>
-  <section class="page-content operations-page">
-    <div class="page-heading"
-      ><div
-        ><h2>{{ tr("operations") }}</h2
-        ><p>{{ tr("operationsLead") }}</p></div
-      ><button
-        class="secondary-button"
-        :disabled="operationsLoading"
-        @click="loadOperations"
-        ><span
-          v-if="operationsLoading"
-          class="spinner small"
-        ></span
-        ><Icon
-          v-else
-          name="refresh"
-          :size="17"
-        />{{ tr("refresh") }}</button
-      ></div
-    >
-    <div class="alert info system-notice"
-      ><Icon
-        name="info"
-        :size="16"
-      /><span>{{
-        tr("updateNotice", { version: operations.diagnostics.version || "—" })
-      }}</span></div
-    >
-    <div class="operations-grid operations-primary">
-      <article class="operation-card operation-wide"
+  <section class="page-content operations-page" data-admin-scope="webspeak">
+    <div class="page-heading"><div><h2>{{ tr('adminInstanceOperations') }}</h2><p>{{ tr('adminInstanceOperationsLead') }}</p></div>
+      <button class="secondary-button" type="button" :disabled="operationsLoading" @click="loadOperations"><span v-if="operationsLoading" class="spinner small"></span><Icon v-else name="refresh" :size="17"/>{{ tr('refresh') }}</button>
+    </div>
+    <nav class="admin-section-nav" :aria-label="tr('adminInstanceOperations')">
+      <button v-for="section in sections" :key="section.id" type="button" :aria-current="activeSection === section.id ? 'page' : undefined" @click="activeSection = section.id">{{ section.label }}<span v-if="section.count !== undefined" class="admin-tab-count">{{ section.count }}</span></button>
+    </nav>
+    <div v-show="activeSection === 'sessions'" class="admin-operations-section" data-admin-section="sessions"><article class="operation-card operation-wide"
         ><header
           ><div
-            ><h3>{{ tr("sessions") }}</h3
-            ><p>{{ tr("sessionsLead") }}</p></div
+            ><h3>{{ tr("adminBrowserSessions") }}</h3
+            ><p>{{ tr("adminBrowserSessionsLead") }}</p></div
           ><strong>{{ operations.sessions.length }}</strong></header
         ><div
           v-if="operations.sessions.length"
@@ -78,12 +56,12 @@
             :size="22"
           /><span>{{ tr("sessionEmpty") }}</span></div
         ></article
-      >
-      <article class="operation-card"
+      ></div>
+    <div v-show="activeSection === 'invites'" class="admin-operations-section" data-admin-section="invites"><article class="operation-card"
         ><header
           ><div
             ><h3>{{ tr("invites") }}</h3
-            ><p>{{ tr("invitesLead") }}</p></div
+            ><p>{{ tr("adminInviteScope") }}</p></div
           ></header
         ><form
           class="invite-form"
@@ -161,47 +139,8 @@
             ></div
           ></div
         ></article
-      >
-    </div>
-    <div class="operations-grid lower-operations">
-      <article class="operation-card diagnostics-card"
-        ><header
-          ><div
-            ><h3>{{ tr("diagnostics") }}</h3
-            ><p>{{ tr("diagnosticsLead") }}</p></div
-          ><a
-            class="text-link"
-            href="/api/admin/diagnostics/report"
-            >{{ tr("downloadReport") }}</a
-          ></header
-        ><dl class="diagnostic-list"
-          ><div
-            ><dt>{{ tr("version") }}</dt
-            ><dd>{{ operations.diagnostics.version || "—" }}</dd></div
-          ><div
-            ><dt>{{ tr("runtime") }}</dt
-            ><dd>{{ operations.diagnostics.node || "—" }}</dd></div
-          ><div
-            ><dt>{{ tr("platform") }}</dt
-            ><dd
-              >{{ operations.diagnostics.platform || "—" }} /
-              {{ operations.diagnostics.arch || "—" }}</dd
-            ></div
-          ><div
-            ><dt>{{ tr("databaseSchema") }}</dt
-            ><dd>v{{ operations.diagnostics.schemaVersion || "—" }}</dd></div
-          ><div
-            ><dt>{{ tr("createdSessions") }}</dt
-            ><dd>{{ operations.diagnostics.createdSessions }}</dd></div
-          ></dl
-        ><button
-          class="secondary-button"
-          type="button"
-          @click="downloadBackup"
-          >{{ tr("exportBackup") }}</button
-        ></article
-      >
-      <article class="operation-card logs-card"
+      ></div>
+    <div v-show="activeSection === 'logs'" class="admin-operations-section" data-admin-section="logs"><article class="operation-card logs-card"
         ><header
           ><div
             ><h3>{{ tr("logViewer") }}</h3
@@ -271,8 +210,8 @@
             :size="22"
           /><span>{{ tr("noLogs") }}</span></div
         ></article
-      >
-      <article class="operation-card audit-card"
+      ></div>
+    <div v-show="activeSection === 'audit'" class="admin-operations-section" data-admin-section="audit"><article class="operation-card audit-card"
         ><header
           ><div
             ><h3>{{ tr("audit") }}</h3
@@ -296,12 +235,51 @@
             >{{ tr("auditEmpty") }}</li
           ></ul
         ></article
+      ></div>
+    <div v-show="activeSection === 'maintenance'" class="admin-operations-section" data-admin-section="maintenance"><article class="operation-card diagnostics-card"
+        ><header
+          ><div
+            ><h3>{{ tr("diagnostics") }}</h3
+            ><p>{{ tr("diagnosticsLead") }}</p></div
+          ><a
+            class="text-link"
+            href="/api/admin/diagnostics/report"
+            >{{ tr("downloadReport") }}</a
+          ></header
+        ><dl class="diagnostic-list"
+          ><div
+            ><dt>{{ tr("version") }}</dt
+            ><dd>{{ operations.diagnostics.version || "—" }}</dd></div
+          ><div
+            ><dt>{{ tr("runtime") }}</dt
+            ><dd>{{ operations.diagnostics.node || "—" }}</dd></div
+          ><div
+            ><dt>{{ tr("platform") }}</dt
+            ><dd
+              >{{ operations.diagnostics.platform || "—" }} /
+              {{ operations.diagnostics.arch || "—" }}</dd
+            ></div
+          ><div
+            ><dt>{{ tr("databaseSchema") }}</dt
+            ><dd>v{{ operations.diagnostics.schemaVersion || "—" }}</dd></div
+          ><div
+            ><dt>{{ tr("createdSessions") }}</dt
+            ><dd>{{ operations.diagnostics.createdSessions }}</dd></div
+          ></dl
+        ><button
+          class="secondary-button"
+          type="button"
+          @click="downloadBackup"
+          >{{ tr("exportBackup") }}</button
+        ></article
       >
+      <div class="alert info system-notice"><Icon name="info" :size="16"/><span>{{ tr('updateNotice', {version: operations.diagnostics.version || '—'}) }}</span></div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import Icon from "../Icon.vue";
 import type { useAdminOperations } from "../../composables/useAdminOperations.js";
 import type { useAdminI18n } from "../../composables/useAdminI18n.js";
@@ -309,12 +287,25 @@ import type { AdminConnectionRecord } from "../../../../src/shared/admin-respons
 
 const props = defineProps<{
   model: ReturnType<typeof useAdminOperations>;
+  initialSection?: string;
   i18n: Pick<ReturnType<typeof useAdminI18n>, "tr" | "formatDate" | "formatAge" | "sessionStateLabel" | "connectionStatusLabel" | "inviteStatusLabel" | "eventName" | "connectionFailureText">;
 }>();
 // Request ownership, cancellation and drafts remain in the page's controller.
 const { operations, operationsLoading, terminatingSession, inviteSubmitting, revokingInvites, inviteForm, createdInvite,
   loadOperations, terminateSession, createInvite, revokeInvite, copyInviteLink, downloadBackup } = props.model;
 const { tr, formatDate, formatAge, sessionStateLabel, connectionStatusLabel, inviteStatusLabel, eventName, connectionFailureText } = props.i18n;
+type OperationsSection = 'sessions' | 'invites' | 'logs' | 'audit' | 'maintenance';
+const normalizeSection = (value?: string): OperationsSection => value === 'invites' || value === 'logs' || value === 'audit' || value === 'maintenance' ? value : 'sessions';
+const activeSection = ref<OperationsSection>(normalizeSection(props.initialSection));
+watch(() => props.initialSection, value => { activeSection.value = normalizeSection(value); });
+const sections = computed(() => [
+  { id: 'sessions' as const, label: tr('adminBrowserSessions'), count: operations.sessions.length },
+  { id: 'invites' as const, label: tr('invites'), count: operations.invites.length },
+  { id: 'logs' as const, label: tr('adminLogsSection'), count: undefined },
+  { id: 'audit' as const, label: tr('audit'), count: undefined },
+  { id: 'maintenance' as const, label: tr('adminMaintenanceSection'), count: undefined },
+]);
+
 
 function connectionRoute(record: AdminConnectionRecord) {
   const route = tr("connectionFromTo", { ip: record.clientIp || "—", target: record.target || "—" });

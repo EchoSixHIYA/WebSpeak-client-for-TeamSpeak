@@ -54,20 +54,19 @@
       @surface-change="skinRuntimePluginSurfaceActive = $event"
       @restore-skin="switchToBuiltIn"
     />
+    <VoiceConnectionStatus
+      v-if="voiceWorkspace.active.value && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive && !favoriteServerDialogOpen && !serverPasswordDialog.open"
+      class="workspace-connection-status"
+      :connected="voiceState.connected"
+      :connecting="voiceConnectionBusy"
+      :nickname="nickname"
+      :error="voiceConnectionError"
+      :can-connect="canRequestVoiceConnection"
+      :t="t"
+      @update:nickname="nickname = $event"
+      @connect="requestVoiceConnection"
+    />
     <!-- Connection / welcome screen -->
-    <aside
-      v-if="kookWorkspace.active.value && !voiceState.connected && !favoriteServerDialogOpen && !serverPasswordDialog.open"
-      class="kook-connection-status"
-      data-ws-part="voice.connection-status"
-      role="status"
-    >
-      <span>{{ voiceState.connecting || voiceState.reconnecting ? t('connecting') : localizedMessage(voiceState.error) || t('voiceHealthDisconnected') }}</span>
-      <button
-        type="button"
-        :disabled="!canJoin || serverConfigLoading || !identityReady || voiceState.connecting || voiceState.reconnecting"
-        @click="doConnect"
-      >{{ t('reconnectNow') }}</button>
-    </aside>
     <section
       v-if="!showVoiceShell && !skinPluginSurfaceActive && !skinRuntimePluginSurfaceActive"
       class="join-page"
@@ -964,6 +963,8 @@
 import { observeMobileViewport } from "../services/mobile-viewport.js";
 import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import VoiceConnectionStatus from "../components/web-client/VoiceConnectionStatus.vue";
+import { useVoiceWorkspace } from "../composables/useVoiceWorkspace.js";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import SkinPluginEditor from "../components/SkinPluginEditor.vue";
 import SkinRuntimePluginHost from "../components/SkinRuntimePluginHost.js";
@@ -971,6 +972,7 @@ import SkinLoadRecoveryNotice from "../components/SkinLoadRecoveryNotice.vue";
 import VoiceMemberCards from "../components/web-client/VoiceMemberCards.vue";
 import VoicePerformancePanel from "../components/web-client/VoicePerformancePanel.vue";
 import VoiceChannelTree from "../components/web-client/VoiceChannelTree.vue";
+import { channelDisplayName, getChannelSpacer } from "../../../src/shared/channel-spacer.js";
 import VoiceServerSwitcher from "../components/web-client/VoiceServerSwitcher.vue";
 import VoiceServerHeader from "../components/web-client/VoiceServerHeader.vue";
 import VoiceServerBanner from "../components/web-client/VoiceServerBanner.vue";
@@ -1008,7 +1010,6 @@ import { useWebClientServerHistory } from "../composables/useWebClientServerHist
 import { getInitialLanguage, type Language } from "../i18n/web-client.js";
 import { clearLocalData as clearStoredLocalData, isLocalPersistenceAvailable, loadLocalPreferences, loadStoredIdentity, removeStoredIdentity, saveLocalPreferences, saveStoredIdentity, type FavoriteServer } from "../services/local-persistence.js";
 import { isQuickServerAddressLabel, quickServerTargetsEqual, type QuickServer } from "../services/quick-servers.js";
-import { useKookWorkspace } from "../composables/useKookWorkspace.js";
 import { requestIdentityProviderLogin as dispatchIdentityProviderLogin } from "../services/identity-provider.js";
 import type { InstalledSkin, SkinHomeCopy } from "../services/skin-pack.js";
 import { isPublicSkinEnabled } from "../services/skin-catalog.js";
@@ -1438,12 +1439,20 @@ const {
   t,
 });
 
-const kookWorkspace = useKookWorkspace({
-  skinId: activeSkinId,
+const voiceWorkspace = useVoiceWorkspace({
+  enabled: computed(() => activeSkin.value?.workspace?.apiVersion === 1 && activeSkin.value.workspace.mode === "persistent"),
   connected: computed(() => voiceState.connected),
 });
+const voiceConnectionBusy = computed(() => voiceState.connecting || voiceState.reconnecting || favoriteSwitchPending.value);
+const voiceConnectionError = computed(() => voiceState.error ? localizedMessage(voiceState.error) : favoriteSwitchError.value);
+const canRequestVoiceConnection = computed(() => canJoin.value && !serverConfigLoading.value && identityReady.value
+  && !voiceState.connected && !voiceConnectionBusy.value);
+function requestVoiceConnection(): void {
+  if (!canRequestVoiceConnection.value || favoriteServerDialogOpen.value || serverPasswordDialog.open) return;
+  beginFavoriteConnection();
+}
 const showVoiceShell = computed(() => Boolean(
-  kookWorkspace.active.value ||
+  voiceWorkspace.active.value ||
   voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed
   || favoriteSwitchPending.value || favoriteSwitchFailed.value,
 ));
@@ -1641,9 +1650,14 @@ const skinPluginContext = computed(() => ({
     },
     channels: channelTree.value.map((item) => {
       const members = skinPluginMembers.value.filter((member) => member.channelId === item.id);
+      const spacer = getChannelSpacer(item);
       return {
         id: item.id,
         name: item.name,
+        displayName: channelDisplayName(item),
+        isSpacer: Boolean(spacer),
+        spacerAlignment: spacer?.alignment ?? "",
+        spacerStyle: spacer?.style ?? "",
         parentId: item.parentID,
         depth: item.depth,
         memberCount: item.members.length,
@@ -1756,7 +1770,8 @@ const skinPluginActions = {
     if (!Number.isFinite(volume)) return;
     setOutputVolume(Math.max(0, Math.min(1, volume)));
   },
-  "voice.disconnect": () => { if (voiceState.connected || voiceState.connecting) doDisconnect(); },
+  "voice.connect": () => requestVoiceConnection(),
+  "voice.disconnect": () => { if (voiceState.connected || voiceState.connecting || favoriteSwitchPending.value) leaveVoiceWorkspace(); },
   "voice.setAway": (args: Record<string, string | number | boolean>) => {
     if (!voiceState.connected || typeof args.away !== "boolean") return;
     const message = typeof args.message === "string" ? args.message.slice(0, 200) : "";
@@ -2022,6 +2037,16 @@ const skinPluginWidgets = {
     showScreenShare: options?.screenShare !== false,
     t,
   }),
+  "voice.connection-status": () => favoriteServerDialogOpen.value || serverPasswordDialog.open ? null : h(VoiceConnectionStatus, {
+    connected: voiceState.connected,
+    connecting: voiceConnectionBusy.value,
+    nickname: nickname.value,
+    "onUpdate:nickname": (value: string) => { if (!voiceConnectionBusy.value) nickname.value = value; },
+    error: voiceConnectionError.value,
+    canConnect: canRequestVoiceConnection.value,
+    t,
+    onConnect: requestVoiceConnection,
+  }),
   "voice.connection-controls": () => h("div", { class: "ws-plugin-connection-controls", role: "toolbar", "aria-label": t("desktopAudioControls") }, [
     h("button", { type: "button", "aria-label": t("copyInvite"), title: t("copyInvite"), onClick: doShare }, [h(Icon, { name: "share", size: 18 })]),
     ...(accessMode.value === "open" ? [h("button", {
@@ -2126,13 +2151,18 @@ onMounted(() => {
   // The selected skin is applied to this public root, never to the admin DOM.
   applyTheme(themeMode.value);
   browserError.value = checkSupport() ?? "";
-  void Promise.all([loadPublicConfig(), initializeSkin(), loadSavedServers(), loadLocalPreferences()]).then(([, , , preferences]) => {
+  void voiceWorkspace.restore(async () => {
+    const [, , , preferences] = await Promise.all([loadPublicConfig(), initializeSkin(), loadSavedServers(), loadLocalPreferences()]);
+    return { preferences, recent: [...recentServers.value] };
+  }, (snapshot) => {
+    const { preferences, recent } = snapshot;
     if (!localStorage.getItem("webspeak:language") && (preferences.language === "zh" || preferences.language === "en" || preferences.language === "de" || preferences.language === "ru" || preferences.language === "ja")) language.value = preferences.language;
-    if (!nickname.value.trim() && preferences.lastNickname) nickname.value = preferences.lastNickname;
-    kookWorkspace.restore(preferences, recentServers.value);
-    const hasInvite = ["invite", "server", "target", "tsHost", "tsPort", "channel"].some((key) => query.has(key));
-    if (kookWorkspace.active.value && !hasInvite && accessMode.value === "open" && !voiceState.connected && !voiceState.connecting) {
-      const latest = recentServers.value[0];
+    if (!nickname.value.trim()) nickname.value = preferences.lastNickname || recent[0]?.nickname || "";
+    const hasInvite = ["invite", "server", "target", "tsHost", "tsPort", "channel"].some(key => query.has(key));
+    if (voiceWorkspace.active.value && !hasInvite && accessMode.value === "open"
+      && !voiceState.connected && !voiceState.connecting && !favoriteSwitchPending.value
+      && !favoriteServerDialogOpen.value && !serverPasswordDialog.open) {
+      const latest = recent[0];
       if (latest) selectLocalServer(latest.address, latest.nickname, latest.lastChannelHint?.name);
     }
   });
@@ -2189,8 +2219,8 @@ async function clearBrowserData(): Promise<void> {
   if (!window.confirm(t("clearLocalDataConfirm"))) return;
   resetIdentityOperations();
   publicSkin.cancel();
+  voiceWorkspace.reset();
   await clearStoredLocalData();
-  kookWorkspace.reset();
   for (const key of ["webspeak:nickname", "webspeak:language", "webspeak:theme", "webspeak:active-skin", "webspeak:skin-choice", "webspeak:input-device", "webspeak:output-device", "webspeak:remember-identity"]) localStorage.removeItem(key);
   await publicSkin.reset();
   identityMaterial.value = "";

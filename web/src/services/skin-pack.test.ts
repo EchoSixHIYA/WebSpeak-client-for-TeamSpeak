@@ -486,7 +486,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.121");
+  assert.equal(skin.version, "3.1.127");
+  assert.deepEqual(skin.workspace, { apiVersion: 1, mode: "persistent" });
+  assert.equal(skin.minAppVersion, "0.2.8");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const baseMessages = skin.contentData?.locales["zh-CN"]?.messages ?? {};
@@ -499,6 +501,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   }
   const home = skin.pluginData?.components.find((component) => component.page === "home");
   const voice = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voice?.permissions.includes("voice.connect"));
+  assert.match(JSON.stringify(voice?.root), /"widget":"voice.connection-status"/);
   assert.deepEqual(skin.pluginData?.components.map((component) => [component.id, component.mode]), [
     ["kaak-home", "surface"],
     ["kaak-workspace", "surface"],
@@ -671,7 +675,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   assert.ok(skin.css.includes("data-session-connected=\"true\""));
   assert.ok(skin.css.includes("[data-ws-plugin-part=\"kaak-workspace.workspace\"][data-session-connected=\"true\"]:not([data-mobile-channels=\"true\"])"));
   assert.ok(skin.css.includes("[data-ws-plugin-part=\"kaak-workspace\"][data-ws-plugin-surface=\"voice\"]:has([data-ws-plugin-part=\"kaak-workspace.chat-panel-toggle\"][aria-expanded=\"false\"])"));
-  assert.match(skin.css, /\.ws-skin-root\[data-ws-skin="community\.kaak-voice"\]\s+\[data-ws-plugin-part="kaak-workspace"\]\[data-ws-plugin-surface="voice"\]\s*\{[\s\S]*?height: 100dvh;/, "the voice surface owns the KAAK grid and viewport sizing");
+  assert.match(skin.css, /\.ws-skin-root\[data-ws-skin="community\.kaak-voice"\]\s+\[data-ws-plugin-part="kaak-workspace"\]\[data-ws-plugin-surface="voice"\]\s*\{[^}]*height: calc\(var\(--ws-viewport-height, 100dvh\) \/ var\(--ui-scale, 1\)\);[^}]*max-height: calc\(var\(--ws-viewport-height, 100dvh\) \/ var\(--ui-scale, 1\)\);/, "the voice surface compensates application zoom so the bottom dock stays within the viewport");
   assert.doesNotMatch(skin.css, /\[data-ws-plugin-part="kaak-workspace"\](?!\[data-ws-plugin-surface="voice"\])/, "KAAK workspace selectors must anchor to the voice surface root, not generic child nodes");
   assert.ok(skin.css.includes("mobile-room-return"));
   assert.ok(skin.css.includes('[data-ws-plugin-part="kaak-workspace.workspace"][data-session-connected="true"][data-mobile-channels="true"] [data-ws-plugin-part="kaak-workspace.mobile-room-menu"]'), "the room menu stays hidden on the channel tree page");
@@ -934,6 +938,40 @@ test("the full voice surface example packages share-aware members and host-owned
   assert.equal(openMemberWatchAction?.type, "voice.joinScreenShare");
   assert.equal(openMemberWatchAction?.args.streamId, "{{member.screenShareStreamId}}");
   assert.ok(skin.css.includes("@media (max-width: 800px)"));
+});
+
+test("the Discord Voice package imports portable home and voice surfaces", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/discord-voice.wskin", import.meta.url));
+  const file = new File([archive], "discord-voice.wskin", { type: "application/octet-stream" });
+  const skin = await importSkinPack(file);
+  assert.equal(skin.id, "community.discord-voice");
+  assert.equal(skin.packageType, "open-skin");
+  assert.equal(skin.schemaVersion, 3);
+  assert.deepEqual(skin.pluginData?.components.map(({ id, page, mode }) => [id, page, mode]), [
+    ["discord-home", "home", "surface"],
+    ["discord-workspace", "voice", "surface"],
+  ]);
+  const voice = skin.pluginData?.components.find((component) => component.page === "voice");
+  assert.ok(voice?.permissions.includes("ui.surface.replace"));
+  assert.ok(voice?.permissions.includes("session.channels.read"));
+  assert.ok(voice?.permissions.includes("session.members.read"));
+  assert.ok(voice?.permissions.includes("chat.channel.send"));
+  assert.ok(voice?.permissions.includes("audio.microphone.control"));
+  assert.ok(voice?.permissions.includes("voice.screenShare.control"));
+  assert.equal(voice?.actions["copy-invite-link"]?.type, "session.copyInviteLink");
+  assert.equal(skin.runtimePlugins?.plugins.length ?? 0, 0, "the open skin contains no executable plugin code");
+  const baseMessageKeys = Object.keys(skin.contentData?.locales.en?.messages ?? {}).sort();
+  for (const locale of ["zh-CN", "de", "ru", "ja"]) {
+    assert.deepEqual(
+      Object.keys(skin.contentData?.locales[locale]?.messages ?? {}).sort(),
+      baseMessageKeys,
+      `Discord Voice provides complete skin copy for ${locale}`,
+    );
+  }
+  assert.ok(skin.css.includes("--skin-discord-bg-guilds"));
+  assert.doesNotMatch(skin.css, /\.ws-skin-root\[data-ws-skin="community\.discord-voice"\]\s+(?:strong|time)\b/, "host chat text styles stay scoped to public chat parts");
+  assert.doesNotMatch(skin.css, /(?:^|[\s,])\.message-(?:meta|row|body|bubble|composer)\b/, "the package does not depend on private chat CSS classes");
+  assert.ok(skin.css.includes("@media (max-width: 760px)"));
 });
 
 test("the Harbor voice skin imports a complete voice-only KOOK-inspired workspace", async () => {

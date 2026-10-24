@@ -12,7 +12,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { BlockList, isIP } from "node:net";
-import { identityFromString } from "@echosixhiya/teamspeak-client";
+import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { TSClient, type TSClientOptions } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
 import { clientConnectionFailureCode, describeTeamSpeakError, normalizeTeamSpeakError } from "../errors.js";
@@ -29,6 +29,17 @@ import { OpusEncoder } from "./opus-codec.js";
 import { avatarDataUrl } from "./directory-view.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const MAX_MISSED_HEARTBEATS = 2;
+const MAX_LOGGED_WEBSOCKET_CLOSE_REASON_LENGTH = 160;
+
+function sanitizeWebSocketCloseReason(reason: Buffer): string {
+  return reason.toString("utf8")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_LOGGED_WEBSOCKET_CLOSE_REASON_LENGTH);
+}
+
 function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>): string | undefined {
   const serverMessage = error.diagnostics.serverMessage?.trim();
   const serverId = error.diagnostics.id?.trim();
@@ -86,6 +97,8 @@ interface WebClientEntry extends SessionDirectoryState {
   eventLog: ServerEvent[];
   audioTransport: SessionAudioTransport | null;
   isAlive: boolean;
+  lastPongAt: number;
+  missedHeartbeats: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   audio: AudioFlowStats;
   webrtc: WebRtcAudioSession | null;
@@ -161,7 +174,7 @@ export class VoiceBridge {
       const webrtcPublicHost = resolveWebRtcPublicHost(req);
       let identity;
       try {
-        identity = connection.identity ? identityFromString(connection.identity) : undefined;
+        identity = connection.identity ? parseIdentity(connection.identity) : undefined;
       } catch {
         // Send a structured failure before the close so the browser can tell
         // an invalid remembered identity apart from a real connection failure.
@@ -235,6 +248,8 @@ export class VoiceBridge {
         whisperTargetIds: new Set(),
         whisperActive: false,
         isAlive: true,
+        lastPongAt: Date.now(),
+        missedHeartbeats: 0,
         reconnectTimer: null,
         audio: createAudioFlowStats(),
         webrtc: null,
@@ -536,7 +551,12 @@ export class VoiceBridge {
       });
       entry.events = events;
 
-      ws.on("pong", () => { if (entry) entry.isAlive = true; });
+      ws.on("pong", () => {
+        if (!entry) return;
+        entry.isAlive = true;
+        entry.lastPongAt = Date.now();
+        entry.missedHeartbeats = 0;
+      });
       ws.on("message", (data: Buffer | string, isBinary: boolean) => {
         if (this.entries.get(entryId) !== entry) return;
         if (isBinary) {
@@ -588,8 +608,19 @@ export class VoiceBridge {
         void handleCommand(entry!, command, sendJson);
       });
 
-      ws.on("close", () => {
-        this.logger.info({ entryId }, "WebSocket closed");
+      ws.on("close", (code, reason) => {
+        const closedAt = Date.now();
+        this.logger.info({
+          entryId,
+          closeCode: code,
+          closeReason: sanitizeWebSocketCloseReason(reason),
+          abnormalClose: code === 1006,
+          ...(entry ? {
+            lastPongAt: new Date(entry.lastPongAt).toISOString(),
+            lastPongAgeMs: Math.max(0, closedAt - entry.lastPongAt),
+            missedHeartbeats: entry.missedHeartbeats,
+          } : {}),
+        }, "WebSocket closed");
         void this.teardown(entryId, "websocket-close");
       });
 
@@ -712,6 +743,9 @@ export class VoiceBridge {
       target: formatTeamSpeakTarget(entry.target),
       ...(entry.accelerationRelay ? { relayName: entry.accelerationRelay.name, relayTarget: entry.accelerationRelay.target } : {}),
       reason,
+      lastPongAt: new Date(entry.lastPongAt).toISOString(),
+      lastPongAgeMs: Math.max(0, Date.now() - entry.lastPongAt),
+      missedHeartbeats: entry.missedHeartbeats,
       ...(entry.connectionFailureCode ? { failureCode: entry.connectionFailureCode } : {}),
       durationSeconds: Math.max(0, Math.floor((Date.now() - entry.session.createdAt) / 1000)),
       audio: { ...entry.audio },
@@ -720,19 +754,33 @@ export class VoiceBridge {
 
   private startHeartbeat(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-    this.heartbeatTimer = setInterval(() => {
-      for (const entry of this.entries.values()) {
-        if (entry.ws.readyState !== WebSocket.OPEN) continue;
-        if (!entry.isAlive) {
+    this.heartbeatTimer = setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL_MS);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private checkHeartbeats(): void {
+    for (const entry of this.entries.values()) {
+      if (entry.ws.readyState !== WebSocket.OPEN) continue;
+      if (!entry.isAlive) {
+        entry.missedHeartbeats += 1;
+        const lastPongAgeMs = Math.max(0, Date.now() - entry.lastPongAt);
+        const timedOut = entry.missedHeartbeats >= MAX_MISSED_HEARTBEATS;
+        this.logger.warn({
+          entryId: entry.id,
+          missedHeartbeats: entry.missedHeartbeats,
+          maxMissedHeartbeats: MAX_MISSED_HEARTBEATS,
+          lastPongAt: new Date(entry.lastPongAt).toISOString(),
+          lastPongAgeMs,
+        }, timedOut ? "WebSocket heartbeat timed out" : "WebSocket heartbeat missed; retrying");
+        if (timedOut) {
           entry.ws.terminate();
           void this.teardown(entry.id, "heartbeat-timeout");
           continue;
         }
-        entry.isAlive = false;
-        entry.ws.ping();
       }
-    }, HEARTBEAT_INTERVAL_MS);
-    this.heartbeatTimer.unref?.();
+      entry.isAlive = false;
+      entry.ws.ping();
+    }
   }
 
   private resolveConnection(url: URL): JoinTicketPayload | null {
@@ -845,11 +893,14 @@ export class VoiceBridge {
   }
 }
 
-function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
+export function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
   const origin = firstHeader(request.headers.origin);
   const forwardedHost = firstHeader(request.headers["x-forwarded-host"]);
   const directHost = firstHeader(request.headers.host);
-  for (const candidate of [origin, forwardedHost, directHost]) {
+  // The page can be hosted on the ingress gateway while its voice socket is
+  // connected to a different relay node. ICE candidates must name the socket's
+  // gateway, not the page's Origin.
+  for (const candidate of [forwardedHost, directHost, origin]) {
     const host = normalizeWebRtcHost(candidate);
     if (host) return host;
   }

@@ -62,9 +62,11 @@ export function createVoiceConnection(options: ConnectionOptions) {
     options.onFailure(failure);
   }
 
-  function openSocket(record: Attempt, ticket: string): void {
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${location.host}/ws/voice?ticket=${encodeURIComponent(ticket)}`);
+  function openSocket(record: Attempt, ticket: string, voiceEndpoint?: string): void {
+    let socketUrl: string;
+    try { socketUrl = buildVoiceSocketUrl(ticket, voiceEndpoint); }
+    catch (cause) { fail(record, { code: "VOICE_GATEWAY_UNAVAILABLE", cause }); return; }
+    const socket = new WebSocket(socketUrl);
     record.socket = socket;
     socket.binaryType = "arraybuffer";
     options.onSocket(socket);
@@ -112,7 +114,7 @@ export function createVoiceConnection(options: ConnectionOptions) {
       // TeamSpeak handshake, which has its own gateway connection policy.
       clearDeadline(record);
       record.controller = null;
-      openSocket(record, result.ticket);
+      openSocket(record, result.ticket, typeof result.voiceEndpoint === "string" ? result.voiceEndpoint : undefined);
     } catch (cause) {
       fail(record, { code: "REQUEST_FAILED", cause });
     }
@@ -129,4 +131,17 @@ export function createVoiceConnection(options: ConnectionOptions) {
       void requestTicket(record, body, ready);
     },
   };
+}
+
+function buildVoiceSocketUrl(ticket: string, endpoint?: string): string {
+  const securePage = location.protocol === "https:";
+  const base = endpoint ? new URL(endpoint) : new URL(`${securePage ? "https:" : "http:"}//${location.host}`);
+  if ((base.protocol !== "https:" && base.protocol !== "http:") || base.username || base.password
+    || base.pathname !== "/" || base.search || base.hash || securePage && base.protocol !== "https:") {
+    throw new Error("Invalid voice gateway endpoint");
+  }
+  base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+  base.pathname = "/ws/voice";
+  base.search = `?ticket=${encodeURIComponent(ticket)}`;
+  return base.toString();
 }

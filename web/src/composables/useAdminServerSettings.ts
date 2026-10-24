@@ -6,7 +6,7 @@ import { createAdminRequests } from "../services/admin-requests.js";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget, suggestedTeamSpeakPort } from "../services/teamspeak-target.js";
 
 type SecretAction = "keep" | "replace" | "remove";
-interface RelayNodeForm { id: string; name: string; enabled: boolean; target: string; token: string; tokenAction: SecretAction; hasToken: boolean }
+interface RelayNodeForm { id: string; name: string; enabled: boolean; target: string; voiceEndpoint: string; token: string; tokenAction: SecretAction; hasToken: boolean }
 interface ProbeState { ok: boolean; checkType?: "network" | "protocol"; latencyMs?: number; serverName?: string | null; packetLossPercent?: number; code?: string; errorCode?: string }
 interface Options { api: AdminApi; errorMessage: Ref<string>; errorText(code?: string): string; refreshOverview(): Promise<void> }
 
@@ -23,6 +23,7 @@ const snapshot = (form: ServerForm): ServerForm => JSON.parse(JSON.stringify(for
 export function useAdminServerSettings(options: Options) {
   const requests = createAdminRequests();
   const serverForm = reactive(emptyForm());
+  const savedSettings = ref<AdminSettings | null>(null);
   const serverSaving = ref(false);
   const testing = ref(false);
   const testResult = ref<ProbeState | null>(null);
@@ -38,7 +39,7 @@ export function useAdminServerSettings(options: Options) {
     serverSaving.value = false;
     testing.value = false;
   }
-  function reset() { cancelRequests(); Object.assign(serverForm, emptyForm()); testResult.value = null; }
+  function reset() { cancelRequests(); Object.assign(serverForm, emptyForm()); savedSettings.value = null; testResult.value = null; }
   onScopeDispose(cancelRequests);
   function invalidateProbe() {
     probeRevision++;
@@ -53,6 +54,7 @@ export function useAdminServerSettings(options: Options) {
   }, { flush: "sync" });
 
   function mergeSettings(value: AdminSettings, baseline: ServerForm, observedProbeRevision: number): void {
+    savedSettings.value = structuredClone(value);
     const target = splitTeamSpeakTarget(value.target);
     const next: ServerForm = { ...emptyForm(), ...value, address: target.address, port: target.port,
       relayNodes: value.relayNodes.map(node => ({ ...node, token: "", tokenAction: "keep" })),
@@ -85,7 +87,7 @@ export function useAdminServerSettings(options: Options) {
           const old = oldNodes.get(node.id), saved = savedNodes.get(node.id);
           if (!old || !saved) return node;
           const merged = { ...node, hasToken: saved.hasToken };
-          for (const key of ["name", "target", "enabled"] as const) {
+          for (const key of ["name", "target", "voiceEndpoint", "enabled"] as const) {
             if (node[key] === old[key]) Object.assign(merged, { [key]: saved[key] });
           }
           if (node.token === old.token && node.tokenAction === old.tokenAction) {
@@ -103,7 +105,7 @@ export function useAdminServerSettings(options: Options) {
       welcomeText: serverForm.welcomeText, welcomeTextEn: serverForm.welcomeTextEn, welcomeTextDe: serverForm.welcomeTextDe, welcomeTextRu: serverForm.welcomeTextRu, welcomeTextJa: serverForm.welcomeTextJa,
       webRtcPublicHost: serverForm.webRtcPublicHost, webRtcIpv6Enabled: serverForm.webRtcIpv6Enabled, webRtcStunServer: serverForm.webRtcStunServer,
       webRtcEnabled: serverForm.webRtcEnabled, webRtcUdpStart: serverForm.webRtcUdpStart, webRtcUdpEnd: serverForm.webRtcUdpEnd,
-      relayNodes: serverForm.relayNodes.map(node => ({ id: node.id, name: node.name, target: node.target, enabled: node.enabled, tokenAction: node.tokenAction, ...(node.tokenAction === "replace" ? { token: node.token } : {}) })) };
+      relayNodes: serverForm.relayNodes.map(node => ({ id: node.id, name: node.name, target: node.target, voiceEndpoint: node.voiceEndpoint, enabled: node.enabled, tokenAction: node.tokenAction, ...(node.tokenAction === "replace" ? { token: node.token } : {}) })) };
   }
   function report(error: unknown) {
     if (!isAdminRequestCancelled(error)) options.errorMessage.value = options.errorText((error as { code?: string }).code);
@@ -148,8 +150,8 @@ export function useAdminServerSettings(options: Options) {
     } finally { if (request.isCurrent()) testing.value = false; request.finish(); }
   }
   function addRelayNode() {
-    serverForm.relayNodes.push({ id: `relay-new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: "", enabled: false, target: "", token: "", tokenAction: "replace", hasToken: false });
+    serverForm.relayNodes.push({ id: `relay-new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, name: "", enabled: false, target: "", voiceEndpoint: "", token: "", tokenAction: "replace", hasToken: false });
   }
   function removeRelayNode(index: number) { serverForm.relayNodes.splice(index, 1); }
-  return { serverForm, serverSaving, testing, testResult, loadServerSettings, saveServerSettings, testServerConnection, addRelayNode, removeRelayNode, cancelRequests, reset };
+  return { serverForm, savedSettings, serverSaving, testing, testResult, loadServerSettings, saveServerSettings, testServerConnection, addRelayNode, removeRelayNode, cancelRequests, reset };
 }

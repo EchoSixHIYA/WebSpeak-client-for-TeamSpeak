@@ -1,8 +1,9 @@
-import type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput } from "../shared/admin-inputs.js";
-export type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput } from "../shared/admin-inputs.js";
+import type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput, TsAdminSettingsInput } from "../shared/admin-inputs.js";
+export type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput, TsAdminSettingsInput } from "../shared/admin-inputs.js";
 import type { AdminOverview, AdminSettings } from "../shared/admin-responses.js";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
+import { isIP } from "node:net";
 import type { Logger } from "../logger.js";
 import { loadConfig } from "../config.js";
 import { DEFAULT_TEAM_SPEAK_PORT, formatTeamSpeakTarget, parseTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
@@ -18,6 +19,9 @@ import type { WebRtcAudioOptions } from "../server/webrtc-audio.js";
 import { DEFAULT_ACCELERATION_RELAY_PORT, type ConfiguredAccelerationRelay } from "../server/acceleration-relay.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_MAX, WEBRTC_UDP_PORT_MIN } from "../server/webrtc-config.js";
 import { DEFAULT_WELCOME_TEXTS, resolveWelcomeTexts } from "../site-copy.js";
+import { TsAdminService, type TsAdminQueryClientFactory } from "./ts-admin-service.js";
+import { AdminInputError } from "./admin-errors.js";
+export { AdminInputError } from "./admin-errors.js";
 
 export interface ConnectionPolicy {
   defaultTarget: string;
@@ -40,6 +44,7 @@ export interface ManagedInviteView {
 type ProbeFunction = typeof probeTeamSpeak;
 
 export class AdminService {
+  private readonly tsAdmin: TsAdminService;
   constructor(
     readonly database: WebSpeakDatabase,
     private readonly masterSecret: Buffer,
@@ -47,7 +52,13 @@ export class AdminService {
     private readonly legacyConfigPath: string,
     private readonly probe: ProbeFunction = probeTeamSpeak,
     private readonly version = "0.1.0",
-  ) {}
+    tsAdminClientFactory?: TsAdminQueryClientFactory,
+  ) {
+    this.tsAdmin = new TsAdminService(database, masterSecret, logger, () => {
+      const settings = database.getSettings();
+      return { mode: settings.accessMode, target: settings.tsTarget || formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort }) };
+    }, tsAdminClientFactory);
+  }
 
   async initialize(): Promise<void> {
     this.importLegacyConfigOnce();
@@ -154,7 +165,7 @@ export class AdminService {
       if (!node.enabled || !node.host || !node.tokenEncrypted) continue;
       try {
         const token = decryptSecret(node.tokenEncrypted, this.masterSecret);
-        relays.push({ id: node.id, name: node.name, relayHost: node.host, relayPort: node.port, token });
+        relays.push({ id: node.id, name: node.name, relayHost: node.host, relayPort: node.port, token, voiceEndpoint: node.voiceEndpoint || defaultRelayVoiceEndpoint(node.host) });
       } catch (error: unknown) {
         this.logger.error({ err: error instanceof Error ? error.message : String(error), relayId: node.id }, "Stored acceleration relay token could not be decrypted");
       }
@@ -172,6 +183,10 @@ export class AdminService {
     const settings = this.normalizeSettings(input, current, relayNodes);
     const targetChanged = current.tsHost !== settings.tsHost || current.tsPort !== settings.tsPort || current.tsTarget !== settings.tsTarget;
     this.database.updateSettings(settings);
+    if (settings.accessMode === "open") {
+      const tsAdmin = this.database.getTsAdminSettings();
+      if (tsAdmin.enabled) this.database.updateTsAdminSettings({ ...tsAdmin, enabled: false });
+    }
     if (relayNodes !== undefined) {
       this.database.replaceRelayNodes(relayNodes);
     } else if (input.relaySettingsAction && input.relaySettingsAction !== "keep") {
@@ -310,6 +325,11 @@ export class AdminService {
     if (revoked) this.database.addAudit("INVITE_REVOKED", { id });
     return revoked;
   }
+
+  getTsAdminSettings() { return this.tsAdmin.settings(); }
+  saveTsAdminSettings(input: TsAdminSettingsInput): void { this.tsAdmin.save(input); }
+  getTsAdminOverview() { return this.tsAdmin.overview(); }
+  runTsAdminAction(input: unknown) { return this.tsAdmin.action(input); }
 
   getManagedInvite(token: string): { target: string; channel: string } | null {
     if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) return null;
@@ -482,6 +502,8 @@ export class AdminService {
       if (seen.has(id)) throw new AdminInputError("INVALID_RELAY_ID", "Relay id must be unique");
       seen.add(id);
       const previous = current.get(id);
+      const voiceEndpointInput = typeof input.voiceEndpoint === "string" ? input.voiceEndpoint.trim() : previous?.voiceEndpoint ?? "";
+      const voiceEndpoint = normalizeRelayVoiceEndpoint(voiceEndpointInput, target.host);
       const tokenAction = input.tokenAction ?? (input.token === undefined ? "keep" : "replace");
       let tokenEncrypted = previous?.tokenEncrypted ?? null;
       if (tokenAction === "remove") tokenEncrypted = null;
@@ -498,6 +520,7 @@ export class AdminService {
         enabled: input.enabled === true,
         host: target.host,
         port: target.port,
+        voiceEndpoint,
         tokenEncrypted,
         createdAt: previous?.createdAt ?? now,
         updatedAt: now,
@@ -513,12 +536,13 @@ export class AdminService {
     }
   }
 
-  private getRelayNodeViews(): Array<{ id: string; name: string; enabled: boolean; target: string; hasToken: boolean }> {
+  private getRelayNodeViews(): Array<{ id: string; name: string; enabled: boolean; target: string; voiceEndpoint: string; hasToken: boolean }> {
     return this.database.listRelayNodes().map((node) => ({
       id: node.id,
       name: node.name,
       enabled: node.enabled,
       target: formatRelayTarget(node.host, node.port),
+      voiceEndpoint: node.voiceEndpoint || defaultRelayVoiceEndpoint(node.host),
       hasToken: Boolean(node.tokenEncrypted),
     }));
   }
@@ -533,6 +557,7 @@ export class AdminService {
       enabled: settings.relayEnabled,
       host: settings.relayHost,
       port: settings.relayPort || DEFAULT_ACCELERATION_RELAY_PORT,
+      voiceEndpoint: defaultRelayVoiceEndpoint(settings.relayHost),
       tokenEncrypted: settings.relayTokenEncrypted,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
@@ -630,13 +655,25 @@ function settingsTarget(settings: { tsHost: string; tsPort: number; tsTarget?: s
   return settings.tsTarget ?? formatTeamSpeakTarget({ host: settings.tsHost, port: settings.tsPort });
 }
 
-function formatRelayTarget(host: string, port: number): string {
-  return `${host.includes(":") ? `[${host}]` : host}#${port}`;
+function defaultRelayVoiceEndpoint(host: string): string {
+  const formattedHost = isIP(host) === 6 ? `[${host}]` : host;
+  return `https://${formattedHost}`;
 }
 
-export class AdminInputError extends Error {
-  constructor(readonly code: string, message: string) {
-    super(message);
-    this.name = "AdminInputError";
+function normalizeRelayVoiceEndpoint(value: string, relayHost: string): string {
+  const endpoint = value || defaultRelayVoiceEndpoint(relayHost);
+  let parsed: URL;
+  try { parsed = new URL(endpoint); }
+  catch { throw new AdminInputError("INVALID_RELAY_VOICE_ENDPOINT", "Relay voice gateway address must be an HTTP(S) origin"); }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const local = hostname === "localhost" || hostname === "::1" || hostname === "127.0.0.1" || hostname.startsWith("127.");
+  if ((parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local))
+    || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+    throw new AdminInputError("INVALID_RELAY_VOICE_ENDPOINT", "Relay voice gateway must use HTTPS and contain only an origin");
   }
+  return parsed.origin;
+}
+
+function formatRelayTarget(host: string, port: number): string {
+  return `${host.includes(":") ? `[${host}]` : host}#${port}`;
 }

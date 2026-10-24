@@ -1,90 +1,15 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { Resolver as TeamSpeakResolver } from "@echosixhiya/teamspeak-client/discovery";
-import type { AddrResolver, ResolvedAddr } from "@echosixhiya/teamspeak-client";
-import { formatTeamSpeakTarget, parseTeamSpeakTarget } from "../domain/teamspeak-target.js";
 
 const LOCAL_ALIAS_LOOKUP_TIMEOUT_MS = 1_000;
-const NICKNAME_LOOKUP_TIMEOUT_MS = 3_000;
 
 type LocalAddress = { address: string; family: number };
 type LocalLookup = (hostname: string) => Promise<LocalAddress[]>;
 
-interface WebSpeakTeamSpeakResolverOptions {
-  baseResolver?: AddrResolver;
-  localLookup?: LocalLookup;
-  localAliasLookupTimeoutMs?: number;
-  nicknameLookupTimeoutMs?: number;
-}
-
 /**
- * Keep TeamSpeak nickname discovery for normal names, while allowing an
- * internal short hostname (for example a Docker Compose service name) to use
- * the local resolver directly. Bound cloud nickname discovery so a network
- * black hole cannot prevent the SDK's direct-host fallback indefinitely.
+ * Resolve an internal short hostname before the upstream SDK's SRV/TSDNS and
+ * optional nickname resolution. Public hosts are left to the SDK's resolver.
  */
-export class WebSpeakTeamSpeakResolver implements AddrResolver {
-  private readonly baseResolver: AddrResolver;
-  private readonly localLookup: LocalLookup;
-  private readonly localAliasLookupTimeoutMs: number;
-  private readonly nicknameLookupTimeoutMs: number;
-
-  constructor(options: WebSpeakTeamSpeakResolverOptions = {}) {
-    this.baseResolver = options.baseResolver ?? new TeamSpeakResolver();
-    this.localLookup = options.localLookup ?? ((hostname) => lookup(hostname, { all: true, verbatim: true }));
-    this.localAliasLookupTimeoutMs = options.localAliasLookupTimeoutMs ?? LOCAL_ALIAS_LOOKUP_TIMEOUT_MS;
-    this.nicknameLookupTimeoutMs = options.nicknameLookupTimeoutMs ?? NICKNAME_LOOKUP_TIMEOUT_MS;
-  }
-
-  async resolve(address: string, signal?: AbortSignal): Promise<ResolvedAddr[]> {
-    if (signal?.aborted) throw signal.reason ?? new Error("TeamSpeak address resolution was aborted");
-
-    let target;
-    try {
-      target = parseTeamSpeakTarget(address);
-    } catch {
-      return this.resolveBase(address, signal);
-    }
-
-    const { host, port } = target;
-    if (isIP(host) || host === "localhost" || host.includes(".")) {
-      return this.resolveBase(address, signal);
-    }
-
-    const localAddress = await resolveLocalTeamSpeakAlias(host, {
-      lookup: this.localLookup, timeoutMs: this.localAliasLookupTimeoutMs, signal,
-    });
-    if (localAddress) {
-      return [directAddress(localAddress, port)];
-    }
-
-    const baseResults = await this.resolveBaseWithTimeout(address, signal);
-    return baseResults?.length ? baseResults : [directAddress(host, port)];
-  }
-
-  private resolveBase(address: string, signal?: AbortSignal): Promise<ResolvedAddr[]> {
-    return this.baseResolver.resolve(address, signal);
-  }
-
-  private async resolveBaseWithTimeout(address: string, signal?: AbortSignal): Promise<ResolvedAddr[] | null> {
-    const timeoutController = new AbortController();
-    const combinedSignal = signal ? AbortSignal.any([signal, timeoutController.signal]) : timeoutController.signal;
-    try {
-      return await raceWithTimeout(
-        Promise.resolve().then(() => this.baseResolver.resolve(address, combinedSignal)),
-        this.nicknameLookupTimeoutMs,
-        signal,
-      );
-    } catch (error: unknown) {
-      if (signal?.aborted) throw signal.reason ?? error;
-      return null;
-    } finally {
-      timeoutController.abort(new Error("TeamSpeak nickname lookup timed out"));
-    }
-  }
-}
-
-/** Keep Docker/service names local before attempting public nickname discovery. */
 export async function resolveLocalTeamSpeakAlias(
   host: string,
   options: { lookup?: LocalLookup; timeoutMs?: number; signal?: AbortSignal } = {},
@@ -100,14 +25,6 @@ export async function resolveLocalTeamSpeakAlias(
     return null;
   });
   return addresses?.find(({ address }) => isPrivateNetworkAddress(address))?.address;
-}
-
-function directAddress(host: string, port: number): ResolvedAddr {
-  return {
-    addr: formatTeamSpeakTarget({ host, port }),
-    source: "Direct",
-    expiry: new Date(0),
-  };
 }
 
 function isPrivateNetworkAddress(address: string): boolean {

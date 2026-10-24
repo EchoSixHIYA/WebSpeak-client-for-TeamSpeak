@@ -144,37 +144,19 @@
             ><strong>WebSpeak</strong><small>{{ tr("adminConsole") }}</small></div
           ></div
         >
-        <nav
-          ><RouterLink
-            to="/admin"
-            exact-active-class="active"
-            ><Icon
-              name="activity"
-              :size="18"
-            />{{ tr("overview") }}</RouterLink
-          ><RouterLink
-            to="/admin/server"
-            active-class="active"
-            ><Icon
-              name="server"
-              :size="18"
-            />{{ tr("server") }}</RouterLink
-          ><RouterLink
-            to="/admin/operations"
-            active-class="active"
-            ><Icon
-              name="users"
-              :size="18"
-            />{{ tr("operations") }}</RouterLink
-          ><RouterLink
-            to="/admin/skins"
-            active-class="active"
-            ><Icon
-              name="compass"
-              :size="18"
-            />{{ tr("skinLibrary") }}</RouterLink
-          ></nav
-        >
+        <nav :aria-label="tr('adminConsole')" class="admin-primary-nav">
+          <div class="admin-nav-group">
+            <span class="admin-nav-heading">{{ tr('adminWsGroup') }}</span>
+            <RouterLink to="/admin" exact-active-class="active"><Icon name="activity" :size="18" />{{ tr('overview') }}</RouterLink>
+            <RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('adminInstanceSettings') }}</RouterLink>
+            <RouterLink to="/admin/operations" active-class="active"><Icon name="users" :size="18" />{{ tr('adminInstanceOperations') }}</RouterLink>
+            <RouterLink to="/admin/skins" active-class="active"><Icon name="compass" :size="18" />{{ tr('skinLibrary') }}</RouterLink>
+          </div>
+          <div class="admin-nav-group">
+            <span class="admin-nav-heading">{{ tr('adminTsGroup') }}<span class="admin-optional">{{ tr('adminOptional') }}</span></span>
+            <RouterLink to="/admin/ts-admin" active-class="active"><Icon name="shield" :size="18" />{{ tr('tsAdminTitle') }}</RouterLink>
+          </div>
+        </nav>
         <div class="sidebar-bottom"
           ><a
             href="/"
@@ -202,7 +184,7 @@
       >
         <header class="admin-topbar">
           <div class="admin-page-title"
-            ><small>{{ tr("adminConsole") }}</small
+            ><small>{{ currentScope }}</small
             ><h1>{{ currentPageTitle }}</h1></div
           >
           <div class="admin-tools">
@@ -243,6 +225,7 @@
         <AdminServerSettings
           v-if="route.path === '/admin/server'"
           :model="serverSettings"
+          :initial-section="initialSection"
           :i18n="i18n"
           v-model:welcome-language="welcomeLanguage"
           @webrtc-toggle="handleWebRtcToggle"
@@ -250,12 +233,20 @@
         <AdminOperations
           v-else-if="route.path === '/admin/operations'"
           :model="adminOperations"
+          :initial-section="initialSection"
           :i18n="i18n"
         />
         <AdminSkins
           v-else-if="route.path === '/admin/skins'"
           :model="adminSkins"
           :i18n="i18n"
+        />
+        <AdminTsAdmin
+          v-else-if="route.path === '/admin/ts-admin'"
+          :model="adminTsAdmin"
+          :i18n="i18n"
+          :target-address="savedTsTarget.address"
+          :target-port="savedTsTarget.port"
         />
 
         <section
@@ -275,8 +266,8 @@
           <div class="hero-status"
             ><div
               ><small>{{ tr("systemStatus") }}</small
-              ><h2>{{ tr("everythingRunning") }}</h2
-              ><p>{{ tr("overviewLead") }}</p></div
+              ><h2>{{ tr("adminWsOverviewTitle") }}</h2
+              ><p>{{ tr("adminWsOverviewLead") }}</p></div
             ><span class="status-badge"><i></i>{{ tr("running") }}</span></div
           >
           <div class="metric-grid"
@@ -306,6 +297,21 @@
               ><em>{{ tr("peakSessions", { count: overview.sessions.peak }) }}</em></article
             ></div
           >
+          <div class="admin-domain-grid">
+            <article class="overview-card admin-domain-card">
+              <header><div><h3><Icon name="waveform" :size="20" />{{ tr('adminWsGroup') }}</h3><p>{{ tr('adminWsManageLead') }}</p></div></header>
+              <div class="admin-domain-links">
+                <RouterLink to="/admin/server"><Icon name="server" :size="17" />{{ tr('adminInstanceSettings') }}</RouterLink>
+                <RouterLink to="/admin/operations"><Icon name="users" :size="17" />{{ tr('adminInstanceOperations') }}</RouterLink>
+                <RouterLink to="/admin/skins"><Icon name="compass" :size="17" />{{ tr('skinLibrary') }}</RouterLink>
+              </div>
+            </article>
+            <article class="overview-card admin-domain-card">
+              <header><div><h3><Icon name="shield" :size="20" />{{ tr('adminTsGroup') }}<span class="admin-optional">{{ tr('adminOptional') }}</span></h3><p>{{ tr('adminTsManageLead') }}</p></div></header>
+              <div class="admin-capability-list"><span>{{ tr('tsAdminServerSettings') }}</span><span>{{ tr('tsAdminChannels') }}</span><span>{{ tr('tsAdminClients') }}</span><span>{{ tr('tsAdminBans') }}</span></div>
+              <RouterLink to="/admin/ts-admin" class="admin-domain-entry">{{ tr('adminTsEntry') }}<Icon name="chevron-right" :size="16" /></RouterLink>
+            </article>
+          </div>
           <div class="overview-columns"
             ><article class="overview-card target-health-card"
               ><header
@@ -393,11 +399,14 @@ import Icon from "../components/Icon.vue";
 import AdminServerSettings from "../components/admin/AdminServerSettings.vue";
 import AdminOperations from "../components/admin/AdminOperations.vue";
 import AdminSkins from "../components/admin/AdminSkins.vue";
+import AdminTsAdmin from "../components/admin/AdminTsAdmin.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import { createAdminRequests } from "../services/admin-requests.js";
 import { useAdminServerSettings } from "../composables/useAdminServerSettings.js";
 import { useAdminOperations } from "../composables/useAdminOperations.js";
 import { useAdminSkins } from "../composables/useAdminSkins.js";
+import { useAdminTsAdmin } from "../composables/useAdminTsAdmin.js";
+import { splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 import type { SiteLanguage } from "../../../src/site-copy.js";
 import { applyTheme, getStoredTheme, isDarkTheme, nextTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 
@@ -438,14 +447,19 @@ const emptyOverview = () => ({ gateway: { version: "", uptimeSeconds: 0 }, teamS
 const overview = reactive(emptyOverview());
 const webrtcPortNoticeOpen = ref(false);
 const serverSettings = useAdminServerSettings({ api: adminApi, errorMessage, errorText, refreshOverview: loadOverview });
-const { serverForm, loadServerSettings } = serverSettings;
+const { serverForm, savedSettings, loadServerSettings } = serverSettings;
+const savedTsTarget = computed(() => splitTeamSpeakTarget(savedSettings.value?.target));
+const initialSection = computed(() => typeof route.query.section === "string" ? route.query.section : undefined);
+const currentScope = computed(() => route.path === "/admin/ts-admin" ? tr("adminTsGroup") : tr("adminWsGroup"));
 const adminOperations = useAdminOperations({ api: adminApi, errorMessage, errorText, tr, refreshOverview: loadOverview });
 const { loadOperations } = adminOperations;
 const adminSkins = useAdminSkins({ api: adminApi, tr });
 const { loadSkinCatalog } = adminSkins;
+const adminTsAdmin = useAdminTsAdmin({ api: adminApi, errorMessage, errorText, tr });
+const { loadSettings: loadTsAdminSettings } = adminTsAdmin;
 
 const passwordStrength = computed(() => Math.min(100, Math.max(8, newPassword.value.length * 5 + (/[\s\W]/.test(newPassword.value) ? 15 : 0))));
-const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('server') : route.path === "/admin/operations" ? tr('operations') : route.path === "/admin/skins" ? tr('skinLibrary') : tr('overview'));
+const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('adminInstanceSettings') : route.path === "/admin/operations" ? tr('adminInstanceOperations') : route.path === "/admin/skins" ? tr('skinLibrary') : route.path === "/admin/ts-admin" ? tr('tsAdminTitle') : tr('overview'));
 const targetStatusText = computed(() => overview.teamSpeak.status === "reachable" ? tr('reachable') : overview.teamSpeak.status === "unreachable" ? tr('unreachable') : tr('notTested'));
 const webrtcPortRangeText = computed(() => `${serverForm.webRtcUdpStart}–${serverForm.webRtcUdpEnd}`);
 
@@ -457,9 +471,11 @@ watch(() => route.path, (path, previous) => {
   if (previous === "/admin/server") serverSettings.cancelRequests();
   if (previous === "/admin/operations") adminOperations.cancelRequests();
   if (previous === "/admin/skins") adminSkins.cancelRequests();
+  if (previous === "/admin/ts-admin") adminTsAdmin.cancelRequests();
   if (screen.value !== "admin" || loading.value || submitting.value || loggingOut.value) return;
   if (path === "/admin/operations") void loadOperations();
   else if (path === "/admin/skins") void loadSkinCatalog();
+  else if (path === "/admin/ts-admin") void loadTsAdminSettings();
   else if (path === "/admin") void loadOverview();
 });
 
@@ -469,12 +485,13 @@ function cancelPendingWork() {
   serverSettings.cancelRequests();
   adminOperations.cancelRequests();
   adminSkins.cancelRequests();
+  adminTsAdmin.cancelRequests();
   loading.value = false;
   submitting.value = false;
   loggingOut.value = false;
 }
 function resetPrivateState() {
-  serverSettings.reset(); adminOperations.reset(); adminSkins.reset();
+  serverSettings.reset(); adminOperations.reset(); adminSkins.reset(); adminTsAdmin.reset();
   Object.assign(overview, emptyOverview());
   loginPassword.value = ""; newPassword.value = ""; confirmNewPassword.value = "";
   errorMessage.value = "";
@@ -488,6 +505,7 @@ async function loadAdminData(request: { isCurrent(): boolean }) {
   if (!request.isCurrent()) return;
   if (route.path === "/admin/operations") await loadOperations();
   else if (route.path === "/admin/skins") await loadSkinCatalog();
+  else if (route.path === "/admin/ts-admin") await loadTsAdminSettings();
 }
 async function loadAdminView() {
   const request = pageRequests.begin("auth");

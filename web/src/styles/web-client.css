@@ -27,37 +27,6 @@
   visibility: hidden;
 }
 
-.kook-connection-status {
-  position: fixed;
-  z-index: 40;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: calc(100% - 100px);
-  padding: 10px 14px;
-  border: 1px solid #424448;
-  border-radius: 10px;
-  color: #fff;
-  background: #252629;
-}
-
-.kook-connection-status button {
-  flex-shrink: 0;
-  padding: 7px 10px;
-  border-radius: 6px;
-  color: #fff;
-  background: #477f00;
-  cursor: pointer;
-}
-
-.kook-connection-status button:disabled {
-  opacity: .5;
-  cursor: default;
-}
-
 :global(html[data-ws-route="webclient"] .web-client .rail-avatar),
 :global(html[data-ws-route="webclient"] .web-client .server-avatar),
 :global(html[data-ws-route="webclient"] .web-client .profile-avatar),
@@ -8369,3 +8338,13 @@
     padding: 8px;
   }
 }
+
+/* Public voice.connection-status widget; package CSS controls its placement. */
+:deep(.voice-connection-status) { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--border,#dfe8e5); border-radius: 12px; background: var(--surface,#fff); color: var(--text,#20302c); }
+:deep(.voice-connection-status p) { flex: 1 1 180px; margin: 0; overflow-wrap: anywhere; font-size: 13px; }
+:deep(.voice-connection-status label) { display: grid; gap: 4px; width: 150px; max-width: 100%; font-size: 11px; }
+:deep(.voice-connection-status input) { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid var(--border,#dfe8e5); border-radius: 7px; background: var(--surface,#fff); color: inherit; font: inherit; font-size: 13px; }
+:deep(.voice-connection-status button) { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 9px 14px; border: 0; border-radius: 8px; background: var(--accent,#087d74); color: #fff; cursor: pointer; }
+:deep(.voice-connection-status button:disabled) { opacity: .5; cursor: not-allowed; }
+:deep(.voice-connection-status input:focus-visible), :deep(.voice-connection-status button:focus-visible) { outline: 3px solid var(--accent,#087d74); outline-offset: 2px; }
+.workspace-connection-status { position: fixed; z-index: 40; top: 12px; left: 50%; transform: translateX(-50%); width: min(640px,calc(100% - 28px)); }

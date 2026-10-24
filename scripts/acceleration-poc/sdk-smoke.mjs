@@ -1,4 +1,4 @@
-import { Client, generateIdentity } from "../../../teamspeak-js/dist/index.mjs";
+import { Client, generateIdentitySync } from "@honeybbq/teamspeak/client";
 import { createRelayClient } from "./relay-client.mjs";
 import { createRelayServer } from "./relay-server.mjs";
 import { parseEndpoint } from "./protocol.mjs";
@@ -38,7 +38,7 @@ try {
     token,
   });
 
-  tsClient = new Client(generateIdentity(8), `127.0.0.1:${relayClient.localPort}`, "acceleration-sdk-smoke");
+  tsClient = new Client(generateIdentitySync(8), `127.0.0.1:${relayClient.localPort}`, "acceleration-sdk-smoke");
   await withTimeout(tsClient.connect(), 15_000, "TS_CONNECT");
   console.log(`TS_ACCEL_CONNECTED target=${target.host}#${target.port}`);
   await new Promise((resolve) => setTimeout(resolve, 500));

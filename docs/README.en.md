@@ -37,12 +37,23 @@ Network conditions and load may vary at either demo. Latency, disconnections, or
 
 ## TeamSpeak version compatibility
 
-WebSpeak connects through the standard TeamSpeak client protocol, not ServerQuery or WebQuery, so no query credentials are required.
+Voice uses the standard TeamSpeak client protocol and needs no Query credentials. Optional TeamSpeak administration uses separate WebQuery / ServerQuery credentials.
 
 - **TeamSpeak 3**: protocol detection recognizes the leading `3.x` version. Older server releases should be validated with the specific deployment because not every historical release has been independently tested.
 - **TeamSpeak 6**: supported, including screen sharing with native TeamSpeak 6 clients.
 - **Auto-detection**: the gateway reads the server's `version` response and records the detected protocol in connection diagnostics.
-- The underlying [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) also speaks TeamSpeak 5, but WebSpeak targets TeamSpeak 3 and TeamSpeak 6.
+- The gateway uses the upstream [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) 1.0 SDK; WebSpeak targets TeamSpeak 3 and TeamSpeak 6.
+
+## Optional TeamSpeak administration
+
+WebSpeak administration and visitor voice do not depend on this feature. In fixed-server mode, open `/admin/ts-admin` to configure the TS management connection.
+
+1. Enable WebQuery on the TS server and have an authorized TS administrator create an API key. Enter the WebQuery HTTP/HTTPS URL and key. This is the TS Query endpoint, not the WebSpeak website. TS3 (3.12+) and TS6 are supported.
+2. Virtual server ID `0` selects the fixed target's voice port. For a restricted key, enter its authorized server ID. Read-only keys support viewing; changes require writable scope and the corresponding TS permissions.
+3. Alternatively, choose ServerQuery SSH, or ServerQuery TCP for TS3. Enter the Query host (blank uses the fixed target), Query port, username and password; SSH also requires a trusted host-key fingerprint. This is the TS Query service, not an operating-system SSH login. TCP is unencrypted and suitable only for trusted networks. HTTPS certificates must be trusted by the gateway.
+4. Save and connect or refresh to inspect the server, channels, members, server groups and bans. Actions include server settings, channel creation/renaming/deletion, moving/kicking/banning members by identity, group assignment and removing bans. Actions require confirmation and TS permission checks; lists refresh manually.
+
+Credentials are encrypted on the server and never returned by the API. Back up both the database and `master.key`. A failed management connection does not affect WebSpeak administration or ordinary voice. UID bans avoid banning other users sharing the gateway IP.
 
 ## 🖼️ Screenshots
 
@@ -105,7 +116,7 @@ Browser users and native TeamSpeak 6 clients can discover, start, and watch each
 
 Use a relay when a TeamSpeak server rejects connections from another region or when the direct path is unstable. It is not a VPN: it forwards only the TeamSpeak traffic of the current WebSpeak session, while the visitor still chooses the target server in the web page.
 
-A relay instance is a dedicated forwarding service with no visitor page or administration console. It accepts only gateway sessions with a matching token. Use a random token of at least 16 characters.
+A relay instance runs both the legacy UDP compatibility forwarder and a separate voice gateway, with no visitor page or administration console. The ingress gateway signs and delegates a one-time voice ticket with the shared token; the browser then connects directly to the relay, and the relay connects to TeamSpeak. The page stays on the ingress gateway URL. Use a random token of at least 16 characters.
 
 #### Run from source
 
@@ -113,7 +124,6 @@ A relay instance is a dedicated forwarding service with no visitor page or admin
 git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm run build
 WEBSPEAK_MODE=relay \
 WEBSPEAK_RELAY_TOKEN='replace-with-a-long-random-token' \
@@ -157,12 +167,20 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
   ghcr.io/echosixhiya/webspeak:latest
 ```
 
-Allow the relay host's UDP listen port, `39087` by default.
+The voice gateway listens on `127.0.0.1:3041` by default. Give the relay an HTTPS hostname and reverse-proxy it to `127.0.0.1:3041` with Caddy or an equivalent proxy, for example:
+
+```caddyfile
+relay.example.com {
+  reverse_proxy 127.0.0.1:3041
+}
+```
+
+In the ingress gateway's relay settings, set **Voice gateway address** to that HTTPS origin (for example, `https://relay.example.com`). The page remains on its original gateway, then opens a WSS connection to this relay hostname. WebRTC is enabled by default on the relay; also allow UDP `40000-40099` and set `WEBSPEAK_RELAY_WEBRTC_PUBLIC_HOST` to a public relay IP or directly reachable hostname. Update firewall rules if you change the WebRTC UDP range. Keep UDP `39087` open for compatibility with older forwarding.
 
 #### Enable it in the gateway
 
 1. Open **Administration → Servers → Relay server** and add one or more nodes.
-2. Set a custom display name, endpoint such as `relay.example.com#39087`, and matching token for each node, then save.
+2. Set a display name, UDP endpoint such as `relay.example.com#39087`, HTTPS voice gateway origin such as `https://relay.example.com`, and matching token for each node, then save.
 3. Visitors can choose direct access or one of the configured relays on the welcome page.
 
 Disable and save the relay configuration to remove the relay option from the welcome page.
@@ -273,7 +291,7 @@ Added bundled WebRTC, migrated the TeamSpeak SDK, and improved member synchroniz
 | --- | --- | --- |
 | Docker Compose (recommended) | Long-running servers, simple upgrades, and persistent data | Docker Engine + Docker Compose |
 | Release package | Running without Node.js or build dependencies | Windows x64 or Linux x64/ARM64 |
-| From source | Development, debugging, and customization | Node.js 22.5+, Git, and native build tools |
+| From source | Development, debugging, and customization | Node.js 22.12+, Git, and native build tools |
 
 ### Docker Compose (recommended)
 
@@ -313,7 +331,6 @@ Android APKs for `arm64-v8a`, `armeabi-v7a`, and `x86_64` are also attached. The
 git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build
@@ -344,9 +361,11 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain.
 | Data | Docker data is in `webspeak-data`; release packages and source installs use `data/`. Back up before upgrades. |
 | Session limit | One instance accepts up to 100 active browser sessions. |
 
-## Recent contributors
+## Contributors and contributions
 
-- Listed from GitHub's merge records; the version summaries above describe only changes included in each release.
-- [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) improved browser error translations; [PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) fixed scaling, floating layout, and the homepage footer.
+This list acknowledges the upstream SDK author, contributions through merged GitHub PRs, and original work adapted into independently distributed skin packages.
+
+- [HoneyBBQ](https://github.com/HoneyBBQ) — Author of the upstream [teamspeak-js (`@honeybbq/teamspeak`)](https://github.com/HoneyBBQ/teamspeak-js) SDK, which provides the TeamSpeak protocol client used by WebSpeak.
+- [LainHE](https://github.com/LainHE) — [merged PRs #2, #8, #28, #31–#35, #37, #38 and #40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE), covering browser error translations, scaling and home layout, screen-share bitrate and viewer avatars, relay target validation and recovery, trusted proxy handling, connection-failure propagation, audio fault reporting, and WebRTC failure cleanup.
 - [TimmySheep](https://github.com/TimmySheep) — [merged PRs #13 and #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep), covering existing TS6 share discovery, share aspect ratio, mobile voice/wake/skin-menu behavior, identity channel options, PWA/theme work, chat history, member audio states, and microphone permission.
-- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) added connections through registered TeamSpeak nicknames and preserved nickname targets in settings, favorites, and invitations.
+- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) added registered TeamSpeak nickname connections and preserved nickname targets; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) improved KAAK workspace retention and reconnection after the first connection. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) and [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) supplied the original Discord skin design and implementation (commit author **yumi**), later adapted by the WebSpeak project into an [independently distributed `.wskin` skin](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice).

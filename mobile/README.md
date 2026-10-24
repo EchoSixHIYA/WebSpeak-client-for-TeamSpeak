@@ -6,11 +6,10 @@ The Android app packages the Vue client with a small local gateway. Capacitor st
 
 Use a short checkout path such as `C:\src\webspeak`. The Node.js plugin's CMake/Ninja object paths can exceed the Windows toolchain limit in deeply nested workspaces. A clean build in a nested validation directory failed with CMake's 250-character object-path warning and a Ninja `mkdir` error; the same source and dependencies built successfully from a shorter path. Changing application code or the embedded runtime is not required for this build-host issue.
 
-Use the server development Node.js version (22.5 or newer) on the build host. Install all three dependency sets, then prepare and sync the Android project:
+Use Node.js 22.12 or newer on the build host. Install all three dependency sets, then prepare and sync the Android project:
 
 ```powershell
 npm ci --ignore-scripts --no-audit --no-fund
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
 npm --prefix web ci --no-audit --no-fund
 npm --prefix mobile ci --no-audit --no-fund
@@ -34,5 +33,5 @@ Gradle writes one APK per supported CPU architecture under `web/android/app/buil
 - The local gateway serves the join page, public configuration, skin package, join-ticket endpoint, and voice WebSocket bridge.
 - The admin console and server-side skin management are not available in the Android package.
 - Mobile audio encoding uses the JavaScript/WASM Opus codec. The normal server build continues to use the native Opus codec.
-- The embedded runtime supplied by the current Capacitor Node.js plugin is Node.js 18.20.4. The gateway, identity parsing, and Opus encode/decode paths have been smoke-checked on that runtime. The TeamSpeak SDK declares Node.js 20.19 or newer, so real TeamSpeak connectivity and two-way audio remain unverified on Android; the APKs are for sideload testing.
+- The embedded runtime supplied by the current Capacitor Node.js plugin is Node.js 18.20.4. The gateway, identity parsing, and Opus encode/decode paths have been smoke-checked on that runtime. The upstream TeamSpeak SDK 1.0 declares Node.js 22.12 or newer, so real TeamSpeak connectivity and two-way audio remain unverified on Android; the APKs are for sideload testing.
 - Android WebView on the tested emulator does not expose `getDisplayMedia`; screen sharing needs a native MediaProjection integration. A persistent Android foreground service and real-device background audio behavior also remain to be implemented and verified.

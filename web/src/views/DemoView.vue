@@ -144,7 +144,7 @@ const skinPluginContext = computed(() => ({
   skin: { locale: language.value, messages: skinMessages.value },
   session: {
     status: { connected: true, connecting: false, channelId: selectedChannel.value.id, channelName: selectedChannel.value.name, userName: "illusia" },
-    channels: channels.map((channel, depth) => ({ id: channel.id, name: channel.name, parentId: "", depth, memberCount: channel.members.length, current: channel.id === selectedChannel.value.id })),
+    channels: channels.map((channel, depth) => ({ id: channel.id, name: channel.name, displayName: channel.name, isSpacer: false, spacerAlignment: "", spacerStyle: "", parentId: "", depth, memberCount: channel.members.length, current: channel.id === selectedChannel.value.id })),
     members: selectedChannel.value.members.map((member) => ({
       id: member.id,
       name: member.name,

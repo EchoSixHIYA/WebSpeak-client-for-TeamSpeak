@@ -94,11 +94,52 @@ async function runRelayMode(): Promise<void> {
   const host = (process.env.WEBSPEAK_RELAY_HOST || process.env.WEBSPEAK_ACCELERATION_RELAY_HOST)?.trim() || "0.0.0.0";
   const port = parsePort(process.env.WEBSPEAK_RELAY_PORT || process.env.WEBSPEAK_ACCELERATION_RELAY_PORT, 39087);
   const allowPrivate = parseBoolean(process.env.WEBSPEAK_RELAY_ALLOW_PRIVATE || process.env.WEBSPEAK_ACCELERATION_RELAY_ALLOW_PRIVATE);
-  const server = await createAccelerationRelayServer({ host, port, token, allowPrivate });
-  console.log(`WebSpeak relay mode listening on ${server.host}:${server.port}`);
+  const voiceHost = process.env.WEBSPEAK_VOICE_GATEWAY_HOST?.trim() || "127.0.0.1";
+  const voicePort = parsePort(process.env.WEBSPEAK_VOICE_GATEWAY_PORT, 3041);
+  const webRtcUdpStart = parsePort(process.env.WEBSPEAK_RELAY_WEBRTC_UDP_START, 40000);
+  const webRtcUdpEnd = parsePort(process.env.WEBSPEAK_RELAY_WEBRTC_UDP_END, 40099);
+  if (webRtcUdpStart > webRtcUdpEnd) throw new Error("Invalid relay WebRTC UDP port range");
+  const [{ createLogger }, { createVoiceGatewayServer }] = await Promise.all([
+    import("./logger.js"),
+    import("./server/voice-gateway.js"),
+  ]);
+  const logger = createLogger(LOG_DIR);
+  const voiceGateway = createVoiceGatewayServer({
+    host: voiceHost,
+    port: voicePort,
+    sharedToken: token,
+    logger,
+    webRtc: {
+      enabled: process.env.WEBSPEAK_RELAY_WEBRTC_ENABLED === undefined
+        ? true
+        : parseBoolean(process.env.WEBSPEAK_RELAY_WEBRTC_ENABLED),
+      ...(process.env.WEBSPEAK_RELAY_WEBRTC_PUBLIC_HOST?.trim()
+        ? { publicHost: process.env.WEBSPEAK_RELAY_WEBRTC_PUBLIC_HOST.trim() }
+        : {}),
+      ipv6Enabled: parseBoolean(process.env.WEBSPEAK_RELAY_WEBRTC_IPV6_ENABLED),
+      ...(process.env.WEBSPEAK_RELAY_WEBRTC_STUN_SERVER?.trim()
+        ? { stunServer: process.env.WEBSPEAK_RELAY_WEBRTC_STUN_SERVER.trim() }
+        : {}),
+      udpPortRange: [webRtcUdpStart, webRtcUdpEnd] as [number, number],
+    },
+    screenShareIceServers: SCREEN_SHARE_ICE_SERVERS,
+    trustedProxies: readTrustedProxies(process.env.WEBSPEAK_TRUSTED_PROXIES),
+  });
+  const voiceAddress = await voiceGateway.start();
+  let relay: Awaited<ReturnType<typeof createAccelerationRelayServer>>;
+  try {
+    relay = await createAccelerationRelayServer({ host, port, token, allowPrivate });
+  } catch (error) {
+    await voiceGateway.stop();
+    throw error;
+  }
+  console.log(`WebSpeak relay mode listening on ${relay.host}:${relay.port}; voice gateway on ${voiceAddress.host}:${voiceAddress.port}`);
+  let stopping = false;
   const shutdown = (): void => {
-    server.close();
-    process.exit(0);
+    if (stopping) return;
+    stopping = true;
+    relay.close();
+    void voiceGateway.stop().finally(() => process.exit(0));
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);

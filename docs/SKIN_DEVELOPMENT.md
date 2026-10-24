@@ -1,6 +1,6 @@
-# WebSpeak 0.2.7 皮肤系统开发指南
+# WebSpeak 0.2.8 皮肤系统开发指南
 
-本文是 WebSpeak 0.2.7 的唯一皮肤开发说明，整合原皮肤开发规范与开放皮肤系统规格。它覆盖仍受支持的 v1/v2 兼容皮肤、v3 声明式开放皮肤和 v4 插件包，以及当前公开数据、宿主动作、授权、校验与开发流程。v4 有界 Wasm 已在生产构建开放；皮肤 JavaScript 仍只校验和缓存，不会执行。本文件是当前包格式和运行时接口的唯一文档来源。
+本文是 WebSpeak 0.2.8 的唯一皮肤开发说明，整合原皮肤开发规范与开放皮肤系统规格。它覆盖仍受支持的 v1/v2 兼容皮肤、v3 声明式开放皮肤和 v4 插件包，以及当前公开数据、宿主动作、授权、校验与开发流程。v4 有界 Wasm 已在生产构建开放；皮肤 JavaScript 仍只校验和缓存，不会执行。本文件是当前包格式和运行时接口的唯一文档来源。
 
 ## 目标：皮肤是可移植的外挂包
 
@@ -31,6 +31,58 @@ v3 保留安全的标准元素和属性白名单；组件可通过完整页面 s
 管理员在 `/admin/skins` 查看三款随 WebSpeak 提供的内置皮肤，并可导入、替换、启用/停用或删除实例自定义皮肤；还可指定访客首次访问时使用的默认皮肤。默认日间、默认夜间和 ILLUSIA 风为受保护内置项，不可替换、停用或移除。访客手动选择的皮肤保存在该浏览器，后续实例默认值变更不会覆盖该明确选择；仅自动套用过旧默认值的浏览器会采用最新实例默认值。皮肤包会缓存在浏览器本地；页面启动时会查询实例目录，目录可用且版本更新时拉取新包。若网络不可用，已缓存的版本仍可使用。
 
 选择器提供默认日间、默认夜间、内置 ILLUSIA 风和已启用的实例皮肤；没有“跟随系统”选项。停用的实例皮肤不向访客展示，也不能从服务端下载；若它是当前默认皮肤，系统会安全回退到默认日间。管理员设置的默认值只影响未手动选择皮肤的访客。自定义皮肤是独立的外观选择，不继承之前的日间或夜间模式；皮肤未覆盖的部件回退到浅色基础外观，避免一套组件混入另一套模式。自定义皮肤可自行声明 `color-scheme` 并定义深色外观；切换为日间或夜间时，会停用当前自定义包。文档级 `data-theme` 仍由 WebSpeak 保留给管理后台使用。
+
+### GitHub 皮肤商店分发
+
+管理员在 `/admin/skins` 的“皮肤商店”页安装仓库分发的皮肤；“实例皮肤”页负责导入、启停、删除和设置默认值。安装和更新不改变默认皮肤，更新保留原启停状态。商店网络故障不会影响已安装皮肤。访客仍需自行批准皮肤组件权限，管理员安装不能替访客授权。
+
+官方索引为 [Huddle-Up-Forge/webspeak-skins](https://github.com/Huddle-Up-Forge/webspeak-skins) 的 `master/index.json`。索引仅登记稳定的皮肤 ID 和公开 GitHub 仓库地址，不包含皮肤实现：
+
+```json
+{
+  "schemaVersion": 1,
+  "skins": [{
+    "id": "community.discord-voice",
+    "repository": "https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice"
+  }]
+}
+```
+
+每个皮肤仓库的默认分支根目录提供 `skin.json`（位于 `.wskin` **之外**），例如：
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "community.example-skin",
+  "name": "Example skin",
+  "version": "1.0.0",
+  "author": "Example author",
+  "license": "CC-BY-4.0",
+  "description": "A portable WebSpeak skin.",
+  "minAppVersion": "0.2.8",
+  "package": {
+    "ref": "v1.0.0",
+    "path": "example.wskin",
+    "sha256": "填写最终归档文件的 64 位小写 SHA-256"
+  }
+}
+```
+
+`package.ref` 使用已发布 tag 或完整提交 SHA，`path` 指向该 ref 中的 `.wskin` 文件。推荐 tag 一经发布不再移动。`skin.json` 必须与归档清单的 ID、名称、版本、作者、许可证和最低应用版本一致。版本和最低应用版本使用语义化版本；`description` 必须是字符串，可以留空。仓库无需提供 GitHub 令牌，实例从 GitHub 的公开原始文件服务读取；不支持私有仓库、任意下载域名或重定向。
+
+发布步骤：先构建并用客户端和服务端导入器验证最终归档；计算 SHA-256；提交源码、归档、许可证和 `skin.json`；为这个提交创建版本 tag；最后提交中央索引条目。后续更新只需在皮肤仓库发布新版本并更新默认分支的 `skin.json`，无需同步修改中央索引。安装时服务端重新检查索引及元数据，核对摘要并运行普通 `.wskin` 校验；校验失败不替换实例皮肤。同 ID 已安装且版本相同或更新时，不提供覆盖或降级操作。多个管理员同时修改实例皮肤时，过期的安装请求会被拒绝，需刷新后重试。
+
+仓库地址限定为 `https://github.com/owner/repository`。索引最多 50 项；索引最大 128 KiB，单个 `skin.json` 最大 16 KiB，归档最大 20 MiB，下载有超时限制。商店不执行皮肤构建脚本，也不从仓库加载未打入归档的资源。
+
+### 工作区接口 v1（WebSpeak 0.2.8 当前运行时）
+
+v3/v4 开放皮肤可在 `manifest.json` 中声明 `"workspace": { "apiVersion": 1, "mode": "persistent" }`。未声明时保留原先的首页流程。该通用接口不识别皮肤 ID，也不授予额外网络或存储权限；皮肤包本身不能读写此偏好。旧运行时不认识该字段或权限时会拒绝导入，不能仅凭应用版本号认定支持；使用它的包需要 `minAppVersion: "0.2.8"` 及工作区接口 v1。
+
+首次使用仍显示连接表单；只有成功连接才记录 `hasConnected`。旧的成功连接历史会迁移为已使用状态，只有昵称或失败尝试不算。启用此策略的皮肤在主动断开或刷新回访后仍进入工作区，但不会自动连接、采集麦克风或切换服务器。普通回访可由宿主恢复最近目标；显式邀请、目标或频道链接优先。切换到未声明策略的皮肤恢复其原有流程，清除本地数据会重置此记录。
+
+可信控件 `voice.connection-status` 需要 `session.status.read` 与 `voice.connect`，显示本地化的连接/失败状态、可编辑昵称与重连按钮；忙碌时禁用重复提交，服务器密码和新增服务器对话框仍由宿主管理。公开部件为 `voice.connection-status`、`voice.connection-status.message`、`voice.connection-status.nickname`、`voice.connection-status.nickname.input`、`voice.connection-status.reconnect`。皮肤负责这些部件的位置、响应式布局和外观。
+
+声明式动作 `voice.connect` 使用同名权限且不接受参数；它只在明确可信点击后连接宿主当前选定的目标，不能携带地址、密码、身份材料、邀请令牌或自动执行。服务器配置和身份未就绪、正在连接/重连、已经连接或对话框尚待处理时，宿主拒绝重复发起。它和既有的 `quickServers.switch`、服务器栏加号共用宿主连接流程；异步读取浏览器已保存密码不会被误判为连接失败。
 
 ## 包结构
 
@@ -136,6 +188,10 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 普通节点使用白名单 HTML/SVG 元素。节点可包含 text、part、className、受限 attributes、包内图片 asset、bindValue、本地 repeat/when、events 和 children。文本与属性支持简单的双大括号数据路径；不支持表达式、HTML 字符串或脚本。重复列表可使用注册的公开集合；频道重复项仅能再重复其 `channel.members`，并且需要额外批准 `session.members.read`。宿主每个组件的实际渲染节点最多 8192 个，防止嵌套集合放大界面。v3/v4 的作者默认布局使用与 v2 相同的有界 layout schema；可通过 `skin.<page>.<component-id>` 指定声明式自定义组件，通过 `skin.<page>.runtime_plugin_root_<plugin-id>` 指定 v4 插件根。用户的本地布局覆盖优先于包默认值。schema v2 另允许固定宿主控件节点，例如：
 
 申请 `session.channels.read` 的 `session.channels` 列表还提供 `memberCount`、两位数显示用的 `memberCountLabel`、`maxClients` 和 `maxClientsLimited`。后两个字段仅在 TeamSpeak 返回有效上限数据时出现；`maxClientsLimited: false` 表示频道不限人数。它们与频道树一起属于公开只读数据，不会授予服务器写入能力。
+
+频道显示接口增补（0.2.8）：同一权限下新增 `displayName`、`isSpacer`、`spacerAlignment` 与 `spacerStyle`，声明式 v3 和 Wasm v4 均可读取。`name` 始终保留服务器原名，`displayName` 仅对永久、顶层且名称以 `[spacer…]`、`[lspacer…]`、`[cspacer…]`、`[rspacer…]` 或 `[*spacer…]` 开头的频道移除前缀（大小写不敏感，省略或自定义标识均可）。分隔栏的 `spacerAlignment` 为 `left`、`center`、`right` 或 `repeat`；`spacerStyle` 为 `text`、`solid`、`dashed`、`dotted`、`dash-dot` 或 `dash-dot-dot`，五种线型对应 `___`、`---`、`...`、`-.-`、`-..`。普通频道的 `displayName` 等于 `name`、`isSpacer: false`、两个格式字段为空字符串。旧运行时可能不含新增字段；兼容包应回退到 `name`，不能只凭相同的 0.2.8 版本号推断字段存在。分隔栏仍为真实 TS 频道，不增加加入限制，不隐藏其中的成员或子频道；管理编辑继续使用原名。
+
+宿主 `voice.channel-tree` 与 `voice.channel-panel` 自动使用上述显示规则；分隔栏隐藏普通频道图标和人数，不显示空成员提示。新增稳定部件 `voice.channel-spacer`，提供 `data-alignment` 与 `data-spacer-style` 属性；频道树行 `voice.channel-tree.row` 和成员面板标题 `voice.channel-group.heading` 在分隔栏上提供 `data-spacer="true"`。颜色和字体继承皮肤，文字及重复填充在可用宽度内裁剪，空文本保留分隔间距。皮肤无需新增权限或修改传输逻辑。
 
 ```json
 {

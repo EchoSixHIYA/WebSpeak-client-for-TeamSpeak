@@ -5,6 +5,34 @@ import type { ChannelMember } from "../composables/useVoiceWebSocket.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import { buildVoiceChannelTree, filterVoiceChannelTree } from "./voice-channel-tree.js";
 import { memberPresenceKey } from "./member-presence.js";
+import { channelDisplayName, getChannelSpacer } from "../../../src/shared/channel-spacer.js";
+
+test("TeamSpeak spacers require a leading marker on a permanent root channel", () => {
+  const channel = { name: "[cspacer0]🏔 后山 🏔", parentID: "0", isPermanent: true };
+  assert.deepEqual(getChannelSpacer(channel), { text: "🏔 后山 🏔", alignment: "center", style: "text" });
+  assert.equal(channelDisplayName(channel), "🏔 后山 🏔");
+  for (const ordinary of [
+    { ...channel, isPermanent: false }, { ...channel, isPermanent: undefined }, { ...channel, parentID: "1" },
+    { ...channel, name: "prefix [cspacer0]Title" }, { ...channel, name: "[cspacer0Title" },
+    { ...channel, name: "[xspacer0]Title" }, { ...channel, name: "General" },
+  ]) {
+    assert.equal(getChannelSpacer(ordinary), null);
+    assert.equal(channelDisplayName(ordinary), ordinary.name);
+  }
+});
+
+test("spacer display supports blank labels, arbitrary IDs, case, alignment and standard line patterns", () => {
+  const base = { parentID: "0", isPermanent: true };
+  for (const [name, alignment, text] of [
+    ["[spacer]", "left", ""], ["[CSPACER0]", "center", ""],
+    ["[lspacerstaff]Staff", "left", "Staff"], ["[rspacer42]Right", "right", "Right"],
+    ["[*spacer0]★·", "repeat", "★·"], ["[cspacer1]A]B", "center", "A]B"],
+    ["[cspacer]__proto__", "center", "__proto__"],
+  ]) assert.deepEqual(getChannelSpacer({ ...base, name }), { text, alignment, style: "text" });
+  for (const [text, style] of [["___", "solid"], ["---", "dashed"], ["...", "dotted"], ["-.-", "dash-dot"], ["-..", "dash-dot-dot"]]) {
+    assert.deepEqual(getChannelSpacer({ ...base, name: `[*spacer0]${text}` }), { text, alignment: "repeat", style });
+  }
+});
 
 test("channel search keeps matching nested channels and only their ancestors", () => {
   const tree = buildVoiceChannelTree([

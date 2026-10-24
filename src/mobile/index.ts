@@ -2,7 +2,7 @@ import express from "express";
 import { createServer } from "node:http";
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { identityFromString } from "@echosixhiya/teamspeak-client";
+import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { createLogger } from "../logger.js";
 import { parseTeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { JoinTicketStore } from "../server/join-ticket.js";
@@ -79,7 +79,7 @@ app.post("/api/join-ticket", (request, response) => {
   let identity: string | undefined;
   if (typeof body.identity === "string" && body.identity.length <= 8192) {
     try {
-      identityFromString(body.identity);
+      parseIdentity(body.identity);
       identity = body.identity;
     } catch {
       // Corrupt local identity should not prevent an ephemeral join.

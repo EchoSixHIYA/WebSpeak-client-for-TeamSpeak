@@ -192,6 +192,7 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.breadcrumbs",
   "voice.channel-group",
   "voice.channel-group.heading",
+  "voice.channel-spacer",
   "voice.channel-group.members",
   "voice.channel-tree.avatar",
   "voice.channel-tree.branch",
@@ -239,6 +240,10 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.chat.tab",
   "voice.chat.tabs",
   "voice.connection-status",
+  "voice.connection-status.message",
+  "voice.connection-status.nickname",
+  "voice.connection-status.nickname.input",
+  "voice.connection-status.reconnect",
   "voice.content",
   "voice.context-menu",
   "voice.context-menu-backdrop",
@@ -370,6 +375,7 @@ const ACTION_PART_IDS = new Set([
   "voice.channel-tree.expander", "voice.channel-tree.row", "demo.skin-switcher", "demo.language-switcher",
 ]);
 const INTERACTIVE_PART_IDS = new Set([
+  "voice.connection-status.nickname.input", "voice.connection-status.reconnect",
   "demo.action.poke", "demo.action.reconnect", "demo.action.speaking", "demo.channel.select",
   "demo.chat.input", "demo.chat.send", "demo.chat.tab", "demo.home-link", "demo.poke.dismiss",
   "demo.reconnect.restore", "home.connect", "home.favorite-toggle", "home.identity-export.button",

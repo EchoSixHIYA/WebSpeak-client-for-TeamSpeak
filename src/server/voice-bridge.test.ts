@@ -3,7 +3,7 @@ import test from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { IncomingMessage } from "node:http";
 import pino from "pino";
-import { VoiceBridge, createTrustedProxies, resolveClientIp } from "./voice-bridge.js";
+import { VoiceBridge, createTrustedProxies, resolveClientIp, resolveWebRtcPublicHost } from "./voice-bridge.js";
 import { JoinTicketStore } from "./join-ticket.js";
 import { createAudioFlowStats } from "./audio-stats.js";
 import { SessionAudioTransport } from "./session-audio.js";
@@ -162,6 +162,16 @@ test("a current peer construction failure reports a recoverable negotiation erro
   await f.offer("current");
   assert.equal(f.entry.webrtc, null);
   assert.deepEqual(f.messages, [{ type: "webrtcError", code: "WEBRTC_NEGOTIATION_FAILED" }]);
+});
+
+test("WebRTC candidates use the voice gateway host when the page Origin belongs to another gateway", () => {
+  const request = {
+    headers: {
+      origin: "https://ingress.example.com",
+      host: "voice-relay.example.com:3041",
+    },
+  } as IncomingMessage;
+  assert.equal(resolveWebRtcPublicHost(request), "voice-relay.example.com");
 });
 
 test("initial accompaniment updates TeamSpeak before creating a muted mixer and resets on stop", async () => {

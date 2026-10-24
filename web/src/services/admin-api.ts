@@ -1,5 +1,6 @@
 import { adminResponses, type AdminResponseReader } from "../../../src/shared/admin-responses.js";
-import type { AdminSettingsInput, ManagedInviteInput } from "../../../src/shared/admin-inputs.js";
+import type { AdminSettingsInput, ManagedInviteInput, TsAdminSettingsInput, TsAdminActionRequest } from "../../../src/shared/admin-inputs.js";
+import type { SkinStoreInstallInput } from "../../../src/shared/skin-store.js";
 
 export class AdminApiError extends Error {
   constructor(readonly code: string, readonly status = 0, message = code) {
@@ -106,6 +107,10 @@ export function createAdminApi(options: AdminApiOptions) {
     overview: (signal?: AbortSignal) => request("/overview", adminResponses.overview, "GET", undefined, true, signal),
     settings: (signal?: AbortSignal) => request("/server", adminResponses.settings, "GET", undefined, true, signal),
     saveSettings: (body: AdminSettingsInput, signal?: AbortSignal) => request("/server", adminResponses.savedSettings, "PUT", body, true, signal),
+    tsAdminSettings: (signal?: AbortSignal) => request("/ts-admin/settings", adminResponses.tsAdminSettings, "GET", undefined, true, signal),
+    saveTsAdminSettings: (body: TsAdminSettingsInput, signal?: AbortSignal) => request("/ts-admin/settings", adminResponses.savedTsAdminSettings, "PUT", body, true, signal),
+    tsAdminOverview: (signal?: AbortSignal) => request("/ts-admin/overview", adminResponses.tsAdminOverview, "POST", {}, true, signal),
+    tsAdminAction: (body: TsAdminActionRequest, signal?: AbortSignal) => request("/ts-admin/action", adminResponses.ok, "POST", body, true, signal),
     probe: (body: Pick<AdminSettingsInput, "target" | "serverPassword" | "passwordAction">, signal?: AbortSignal) => request("/server/test", adminResponses.probe, "POST", body, true, signal),
     sessions: (signal?: AbortSignal) => request("/sessions", adminResponses.sessions, "GET", undefined, true, signal),
     terminateSession: (id: string, signal?: AbortSignal) => request(`/sessions/${encodeURIComponent(id)}/terminate`, adminResponses.ok, "POST", {}, true, signal),
@@ -116,6 +121,8 @@ export function createAdminApi(options: AdminApiOptions) {
     logs: (signal?: AbortSignal) => request("/logs?limit=100", adminResponses.logs, "GET", undefined, true, signal),
     audit: (signal?: AbortSignal) => request("/audit?limit=50", adminResponses.audit, "GET", undefined, true, signal),
     skins: (signal?: AbortSignal) => request("/skins", adminResponses.skins, "GET", undefined, true, signal),
+    skinStore: (refresh = false, signal?: AbortSignal) => request(refresh ? "/skin-store/refresh" : "/skin-store", adminResponses.skinStore, refresh ? "POST" : "GET", refresh ? {} : undefined, true, signal),
+    installStoreSkin: (body: SkinStoreInstallInput, signal?: AbortSignal) => request("/skin-store/install", adminResponses.uploadedSkin, "POST", body, true, signal),
     setDefaultSkin: (id: string, signal?: AbortSignal) => request("/skins/default", adminResponses.defaultSkin, "PUT", { id }, true, signal),
     setSkinEnabled: (id: string, enabled: boolean, signal?: AbortSignal) => request(`/skins/${encodeURIComponent(id)}/enabled`, adminResponses.updatedSkin, "PUT", { enabled }, true, signal),
     deleteSkin: (id: string, signal?: AbortSignal) => request(`/skins/${encodeURIComponent(id)}`, adminResponses.ok, "DELETE", {}, true, signal),
