@@ -4,7 +4,7 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors can join channels without installing a desktop client, while administrators manage the target servers, access policy, and runtime state from the web console.
 
-Latest release: [read the 0.2.8 changelog on this page](#latest-release-notes).
+Latest release: [read the 0.2.9 changelog on this page](#latest-release-notes).
 
 Skin authors should start with the [current skin development guide](./SKIN_DEVELOPMENT.md), which combines the `.wskin` package format, current runtime APIs, permission boundaries, and authoring workflow. The repository also includes the [WebSpeak skin development skill for agents](../.agents/skills/webspeak-skin-development/SKILL.md).
 
@@ -189,11 +189,33 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 - The relay service is built into WebSpeak with Node.js standard libraries; it does not use GOST, sing-box, or another proxy framework.
 - WebRTC uses [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`, whose upstream project is licensed under MIT.
-- TeamSpeak protocol connectivity uses the project-maintained [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js) SDK fork.
+- TeamSpeak connectivity uses upstream [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js), published as `@honeybbq/teamspeak@1.0.0-beta.19`; building the project's SDK fork is no longer required.
 
 ## 🧾 Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### Enhancements
+
+- Migrated to upstream SDK 1.0.0-beta.19. Ordinary voice connections use the live client directory without Query list permissions.
+- Added a GitHub skin store and instance-level installation, updates and availability controls. Discord Voice is distributed independently as a standard `.wskin` example.
+- Added optional TS administration in fixed-instance mode, with WebQuery, TCP or SSH Query credentials for managing the server, channels, members, server groups and bans.
+- Relays can advertise a direct browser voice endpoint and own the voice session, avoiding an extra gateway forwarding hop.
+- Added generic persistent-workspace and reconnect APIs, adopted by KAAK alongside administrator, project GitHub and QQ group shortcuts.
+- Added TeamSpeak channel spacers with alignment, repeated fill, blank rows and standard line patterns, including public presentation data for skins.
+
+#### Fixes
+
+- Fixed screen-share fullscreen sizing and cleanup of departed members' state and playback resources.
+- Fixed successful bans being reported as failures, Query connections appearing in member counts and the channel-password label.
+- Distinguished permission, rate-limit and timeout errors. A refresh failure after a successful action now has its own warning to prevent duplicate actions.
+- Guarded against the SDK treating failed HTTP responses as successful WebQuery results, and fixed DC home, chat and narrow-screen control layouts.
+
+#### Known issues
+
+- The security hardening described in [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) is not included in this release; closing that PR does not mean the reported issues are fixed.
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 

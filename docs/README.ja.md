@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 
-最新リリース：[v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8)。
+最新リリース：[v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9)。
 
 | 観点 | 説明 |
 | --- | --- |
@@ -103,7 +103,7 @@ TURN を設定した場合、メディアは外部 TURN サービスを経由す
 
 中継は現在の WebSpeak セッションの TeamSpeak 通信だけを転送し、VPN ではありません。管理コンソールで複数のノードに名前、アドレス、トークンを設定すると、ユーザーは直接接続または中継を選択できます。中継モードは専用の転送サービスとして動作し、ゲスト画面や管理コンソールを提供しません。
 
-中継サービスは WebSpeak に組み込まれており、Node.js の標準ライブラリを使用します。GOST や sing-box などのプロキシフレームワークは不要です。WebRTC は [werift](https://github.com/shinyoshiaki/werift-webrtc)、TeamSpeak 接続はプロジェクトが保守する [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js) SDK を使用します。
+中継サービスは WebSpeak に組み込まれており、Node.js の標準ライブラリを使用します。GOST や sing-box などのプロキシフレームワークは不要です。WebRTC は [werift](https://github.com/shinyoshiaki/werift-webrtc)、TeamSpeak 接続は上流の [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) が公開する `@honeybbq/teamspeak@1.0.0-beta.19` を使用します。SDK フォークのビルドは不要になりました。
 
 ## 🚀 デプロイ
 
@@ -158,6 +158,28 @@ npm start
 ## 🧾 更新履歴
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### 機能追加
+
+- 上流 SDK 1.0.0-beta.19 へ移行しました。通常の音声接続はクライアントのライブ一覧を使用し、Query の一覧取得権限を必要としません。
+- GitHub スキンストアと、インスタンスごとのインストール、更新、有効化の管理を追加しました。Discord Voice は標準 `.wskin` の独立したサンプルとして配布します。
+- 固定サーバーモードに任意の TS 管理パネルを追加しました。WebQuery、TCP または SSH Query の認証情報を設定し、サーバー、チャンネル、メンバー、サーバーグループ、BAN を管理できます。
+- 中継ノードがブラウザー向けの音声接続先を公開し、音声セッションを担当できるようになりました。ゲートウェイ間の余分な転送を減らせます。
+- ワークスペース保持と再接続の共通 API を追加し、KAAK に適用しました。管理画面、プロジェクトの GitHub、QQ グループへの入口も追加しました。
+- TeamSpeak のチャンネル区切りに対応しました。配置、繰り返し、空白行、標準線種を扱い、表示データをスキンにも公開します。
+
+#### 修正
+
+- 画面共有の全画面サイズと、退出したメンバーの状態および再生リソースの解放を修正しました。
+- BAN 成功時の誤った失敗表示、Query 接続の人数への混入、チャンネルパスワードのラベルを修正しました。
+- 権限不足、レート制限、タイムアウトを区別します。操作成功後の更新だけが失敗した場合は別の警告を表示し、重複操作を防ぎます。
+- SDK が失敗した HTTP 応答を WebQuery 成功とみなすことを防止し、DC のホーム、チャット、狭い画面の操作部品の配置を修正しました。
+
+#### 既知の問題
+
+- [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) のセキュリティ強化は本リリースに含まれません。PR のクローズは、報告された問題の修正完了を意味しません。
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 

@@ -4,7 +4,7 @@
 
 WebSpeak ist ein selbst gehosteter Webclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer können ohne Desktop-Client im Browser Kanälen beitreten; Administratoren verwalten Zielserver, Zugriff und Laufzeitstatus über die Webkonsole.
 
-Aktuelle Version: [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8).
+Aktuelle Version: [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9).
 
 ## Live-Demo
 
@@ -179,11 +179,33 @@ Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entf
 
 - Der Relay-Dienst ist Bestandteil von WebSpeak und verwendet Node.js-Standardbibliotheken; GOST, sing-box oder ein anderes Proxy-Framework werden nicht verwendet.
 - WebRTC verwendet [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`; das Upstream-Projekt steht unter MIT-Lizenz.
-- Die TeamSpeak-Protokollverbindung verwendet den projektgepflegten [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js)-SDK-Fork.
+- Die TeamSpeak-Verbindung verwendet das Upstream-SDK [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js), veröffentlicht als `@honeybbq/teamspeak@1.0.0-beta.19`; der SDK-Fork des Projekts muss nicht mehr gebaut werden.
 
 ## 🧾 Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### Erweiterungen
+
+- Umstellung auf das Upstream-SDK 1.0.0-beta.19. Normale Sprachverbindungen verwenden das Live-Clientverzeichnis ohne Query-Listenberechtigungen.
+- Neuer GitHub-Skin-Store mit Installation, Updates und Freigabe pro Instanz. Discord Voice wird als eigenständiges standardkonformes `.wskin`-Beispiel verteilt.
+- Optionale TS-Verwaltung im Modus mit festem Server: WebQuery-, TCP- oder SSH-Query-Zugangsdaten ermöglichen die Verwaltung von Server, Kanälen, Mitgliedern, Servergruppen und Sperren.
+- Relays können einen direkten Sprachendpunkt für Browser bereitstellen und die Sprachsitzung übernehmen; eine zusätzliche Weiterleitung zwischen Gateways entfällt.
+- Allgemeine Schnittstellen zum Beibehalten des Arbeitsbereichs und zur Wiederverbindung; KAAK nutzt diese und bietet Zugänge zur Administration, zum Projekt-GitHub und zur QQ-Gruppe.
+- Unterstützung für TeamSpeak-Kanaltrenner mit Ausrichtung, Wiederholung, Leerzeilen und Standardlinien sowie öffentlichen Darstellungsdaten für Skins.
+
+#### Fehlerbehebungen
+
+- Vollbildgröße der Bildschirmfreigabe und Bereinigung von Status und Wiedergaberessourcen ausgeschiedener Mitglieder korrigiert.
+- Erfolgreiche Sperren werden nicht mehr als Fehler gemeldet; Query-Verbindungen zählen nicht als Mitglieder, und das Kanalpasswort ist korrekt beschriftet.
+- Berechtigungs-, Ratenlimit- und Zeitüberschreitungsfehler werden unterschieden. Schlägt nur die Aktualisierung nach einer erfolgreichen Aktion fehl, erscheint eine eigene Warnung gegen doppelte Ausführung.
+- Verhindert, dass das SDK fehlgeschlagene HTTP-Antworten als erfolgreiche WebQuery-Ergebnisse behandelt; Layoutfehler auf der DC-Startseite, im Chat und bei schmalen Ansichten behoben.
+
+#### Bekannte Probleme
+
+- Die in [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) beschriebene Sicherheitsabsicherung ist nicht enthalten; das Schließen des PRs bedeutet nicht, dass die gemeldeten Probleme behoben sind.
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 

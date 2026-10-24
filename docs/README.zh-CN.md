@@ -13,7 +13,7 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 演示站点的网络和负载可能不稳定；延迟、断线或暂时不可用不代表自行部署后的实际表现。
 
-最新版本：[查看本页的 0.2.8 更新日志](#latest-release-notes)。
+最新版本：[查看本页的 0.2.9 更新日志](#latest-release-notes)。
 
 ## ✨ 特性
 
@@ -193,11 +193,33 @@ relay.example.com {
 
 - 中继服务是 WebSpeak 自带实现，使用 Node.js 标准库，不依赖 GOST、sing-box 或其他代理框架。
 - WebRTC 使用 [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`，上游采用 MIT 许可证。
-- TeamSpeak 协议使用项目维护的 [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js) SDK fork。
+- TeamSpeak 协议使用上游 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) 发布的 `@honeybbq/teamspeak@1.0.0-beta.19`，不再需要构建项目 SDK fork。
 
 ## 🧾 更新日志
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### 功能增强
+
+- 接入上游 SDK 1.0.0-beta.19，普通语音连接使用客户端实时目录，不再依赖 Query 列表权限。
+- 管理员控制台新增 GitHub 皮肤商店，以及按实例管理、更新和启停皮肤的入口；Discord Voice 作为标准 `.wskin` 示例独立分发。
+- 指定实例模式支持可选 TS 管理面板，可配置 WebQuery、TCP 或 SSH Query 凭据，管理服务器、频道、成员、服务器组和封禁。
+- 中继可配置浏览器直连的语音入口，将语音会话交给中继节点处理，减少网关间的额外转发。
+- 提供通用工作区保留与重连接口，KAAK 同步接入，并新增管理员、项目 GitHub 和 QQ 群入口。
+- 支持 TeamSpeak 频道分隔栏，包括左中右对齐、重复填充、空白及标准线型；向皮肤开放格式化数据。
+
+#### 问题修复
+
+- 修复屏幕共享播放器的全屏尺寸，以及断线成员的状态、播放资源清理。
+- 修复 TS 管理中封禁成功却报错、Query 连接混入成员统计和频道密码标签错误的问题。
+- 区分权限、限流和超时提示；操作完成后的刷新失败单独提示，避免用户重复执行操作。
+- 防止 SDK 将 HTTP 失败响应误判为 WebQuery 成功；修复 DC 首页、聊天区与窄屏控件布局。
+
+#### 已知问题
+
+- [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) 记录的安全加固尚未纳入本版本，关闭该 PR 不代表相关问题已修复。
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 

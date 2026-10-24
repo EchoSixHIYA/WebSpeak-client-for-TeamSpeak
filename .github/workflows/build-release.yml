@@ -9,7 +9,7 @@ on:
       version:
         description: Release version without the v prefix
         required: true
-        default: 0.2.8
+        default: 0.2.9
         type: string
 
 permissions:
@@ -299,15 +299,29 @@ jobs:
           cd release-assets
           sha256sum * > SHA256SUMS.txt
       - name: Publish GitHub release
+        env:
+          RELEASE_REF: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          const tag = process.env.RELEASE_REF;
+          const languages = [['简体中文', 'zh-CN'], ['English', 'en'], ['Deutsch', 'de'], ['Русский', 'ru'], ['日本語', 'ja']];
+          const sections = languages.map(([label, locale]) => {
+            const source = readFileSync(`docs/README.${locale}.md`, 'utf8');
+            const start = source.indexOf(`### [${tag}](`);
+            if (start < 0) throw new Error(`Missing ${tag} release notes for ${locale}`);
+            const remaining = source.slice(start);
+            const next = remaining.indexOf('\n### [v', 1);
+            const notes = (next < 0 ? remaining : remaining.slice(0, next)).trim();
+            return `## ${label}\n\n${notes}\n\n[Project documentation](https://github.com/${process.env.GITHUB_REPOSITORY}/blob/${tag}/docs/README.${locale}.md)`;
+          });
+          writeFileSync(join(process.env.RUNNER_TEMP, 'webspeak-release-notes.md'), sections.join('\n\n---\n\n') + '\n');
+          NODE
+      - name: Upload GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: WebSpeak ${{ github.ref_name }}
-          body: |
-            Release notes are maintained in each language's project documentation:
-            - [简体中文](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.zh-CN.md#latest-release-notes)
-            - [English](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.en.md#latest-release-notes)
-            - [Deutsch](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.de.md#latest-release-notes)
-            - [Русский](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.ru.md#latest-release-notes)
-            - [日本語](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/README.ja.md#latest-release-notes)
+          body_path: ${{ runner.temp }}/webspeak-release-notes.md
           files: release-assets/*
