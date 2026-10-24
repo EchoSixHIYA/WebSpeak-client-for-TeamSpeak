@@ -361,9 +361,11 @@ Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain.
 | Data | Docker data is in `webspeak-data`; release packages and source installs use `data/`. Back up before upgrades. |
 | Session limit | One instance accepts up to 100 active browser sessions. |
 
-## Recent contributors
+## Contributors and contributions
 
-- Listed from GitHub's merge records; the version summaries above describe only changes included in each release.
-- [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) improved browser error translations; [PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) fixed scaling, floating layout, and the homepage footer.
+This list acknowledges the upstream SDK author, contributions through merged GitHub PRs, and original work adapted into independently distributed skin packages.
+
+- [HoneyBBQ](https://github.com/HoneyBBQ) — Author of the upstream [teamspeak-js (`@honeybbq/teamspeak`)](https://github.com/HoneyBBQ/teamspeak-js) SDK, which provides the TeamSpeak protocol client used by WebSpeak.
+- [LainHE](https://github.com/LainHE) — [merged PRs #2, #8, #28, #31–#35, #37, #38 and #40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE), covering browser error translations, scaling and home layout, screen-share bitrate and viewer avatars, relay target validation and recovery, trusted proxy handling, connection-failure propagation, audio fault reporting, and WebRTC failure cleanup.
 - [TimmySheep](https://github.com/TimmySheep) — [merged PRs #13 and #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep), covering existing TS6 share discovery, share aspect ratio, mobile voice/wake/skin-menu behavior, identity channel options, PWA/theme work, chat history, member audio states, and microphone permission.
-- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) added connections through registered TeamSpeak nicknames and preserved nickname targets in settings, favorites, and invitations.
+- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) added registered TeamSpeak nickname connections and preserved nickname targets; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) improved KAAK workspace retention and reconnection after the first connection. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) and [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) supplied the original Discord skin design and implementation (commit author **yumi**), later adapted by the WebSpeak project into an [independently distributed `.wskin` skin](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice).

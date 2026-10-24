@@ -235,9 +235,11 @@ npm start
 
 WebSpeak распространяется по [GNU Affero General Public License v3.0 only](../LICENSE).
 
-## Недавно объединённые вклады
+## Участники и вклад в проект
 
-- Список составлен по записям о слиянии на GitHub; сводки выше описывают только изменения, вошедшие в соответствующий релиз.
-- [LainHE](https://github.com/LainHE) — [PR #2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/2) улучшил переводы ошибок браузера; [PR #8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/8) исправил масштабирование, плавающую компоновку и нижний колонтитул главной страницы.
+Список отмечает автора SDK, используемого в основе проекта, вклад через объединённые PR на GitHub и исходные работы, перенесённые в отдельно распространяемые пакеты скинов.
+
+- [HoneyBBQ](https://github.com/HoneyBBQ) — Автор SDK [teamspeak-js (`@honeybbq/teamspeak`)](https://github.com/HoneyBBQ/teamspeak-js), который предоставляет используемый WebSpeak клиент протокола TeamSpeak.
+- [LainHE](https://github.com/LainHE) — [объединённые PR #2, #8, #28, #31–#35, #37, #38 и #40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE): переводы ошибок браузера, масштабирование и компоновка главной страницы, битрейт трансляции и аватары зрителей, проверка целей и восстановление ретранслятора, доверенные прокси, передача ошибок подключения, сообщения об ошибках аудио и освобождение ресурсов при сбоях WebRTC.
 - [TimmySheep](https://github.com/TimmySheep) — [объединённые PR #13 и #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep): обнаружение активных трансляций TS6, пропорции экрана, мобильное аудио/подсветка экрана/меню скинов, канал в настройках идентичности, PWA/темы, история чата, состояние аудио участников и разрешение микрофона.
-- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) добавил подключение по зарегистрированным именам TeamSpeak и сохранение имени цели в настройках, избранном и приглашениях.
+- [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) добавил подключение по зарегистрированным именам TeamSpeak с сохранением имени цели; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) улучшил сохранение рабочего пространства KAAK и повторное подключение после первого соединения. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) и [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) содержали исходный дизайн и реализацию скина Discord (автор коммитов **yumi**), которые проект WebSpeak перенёс в [отдельно распространяемый скин `.wskin`](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice).
