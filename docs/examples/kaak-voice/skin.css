@@ -4639,3 +4639,67 @@
 @media (max-width: 820px) {
   [data-ws-plugin-part="kaak-workspace.connection-status"] { margin: 10px 4px; }
 }
+
+/* Shared public links: management follows Add; community links finish the rail. */
+[data-ws-plugin-part="kaak-workspace.server-rail"] {
+  gap: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+[data-ws-plugin-part="kaak-workspace.server-list"] { min-height: 58px; }
+[data-ws-plugin-part="kaak-workspace.rail-links"],
+[data-ws-plugin-part="kaak-workspace.rail-links"] [data-ws-part="home.social-links"] { display: contents; }
+[data-ws-plugin-part="kaak-workspace.rail-links"] a {
+  position: relative;
+  display: grid;
+  flex: 0 0 44px;
+  place-items: center;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: #b7bbc4;
+  background: transparent;
+  text-decoration: none;
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+[data-ws-plugin-part="kaak-workspace.rail-links"] a .ui-icon { display: block; width: 22px; height: 22px; flex: 0 0 auto; }
+[data-ws-plugin-part="kaak-workspace.rail-links"] a[href="/admin"] {
+  order: 3;
+  flex-basis: 58px;
+  width: 58px;
+  height: 58px;
+  border-color: #3d4048;
+  border-radius: 18px;
+  color: #d1d5dc;
+  background: var(--skin-kaak-rail-item-bg);
+}
+[data-ws-plugin-part="kaak-workspace.rail-skin"] { order: 4; }
+[data-ws-plugin-part="kaak-workspace.rail-language"] { order: 5; }
+[data-ws-plugin-part="kaak-workspace.rail-links"] a[href*="github.com/"] { order: 6; }
+[data-ws-plugin-part="kaak-workspace.rail-links"] a[href*="qm.qq.com/"] { order: 7; }
+[data-ws-plugin-part="kaak-workspace.rail-links"] a:hover,
+[data-ws-plugin-part="kaak-workspace.rail-links"] a:focus-visible {
+  border-color: #699b32;
+  color: #a8ed50;
+  background: #2b3524;
+}
+[data-ws-plugin-part="kaak-workspace.rail-links"] a:focus-visible { outline: 2px solid #a8ed50; outline-offset: 3px; }
+@media (max-height: 620px) {
+  [data-ws-plugin-part="kaak-workspace.server-rail"] { gap: 8px; padding-top: 10px; padding-bottom: max(82px, env(safe-area-inset-bottom)); }
+  [data-ws-plugin-part="kaak-workspace.server-add"],
+  [data-ws-plugin-part="kaak-workspace.rail-links"] a[href="/admin"],
+  [data-ws-plugin-part="kaak-workspace.rail-skin"],
+  [data-ws-plugin-part="kaak-workspace.rail-language"] { flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
+  [data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-switcher,
+  [data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger,
+  [data-ws-plugin-part="kaak-workspace.rail-language"] .language-switcher,
+  [data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger { width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ws-plugin-part="kaak-workspace.rail-links"] a { transition: none; }
+}

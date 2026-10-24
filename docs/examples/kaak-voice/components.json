@@ -581,6 +581,10 @@
               {
                 "widget": "app.language-switcher",
                 "part": "rail-language"
+              },
+              {
+                "widget": "home.social-links",
+                "part": "rail-links"
               }
             ]
           },
