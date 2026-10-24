@@ -1,0 +1,11 @@
+{
+  "apiVersion": 1,
+  "id": "community.watch-together",
+  "name": "Watch Together / 一起观看",
+  "version": "1.0.0",
+  "author": "Huddle-Up-Forge",
+  "license": "AGPL-3.0-only",
+  "description": "A shared video player with synchronized playback, pause and seeking. / 同步播放、暂停与跳转的视频播放器。",
+  "scopes": ["server", "instance"],
+  "permissions": ["room.read", "room.write"]
+}

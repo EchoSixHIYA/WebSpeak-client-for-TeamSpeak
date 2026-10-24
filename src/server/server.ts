@@ -18,6 +18,7 @@ import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
 import { createVoiceGatewayAuthHeaders, type DelegatedVoiceSession } from "./voice-gateway-auth.js";
 import type { SkinRegistry } from "../admin/skin-registry.js";
 import { resolveVisitorTotal } from "./visitor-count.js";
+import type { PluginRegistry } from "../plugins/registry.js";
 
 export interface WebServerOptions {
   port: number;
@@ -28,6 +29,7 @@ export interface WebServerOptions {
   voiceBridgeOptions: VoiceBridgeOptions;
   adminService: AdminService;
   skinRegistry?: SkinRegistry;
+  pluginRegistry?: PluginRegistry;
   logger: Logger;
   nextVisitorNumber?: () => number;
   visitorCount?: () => number;
@@ -55,9 +57,10 @@ export function createWebServer(options: WebServerOptions): WebServer {
     server = createHttpServer(app);
   }
 
+  app.use("/api/admin/plugins/upload", express.json({ limit: "600kb" }));
   app.use(express.json({ limit: "100kb" }));
 
-  const voiceBridge = new VoiceBridge(options.voiceBridgeOptions, logger);
+  const voiceBridge = new VoiceBridge({ ...options.voiceBridgeOptions, pluginRegistry: options.pluginRegistry }, logger);
   const adminSessions = new AdminSessionStore();
   const joinRateLimiter = new JoinRateLimiter();
   const startedAt = Date.now();
@@ -273,6 +276,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
     getSessionSummaries: () => voiceBridge.getSessionSummaries(),
     terminateSession: (id) => voiceBridge.terminateSession(id),
     skinRegistry: options.skinRegistry,
+    pluginRegistry: options.pluginRegistry,
     version: options.version,
     logFile: options.logFile,
     startedAt,

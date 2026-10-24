@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createAccelerationRelayServer } from "./server/acceleration-relay.js";
 import { normalizeScreenShareIceServers, type ScreenShareIceServer } from "./server/screen-share.js";
 import { SkinRegistry } from "./admin/skin-registry.js";
+import { PluginRegistry } from "./plugins/registry.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -45,6 +46,8 @@ async function main() {
   await adminService.initialize();
   removeObsoleteBootstrapFile();
   const joinTickets = new JoinTicketStore();
+  const pluginRegistry = new PluginRegistry(path.join(DATA_DIR, "plugins"));
+  await pluginRegistry.initialize();
 
   logger.info({ dataDir: DATA_DIR }, "Starting WebSpeak server");
 
@@ -70,6 +73,7 @@ async function main() {
     },
     adminService,
     skinRegistry: new SkinRegistry(path.join(DATA_DIR, "skins")),
+    pluginRegistry,
     logger,
     nextVisitorNumber: () => database.nextVisitorNumber(),
     visitorCount: () => database.getVisitorCount(),

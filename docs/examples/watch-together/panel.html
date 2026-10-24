@@ -1,0 +1,10 @@
+<main>
+  <header><h1 id="title">Watch Together</h1><span id="members"></span></header>
+  <p id="lead"></p>
+  <form id="source"><label><span id="url-label">Video URL</span><input id="url" type="url" maxlength="2048" placeholder="https://…/video.mp4" required></label><button id="load" type="button">Load</button></form>
+  <video id="video" playsinline preload="metadata"></video>
+  <div class="controls"><button id="play" type="button">▶</button><button id="pause" type="button">Ⅱ</button><button id="unlock" type="button">Enable playback</button><button id="fullscreen" type="button">⛶</button><label class="volume">♫ <input id="volume" type="range" min="0" max="1" step=".05" value=".7" aria-label="Volume"></label></div>
+  <label class="seek"><span id="time">0:00 / 0:00</span><input id="seek" type="range" min="0" max="1" step=".1" value="0" aria-label="Seek"></label>
+  <p id="status" role="status"></p>
+  <p id="note" class="note"></p>
+</main>

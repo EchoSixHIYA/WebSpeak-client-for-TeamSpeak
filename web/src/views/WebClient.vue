@@ -870,6 +870,7 @@
       <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
 
+    <PluginPanel :transport="plugins" :connected="voiceState.connected" :language="language" />
     <IdentityImportDialog
       v-if="identityImportOpen"
       v-model="identityImportText"
@@ -1001,6 +1002,7 @@ import { useWebClientAudioControls } from "../composables/useWebClientAudioContr
 import { useWebClientChannels, type TreeChannel } from "../composables/useWebClientChannels.js";
 import { useWebClientConnection } from "../composables/useWebClientConnection.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
+import PluginPanel from "../components/PluginPanel.vue";
 import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
 import { useWebClientScreenShare } from "../composables/useWebClientScreenShare.js";
 import { useWebClientPerformance } from "../composables/useWebClientPerformance.js";
@@ -1102,6 +1104,7 @@ const {
   leaveScreenShare,
   checkSupport,
   clearError,
+  plugins,
   measureVoiceAudioStatus,
 } = useVoiceWebSocket();
 const performance = useWebClientPerformance(computed(() => voiceState.connected), measureVoiceAudioStatus);

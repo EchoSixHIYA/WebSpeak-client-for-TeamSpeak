@@ -359,3 +359,10 @@ Diese Liste würdigt den Autor des zugrunde liegenden SDKs, Beiträge aus zusamm
 - [LainHE](https://github.com/LainHE) — [zusammengeführte PRs #2, #8, #28, #31–#35, #37, #38 und #40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE): Browser-Fehlerübersetzungen, Skalierung und Startseitenlayout, Bildschirmfreigabe-Bitrate und Zuschaueravatare, Relay-Zielprüfung und Wiederverbindung, vertrauenswürdige Proxys, Weitergabe von Verbindungsfehlern, Audio-Fehlermeldungen und Ressourcenfreigabe bei WebRTC-Fehlern.
 - [TimmySheep](https://github.com/TimmySheep) — [zusammengeführte PRs #13 und #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep) zu vorhandenen TS6-Freigaben, Seitenverhältnis, mobiler Sprache/Bildschirm-Wachhalten/Skin-Menü, Kanaloptionen der Identität, PWA/Design, Chatverlauf, Mitglieder-Audiozuständen und Mikrofonberechtigungen.
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) ermöglichte Verbindungen über registrierte TeamSpeak-Nicknames und bewahrte Nickname-Ziele; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) verbesserte das Beibehalten des KAAK-Arbeitsbereichs und die Wiederverbindung nach der ersten Verbindung. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) und [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) lieferten das ursprüngliche Design und die Implementierung des Discord-Skins (Commit-Autor **yumi**), die das WebSpeak-Projekt in einen [eigenständig verteilten `.wskin`-Skin](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) überführte.
+
+## Funktionale Plugins entwickeln (dev)
+
+Plugin-API, Server-/Instanzbereiche, gemeinsamer Videoplayer und GitHub-Verteilung:
+
+- [Plugin-Entwicklungsleitfaden](PLUGIN_DEVELOPMENT.md)
+- [Agent Skill für Plugin-Entwicklung](../.agents/skills/webspeak-plugin-development/SKILL.md)

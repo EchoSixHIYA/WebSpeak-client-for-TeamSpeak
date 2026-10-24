@@ -151,6 +151,7 @@
             <RouterLink to="/admin/server" active-class="active"><Icon name="server" :size="18" />{{ tr('adminInstanceSettings') }}</RouterLink>
             <RouterLink to="/admin/operations" active-class="active"><Icon name="users" :size="18" />{{ tr('adminInstanceOperations') }}</RouterLink>
             <RouterLink to="/admin/skins" active-class="active"><Icon name="compass" :size="18" />{{ tr('skinLibrary') }}</RouterLink>
+            <RouterLink to="/admin/plugins" active-class="active"><Icon name="grid" :size="18" />{{ pluginTranslations[language].store }}</RouterLink>
           </div>
           <div class="admin-nav-group">
             <span class="admin-nav-heading">{{ tr('adminTsGroup') }}<span class="admin-optional">{{ tr('adminOptional') }}</span></span>
@@ -241,6 +242,7 @@
           :model="adminSkins"
           :i18n="i18n"
         />
+        <AdminPlugins v-else-if="route.path === '/admin/plugins'" :model="adminPlugins" :language="language" />
         <AdminTsAdmin
           v-else-if="route.path === '/admin/ts-admin'"
           :model="adminTsAdmin"
@@ -399,6 +401,9 @@ import Icon from "../components/Icon.vue";
 import AdminServerSettings from "../components/admin/AdminServerSettings.vue";
 import AdminOperations from "../components/admin/AdminOperations.vue";
 import AdminSkins from "../components/admin/AdminSkins.vue";
+import AdminPlugins from "../components/admin/AdminPlugins.vue";
+import { useAdminPlugins } from "../composables/useAdminPlugins.js";
+import { pluginTranslations } from "../i18n/plugins.js";
 import AdminTsAdmin from "../components/admin/AdminTsAdmin.vue";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";
 import { createAdminRequests } from "../services/admin-requests.js";
@@ -454,12 +459,13 @@ const currentScope = computed(() => route.path === "/admin/ts-admin" ? tr("admin
 const adminOperations = useAdminOperations({ api: adminApi, errorMessage, errorText, tr, refreshOverview: loadOverview });
 const { loadOperations } = adminOperations;
 const adminSkins = useAdminSkins({ api: adminApi, tr });
+const adminPlugins = useAdminPlugins(adminApi);
 const { loadSkinCatalog } = adminSkins;
 const adminTsAdmin = useAdminTsAdmin({ api: adminApi, errorMessage, errorText, tr });
 const { loadSettings: loadTsAdminSettings } = adminTsAdmin;
 
 const passwordStrength = computed(() => Math.min(100, Math.max(8, newPassword.value.length * 5 + (/[\s\W]/.test(newPassword.value) ? 15 : 0))));
-const currentPageTitle = computed(() => route.path === "/admin/server" ? tr('adminInstanceSettings') : route.path === "/admin/operations" ? tr('adminInstanceOperations') : route.path === "/admin/skins" ? tr('skinLibrary') : route.path === "/admin/ts-admin" ? tr('tsAdminTitle') : tr('overview'));
+const currentPageTitle = computed(() => route.path === "/admin/plugins" ? pluginTranslations[language.value].store : route.path === "/admin/server" ? tr('adminInstanceSettings') : route.path === "/admin/operations" ? tr('adminInstanceOperations') : route.path === "/admin/skins" ? tr('skinLibrary') : route.path === "/admin/ts-admin" ? tr('tsAdminTitle') : tr('overview'));
 const targetStatusText = computed(() => overview.teamSpeak.status === "reachable" ? tr('reachable') : overview.teamSpeak.status === "unreachable" ? tr('unreachable') : tr('notTested'));
 const webrtcPortRangeText = computed(() => `${serverForm.webRtcUdpStart}–${serverForm.webRtcUdpEnd}`);
 
@@ -471,10 +477,12 @@ watch(() => route.path, (path, previous) => {
   if (previous === "/admin/server") serverSettings.cancelRequests();
   if (previous === "/admin/operations") adminOperations.cancelRequests();
   if (previous === "/admin/skins") adminSkins.cancelRequests();
+  if (previous === "/admin/plugins") adminPlugins.cancelRequests();
   if (previous === "/admin/ts-admin") adminTsAdmin.cancelRequests();
   if (screen.value !== "admin" || loading.value || submitting.value || loggingOut.value) return;
   if (path === "/admin/operations") void loadOperations();
   else if (path === "/admin/skins") void loadSkinCatalog();
+  else if (path === "/admin/plugins") void adminPlugins.load();
   else if (path === "/admin/ts-admin") void loadTsAdminSettings();
   else if (path === "/admin") void loadOverview();
 });
@@ -485,6 +493,7 @@ function cancelPendingWork() {
   serverSettings.cancelRequests();
   adminOperations.cancelRequests();
   adminSkins.cancelRequests();
+  adminPlugins.cancelRequests();
   adminTsAdmin.cancelRequests();
   loading.value = false;
   submitting.value = false;
@@ -492,6 +501,7 @@ function cancelPendingWork() {
 }
 function resetPrivateState() {
   serverSettings.reset(); adminOperations.reset(); adminSkins.reset(); adminTsAdmin.reset();
+  adminPlugins.reset();
   Object.assign(overview, emptyOverview());
   loginPassword.value = ""; newPassword.value = ""; confirmNewPassword.value = "";
   errorMessage.value = "";
@@ -505,6 +515,7 @@ async function loadAdminData(request: { isCurrent(): boolean }) {
   if (!request.isCurrent()) return;
   if (route.path === "/admin/operations") await loadOperations();
   else if (route.path === "/admin/skins") await loadSkinCatalog();
+  else if (route.path === "/admin/plugins") await adminPlugins.load();
   else if (route.path === "/admin/ts-admin") await loadTsAdminSettings();
 }
 async function loadAdminView() {

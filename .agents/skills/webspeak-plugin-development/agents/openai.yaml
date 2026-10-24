@@ -1,0 +1,4 @@
+interface:
+  display_name: "WebSpeak Plugin Development"
+  short_description: "Build portable WebSpeak functional plugins"
+  default_prompt: "Use $webspeak-plugin-development to build and verify a portable WebSpeak plugin."

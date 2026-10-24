@@ -7,6 +7,7 @@ import { createAccompaniment, type AccompanimentErrorCode } from "../voice/accom
 import { createWebRtcTransport } from "../voice/webrtc-transport.js";
 import { createVoiceConnection } from "../voice/connection.js";
 import { createVoiceCommands } from "../voice/commands.js";
+import { createPluginTransport } from "../services/plugin-transport.js";
 import { createVoiceSessionState } from "../voice/session-state.js";
 import { applySavedMemberVolumes } from "../voice/member-volume-preferences.js";
 import { createAudioDiagnostics, type AudioPermission, type VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
@@ -200,6 +201,7 @@ export function useVoiceWebSocket() {
   const ws = shallowRef<WebSocket | null>(null);
   const serverInfo = shallowRef<VoiceServerInfo | null>(null);
   const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
+  const plugins = createPluginTransport(() => ws.value, () => state.connected);
   const sessionState = createVoiceSessionState({
     selfId: () => state.tsClientId,
     onMemberRemoved(id) {
@@ -1023,6 +1025,7 @@ export function useVoiceWebSocket() {
 
   /** All ways a session ends release the same owned media and pending work. */
   function releaseSessionResources(sendScreenStop = false): void {
+    plugins.reset();
     chatGeneration++;
     inputDeviceGeneration++;
     outputDeviceGeneration++;
@@ -1043,6 +1046,7 @@ export function useVoiceWebSocket() {
   }
 
   function handleMessage(raw: unknown): void {
+    if (plugins.receive(raw)) return;
     const msg = parseServerMessage(raw);
     if (!msg || screenShare.handleMessage(msg) || sessionState.receive(msg)) return;
     switch (msg.type) {
@@ -1416,6 +1420,7 @@ export function useVoiceWebSocket() {
   }
 
   return {
+    plugins,
     ...screenShare.api,
     ws,
     state,

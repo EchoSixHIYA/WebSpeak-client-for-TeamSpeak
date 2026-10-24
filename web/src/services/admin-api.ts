@@ -1,6 +1,7 @@
 import { adminResponses, type AdminResponseReader } from "../../../src/shared/admin-responses.js";
 import type { AdminSettingsInput, ManagedInviteInput, TsAdminSettingsInput, TsAdminActionRequest } from "../../../src/shared/admin-inputs.js";
 import type { SkinStoreInstallInput } from "../../../src/shared/skin-store.js";
+import { pluginResponses, type PluginPackage, type PluginSettings } from "../../../src/shared/plugins.js";
 
 export class AdminApiError extends Error {
   constructor(readonly code: string, readonly status = 0, message = code) {
@@ -100,6 +101,12 @@ export function createAdminApi(options: AdminApiOptions) {
 
   return {
     invalidate() { generation++; for (const controller of pending) controller.abort(); },
+    plugins: (signal?: AbortSignal) => request("/plugins", pluginResponses.installed, "GET", undefined, true, signal),
+    pluginStore: (signal?: AbortSignal) => request("/plugins/store", pluginResponses.catalog, "GET", undefined, true, signal),
+    installPlugin: (body: { id: string; revision: string; installedRevision: string | null }, signal?: AbortSignal) => request("/plugins/store/install", pluginResponses.saved, "POST", body, true, signal),
+    uploadPlugin: (pack: PluginPackage, installedRevision: string | null, signal?: AbortSignal) => request("/plugins/upload", pluginResponses.saved, "POST", { package: pack, installedRevision }, true, signal),
+    configurePlugin: (id: string, revision: string, settings: PluginSettings, signal?: AbortSignal) => request(`/plugins/${encodeURIComponent(id)}/settings`, pluginResponses.saved, "PUT", { revision, settings }, true, signal),
+    removePlugin: (id: string, revision: string, signal?: AbortSignal) => request(`/plugins/${encodeURIComponent(id)}`, adminResponses.ok, "DELETE", { revision }, true, signal),
     session: (signal?: AbortSignal) => request("/session", adminResponses.session, "GET", undefined, true, signal),
     login: (username: string, password: string, signal?: AbortSignal) => request("/login", adminResponses.login, "POST", { username, password }, false, signal),
     changePassword: (newPassword: string, signal?: AbortSignal) => request("/change-password", adminResponses.ok, "POST", { newPassword }, true, signal),

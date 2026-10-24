@@ -369,3 +369,10 @@ This list acknowledges the upstream SDK author, contributions through merged Git
 - [LainHE](https://github.com/LainHE) — [merged PRs #2, #8, #28, #31–#35, #37, #38 and #40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE), covering browser error translations, scaling and home layout, screen-share bitrate and viewer avatars, relay target validation and recovery, trusted proxy handling, connection-failure propagation, audio fault reporting, and WebRTC failure cleanup.
 - [TimmySheep](https://github.com/TimmySheep) — [merged PRs #13 and #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep), covering existing TS6 share discovery, share aspect ratio, mobile voice/wake/skin-menu behavior, identity channel options, PWA/theme work, chat history, member audio states, and microphone permission.
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) added registered TeamSpeak nickname connections and preserved nickname targets; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) improved KAAK workspace retention and reconnection after the first connection. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) and [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) supplied the original Discord skin design and implementation (commit author **yumi**), later adapted by the WebSpeak project into an [independently distributed `.wskin` skin](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice).
+
+## Functional plugin development (dev)
+
+Plugin API, server/instance scopes, Watch Together example, and GitHub distribution:
+
+- [Plugin development guide](PLUGIN_DEVELOPMENT.md)
+- [Plugin development Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md)

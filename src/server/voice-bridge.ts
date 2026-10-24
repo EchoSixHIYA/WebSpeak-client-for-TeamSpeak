@@ -27,6 +27,8 @@ import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./ac
 import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenShareIceServer } from "./screen-share.js";
 import { OpusEncoder } from "./opus-codec.js";
 import { avatarDataUrl } from "./directory-view.js";
+import { PluginCoordinator } from "../plugins/coordinator.js";
+import type { PluginRegistry } from "../plugins/registry.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_MISSED_HEARTBEATS = 2;
@@ -49,6 +51,7 @@ function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>):
 }
 
 export interface VoiceBridgeOptions {
+  pluginRegistry?: PluginRegistry;
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
   screenShareIceServers?: ScreenShareIceServer[] | (() => ScreenShareIceServer[]);
@@ -113,6 +116,7 @@ export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
   private readonly screenShares: ScreenShareCoordinator;
+  private readonly plugins: PluginCoordinator;
   private readonly identityLeases = new IdentityLeaseStore();
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -127,6 +131,14 @@ export class VoiceBridge {
   ) {
     this.logger = logger.child({ component: "voice-bridge" });
     this.trustedProxies = createTrustedProxies(options.trustedProxies);
+    this.plugins = new PluginCoordinator(options.pluginRegistry, this.entries, (id, message) => {
+      const ws = this.entries.get(id)?.ws;
+      // Optional plugin traffic must not build an unbounded queue on the voice socket.
+      // A slow participant can request a fresh snapshot or reopen after draining.
+      if (ws?.readyState === WebSocket.OPEN && ws.bufferedAmount <= 512 * 1024) {
+        try { ws.send(JSON.stringify(message)); } catch { /* retired socket */ }
+      }
+    });
     this.screenShares = new ScreenShareCoordinator(this.entries, (entryId, message) => {
       const entry = this.entries.get(entryId);
       if (entry?.ws.readyState === WebSocket.OPEN) {
@@ -492,7 +504,10 @@ export class VoiceBridge {
           this.screenShares.onClientLeave(entry!, id);
           entry!.webrtc?.removeClient(id);
         },
-        onClientMove: (id, channelId) => this.screenShares.onClientMove(entry!, id, channelId),
+        onClientMove: (id, channelId) => {
+          this.screenShares.onClientMove(entry!, id, channelId);
+          if (id === entry!.tsClient.getClientId()) queueMicrotask(() => this.plugins.reconcile(entry!));
+        },
         onNotification: notification => this.screenShares.handleNotification(entry!, notification),
         onVoice: data => entry!.audioTransport?.receiveTeamSpeak(data),
         onAvatarError: (clientId, uid, error) => this.logger.debug({
@@ -544,6 +559,7 @@ export class VoiceBridge {
           }
           if (session.state !== "connected") return;
           this.screenShares.removePeer(entryId);
+          this.plugins.remove(entryId);
           resetDirectoryForReconnect();
           sendJson({ type: "disconnected", recoverable: isRecoverable(normalized) });
           scheduleReconnect(normalized);
@@ -565,6 +581,12 @@ export class VoiceBridge {
         }
 
         const rawMessage = typeof data === "string" ? data : data.toString("utf-8");
+        try {
+          const value: unknown = JSON.parse(rawMessage);
+          if (value && typeof value === "object" && "type" in value && value.type === "pluginRequest") {
+            this.plugins.reconcile(entry!); this.plugins.handle(entry!, value); return;
+          }
+        } catch { /* Existing command parser owns malformed messages. */ }
         const webRtcMessage = parseWebRtcClientMessage(rawMessage);
         if (webRtcMessage?.type === "webrtcOffer") {
           if (this.getWebRtcOptions()?.enabled !== true) {
@@ -648,6 +670,7 @@ export class VoiceBridge {
   }
 
   async shutdown(): Promise<void> {
+    this.plugins.dispose();
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -712,6 +735,7 @@ export class VoiceBridge {
 
   private async cleanupEntry(entry: WebClientEntry, reason: SessionTeardownReason): Promise<void> {
     this.screenShares.removePeer(entry.id);
+    this.plugins.remove(entry.id);
     if (this.entries.get(entry.id) === entry) this.entries.delete(entry.id);
     entry.events?.close();
     entry.events = null;

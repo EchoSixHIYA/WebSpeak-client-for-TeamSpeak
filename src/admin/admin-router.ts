@@ -8,6 +8,9 @@ import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
 import type { AdminSessionSummary } from "../server/voice-bridge.js";
 import { SkinRegistry, SkinRegistryError } from "./skin-registry.js";
 import { SkinStore } from "./skin-store.js";
+import { createPluginAdminRouter } from "../plugins/admin-router.js";
+import type { PluginRegistry } from "../plugins/registry.js";
+import type { PluginStore } from "../plugins/store.js";
 
 export interface AdminConnectionRecord {
   id: string;
@@ -38,6 +41,8 @@ export interface AdminRouterOptions {
   logFile?: string;
   skinRegistry?: SkinRegistry;
   skinStore?: SkinStore;
+  pluginRegistry?: PluginRegistry;
+  pluginStore?: PluginStore;
   startedAt: number;
 }
 
@@ -126,6 +131,10 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   });
 
   router.use(requireAdmin(options.sessions, options.service));
+  router.use("/plugins", createPluginAdminRouter({ registry: options.pluginRegistry, store: options.pluginStore,
+    protect: [requireSameOrigin, requireCsrf(options.sessions)],
+    audit: (event, data) => options.service.database.addAudit(event, data),
+  }));
 
   router.get("/overview", (_request, response) => {
     response.json(options.service.getOverview(
