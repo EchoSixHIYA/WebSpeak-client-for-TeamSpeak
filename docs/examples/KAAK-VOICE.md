@@ -30,7 +30,7 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 ## Returning to the workspace
 
-KAAK 3.1.126 requires WebSpeak 0.2.8 with workspace API v1. Its manifest opts into the generic persistent workspace policy: first-time visitors keep the connection home until a successful voice connection; returning visitors and disconnected users retain the workspace and server rail. Restoring the workspace never starts a connection or captures the microphone. The host restores the recent target only for ordinary visits, preserving explicit invitation and target links. Clearing browser data resets this history.
+KAAK 3.1.127 requires WebSpeak 0.2.8 with workspace API v1. Its manifest opts into the generic persistent workspace policy: first-time visitors keep the connection home until a successful voice connection; returning visitors and disconnected users retain the workspace and server rail. Restoring the workspace never starts a connection or captures the microphone. The host restores the recent target only for ordinary visits, preserving explicit invitation and target links. Clearing browser data resets this history.
 
 The permission-gated `voice.connection-status` host widget provides the connection state, nickname and explicit reconnect button beside server navigation at desktop and narrow widths. Open-mode server switching and adding servers reuse the host connection flow, including saved-password lookup and trusted password prompts; fixed mode retains its restrictions. All KAAK layout and styling remain in the package.
 

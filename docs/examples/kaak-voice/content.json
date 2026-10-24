@@ -62,8 +62,8 @@
         "kaakLeaveVoice": "退出",
         "kaakCurrentIdentity": "当前 TeamSpeak 身份",
         "kaakOnline": "在线",
-        "githubRepository": "GitHub 仓库",
-        "qqGroup": "QQ群",
+        "githubRepository": "Webspeak项目Github",
+        "qqGroup": "WebSpeak项目QQ群",
         "adminConsole": "管理控制台",
         "communityLinks": "社区与管理入口"
       }
@@ -129,8 +129,8 @@
         "kaakLeaveVoice": "Leave",
         "kaakCurrentIdentity": "Current TeamSpeak identity",
         "kaakOnline": "Online",
-        "githubRepository": "GitHub repository",
-        "qqGroup": "QQ group",
+        "githubRepository": "WebSpeak project GitHub",
+        "qqGroup": "WebSpeak project QQ group",
         "adminConsole": "Admin console",
         "communityLinks": "Community and administration"
       }
@@ -196,8 +196,8 @@
         "kaakLeaveVoice": "Verlassen",
         "kaakCurrentIdentity": "Aktuelle TeamSpeak-Identität",
         "kaakOnline": "Online",
-        "githubRepository": "GitHub-Repository",
-        "qqGroup": "QQ-Gruppe",
+        "githubRepository": "GitHub-Repository des WebSpeak-Projekts",
+        "qqGroup": "QQ-Gruppe des WebSpeak-Projekts",
         "adminConsole": "Administrationskonsole",
         "communityLinks": "Community und Verwaltung"
       }
@@ -263,8 +263,8 @@
         "kaakLeaveVoice": "Выйти",
         "kaakCurrentIdentity": "Текущая личность TeamSpeak",
         "kaakOnline": "В сети",
-        "githubRepository": "Репозиторий GitHub",
-        "qqGroup": "Группа QQ",
+        "githubRepository": "GitHub проекта WebSpeak",
+        "qqGroup": "Группа QQ проекта WebSpeak",
         "adminConsole": "Панель администратора",
         "communityLinks": "Сообщество и управление"
       }
@@ -330,8 +330,8 @@
         "kaakLeaveVoice": "退出",
         "kaakCurrentIdentity": "現在の TeamSpeak ID",
         "kaakOnline": "オンライン",
-        "githubRepository": "GitHub リポジトリ",
-        "qqGroup": "QQ グループ",
+        "githubRepository": "WebSpeak プロジェクトの GitHub",
+        "qqGroup": "WebSpeak プロジェクトの QQ グループ",
         "adminConsole": "管理コンソール",
         "communityLinks": "コミュニティと管理"
       }
