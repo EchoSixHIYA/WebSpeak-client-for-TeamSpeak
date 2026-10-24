@@ -25,6 +25,7 @@ export function useAdminTsAdmin(options: Options) {
   const settings = reactive(emptySettings()), form = reactive(emptyForm()), editor = reactive(emptyEditor());
   const overview = ref<Awaited<ReturnType<AdminApi["tsAdminOverview"]>> | null>(null);
   const noticeMessage = ref("");
+  const refreshWarning = ref("");
   const loading = ref(false), saving = ref(false), connecting = ref(false), acting = ref(false);
   const settingsDirty = computed(() => form.enabled !== settings.enabled || form.transport !== settings.transport
     || form.queryHost !== settings.queryHost || form.webQueryUrl !== settings.webQueryUrl
@@ -40,6 +41,7 @@ export function useAdminTsAdmin(options: Options) {
   function cancelRequests() {
     requests.reset(); loading.value = false; saving.value = false; connecting.value = false; acting.value = false;
     Object.assign(editor, emptyEditor());
+    refreshWarning.value = "";
   }
   function reset() {
     cancelRequests(); Object.assign(settings, emptySettings()); Object.assign(form, emptyForm()); overview.value = null; noticeMessage.value = "";
@@ -51,6 +53,7 @@ export function useAdminTsAdmin(options: Options) {
   function mergeSettings(value: Awaited<ReturnType<AdminApi["tsAdminSettings"]>>, baseline: Form) {
     if (settings.configurationRevision && settings.configurationRevision !== value.configurationRevision) {
       requests.cancel("overview"); connecting.value = false; overview.value = null; Object.assign(editor, emptyEditor());
+      refreshWarning.value = "";
     }
     Object.assign(settings, value);
     const next: Form = { enabled: value.enabled, transport: value.transport, queryHost: value.queryHost, webQueryUrl: value.webQueryUrl,
@@ -77,7 +80,7 @@ export function useAdminTsAdmin(options: Options) {
     if (saving.value || acting.value) return;
     requests.cancel("overview"); connecting.value = false;
     const request = requests.begin("settings"), baseline = { ...form };
-    saving.value = true; loading.value = false; options.errorMessage.value = ""; noticeMessage.value = "";
+    saving.value = true; loading.value = false; options.errorMessage.value = ""; noticeMessage.value = ""; refreshWarning.value = "";
     try {
       const saved = await options.api.saveTsAdminSettings({ ...baseline, queryPort: Number(baseline.queryPort),
         password: baseline.passwordAction === "replace" ? baseline.password : undefined,
@@ -89,12 +92,19 @@ export function useAdminTsAdmin(options: Options) {
     } catch (error) { if (request.isCurrent()) report(error); }
     finally { if (request.isCurrent()) saving.value = false; request.finish(); }
   }
-  async function connectAndRefresh() {
+  function listErrorText(code?: string | null) { return options.errorText(code || "TS_ADMIN_READ_FAILED"); }
+  async function connectAndRefresh() { await readOverview(false); }
+  async function readOverview(afterAction: boolean) {
     if (loading.value || connecting.value || saving.value || acting.value || settingsDirty.value || !settings.enabled || !settings.fixedMode) return;
     const request = requests.begin("overview");
-    connecting.value = true; options.errorMessage.value = "";
+    connecting.value = true; options.errorMessage.value = ""; refreshWarning.value = "";
     try { const value = await options.api.tsAdminOverview(request.signal); if (request.isCurrent()) overview.value = value; }
-    catch (error) { if (request.isCurrent()) report(error); }
+    catch (error) {
+      if (request.isCurrent() && !isAdminRequestCancelled(error)) {
+        if (afterAction) refreshWarning.value = options.tr("tsAdminRefreshError", { error: listErrorText((error as { code?: string }).code) });
+        else report(error);
+      }
+    }
     finally { if (request.isCurrent()) connecting.value = false; request.finish(); }
   }
   function beginAction(action: TsAdminAction["action"], target?: { id: number | string; uid?: string; nickname?: string; name?: string; channelID?: string }) {
@@ -125,17 +135,17 @@ export function useAdminTsAdmin(options: Options) {
     if (acting.value || saving.value || loading.value || settingsDirty.value || !settings.enabled || !settings.fixedMode || !editor.action || !overview.value) return;
     requests.cancel("overview"); connecting.value = false;
     const request = requests.begin("action"), body = { operation: actionPayload(), configurationRevision: overview.value.configurationRevision };
-    acting.value = true; options.errorMessage.value = ""; noticeMessage.value = "";
+    acting.value = true; options.errorMessage.value = ""; noticeMessage.value = ""; refreshWarning.value = "";
     try {
       await options.api.tsAdminAction(body, request.signal);
       if (!request.isCurrent()) return;
       Object.assign(editor, emptyEditor()); noticeMessage.value = options.tr("tsAdminActionSaved"); overview.value = null;
       // A failed refresh must never retry the write or report that it did not happen.
       acting.value = false;
-      await connectAndRefresh();
+      await readOverview(true);
     } catch (error) { if (request.isCurrent()) report(error); }
     finally { if (request.isCurrent()) acting.value = false; request.finish(); }
   }
-  return { settings, form, editor, overview, settingsDirty, noticeMessage, loading, saving, connecting, acting,
+  return { settings, form, editor, overview, settingsDirty, noticeMessage, refreshWarning, listErrorText, loading, saving, connecting, acting,
     loadSettings, saveSettings, connectAndRefresh, beginAction, closeAction, runAction, cancelRequests, reset };
 }

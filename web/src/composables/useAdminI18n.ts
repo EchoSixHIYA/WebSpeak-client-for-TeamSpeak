@@ -50,6 +50,7 @@ const errorLabels: Record<string, AdminTranslationKey> = {
   TS_ADMIN_PERMISSION_DENIED: "tsAdminPermissionError", TS_ADMIN_AUTH_FAILED: "tsAdminAuthError", TS_ADMIN_OPERATION_FAILED: "tsAdminActionError",
   TS_ADMIN_CLIENT_CHANGED: "tsAdminClientChanged", TS_ADMIN_CONFIG_CHANGED: "tsAdminConfigChanged", TS_ADMIN_PARTIAL_SUCCESS: "tsAdminPartialError",
   TS_ADMIN_RATE_LIMITED: "tsAdminRateError", TS_ADMIN_TLS_FAILED: "tsAdminTlsError",
+  TS_ADMIN_READ_FAILED: "tsAdminReadError", TS_ADMIN_TIMEOUT: "tsAdminTimeoutError",
 };
 const connectionErrors: Record<string, AdminTranslationKey> = {
   PASSWORD_REQUIRED: "serverPasswordRequiredError", SERVER_PASSWORD_REQUIRED: "serverPasswordRequiredError",

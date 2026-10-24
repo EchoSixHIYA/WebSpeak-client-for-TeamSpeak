@@ -87,6 +87,7 @@ const tsAdminOverview = object({
   channels: array(object({ id: text, parentID: text, name: text, description: text, totalClients: number, hasPassword: boolean })),
   clients: array(object({ id: number, uid: text, nickname: text, channelID: text, serverGroups: array(text), away: boolean, inputMuted: boolean, outputMuted: boolean })),
   groups: array(object({ id: text, name: text })), groupsAvailable: boolean, bansAvailable: boolean,
+  groupsErrorCode: optional(nullable(text)), bansErrorCode: optional(nullable(text)),
   bans: array(object({ id: text, name: text, uid: text, reason: text, durationSeconds: number, createdAt: nullable(text) })),
   observedAt: text,
 });

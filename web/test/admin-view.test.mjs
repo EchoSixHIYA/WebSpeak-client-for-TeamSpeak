@@ -539,8 +539,12 @@ test("TS mutations send the selected UID once and a failed refresh never retries
   const pending = model.runAction(); await model.runAction();
   response.resolve(json({ ok: true })); await pending;
   assert.equal(writes, 1); assert.equal(model.acting, false); assert.equal(model.editor.action, "");
-  assert.ok(model.noticeMessage); assert.ok(state.errorMessage);
+  assert.ok(model.noticeMessage); assert.equal(state.errorMessage, "");
+  assert.ok(model.refreshWarning.includes("操作已完成")); assert.ok(model.refreshWarning.includes("勿重复执行"));
   assert.equal(model.overview, null);
+  handler = path => Promise.resolve(json(defaults(path)));
+  await model.connectAndRefresh();
+  assert.equal(model.refreshWarning, ""); assert.ok(model.overview);
 });
 
 test("leaving TS management discards a late response and logout clears saved credential drafts", async () => {
@@ -569,6 +573,11 @@ test("TS administration actually renders transport forms, operations and all fiv
     assert.ok(html.includes("WebQuery")); assert.ok(html.includes("https://query.example"));
     assert.ok(html.includes("Selected user")); assert.ok(html.includes("Lobby"));
     assert.ok(!html.includes("undefined"));
+    readable.beginAction("channel.create");
+    const creating = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
+    assert.ok(creating.includes(state.i18n.tr("tsAdminChannelPassword")));
+    assert.ok(!creating.includes(`<span>${state.i18n.tr("tsAdminPassword")}</span><input type="password" autocomplete="new-password" maxlength="512"`));
+    readable.closeAction();
   }
   readable.form.transport = "ssh";
   let html = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
@@ -578,6 +587,25 @@ test("TS administration actually renders transport forms, operations and all fiv
   readable.beginAction("client.move", readable.overview.clients[0]);
   html = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
   assert.ok(html.includes('class="operation-card ts-admin-editor"')); assert.ok(html.includes("Selected user"));
+});
+
+test("TS list warnings distinguish rate limits, permissions, timeouts and other read failures in every language", async () => {
+  const { createSSRApp } = await import("vue");
+  const { renderToString } = await import("vue/server-renderer");
+  const { default: Component } = await vite.ssrLoadModule("/src/components/admin/AdminTsAdmin.vue");
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin);
+  await model.connectAndRefresh();
+  for (const code of ["TS_ADMIN_RATE_LIMITED", "TS_ADMIN_PERMISSION_DENIED", "TS_ADMIN_TIMEOUT", "TS_ADMIN_READ_FAILED"]) {
+    model.overview.groupsAvailable = false; model.overview.bansAvailable = false;
+    model.overview.groupsErrorCode = code; model.overview.bansErrorCode = code;
+    for (const language of ["zh", "en", "de", "ru", "ja"]) {
+      state.language = language;
+      const html = await renderToString(createSSRApp(Component, { model: state.adminTsAdmin, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
+      assert.equal(html.split(state.i18n.errorText(code)).length - 1, 2);
+      assert.ok(!html.includes(state.i18n.tr("tsAdminRestricted")));
+    }
+  }
 });
 
 

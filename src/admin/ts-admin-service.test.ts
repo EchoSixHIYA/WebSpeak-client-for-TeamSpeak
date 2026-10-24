@@ -32,6 +32,8 @@ async function fixture(t: TestContext, family: "ts3" | "ts6" = "ts6") {
   const clients: QueryClient[] = [];
   const clientOptions: QueryClientOptions[] = [];
   let httpStatus = 200;
+  let httpCommand: string | undefined;
+  let jsonErrors = false;
   let reply: (command: string, params: Record<string, string>) => Reply | Promise<Reply> = command => {
     switch (command) {
       case "version": return ok([{ version: family === "ts3" ? "3.13.7" : "6.0.0-beta13" }]);
@@ -54,8 +56,8 @@ async function fixture(t: TestContext, family: "ts3" | "ts6" = "ts6") {
     calls.push({ path, command, params, key: String(req.headers["x-api-key"]) });
     const answer = await reply(command, params);
     res.setHeader("content-type", "application/json");
-    res.statusCode = httpStatus;
-    res.end(httpStatus === 200 ? JSON.stringify(answer) : "Access denied");
+    res.statusCode = httpCommand === undefined || httpCommand === command ? httpStatus : 200;
+    res.end(res.statusCode === 200 || jsonErrors ? JSON.stringify(answer) : "Access denied");
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); assert.ok(address && typeof address !== "string");
@@ -75,6 +77,8 @@ async function fixture(t: TestContext, family: "ts3" | "ts6" = "ts6") {
   return { service, database, master, settings, calls, policy, logs, clientOptions,
     action: (operation: unknown) => service.action({ operation, configurationRevision: service.settings().configurationRevision }),
     set httpStatus(value: number) { httpStatus = value; },
+    set httpCommand(value: string) { httpCommand = value; },
+    set jsonErrors(value: boolean) { jsonErrors = value; },
     get reply() { return reply; }, set reply(value) { reply = value; } };
 }
 
@@ -136,11 +140,81 @@ test("limited list permissions preserve the rest of the overview and error detai
   f.reply = (command, params) => ["servergrouplist", "banlist"].includes(command) ? denied() : original(command, params);
   const result = await f.service.overview();
   assert.equal(result.groupsAvailable, false); assert.equal(result.bansAvailable, false);
+  assert.equal(result.groupsErrorCode, "TS_ADMIN_PERMISSION_DENIED"); assert.equal(result.bansErrorCode, "TS_ADMIN_PERMISSION_DENIED");
   assert.equal(result.channels.length, 1); assert.equal(result.clients.length, 1);
   f.reply = (command, params) => command === "serverinfo" ? denied() : original(command, params);
   await assert.rejects(f.service.overview(), hasCode("TS_ADMIN_PERMISSION_DENIED"));
   assert.ok(!JSON.stringify(f.logs).includes("secret-value-must-not-escape"));
   assert.ok(!JSON.stringify(f.logs).includes(f.settings.apiKey));
+});
+
+test("Query connections never appear in member lists or channel and server member counts", async t => {
+  const f = await fixture(t), original = f.reply;
+  f.reply = (command, params) => {
+    if (command === "clientlist") return ok([member, { ...member, clid: "99", client_type: "1", client_nickname: "serveradmin" }]);
+    if (command === "channellist") return ok([{ ...channel, total_clients: "2" }, { ...channel, cid: "2", channel_name: "Empty" }]);
+    return original(command, params);
+  };
+  const result = await f.service.overview();
+  assert.equal(result.clientCount, 1); assert.deepEqual(result.clients.map(entry => entry.id), [42]);
+  assert.deepEqual(result.channels.map(entry => entry.totalClients), [1, 0]);
+  f.reply = (command, params) => command === "clientlist" ? ok([{ ...member, clid: "99", client_type: "1" }]) : original(command, params);
+  const empty = await f.service.overview();
+  assert.equal(empty.clientCount, 0); assert.deepEqual(empty.clients, []); assert.equal(empty.channels[0].totalClients, 0);
+});
+
+for (const [code, expected] of [[524, "TS_ADMIN_RATE_LIMITED"], [2568, "TS_ADMIN_PERMISSION_DENIED"], [1538, "TS_ADMIN_READ_FAILED"]] as const) {
+  test(`optional list error ${code} retains its cause rather than inventing a permission failure`, async t => {
+    const f = await fixture(t), original = f.reply;
+    f.reply = (command, params) => command === "servergrouplist" ? { body: [], status: { code, message: "private-error-detail" } } : original(command, params);
+    const result = await f.service.overview();
+    assert.equal(result.groupsAvailable, false); assert.equal(result.groupsErrorCode, expected);
+    assert.equal(result.bansAvailable, true); assert.equal(result.bansErrorCode, null);
+    assert.equal(result.clients.length, 1); assert.ok(!JSON.stringify(result).includes("private-error-detail"));
+  });
+}
+
+for (const state of ["disconnected", "reused-id"] as const) test(`a successful UID ban with ${state} does not kick another connection or report partial failure`, async t => {
+  const f = await fixture(t), original = f.reply;
+  let banned = false;
+  f.reply = (command, params) => {
+    if (command === "banadd") banned = true;
+    if (command === "clientlist" && banned) return ok(state === "disconnected" ? [] : [{ ...member, client_unique_identifier: "replacement-identity=" }]);
+    return original(command, params);
+  };
+  assert.deepEqual(await f.action({ action: "client.ban", clientId: 42, clientUid: uid, reason: "UID only", durationSeconds: 120 }), { ok: true });
+  assert.equal(f.calls.filter(call => call.command === "banadd").length, 1);
+  assert.ok(!f.calls.some(call => call.command === "clientkick"));
+  assert.ok(!f.database.recentAudit(50).some(entry => entry.event === "TS_ADMIN_ACTION_PARTIAL"));
+});
+
+test("a banned client leaving between the fresh identity check and kick is successful", async t => {
+  const f = await fixture(t), original = f.reply;
+  f.reply = (command, params) => command === "clientkick" ? { body: [], status: { code: 512, message: "invalid clientID" } } : original(command, params);
+  assert.deepEqual(await f.action({ action: "client.ban", clientId: 42, clientUid: uid, reason: "UID only", durationSeconds: 120 }), { ok: true });
+  assert.equal(f.calls.filter(call => call.command === "clientkick").length, 1);
+});
+
+for (const [status, expected] of [[429, "TS_ADMIN_RATE_LIMITED"], [408, "TS_ADMIN_TIMEOUT"], [504, "TS_ADMIN_TIMEOUT"]] as const) test(`HTTP ${status} has a specific safe Query failure`, async t => {
+  const f = await fixture(t);
+  f.httpStatus = status;
+  await assert.rejects(f.service.overview(), hasCode(expected));
+});
+
+for (const [status, expected] of [[429, "TS_ADMIN_RATE_LIMITED"], [503, "TS_ADMIN_READ_FAILED"]] as const) test(`HTTP ${status} cannot become a successful list through a JSON status.code=0 body`, async t => {
+  const f = await fixture(t);
+  f.httpStatus = status; f.httpCommand = "servergrouplist"; f.jsonErrors = true;
+  const result = await f.service.overview();
+  assert.equal(result.groupsAvailable, false); assert.equal(result.groupsErrorCode, expected);
+  assert.equal(result.bansAvailable, true); assert.equal(result.clientCount, 1);
+});
+
+test("HTTP errors carrying genuine TS permission errors keep the SDK error classification", async t => {
+  const f = await fixture(t), original = f.reply;
+  f.httpStatus = 403; f.httpCommand = "servergrouplist"; f.jsonErrors = true;
+  f.reply = (command, params) => command === "servergrouplist" ? denied() : original(command, params);
+  const result = await f.service.overview();
+  assert.equal(result.groupsErrorCode, "TS_ADMIN_PERMISSION_DENIED");
 });
 
 test("administrator actions use typed SDK commands, escaping and UID-only bans", async t => {

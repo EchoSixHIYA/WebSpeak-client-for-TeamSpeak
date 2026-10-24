@@ -4,7 +4,7 @@ import {
   addBan, addClientToServerGroup, asBanID, asChannelID, asClientID, asServerGroupID,
   createChannel, deleteBan, deleteChannel, editChannel, editServer, getServerInfo, kickClient,
   listBans, listChannels, listClients, listServerGroups, moveClient, Reason,
-  removeClientFromServerGroup, ServerError, type CommandOptions,
+  removeClientFromServerGroup, ServerError, ErrorCode, CommandTimeoutError, type CommandOptions,
 } from "@honeybbq/teamspeak";
 import { QueryClient, WebQueryHttpError, type QueryClientOptions } from "@honeybbq/teamspeak/query";
 import type { Logger } from "../logger.js";
@@ -81,23 +81,31 @@ export class TsAdminService {
       ]);
       const [groups, bans] = await Promise.allSettled([listServerGroups(client, options), listBans(client, options)]);
       assertCurrent();
-      this.database.addAudit("TS_ADMIN_OVERVIEW_READ", { channels: channels.length, clients: clients.length });
+      const voiceClients = clients.filter(entry => entry.type === 0);
+      const channelMembers = new Map<string, number>();
+      for (const entry of voiceClients) {
+        const id = String(entry.channelID);
+        channelMembers.set(id, (channelMembers.get(id) ?? 0) + 1);
+      }
+      this.database.addAudit("TS_ADMIN_OVERVIEW_READ", { channels: channels.length, clients: voiceClients.length });
       return {
         configurationRevision: this.configuration(),
         serverName: server.virtualserver_name ?? "", serverVersion: client.serverVersion, serverFamily: client.serverFamily,
         welcomeMessage: server.virtualserver_welcomemessage ?? "", maxClients: numeric(server.virtualserver_maxclients),
-        uptimeSeconds: numeric(server.virtualserver_uptime), channelCount: channels.length, clientCount: clients.length,
+        uptimeSeconds: numeric(server.virtualserver_uptime), channelCount: channels.length, clientCount: voiceClients.length,
         channels: channels.map(channel => ({ id: String(channel.id), parentID: String(channel.parentID), name: channel.name,
-          description: channel.description, totalClients: channel.totalClients ?? 0, hasPassword: channel.hasPassword })),
-        clients: clients.map(entry => ({ id: Number(entry.id), uid: entry.uid, nickname: entry.nickname, channelID: String(entry.channelID),
+          description: channel.description, totalClients: channelMembers.get(String(channel.id)) ?? 0, hasPassword: channel.hasPassword })),
+        clients: voiceClients.map(entry => ({ id: Number(entry.id), uid: entry.uid, nickname: entry.nickname, channelID: String(entry.channelID),
           serverGroups: entry.serverGroups.map(String), away: entry.isAway, inputMuted: entry.isInputMuted ?? false, outputMuted: entry.isOutputMuted ?? false })),
         groups: groups.status === "fulfilled" ? groups.value.filter(group => group.type === 1).map(group => ({ id: String(group.id), name: group.name })) : [],
         bans: bans.status === "fulfilled" ? bans.value.map(ban => ({ id: String(ban.id), name: ban.name || ban.lastNickname,
           uid: ban.uid, reason: ban.reason, durationSeconds: ban.durationMs / 1000, createdAt: ban.createdAt?.toISOString() ?? null })) : [],
         groupsAvailable: groups.status === "fulfilled", bansAvailable: bans.status === "fulfilled",
+        groupsErrorCode: groups.status === "fulfilled" ? null : classifyError(groups.reason, "TS_ADMIN_READ_FAILED"),
+        bansErrorCode: bans.status === "fulfilled" ? null : classifyError(bans.reason, "TS_ADMIN_READ_FAILED"),
         observedAt: new Date().toISOString(),
       };
-    });
+    }, undefined, "TS_ADMIN_READ_FAILED");
   }
 
   /** Serialize writes, then revalidate live client identities immediately before changing them. */
@@ -136,7 +144,19 @@ export class TsAdminService {
           } else {
             // Banning the gateway's IP would disconnect unrelated WebSpeak users.
             await addBan(client, { uid: current.uid, reason: action.reason, durationMs: action.durationSeconds * 1000 }, options);
-            try { assertCurrent(); await kickClient(client, current.id, Reason.KickServer, { ...options, reasonMessage: action.reason }); }
+            try {
+              assertCurrent();
+              // TS may disconnect the banned identity itself. Never kick a replacement that reused its ID.
+              const remaining = (await listClients(client, { ...options, uid: true })).find(entry => entry.id === current.id);
+              assertCurrent();
+              if (remaining?.uid === current.uid && remaining.type === 0) {
+                try { await kickClient(client, current.id, Reason.KickServer, { ...options, reasonMessage: action.reason }); }
+                catch (error) {
+                  // The same client can leave between the fresh list and the kick.
+                  if (!(error instanceof ServerError && error.code === ErrorCode.ClientInvalidID)) throw error;
+                }
+              }
+            }
             catch { this.database.addAudit("TS_ADMIN_ACTION_PARTIAL", { action: action.action }); fail("TS_ADMIN_PARTIAL_SUCCESS"); }
           }
         }
@@ -155,7 +175,7 @@ export class TsAdminService {
     return createHash("sha256").update(JSON.stringify([this.policy(), this.database.getTsAdminSettings()])).digest("hex");
   }
 
-  private async withClient<T>(run: (client: QueryClient, options: CommandOptions, assertCurrent: () => void) => Promise<T>, expected?: string): Promise<T> {
+  private async withClient<T>(run: (client: QueryClient, options: CommandOptions, assertCurrent: () => void) => Promise<T>, expected?: string, failureCode = "TS_ADMIN_OPERATION_FAILED"): Promise<T> {
     this.assertFixed();
     if (expected !== undefined && this.configuration() !== expected) fail("TS_ADMIN_CONFIG_CHANGED");
     const settings = this.database.getTsAdminSettings();
@@ -196,7 +216,7 @@ export class TsAdminService {
       return await run(client, { signal, timeoutMs: 8_000 }, assertCurrent);
     } catch (error) {
       if (error instanceof AdminInputError) throw error;
-      const code = classifyError(error, connected ? "TS_ADMIN_OPERATION_FAILED" : "TS_ADMIN_CONNECTION_FAILED");
+      const code = classifyError(error, connected ? failureCode : "TS_ADMIN_CONNECTION_FAILED");
       this.logger.warn({ code, transport: settings.transport }, "TeamSpeak administrator request failed");
       return fail(code);
     } finally {
@@ -267,6 +287,9 @@ function classifyError(error: unknown, fallback: string): string {
     seen.add(error);
     if (error.message === "TS_ADMIN_HOST_KEY_MISMATCH") return error.message;
     if (error instanceof WebQueryHttpError && [401, 403].includes(error.status)) return "TS_ADMIN_AUTH_FAILED";
+    if (error instanceof WebQueryHttpError && error.status === 429) return "TS_ADMIN_RATE_LIMITED";
+    if (error instanceof CommandTimeoutError || ["TimeoutError", "AbortError"].includes(error.name)
+      || error instanceof WebQueryHttpError && [408, 504].includes(error.status)) return "TS_ADMIN_TIMEOUT";
     if (error instanceof ServerError) {
       if ([2568, 2569, 2570, 5120].includes(error.code)) return "TS_ADMIN_PERMISSION_DENIED";
       if ([520, 5122, 5124].includes(error.code)) return "TS_ADMIN_AUTH_FAILED";

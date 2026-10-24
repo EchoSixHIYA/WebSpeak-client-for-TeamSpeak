@@ -5,6 +5,7 @@
     <div v-if="!settings.fixedMode" class="alert info admin-fixed-notice"><Icon name="info" :size="18"/><div><p>{{ tr('tsAdminFixedOnly') }}</p><RouterLink to="/admin/server">{{ tr('adminInstanceSettings') }}</RouterLink></div></div>
     <template v-else>
       <div v-if="noticeMessage" class="alert success" role="status">{{ noticeMessage }}</div>
+      <div v-if="refreshWarning" class="alert info" role="status">{{ refreshWarning }}</div>
       <article v-if="!settings.enabled && !loading" class="operation-card admin-ts-setup">
         <Icon name="server" :size="26"/><div><h3>{{ tr('adminTsSetupTitle') }}</h3><p>{{ tr('adminTsSetupLead') }}</p></div>
         <button class="secondary-button" type="button" @click="configureConnection">{{ tr('adminTsConfigure') }}</button>
@@ -63,7 +64,7 @@
               <template v-if="editor.action === 'channel.create'">
                 <label><span>{{ tr('tsAdminParent') }}</span><select v-model="editor.parentId"><option value="0">{{ tr('tsAdminRoot') }}</option><option v-for="channel in overview?.channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
                 <label class="ts-admin-wide"><span>{{ tr('tsAdminDescription') }}</span><textarea v-model="editor.description" maxlength="8192" rows="3"></textarea></label>
-                <label><span>{{ tr('tsAdminPassword') }}</span><input v-model="editor.password" type="password" autocomplete="new-password" maxlength="512" /></label><label class="choice"><input v-model="editor.permanent" type="checkbox" /><span>{{ tr('tsAdminPermanent') }}</span></label>
+                <label><span>{{ tr('tsAdminChannelPassword') }}</span><input v-model="editor.password" type="password" autocomplete="new-password" maxlength="512" /></label><label class="choice"><input v-model="editor.permanent" type="checkbox" /><span>{{ tr('tsAdminPermanent') }}</span></label>
               </template>
               <label v-if="editor.action === 'client.move'"><span>{{ tr('tsAdminChannel') }}</span><select v-model="editor.channelId" required><option v-for="channel in overview?.channels" :key="channel.id" :value="channel.id">{{ channel.name }}</option></select></label>
               <template v-if="editor.action === 'client.group'"><label><span>{{ tr('tsAdminGroup') }}</span><select v-model="editor.groupId" required><option v-for="group in overview?.groups" :key="group.id" :value="group.id">{{ group.name }} (#{{ group.id }})</option></select></label><label class="choice"><input v-model="editor.remove" type="checkbox" /><span>{{ tr('tsAdminRemoveGroup') }}</span></label></template>
@@ -87,12 +88,12 @@
               <tr v-if="!overview.channels.length"><td colspan="4">{{ tr('tsAdminNoChannels') }}</td></tr></tbody></table></div></section>
           </div>
           <div v-show="activeSection === 'clients'" data-admin-section="clients" class="admin-ts-section">
-            <p v-if="!overview.groupsAvailable" class="field-help">{{ tr('tsAdminGroup') }}: {{ tr('tsAdminRestricted') }}</p>
+            <p v-if="!overview.groupsAvailable" class="field-help">{{ tr('tsAdminGroup') }}: {{ listErrorText(overview.groupsErrorCode) }}</p>
             <section class="operation-card"><header><h3>{{ tr('tsAdminClients') }}</h3><strong>{{ overview.clients.length }}</strong></header><div class="table-wrap" role="region" tabindex="0" :aria-label="tr('tsAdminClients')"><table><thead><tr><th>{{ tr('nickname') }}</th><th>{{ tr('tsAdminChannel') }}</th><th>{{ tr('tsAdminGroup') }}</th><th>{{ tr('tsAdminTitle') }}</th></tr></thead><tbody>
               <tr v-for="client in overview.clients" :key="client.id"><td><strong>{{ client.nickname }}</strong><small>#{{ client.id }}</small></td><td>{{ channelNames.get(client.channelID) || client.channelID }}</td><td>{{ client.serverGroups.map(id => groupNames.get(id) || id).join(', ') || '—' }}</td><td><div class="ts-admin-row-actions"><button type="button" :disabled="settingsDirty || loading || saving || acting || !client.uid" @click="beginAction('client.move', client)">{{ tr('tsAdminMove') }}</button><button type="button" :disabled="settingsDirty || loading || saving || acting || !client.uid || !overview.groupsAvailable" @click="beginAction('client.group', client)">{{ tr('tsAdminGroupAction') }}</button><button class="danger" type="button" :disabled="settingsDirty || loading || saving || acting || !client.uid" @click="beginAction('client.kick', client)">{{ tr('tsAdminKick') }}</button><button class="danger" type="button" :disabled="settingsDirty || loading || saving || acting || !client.uid" @click="beginAction('client.ban', client)">{{ tr('tsAdminBan') }}</button></div></td></tr>
               <tr v-if="!overview.clients.length"><td colspan="4">{{ tr('tsAdminNoClients') }}</td></tr></tbody></table></div></section>
           </div>
-          <div v-show="activeSection === 'bans'" data-admin-section="bans" class="admin-ts-section"><section class="operation-card"><header><h3>{{ tr('tsAdminBans') }}</h3><strong>{{ overview.bans.length }}</strong></header><p v-if="!overview.bansAvailable" class="field-help">{{ tr('tsAdminRestricted') }}</p><div v-else class="table-wrap"><table><thead><tr><th>{{ tr('nickname') }} / UID</th><th>{{ tr('tsAdminReason') }}</th><th>{{ tr('tsAdminBanDuration') }}</th><th>{{ tr('tsAdminTitle') }}</th></tr></thead><tbody><tr v-for="ban in overview.bans" :key="ban.id"><td>{{ ban.name || ban.uid || `#${ban.id}` }}</td><td>{{ ban.reason || '—' }}</td><td>{{ ban.durationSeconds }}</td><td><button type="button" class="secondary-button" :disabled="settingsDirty || loading || saving || acting" @click="beginAction('ban.delete', ban)">{{ tr('remove') }}</button></td></tr><tr v-if="!overview.bans.length"><td colspan="4">{{ tr('tsAdminNoBans') }}</td></tr></tbody></table></div></section></div>
+          <div v-show="activeSection === 'bans'" data-admin-section="bans" class="admin-ts-section"><section class="operation-card"><header><h3>{{ tr('tsAdminBans') }}</h3><strong>{{ overview.bans.length }}</strong></header><p v-if="!overview.bansAvailable" class="field-help">{{ listErrorText(overview.bansErrorCode) }}</p><div v-else class="table-wrap"><table><thead><tr><th>{{ tr('nickname') }} / UID</th><th>{{ tr('tsAdminReason') }}</th><th>{{ tr('tsAdminBanDuration') }}</th><th>{{ tr('tsAdminTitle') }}</th></tr></thead><tbody><tr v-for="ban in overview.bans" :key="ban.id"><td>{{ ban.name || ban.uid || `#${ban.id}` }}</td><td>{{ ban.reason || '—' }}</td><td>{{ ban.durationSeconds }}</td><td><button type="button" class="secondary-button" :disabled="settingsDirty || loading || saving || acting" @click="beginAction('ban.delete', ban)">{{ tr('remove') }}</button></td></tr><tr v-if="!overview.bans.length"><td colspan="4">{{ tr('tsAdminNoBans') }}</td></tr></tbody></table></div></section></div>
         </template>
       </article>
     </template>
@@ -109,7 +110,7 @@ import type { AdminTranslationKey } from '../../i18n/admin.js';
 import Icon from '../Icon.vue';
 const props = defineProps<{ model: ReturnType<typeof useAdminTsAdmin>; i18n: Pick<ReturnType<typeof useAdminI18n>, 'tr' | 'formatDate'>; targetAddress: string; targetPort: string }>();
 const {tr, formatDate} = props.i18n;
-const {settings, form, editor, overview, settingsDirty, noticeMessage, loading, saving, connecting, acting, saveSettings, connectAndRefresh, beginAction, closeAction, runAction} = props.model;
+const {settings, form, editor, overview, settingsDirty, noticeMessage, refreshWarning, listErrorText, loading, saving, connecting, acting, saveSettings, connectAndRefresh, beginAction, closeAction, runAction} = props.model;
 const connectionOpen = ref(false);
 const connectionPanel = ref<HTMLDetailsElement | null>(null);
 async function configureConnection() {
