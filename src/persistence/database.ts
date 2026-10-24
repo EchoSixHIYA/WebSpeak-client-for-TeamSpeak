@@ -6,7 +6,7 @@ import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE } from "../server/webrtc-config.js";
 
-export const DATABASE_SCHEMA_VERSION = 9;
+export const DATABASE_SCHEMA_VERSION = 12;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
@@ -72,6 +72,7 @@ export interface PersistedRelayNode {
   enabled: boolean;
   host: string;
   port: number;
+  voiceEndpoint: string;
   tokenEncrypted: string | null;
   createdAt: string;
   updatedAt: string;
@@ -90,6 +91,20 @@ export interface ManagedInviteRecord {
   useCount: number;
   createdAt: string;
   revokedAt: string | null;
+}
+
+export interface PersistedTsAdminSettings {
+  enabled: boolean;
+  transport: "web" | "ssh" | "tcp";
+  queryHost: string;
+  webQueryUrl: string;
+  apiKeyEncrypted: string | null;
+  serverId: number;
+  queryPort: number;
+  username: string;
+  passwordEncrypted: string | null;
+  hostKeyFingerprint: string;
+  updatedAt: string;
 }
 
 interface ManagedInviteRow extends Record<string, unknown> {
@@ -138,12 +153,27 @@ interface SettingsRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+interface TsAdminSettingsRow extends Record<string, unknown> {
+  enabled: number;
+  transport: "web" | "ssh" | "tcp";
+  query_host: string;
+  web_query_url: string;
+  api_key_encrypted: string | null;
+  server_id: number;
+  query_port: number;
+  username: string;
+  password_encrypted: string | null;
+  host_key_fingerprint: string;
+  updated_at: string;
+}
+
 interface RelayNodeRow extends Record<string, unknown> {
   id: string;
   name: string;
   enabled: number;
   host: string;
   port: number;
+  voice_endpoint: string;
   token_encrypted: string | null;
   created_at: string;
   updated_at: string;
@@ -247,6 +277,7 @@ export class WebSpeakDatabase {
       enabled: row.enabled === 1,
       host: row.host,
       port: row.port,
+      voiceEndpoint: row.voice_endpoint,
       tokenEncrypted: row.token_encrypted,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -258,8 +289,8 @@ export class WebSpeakDatabase {
     this.transaction(() => {
       this.database.exec("DELETE FROM relay_nodes");
       const insert = this.database.prepare(
-        `INSERT INTO relay_nodes (id, name, enabled, host, port, token_encrypted, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO relay_nodes (id, name, enabled, host, port, voice_endpoint, token_encrypted, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const node of nodes) {
         insert.run(
@@ -268,6 +299,7 @@ export class WebSpeakDatabase {
           node.enabled ? 1 : 0,
           node.host,
           node.port,
+          node.voiceEndpoint,
           node.tokenEncrypted,
           node.createdAt ?? now,
           node.updatedAt ?? now,
@@ -331,6 +363,37 @@ export class WebSpeakDatabase {
       "SELECT * FROM managed_invites ORDER BY created_at DESC",
     ).all() as ManagedInviteRow[];
     return rows.map(mapManagedInviteRow);
+  }
+
+  getTsAdminSettings(): PersistedTsAdminSettings {
+    const row = this.database.prepare("SELECT * FROM ts_admin_settings WHERE id = 1").get() as TsAdminSettingsRow;
+    return {
+      enabled: row.enabled === 1,
+      transport: row.transport,
+      queryHost: row.query_host,
+      webQueryUrl: row.web_query_url,
+      apiKeyEncrypted: row.api_key_encrypted,
+      serverId: row.server_id,
+      queryPort: row.query_port,
+      username: row.username,
+      passwordEncrypted: row.password_encrypted,
+      hostKeyFingerprint: row.host_key_fingerprint,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  updateTsAdminSettings(settings: Omit<PersistedTsAdminSettings, "updatedAt">): void {
+    const now = new Date().toISOString();
+    this.transaction(() => {
+      this.database.prepare(
+        `UPDATE ts_admin_settings
+         SET enabled = ?, transport = ?, query_host = ?, web_query_url = ?, api_key_encrypted = ?, server_id = ?,
+             query_port = ?, username = ?, password_encrypted = ?, host_key_fingerprint = ?, updated_at = ?
+         WHERE id = 1`,
+      ).run(settings.enabled ? 1 : 0, settings.transport, settings.queryHost, settings.webQueryUrl, settings.apiKeyEncrypted, settings.serverId,
+        settings.queryPort, settings.username, settings.passwordEncrypted, settings.hostKeyFingerprint, now);
+      this.insertAudit("TS_ADMIN_SETTINGS_UPDATED", { enabled: settings.enabled, transport: settings.transport }, now);
+    });
   }
 
   getManagedInvite(tokenHash: string, now = Date.now()): ManagedInviteRecord | null {
@@ -625,6 +688,48 @@ export class WebSpeakDatabase {
           ALTER TABLE managed_invites ADD COLUMN target_text TEXT;
         `);
         this.database.exec("PRAGMA user_version = 9");
+      });
+      version = 9;
+    }
+    if (version === 9) {
+      this.transaction(() => {
+        this.database.exec(`
+          CREATE TABLE ts_admin_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+            query_port INTEGER NOT NULL DEFAULT 10022 CHECK (query_port BETWEEN 1 AND 65535),
+            username TEXT NOT NULL DEFAULT '',
+            password_encrypted TEXT,
+            host_key_fingerprint TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
+          );
+        `);
+        this.database.prepare(
+          `INSERT INTO ts_admin_settings (id, enabled, query_port, username, password_encrypted, host_key_fingerprint, updated_at)
+           VALUES (1, 0, 10022, '', NULL, '', ?)`,
+        ).run(new Date().toISOString());
+        this.database.exec("PRAGMA user_version = 10");
+      });
+      version = 10;
+    }
+    if (version === 10) {
+      this.transaction(() => {
+        this.database.exec("ALTER TABLE relay_nodes ADD COLUMN voice_endpoint TEXT NOT NULL DEFAULT ''");
+        this.database.exec("PRAGMA user_version = 11");
+      });
+      version = 11;
+    }
+    if (version === 11) {
+      this.transaction(() => {
+        this.database.exec(`
+          ALTER TABLE ts_admin_settings ADD COLUMN transport TEXT NOT NULL DEFAULT 'web' CHECK (transport IN ('web', 'ssh', 'tcp'));
+          ALTER TABLE ts_admin_settings ADD COLUMN query_host TEXT NOT NULL DEFAULT '';
+          ALTER TABLE ts_admin_settings ADD COLUMN web_query_url TEXT NOT NULL DEFAULT '';
+          ALTER TABLE ts_admin_settings ADD COLUMN api_key_encrypted TEXT;
+          ALTER TABLE ts_admin_settings ADD COLUMN server_id INTEGER NOT NULL DEFAULT 0 CHECK (server_id BETWEEN 0 AND 4294967295);
+          UPDATE ts_admin_settings SET transport = 'ssh' WHERE enabled = 1 OR password_encrypted IS NOT NULL OR host_key_fingerprint <> '';
+          PRAGMA user_version = 12;
+        `);
       });
     }
   }

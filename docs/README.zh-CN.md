@@ -37,12 +37,23 @@ WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端�
 
 ## TeamSpeak 版本兼容性
 
-WebSpeak 使用标准 TeamSpeak 客户端协议连接，不使用 ServerQuery 或 WebQuery，因此无需查询凭据。
+语音连接使用标准 TeamSpeak 客户端协议，无需 Query 凭据。可选的 TS 管理功能使用独立的 WebQuery / ServerQuery 凭据。
 
 - **TeamSpeak 3**：协议识别会读取版本号开头的 `3.x`。并非所有历史服务器版本都经过独立验证，部署旧版本时请针对实际服务器进行测试。
 - **TeamSpeak 6**：支持，也支持与 TeamSpeak 6 原生客户端进行屏幕共享。
 - **自动探测**：网关读取服务器的 `version` 响应并在连接诊断中记录识别到的协议。
-- 底层 [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js) 也支持 TeamSpeak 5，但 WebSpeak 的目标版本是 TeamSpeak 3 和 TeamSpeak 6。
+- 网关使用上游 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) 1.0 SDK；WebSpeak 面向 TeamSpeak 3 和 TeamSpeak 6。
+
+## 可选的 TeamSpeak 管理
+
+WebSpeak 后台和访客语音不依赖此功能。在固定服务器模式下，打开 `/admin/ts-admin`，可集中配置 TS 管理连接。
+
+1. 在 TS 服务端启用 WebQuery，并由有权限的 TS 管理员创建 API Key。填写 WebQuery 的 HTTP/HTTPS 地址和 API Key；地址指向 TS Query 服务，而非 WebSpeak 网页。支持 TS3（3.12+）和 TS6。
+2. 虚拟服务器 ID 填 `0` 时，按固定目标的语音端口选择；受限 Key 应填写其被授权的服务器 ID。只读 Key 可查看，修改需要可写作用域及相应的 TS 权限。
+3. 也可选择 ServerQuery SSH 或 TS3 ServerQuery TCP，填写 Query 主机（留空沿用固定目标）、Query 端口、用户名和密码；SSH 还需要可信的主机密钥指纹。这是 TS 的 Query 服务，并非服务器操作系统的 SSH。TCP 不加密，仅适合可信网络；HTTPS 证书须受网关信任。
+4. 保存后连接或刷新，可查看服务器、频道、成员、服务器组和封禁，执行服务器设置、频道创建/重命名/删除、成员移动/移出/身份封禁、服务器组分配和解封。操作需确认，由 TS 核验权限；列表手动刷新。
+
+凭据仅加密保存在服务端，接口不返回密码或 API Key；备份时同时保留数据库和 `master.key`。管理连接失败不影响 WebSpeak 后台和普通语音。封禁按 UID 创建，避免误封共用网关 IP 的其他用户。
 
 ## 🖼️ 界面截图
 
@@ -107,7 +118,7 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 
 中继适用于 TeamSpeak 拒绝境外连接或直连不稳定的情况。它不是 VPN，只转发当前 WebSpeak 会话的 TeamSpeak 数据；目标服务器仍由用户在网页中选择。
 
-中继实例是专用转发服务，不提供前台和管理员后台，只接受带匹配令牌的 WebSpeak 网关会话。令牌至少使用 16 个字符的随机值。
+中继实例同时运行 UDP 兼容转发和独立语音网关，不提供访客首页或管理员后台。网关收到用户的入场请求后，会用共享令牌签名并转交一次性语音票据；浏览器随后直接连接中继节点，语音网关再从中继节点连接 TeamSpeak。网页地址仍保持在入口网关，不需要跳转。令牌至少使用 16 个字符的随机值。
 
 #### 源码启动
 
@@ -115,7 +126,6 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm run build
 WEBSPEAK_MODE=relay \
 WEBSPEAK_RELAY_TOKEN='replace-with-a-long-random-token' \
@@ -161,10 +171,20 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 
 放行中继主机的 UDP 监听端口，默认是 `39087`。
 
+语音网关默认监听 `127.0.0.1:3041`。为中继节点配置 HTTPS 域名，并让 Caddy 等反向代理把该域名转发到 `127.0.0.1:3041`，例如：
+
+```caddyfile
+relay.example.com {
+  reverse_proxy 127.0.0.1:3041
+}
+```
+
+管理员后台的中继节点设置中，将“语音网关地址”填写为该 HTTPS 源站（例如 `https://relay.example.com`）。网页仍从原入口网关加载，之后会通过 WSS 连接这个中继域名。语音网关默认启用 WebRTC；还需放行 UDP `40000-40099`，并设置 `WEBSPEAK_RELAY_WEBRTC_PUBLIC_HOST` 为可从用户网络直接访问的中继公网 IP 或直连域名。若修改了 WebRTC UDP 范围，同时更新防火墙规则。UDP `39087` 保留给旧版兼容转发。
+
 #### 在网关中启用
 
 1. 管理员控制台 → “服务器” → “中继服务器”，添加一个或多个节点。
-2. 为每个节点填写自定义名称、地址（例如 `relay.example.com#39087`）和匹配令牌并保存。
+2. 为每个节点填写自定义名称、UDP 地址（例如 `relay.example.com#39087`）、HTTPS 语音网关源站（例如 `https://relay.example.com`）和匹配令牌并保存。
 3. 访客欢迎页即可选择直连或其中一个中继。
 
 关闭并保存中继配置后，访客页面不会显示中继选项。
@@ -275,7 +295,7 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
 | --- | --- | --- |
 | Docker Compose（推荐） | 长期运行、升级简单、数据持久化 | Docker Engine + Docker Compose |
 | 发布包 | 不安装 Node.js 和构建依赖 | Windows x64 或 Linux x64/ARM64 |
-| 源码运行 | 开发、调试和二次开发 | Node.js 22.5+、Git 和本地编译工具 |
+| 源码运行 | 开发、调试和二次开发 | Node.js 22.12+、Git 和本地编译工具 |
 
 ### Docker Compose（推荐）
 
@@ -315,7 +335,6 @@ Release 同时提供 Android `arm64-v8a`、`armeabi-v7a` 和 `x86_64` APK。它�
 git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build

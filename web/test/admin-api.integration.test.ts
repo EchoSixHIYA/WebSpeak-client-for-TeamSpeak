@@ -12,6 +12,8 @@ import { AdminSessionStore } from "../../src/admin/admin-session.js";
 import { createAdminRouter } from "../../src/admin/admin-router.js";
 import { createAdminApi } from "../src/services/admin-api.js";
 import { adminResponses } from "../../src/shared/admin-responses.js";
+import type { QueryClient, QueryClientOptions } from "@honeybbq/teamspeak/query";
+import { decryptSecret } from "../../src/security/secret-crypto.js";
 
 const logger: Logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
 
@@ -21,7 +23,7 @@ test("schema 7 upgrades preserve the previously unused public host and initializ
   const original = new WebSpeakDatabase(filename);
   original.close();
   const legacy = new DatabaseSync(filename);
-  legacy.exec("ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; PRAGMA user_version = 7;");
+  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; PRAGMA user_version = 7;");
   legacy.prepare("UPDATE settings SET webrtc_public_host = ?").run("media.example.com");
   legacy.close();
   const migrated = new WebSpeakDatabase(filename);
@@ -45,7 +47,34 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
     assert.ok(directory.includes("webspeak-admin-api-"));
     rmSync(directory, { recursive: true, force: true });
   });
-  const service = new AdminService(database, Buffer.alloc(32, 7), logger, join(directory, "absent-config.json"), undefined, "test-version");
+  let mismatchHostKey = true;
+  const queryFactory = (queryOptions: QueryClientOptions) => ({
+    async connect() {
+      if (queryOptions.transport.kind !== "ssh") throw new Error("expected SSH transport");
+      queryOptions.transport.hostKey({
+        host: "127.0.0.1", port: queryOptions.transport.port ?? 10022, keyType: "ssh-ed25519",
+        key: new Uint8Array(), fingerprint: `SHA256:${(mismatchHostKey ? "B" : "A").repeat(43)}`,
+      });
+    },
+    async disconnect() {},
+    serverVersion: "6.0.0-beta-test",
+    serverFamily: "ts6",
+    async send(request: { command: string }) {
+      if (request.command === "serverinfo") return [{ virtualserver_name: "Test TeamSpeak" }];
+      if (request.command === "channellist") return [{
+        cid: "1", cpid: "0", channel_name: "Lobby", channel_flag_password: "0", channel_flag_default: "1",
+        channel_flag_permanent: "1", channel_flag_semi_permanent: "0", channel_codec: "4", channel_codec_quality: "6",
+        channel_maxclients: "-1", channel_maxfamilyclients: "-1", total_clients: "1", total_clients_family: "1",
+        channel_needed_talk_power: "0", channel_order: "0", channel_icon_id: "0",
+      }];
+      if (request.command === "clientlist") return [{
+        clid: "42", client_nickname: "Guest", client_unique_identifier: "", cid: "1", client_type: "0",
+        client_servergroups: "6,7", client_channel_group_id: "1", client_away: "0", client_is_recording: "0", client_is_talker: "0",
+      }];
+      throw new Error(`Unexpected ServerQuery command ${request.command}`);
+    },
+  }) as unknown as QueryClient;
+  const service = new AdminService(database, Buffer.alloc(32, 7), logger, join(directory, "absent-config.json"), undefined, "test-version", queryFactory);
   await service.initialize();
   await service.changePassword("test-only-admin-password");
   const app = express();
@@ -69,9 +98,15 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
     return response;
   } });
   assert.equal((await api.session()).authenticated, false);
+  const actionPath = `${origin}/api/admin/ts-admin/action`;
+  assert.equal((await fetch(actionPath, { method: "POST", headers: { origin, "content-type": "application/json" }, body: '{}' })).status, 401);
   csrf = (await api.login("admin", "test-only-admin-password")).csrfToken;
   assert.equal((await api.session()).authenticated, true);
+  assert.equal((await fetch(actionPath, { method: "POST", headers: { origin, cookie, "content-type": "application/json" }, body: '{}' })).status, 403);
+  assert.equal((await fetch(actionPath, { method: "POST", headers: { origin: "https://untrusted.example", cookie, "x-csrf-token": csrf, "content-type": "application/json" }, body: '{}' })).status, 403);
   assert.equal((await api.overview()).gateway.version, "test-version");
+  const tsAdminInitial = await api.tsAdminSettings();
+  assert.deepEqual({ fixedMode: tsAdminInitial.fixedMode, enabled: tsAdminInitial.enabled, hasPassword: tsAdminInitial.hasPassword }, { fixedMode: true, enabled: false, hasPassword: false });
   const original = await api.settings();
   assert.equal(original.webRtcPublicHost, "");
   assert.equal(original.webRtcIpv6Enabled, false);
@@ -105,6 +140,38 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
     assert.equal(saved.settings.relayNodes[0].hasToken, passwordAction !== "remove");
     assert.equal(service.getAccelerationRelayOptions()[0]?.token, passwordAction === "remove" ? undefined : "test-relay-token");
   }
+  const verifiedFingerprint = `SHA256:${"A".repeat(43)}`;
+  const tsAdminSaved = await api.saveTsAdminSettings({
+    enabled: true, transport: "ssh", queryPort: 10022, username: "query-admin", passwordAction: "replace",
+    password: "query-secret-test", hostKeyFingerprint: verifiedFingerprint,
+  });
+  assert.equal(tsAdminSaved.settings.hasPassword, true);
+  assert.equal(tsAdminSaved.settings.hostKeyFingerprint, verifiedFingerprint);
+  assert.equal(JSON.stringify(tsAdminSaved).includes("query-secret-test"), false);
+  assert.notEqual(database.getTsAdminSettings().passwordEncrypted, "query-secret-test");
+  assert.equal(decryptSecret(database.getTsAdminSettings().passwordEncrypted, Buffer.alloc(32, 7), "webspeak:ts-admin-query-password:v1"), "query-secret-test");
+  assert.throws(() => decryptSecret(database.getTsAdminSettings().passwordEncrypted, Buffer.alloc(32, 7)));
+  assert.deepEqual(adminResponses.tsAdminSettings({ ...service.getTsAdminSettings(), password: "query-secret-test" }), service.getTsAdminSettings());
+  await assert.rejects(api.tsAdminOverview(), (error: any) => error.code === "TS_ADMIN_HOST_KEY_MISMATCH");
+  mismatchHostKey = false;
+  const tsAdminOverview = await api.tsAdminOverview();
+  assert.equal(tsAdminOverview.serverName, "Test TeamSpeak");
+  assert.equal(tsAdminOverview.serverFamily, "ts6");
+  assert.equal(tsAdminOverview.channels[0].name, "Lobby");
+  assert.equal(tsAdminOverview.clients[0].nickname, "Guest");
+  assert.deepEqual(tsAdminOverview.clients[0].serverGroups, ["6", "7"]);
+  await assert.rejects(api.tsAdminAction({ configurationRevision: tsAdminOverview.configurationRevision, operation: { action: "channel.delete", channelId: "0" } }), (error: any) => error.code === "INVALID_TS_ADMIN_ACTION");
+  await assert.rejects(api.tsAdminAction({ configurationRevision: tsAdminOverview.configurationRevision, operation: { action: "client.kick", clientId: 42, clientUid: "stale", reason: "" } }), (error: any) => error.code === "TS_ADMIN_CLIENT_CHANGED");
+  mismatchHostKey = true;
+  await assert.rejects(api.tsAdminOverview(), (error: any) => error.code === "TS_ADMIN_HOST_KEY_MISMATCH");
+  assert.equal((await api.overview()).gateway.version, "test-version", "WebSpeak management does not depend on TS management connectivity");
+  assert.equal((await api.settings()).accessMode, "fixed");
+  const settingsWithOpenMode = service.getAdminSettings();
+  await api.saveSettings({ ...settingsWithOpenMode, accessMode: "open" });
+  assert.equal((await api.tsAdminSettings()).fixedMode, false);
+  assert.equal((await api.tsAdminSettings()).enabled, false, "switching to open mode disables the TeamSpeak admin panel");
+  await assert.rejects(api.tsAdminOverview(), (error: any) => error.code === "TS_ADMIN_FIXED_MODE_REQUIRED");
+  await assert.rejects(api.saveTsAdminSettings({ enabled: true, queryPort: 10022, username: "query-admin", hostKeyFingerprint: verifiedFingerprint }), (error: any) => error.code === "TS_ADMIN_FIXED_MODE_REQUIRED");
   const settings = service.getAdminSettings();
   assert.deepEqual(adminResponses.settings({ ...settings, passwordAction: "remove", serverPassword: "injected" }), settings);
   const created = await api.createInvite({ channel: "Lobby", expiresInHours: 1, maxUses: 1 });

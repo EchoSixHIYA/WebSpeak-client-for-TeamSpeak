@@ -79,7 +79,7 @@ async function fixture(t: TestContext, overrides: {
   if (overrides.waitForFirstMessage !== false) await first;
   const entries = (bridge as unknown as { entries: Map<string, {
     id: string; ws: WebSocket; audio: AudioFlowStats; webrtc: WebRtcAudioSession | null;
-    isAlive: boolean; avatarCache: Map<string, string | null>;
+    isAlive: boolean; lastPongAt: number; missedHeartbeats: number; avatarCache: Map<string, string | null>;
     members: Map<number, { id: number; uid: string }>; eventLog: unknown[];
   }> }).entries;
   return { bridge, sdk, socket, messages, entries, wss };
@@ -303,6 +303,44 @@ async function avatarFixture(t: TestContext) {
   await firstStarted;
   return { ...f, calls, release: () => release(avatar), entry: [...f.entries.values()][0]! };
 }
+
+test("a single missed WebSocket heartbeat is retried and a pong resets the miss count", { timeout: 5_000 }, async t => {
+  const f = await fixture(t);
+  const entry = [...f.entries.values()][0]!;
+  const bridge = f.bridge as unknown as { checkHeartbeats(): void };
+  // Suppress the network ping so this test can advance heartbeat ticks directly.
+  entry.ws.ping = (() => {}) as typeof entry.ws.ping;
+
+  bridge.checkHeartbeats();
+  assert.equal(entry.isAlive, false);
+  bridge.checkHeartbeats();
+  assert.equal(entry.missedHeartbeats, 1);
+  assert.equal(entry.ws.readyState, WebSocket.OPEN);
+
+  const previousPongAt = entry.lastPongAt;
+  entry.ws.emit("pong", Buffer.alloc(0));
+  assert.equal(entry.isAlive, true);
+  assert.equal(entry.missedHeartbeats, 0);
+  assert.ok(entry.lastPongAt >= previousPongAt);
+});
+
+test("two consecutive missed WebSocket heartbeats terminate the stale session", { timeout: 5_000 }, async t => {
+  const f = await fixture(t);
+  const entry = [...f.entries.values()][0]!;
+  const bridge = f.bridge as unknown as { checkHeartbeats(): void };
+  entry.ws.ping = (() => {}) as typeof entry.ws.ping;
+
+  const closed = once(f.socket, "close");
+  bridge.checkHeartbeats();
+  bridge.checkHeartbeats();
+  assert.equal(entry.ws.readyState, WebSocket.OPEN);
+  assert.equal(entry.missedHeartbeats, 1);
+
+  bridge.checkHeartbeats();
+  await closed;
+  await nextTurn();
+  assert.equal(f.bridge.getActiveCount(), 0);
+});
 
 test("avatar completion after teardown cannot refill the cache or start another SDK request", { timeout: 5_000 }, async t => {
   const f = await avatarFixture(t);

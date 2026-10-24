@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { EventEmitter } from "node:events";
-import type { ClientInfo } from "@echosixhiya/teamspeak-client";
+import type { ClientInfo } from "./teamspeak-sdk.js";
 import type { ServerMessage } from "../shared/server-messages.js";
 import { SessionEventCoordinator, type SessionDirectoryState } from "./session-events.js";
 import type { TSDirectorySnapshot } from "./ts-client.js";

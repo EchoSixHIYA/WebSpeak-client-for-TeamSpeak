@@ -13,16 +13,12 @@ export function healthcheckUsesHttps(certDirectory = defaultCertDirectory) {
 }
 
 export function runDockerHealthcheck({ mode = process.env.WEBSPEAK_MODE, certDirectory = defaultCertDirectory } = {}) {
-  if (mode?.trim().toLowerCase() === "relay") {
-    process.exitCode = 0;
-    return;
-  }
-
-  const secure = healthcheckUsesHttps(certDirectory);
+  const relayMode = mode?.trim().toLowerCase() === "relay";
+  const secure = !relayMode && healthcheckUsesHttps(certDirectory);
   const client = secure ? https : http;
   const request = client.get({
     hostname: "127.0.0.1",
-    port: 3040,
+    port: relayMode ? process.env.WEBSPEAK_VOICE_GATEWAY_PORT || 3041 : 3040,
     path: "/health",
     ...(secure ? { rejectUnauthorized: false } : {}),
   }, (response) => {

@@ -3,6 +3,7 @@ import test from "node:test";
 import { EventEmitter } from "node:events";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { Writable } from "node:stream";
+import type { CommandRequest } from "@honeybbq/teamspeak";
 import pino from "pino";
 import { TSClient } from "./ts-client.js";
 
@@ -22,10 +23,24 @@ class SdkStub extends EventEmitter {
     name: "兄弟们的teamspeak", iconId: 123456, hostBannerGfxUrl: null, welcomeMessage: "",
   };
   inputUpdate = async (_command: string): Promise<void> => {};
+  async send(request: CommandRequest) {
+    const command = [request.command, ...(request.params ?? []).map(([key, value]) => `${key}=${String(value ?? "")}`)].join(" ");
+    this.inputCommands.push(command);
+    await this.inputUpdate(command);
+    return [];
+  }
   async execCommand(command: string) { this.inputCommands.push(command); await this.inputUpdate(command); }
+  clientID() { return 1; }
+  channelID() { return 1n; }
+  async listDirectoryChannels() { return [{ id: 1n, parentID: 0n, order: 0n, name: "Lobby", description: "", passwordProtected: true }]; }
+  async listDirectoryClients() { return [{ id: 1, nickname: "Test", uid: "self", channelID: 1n, type: 0, serverGroups: [] as string[], inputMuted: true }]; }
   initialized = 0;
   downloaded = 0;
   metadata = async () => rows;
+  async getClientAvatarMetadata() {
+    const [info] = await this.metadata();
+    return info ? { uid: info.client_unique_identifier, cacheKey: info.client_flag_avatar, path: `/avatar_${info.client_base64HashClientUID}` } : null;
+  }
   transfer = async () => transfer;
   download = async (destination: Writable) => { destination.write(Buffer.from("GIF89a")); };
   execCommandWithResponse(command = "") {
@@ -49,6 +64,34 @@ function fixture() {
   state.attachClientListeners(sdk);
   return { client, sdk, state };
 }
+
+test("normal startup publishes the subscribed native directory without privileged list queries", async () => {
+  const f = fixture();
+  f.state.connected = false;
+  const state = f.client as unknown as { adapter: { connect(): Promise<void> } };
+  state.adapter = { connect: async () => {} };
+  const snapshots: Array<{ complete?: boolean; clients: Array<{ id: number; inputMuted?: boolean }> }> = [];
+  f.client.on("directorySnapshot", snapshot => snapshots.push(snapshot));
+  await f.client.connect();
+  assert.equal(f.client.isConnected(), true);
+  assert.equal(snapshots.at(-1)?.complete, true);
+  assert.equal(snapshots.at(-1)?.clients[0]?.id, 1);
+  assert.equal(snapshots.at(-1)?.clients[0]?.inputMuted, true);
+  assert.deepEqual(f.sdk.inputCommands, ["channelsubscribeall"]);
+});
+
+test("a missing native view fails startup instead of leaving a connected session without a directory", async () => {
+  const f = fixture();
+  f.state.connected = false;
+  const state = f.client as unknown as { adapter: { connect(): Promise<void> } };
+  state.adapter = { connect: async () => {} };
+  f.sdk.listDirectoryChannels = async () => { throw new Error("TeamSpeak directory view is not ready"); };
+  let published = false;
+  f.client.on("connected", () => { published = true; });
+  await assert.rejects(f.client.connect(), /view is not ready/);
+  assert.equal(f.client.isConnected(), false);
+  assert.equal(published, false);
+});
 
 test("stream commands wait for server acknowledgement and propagate refusals", async () => {
   const f = fixture();

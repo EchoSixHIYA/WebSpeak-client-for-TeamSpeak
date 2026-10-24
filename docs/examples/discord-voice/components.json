@@ -1,0 +1,431 @@
+{
+  "schemaVersion": 3,
+  "components": [
+    {
+      "id": "discord-home",
+      "name": "{{skin.messages.homeComponentName}}",
+      "page": "home",
+      "mode": "surface",
+      "accessibleName": "{{skin.messages.homeAccessibleName}}",
+      "permissions": ["ui.surface.replace", "session.status.read"],
+      "actions": {},
+      "root": {
+        "tag": "main",
+        "part": "home",
+        "className": "join-page",
+        "children": [
+          {
+            "tag": "header",
+            "part": "home-header",
+            "className": "join-header",
+            "children": [
+              {
+                "tag": "div",
+                "className": "brand-lockup",
+                "children": [
+                  { "tag": "span", "className": "brand-mark", "children": [{ "text": "W" }] },
+                  {
+                    "tag": "div",
+                    "children": [
+                      { "tag": "strong", "children": [{ "text": "WebSpeak" }] },
+                      { "tag": "small", "children": [{ "text": "{{skin.messages.tagline}}" }] }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "home-header-tools",
+                "className": "join-header-tools",
+                "children": [
+                  { "widget": "home.social-links", "part": "social-links" },
+                  { "tag": "div", "className": "workspace-skin-switcher", "children": [{ "widget": "app.skin-switcher", "part": "skin-switcher" }] },
+                  { "tag": "div", "className": "workspace-language", "children": [{ "widget": "app.language-switcher", "part": "language-switcher" }] }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "main",
+            "part": "home-content",
+            "className": "join-content",
+            "children": [
+              {
+                "tag": "section",
+                "part": "home-hero",
+                "className": "join-copy",
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "home-hero-eyebrow",
+                    "className": "eyebrow",
+                    "children": [
+                      { "tag": "span", "className": "eyebrow-dot" },
+                      { "text": "{{skin.messages.eyebrow}}" }
+                    ]
+                  },
+                  {
+                    "tag": "h1",
+                    "part": "home-hero-title",
+                    "children": [
+                      { "text": "{{skin.messages.heroTitle}}" },
+                      { "tag": "em", "children": [{ "text": "{{skin.messages.heroAccent}}" }] }
+                    ]
+                  },
+                  {
+                    "tag": "p",
+                    "part": "home-hero-description",
+                    "className": "join-description",
+                    "children": [{ "text": "{{skin.messages.heroDescription}}" }]
+                  },
+                  {
+                    "tag": "div",
+                    "part": "home-features",
+                    "className": "promise-list",
+                    "children": [
+                      {
+                        "tag": "div",
+                        "part": "home-feature",
+                        "className": "promise-item",
+                        "children": [
+                          { "tag": "span", "className": "promise-icon mint", "children": [{ "text": "01" }] },
+                          { "tag": "span", "children": [
+                            { "tag": "b", "children": [{ "text": "{{skin.messages.featureOneTitle}}" }] },
+                            { "tag": "small", "children": [{ "text": "{{skin.messages.featureOneBody}}" }] }
+                          ] }
+                        ]
+                      },
+                      {
+                        "tag": "div",
+                        "part": "home-feature",
+                        "className": "promise-item",
+                        "children": [
+                          { "tag": "span", "className": "promise-icon sand", "children": [{ "text": "02" }] },
+                          { "tag": "span", "children": [
+                            { "tag": "b", "children": [{ "text": "{{skin.messages.featureTwoTitle}}" }] },
+                            { "tag": "small", "children": [{ "text": "{{skin.messages.featureTwoBody}}" }] }
+                          ] }
+                        ]
+                      },
+                      {
+                        "tag": "div",
+                        "part": "home-feature",
+                        "className": "promise-item",
+                        "children": [
+                          { "tag": "span", "className": "promise-icon mint", "children": [{ "text": "03" }] },
+                          { "tag": "span", "children": [
+                            { "tag": "b", "children": [{ "text": "{{skin.messages.featureThreeTitle}}" }] },
+                            { "tag": "small", "children": [{ "text": "{{skin.messages.featureThreeBody}}" }] }
+                          ] }
+                        ]
+                      }
+                    ]
+                  },
+                  { "tag": "div", "className": "visitor-count", "children": [{ "widget": "home.visitor-count", "part": "visitor-count" }] },
+                  { "tag": "div", "className": "announcement-wrap", "children": [{ "widget": "home.server-announcement", "part": "announcement" }] }
+                ]
+              },
+              {
+                "tag": "section",
+                "part": "home-join-card",
+                "className": "join-card",
+                "children": [
+                  { "tag": "div", "className": "join-card-effects", "attributes": { "aria-hidden": "true" }, "children": [
+                    { "tag": "span", "className": "join-card-waveform", "children": [
+                      { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }, { "tag": "i" }
+                    ] },
+                    { "tag": "span", "className": "join-card-sonar", "children": [{ "tag": "i" }, { "tag": "i" }, { "tag": "i" }] }
+                  ] },
+                  { "tag": "h2", "part": "home-join-title", "children": [{ "text": "{{skin.messages.connectTitle}}" }] },
+                  { "tag": "p", "part": "home-join-description", "className": "card-lead", "children": [{ "text": "{{skin.messages.connectDescription}}" }] },
+                  { "widget": "home.connection-status", "part": "connection-status" },
+                  { "widget": "home.connection-form", "part": "connection-form" },
+                  { "tag": "p", "part": "home-security-note", "className": "join-meta", "children": [{ "text": "{{skin.messages.securityNote}}" }] }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "footer",
+            "part": "home-footer",
+            "className": "join-footer",
+            "children": [
+              { "tag": "span", "children": [{ "text": "WebSpeak" }] },
+              { "tag": "span", "className": "footer-separator", "children": [{ "text": "·" }] },
+              { "tag": "span", "children": [{ "text": "TeamSpeak" }] },
+              { "tag": "span", "className": "footer-spacer" },
+              { "tag": "span", "children": [{ "text": "{{skin.messages.footerNote}}" }] }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "discord-workspace",
+      "name": "{{skin.messages.voiceComponentName}}",
+      "page": "voice",
+      "mode": "surface",
+      "accessibleName": "{{skin.messages.voiceAccessibleName}}",
+      "stateScope": "session.status.channelId",
+      "permissions": [
+        "ui.surface.replace",
+        "session.status.read",
+        "session.invite.copy",
+        "session.channels.read",
+        "session.members.read",
+        "session.memberAvatars.read",
+        "session.channel.join",
+        "servers.quickList.read",
+        "servers.quickList.switch",
+        "chat.channel.read",
+        "chat.channel.send",
+        "audio.status.read",
+        "audio.microphone.control",
+        "audio.output.control",
+        "audio.settings.open",
+        "voice.disconnect",
+        "voice.screenShare.status.read",
+        "voice.screenShare.read",
+        "voice.screenShare.control",
+        "voice.whisper.status.read",
+        "voice.whisper.control"
+      ],
+      "actions": {
+        "switch-server": { "type": "quickServers.switch", "args": { "quickServerId": "{{server.id}}" } },
+        "copy-invite-link": { "type": "session.copyInviteLink", "args": {} },
+        "stop-screen-share": { "type": "voice.stopScreenShare", "args": {} },
+        "toggle-accompaniment": { "type": "audio.toggleAccompaniment", "args": {} },
+        "toggle-chat": { "type": "ui.toggleState", "args": { "key": "chatopen" } }
+      },
+      "state": { "chatopen": true },
+      "root": {
+        "tag": "main",
+        "part": "voice-shell",
+        "className": "app-shell discord-app-shell",
+        "children": [
+          {
+            "tag": "nav",
+            "part": "server-rail",
+            "className": "dc-rail",
+            "attributes": { "aria-label": "{{skin.messages.serverRailLabel}}" },
+            "children": [
+              {
+                "tag": "div",
+                "className": "dc-rail-list",
+                "children": [
+                  {
+                    "tag": "div",
+                    "part": "quick-server-item",
+                    "className": "dc-rail-item",
+                    "repeat": { "path": "servers.quickList", "as": "server" },
+                    "children": [
+                      { "tag": "span", "className": "dc-rail-pill", "attributes": { "aria-hidden": "true" } },
+                      {
+                        "tag": "button",
+                        "part": "quick-server",
+                        "className": "dc-rail-icon dc-rail-server",
+                        "attributes": {
+                          "type": "button",
+                          "aria-label": "{{skin.messages.switchServer}} {{server.label}}",
+                          "aria-pressed": "{{server.current}}",
+                          "aria-disabled": "{{server.switchRestricted}}",
+                          "title": "{{server.switchTitle}}"
+                        },
+                        "events": { "click": "switch-server" },
+                        "children": [{ "tag": "span", "className": "dc-rail-avatar", "children": [{ "text": "{{server.monogram}}" }] }]
+                      },
+                      { "tag": "span", "className": "dc-rail-tooltip", "attributes": { "role": "tooltip" }, "children": [{ "tag": "strong", "children": [{ "text": "{{server.label}}" }] }] },
+                      { "tag": "span", "className": "dc-rail-fav", "when": { "path": "server.favorite", "equals": true }, "attributes": { "aria-label": "{{skin.messages.favoriteServer}}" }, "children": [{ "text": "★" }] }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "member-panel",
+            "className": "dc-sidebar",
+            "children": [
+              {
+                "tag": "header",
+                "className": "dc-server-header",
+                "children": [
+                  { "tag": "strong", "children": [{ "text": "{{session.status.serverLabel}}" }] },
+                  {
+                    "tag": "button",
+                    "part": "invite-copy",
+                    "className": "dc-header-icon",
+                    "attributes": { "type": "button", "aria-label": "{{skin.messages.copyInvite}}", "title": "{{skin.messages.copyInvite}}" },
+                    "events": { "click": "copy-invite-link" },
+                    "children": [{ "text": "↗" }]
+                  }
+                ]
+              },
+              {
+                "tag": "div",
+                "className": "dc-sidebar-scroll",
+                "children": [
+                  { "tag": "div", "className": "dc-category", "children": [{ "text": "{{skin.messages.voiceChannels}}" }] },
+                  { "tag": "div", "className": "dc-channel-list", "children": [{ "widget": "voice.channel-tree", "part": "channel-tree", "options": { "layout": "server-sidebar", "memberActions": true, "memberDragDrop": true } }] }
+                ]
+              },
+              {
+                "tag": "section",
+                "part": "connected-status",
+                "className": "dc-connected",
+                "when": { "path": "session.status.connected", "equals": true },
+                "children": [
+                  {
+                    "tag": "div",
+                    "className": "dc-connected-row",
+                    "children": [
+                      { "tag": "div", "className": "dc-connected-copy", "children": [
+                        { "tag": "strong", "children": [{ "text": "{{skin.messages.voiceConnected}}" }] },
+                        { "tag": "small", "children": [{ "text": "{{session.status.channelName}}" }] }
+                      ] },
+                      { "tag": "div", "className": "dc-performance", "children": [{ "widget": "voice.performance-panel", "part": "performance-panel" }] }
+                    ]
+                  },
+                  { "tag": "div", "className": "dc-connected-actions", "children": [{ "widget": "voice.connection-controls", "part": "connection-controls" }] }
+                ]
+              },
+              {
+                "tag": "div",
+                "part": "audio-dock",
+                "className": "dc-user-bar",
+                "children": [
+                  { "tag": "div", "className": "dc-user-info", "children": [
+                    { "tag": "span", "className": "dc-user-avatar", "children": [{ "tag": "i", "children": [{ "text": "{{session.status.userName}}" }] }] },
+                    { "tag": "span", "className": "dc-user-text", "children": [{ "tag": "strong", "children": [{ "text": "{{session.status.userName}}" }] }, { "tag": "small", "children": [{ "text": "{{skin.messages.online}}" }] }] }
+                  ] },
+                  { "tag": "div", "className": "dc-user-actions", "children": [{ "widget": "voice.audio-controls", "part": "audio-controls" }] }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "part": "workspace",
+            "className": "dc-stage",
+            "children": [
+              {
+                "tag": "header",
+                "part": "voice-header",
+                "className": "dc-stage-header",
+                "children": [
+                  { "tag": "div", "className": "dc-stage-title", "children": [{ "tag": "h2", "children": [{ "text": "{{session.status.channelName}}" }] }] },
+                  {
+                    "tag": "div",
+                    "part": "header-actions",
+                    "className": "dc-stage-header-actions",
+                    "children": [
+                      { "tag": "div", "className": "workspace-skin-switcher", "children": [{ "widget": "app.skin-switcher", "part": "skin-switcher" }] },
+                      { "tag": "div", "className": "workspace-language", "children": [{ "widget": "app.language-switcher", "part": "language-switcher" }] },
+                      {
+                        "tag": "button",
+                        "part": "chat-toggle",
+                        "className": "dc-stage-icon",
+                        "attributes": { "type": "button", "aria-expanded": "{{state.chatopen}}", "aria-label": "{{skin.messages.toggleChat}}", "title": "{{skin.messages.toggleChat}}" },
+                        "events": { "click": "toggle-chat" },
+                        "children": [{ "text": "#" }]
+                      }
+                    ]
+                  }
+                ]
+              },
+              { "tag": "div", "className": "dc-stage-notices" },
+              {
+                "tag": "div",
+                "part": "voice-activity",
+                "className": "dc-stage-canvas",
+                "children": [
+                  {
+                    "tag": "div",
+                    "className": "dc-stage-grid",
+                    "children": [
+                      { "widget": "voice.screen-share-player", "part": "screen-share-player" },
+                      { "widget": "voice.member-cards", "part": "member-cards", "options": { "screenShare": true, "memberActions": true } },
+                      {
+                        "tag": "button",
+                        "part": "invite-tile",
+                        "className": "dc-invite-tile",
+                        "attributes": { "type": "button", "aria-label": "{{skin.messages.invitePeople}}" },
+                        "events": { "click": "copy-invite-link" },
+                        "children": [{ "tag": "strong", "children": [{ "text": "{{skin.messages.invitePeople}}" }] }]
+                      }
+                    ]
+                  },
+                  { "widget": "voice.whisper-controls", "part": "whisper-controls" }
+                ]
+              },
+              {
+                "tag": "footer",
+                "className": "dc-stage-controls",
+                "attributes": { "aria-label": "{{skin.messages.voiceControls}}" },
+                "children": [
+                  { "tag": "div", "className": "dc-stage-controls-side" },
+                  {
+                    "tag": "div",
+                    "className": "dc-stage-controls-main",
+                    "children": [
+                      {
+                        "tag": "div",
+                        "className": "dc-stage-pill",
+                        "children": [
+                          { "widget": "voice.screen-share-start", "part": "screen-share-start", "when": { "path": "screenShare.status.active", "equals": false } },
+                          {
+                            "tag": "button",
+                            "part": "screen-share-stop",
+                            "className": "dc-stage-btn",
+                            "when": { "path": "screenShare.status.active", "equals": true },
+                            "attributes": { "type": "button", "aria-pressed": "true", "aria-label": "{{skin.messages.stopScreenShare}}", "title": "{{skin.messages.stopScreenShare}}" },
+                            "events": { "click": "stop-screen-share" },
+                            "children": [{ "text": "▣" }]
+                          },
+                          {
+                            "tag": "button",
+                            "part": "accompaniment-toggle",
+                            "className": "dc-stage-btn",
+                            "attributes": { "type": "button", "aria-label": "{{skin.messages.toggleAccompaniment}}", "title": "{{skin.messages.toggleAccompaniment}}" },
+                            "events": { "click": "toggle-accompaniment" },
+                            "children": [{ "text": "♫" }]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  { "tag": "div", "className": "dc-stage-controls-side end" }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "aside",
+            "part": "chat-panel",
+            "className": "dc-chat",
+            "when": { "path": "state.chatopen", "equals": true },
+            "children": [
+              {
+                "tag": "header",
+                "className": "dc-chat-header",
+                "children": [
+                  { "tag": "div", "className": "dc-chat-title", "children": [{ "tag": "strong", "children": [{ "text": "{{session.status.channelName}}" }] }] },
+                  {
+                    "tag": "button",
+                    "part": "chat-close",
+                    "className": "dc-stage-icon",
+                    "attributes": { "type": "button", "aria-label": "{{skin.messages.closeChat}}", "title": "{{skin.messages.closeChat}}" },
+                    "events": { "click": "toggle-chat" },
+                    "children": [{ "text": "×" }]
+                  }
+                ]
+              },
+              { "widget": "voice.chat-panel", "part": "chat" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

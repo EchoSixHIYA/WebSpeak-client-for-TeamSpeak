@@ -130,11 +130,11 @@ test("schema 8 settings and invites survive the nickname migration", async (cont
   });
   database.close();
   const legacy = new DatabaseSync(file);
-  legacy.exec("ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; PRAGMA user_version = 8;");
+  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; PRAGMA user_version = 8;");
   legacy.close();
   const migrated = new WebSpeakDatabase(file);
   try {
-    assert.equal(migrated.schemaVersion, 9);
+    assert.equal(migrated.schemaVersion, 12);
     assert.equal(migrated.getSettings().tsHost, "127.0.0.1");
     assert.equal(migrated.getSettings().tsTarget, null);
     const invite = migrated.consumeManagedInvite("legacy-token");

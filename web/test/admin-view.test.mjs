@@ -34,12 +34,20 @@ const overview = { gateway: { status: "running", version: "test", uptimeSeconds:
   teamSpeak: { target: "voice.example:9987", status: "unknown", lastTestAt: null, latencyMs: null, lastError: null },
   sessions: { active: 0, peak: 0, limit: 100 }, recentEvents: [], legacyConfigImported: false };
 const session = nickname => ({ id: nickname, nickname, target: "voice.example:9987", state: "connected", createdAt: "2026-10-01T00:00:00Z", ageSeconds: 0, tsClientId: 1, channelId: "1", memberCount: 1 });
+const tsSettings = (extra = {}) => ({ enabled: true, fixedMode: true, transport: "web", queryHost: "", webQueryUrl: "https://query.example", serverId: 1,
+  configurationRevision: "reviewed-configuration",
+  queryPort: 10022, username: "", hasPassword: false, hasApiKey: true, hostKeyFingerprint: "", updatedAt: "2026-10-01T00:00:00Z", ...extra });
+const tsOverview = () => ({ configurationRevision: "reviewed-configuration", serverName: "TS fixture", serverVersion: "6.0.0", serverFamily: "ts6", welcomeMessage: "Welcome", maxClients: 32, uptimeSeconds: 1,
+  channelCount: 1, clientCount: 1, channels: [{ id: "1", parentID: "0", name: "Lobby", description: "", totalClients: 1, hasPassword: false }],
+  clients: [{ id: 42, uid: "selected-uid", nickname: "Selected user", channelID: "1", serverGroups: ["6"], away: false, inputMuted: false, outputMuted: false }],
+  groups: [{ id: "6", name: "Member" }], bans: [], groupsAvailable: true, bansAvailable: true, observedAt: "2026-10-01T00:00:00Z" });
 const defaults = path => ({
   "/session": { authenticated: true, mustChangePassword: false, csrfToken: "test-csrf" },
   "/server": settings(), "/overview": overview, "/sessions": { sessions: [] }, "/invites": { invites: [] },
   "/diagnostics": { gateway: { version: "test", node: "test", platform: "test", arch: "test" }, database: { schemaVersion: 1 }, sessions: { created: 0 } },
   "/logs?limit=100": { available: false, entries: [], sessions: [] }, "/audit?limit=50": { events: [] },
   "/skins": { skins: [], defaultSkinId: "builtin.light" },
+  "/ts-admin/settings": tsSettings(), "/ts-admin/overview": tsOverview(),
 })[path];
 
 before(async () => {
@@ -385,6 +393,75 @@ test("skin mutations are serialized and failure restores the last saved default"
   assert.ok(skinsModel.skinManagerError);
 });
 
+const storeFixture = () => ({ repository: "https://github.com/Huddle-Up-Forge/webspeak-skins", appVersion: "0.2.8", fetchedAt: 1,
+  entries: [{ id: "store-test", repository: "https://github.com/example/skin", revision: "a".repeat(64), compatible: true, error: null,
+    metadata: { schemaVersion: 1, id: "store-test", name: "Fixture", version: "1.0.0", author: "Fixture", license: "MIT", description: "Fixture", minAppVersion: "0.2.8", package: { path: "skin.wskin", ref: "v1.0.0", sha256: "b".repeat(64) } } }] });
+
+test("skin store is loaded lazily and a failed refresh preserves its previous catalog", async () => {
+  let reads = 0;
+  handler = path => path === "/skin-store" ? (++reads, Promise.resolve(json(storeFixture()))) : Promise.resolve(json(defaults(path)));
+  await mount("/admin/skins");
+  assert.equal(reads, 0);
+  skinsModel.selectSkinTab("store"); await nextTurn();
+  assert.equal(reads, 1);
+  assert.equal(skinsModel.storeCatalog.entries[0].id, "store-test");
+  handler = path => Promise.resolve(json(path === "/skin-store/refresh" ? { code: "SKIN_STORE_UNAVAILABLE" } : defaults(path), path === "/skin-store/refresh" ? 502 : 200));
+  await skinsModel.loadSkinStore(true);
+  assert.equal(skinsModel.storeCatalog.entries.length, 1);
+  assert.ok(skinsModel.storeError);
+});
+
+test("leaving skins discards a late store catalog and logout clears store state", async () => {
+  await mount("/admin/skins");
+  const catalog = deferred();
+  handler = path => path === "/skin-store" ? catalog.promise : Promise.resolve(json(defaults(path)));
+  const pending = skinsModel.loadSkinStore();
+  await router.push("/admin/server"); await nextTurn();
+  catalog.resolve(json(storeFixture())); await pending;
+  assert.equal(skinsModel.storeCatalog, null);
+  assert.equal(skinsModel.storeLoading, false);
+  skinsModel.storeCatalog = storeFixture();
+  skinsModel.reset();
+  assert.equal(skinsModel.storeCatalog, null);
+});
+
+test("refreshing the store also reloads packages changed by another administrator", async () => {
+  await mount("/admin/skins");
+  handler = path => Promise.resolve(json(path === "/skin-store/refresh" ? storeFixture()
+    : path === "/skins" ? { skins: [{ ...manifestForStoreTest(), version: "1.1.0", enabled: false }], defaultSkinId: "builtin.light" } : defaults(path)));
+  await skinsModel.loadSkinStore(true);
+  assert.equal(skinsModel.skinEntries.find(skin => skin.id === "store-test").version, "1.1.0");
+  assert.equal(skinsModel.installedStoreSkin(storeFixture().entries[0]).enabled, false);
+  assert.equal(skinsModel.storeVersionOrder(storeFixture().entries[0]), -1);
+});
+
+test("store install submits the reviewed revision once and reloads the instance catalog", async () => {
+  await mount("/admin/skins");
+  const install = deferred(); let writes = 0, submitted;
+  handler = (path, init) => path === "/skin-store/install" ? (++writes, submitted = JSON.parse(init.body), install.promise) : Promise.resolve(json(defaults(path)));
+  const entry = storeFixture().entries[0];
+  const pending = skinsModel.installStoreSkin(entry);
+  await skinsModel.installStoreSkin(entry);
+  await skinsModel.saveSkinDefault();
+  assert.equal(writes, 1);
+  assert.deepEqual(submitted, { id: entry.id, revision: entry.revision, installedVersion: null });
+  assert.equal(skinsModel.skinBusy, true);
+  install.resolve(json({ ok: true, skin: { ...manifestForStoreTest(), enabled: true } }));
+  await pending;
+  assert.equal(skinsModel.skinBusy, false);
+  assert.ok(skinsModel.skinManagerNotice);
+});
+function manifestForStoreTest() { return { id: "store-test", name: "Fixture", version: "1.0.0", author: "Fixture", license: "MIT", minAppVersion: "0.2.8", installedAt: 1 }; }
+
+test("all store translations are explicit in each supported language", async () => {
+  const { skinStoreCopy } = await vite.ssrLoadModule("/src/i18n/skin-store.ts");
+  const keys = Object.keys(skinStoreCopy.zh).sort();
+  for (const language of ["en", "de", "ru", "ja"]) {
+    assert.deepEqual(Object.keys(skinStoreCopy[language]).sort(), keys);
+    for (const key of keys) assert.ok(skinStoreCopy[language][key].trim());
+  }
+});
+
 test("a settings response cannot restore probe metadata after the draft password changes", async () => {
   await mount();
   const save = deferred();
@@ -421,4 +498,220 @@ test("duplicate invite revocation sends one mutation", async () => {
   revoke.resolve(json({ ok: true }));
   await Promise.all([pending, duplicate]);
   assert.equal(calls, 1);
+});
+
+test("TS management saves keep newer credential edits and invalidate pending overview reads", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin), oldOverview = deferred(), save = deferred();
+  handler = (path, init) => path === "/ts-admin/overview" ? oldOverview.promise : path === "/ts-admin/settings" && init.method === "PUT" ? save.promise : Promise.resolve(json(defaults(path)));
+  const reading = model.connectAndRefresh();
+  model.form.apiKeyAction = "replace"; model.form.apiKey = "submitted-key";
+  const saving = model.saveSettings();
+  model.form.apiKey = "newer-draft-key";
+  save.resolve(json({ ok: true, settings: tsSettings({ hasApiKey: true }) }));
+  await saving;
+  oldOverview.resolve(json(tsOverview())); await reading;
+  assert.equal(model.form.apiKey, "newer-draft-key");
+  assert.equal(model.form.apiKeyAction, "replace");
+  assert.equal(model.overview, null);
+  assert.equal(model.connecting, false); assert.equal(model.saving, false);
+  handler = () => Promise.resolve(json({ ok: true, settings: tsSettings({ hasApiKey: true }) }));
+  await model.saveSettings();
+  assert.equal(model.form.apiKey, ""); assert.equal(model.form.apiKeyAction, "keep");
+});
+
+test("TS mutations send the selected UID once and a failed refresh never retries a completed write", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin);
+  await model.connectAndRefresh();
+  model.beginAction("client.kick", model.overview.clients[0]);
+  model.editor.reason = "Test reason";
+  const response = deferred(); let writes = 0;
+  handler = (path, init) => {
+    if (path === "/ts-admin/action") {
+      writes++;
+      assert.deepEqual(JSON.parse(init.body), { configurationRevision: "reviewed-configuration", operation: { action: "client.kick", clientId: 42, clientUid: "selected-uid", reason: "Test reason" } });
+      return response.promise;
+    }
+    if (path === "/ts-admin/overview") return Promise.resolve(json({ code: "TS_ADMIN_CONNECTION_FAILED" }, 400));
+    return Promise.resolve(json(defaults(path)));
+  };
+  const pending = model.runAction(); await model.runAction();
+  response.resolve(json({ ok: true })); await pending;
+  assert.equal(writes, 1); assert.equal(model.acting, false); assert.equal(model.editor.action, "");
+  assert.ok(model.noticeMessage); assert.ok(state.errorMessage);
+  assert.equal(model.overview, null);
+});
+
+test("leaving TS management discards a late response and logout clears saved credential drafts", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin), read = deferred();
+  handler = path => path === "/ts-admin/overview" ? read.promise : Promise.resolve(json(path === "/logout" ? { ok: true } : defaults(path)));
+  const pending = model.connectAndRefresh();
+  await router.push("/admin"); await nextTurn();
+  read.resolve(json(tsOverview())); await pending;
+  assert.equal(model.overview, null); assert.equal(model.connecting, false);
+  model.form.apiKey = "private-key-draft"; model.form.password = "private-password-draft";
+  await state.logout();
+  assert.equal(model.form.apiKey, ""); assert.equal(model.form.password, ""); assert.equal(model.settings.hasApiKey, false);
+});
+
+test("TS administration actually renders transport forms, operations and all five translations", async () => {
+  const { createSSRApp } = await import("vue");
+  const { renderToString } = await import("vue/server-renderer");
+  const { default: Component } = await vite.ssrLoadModule("/src/components/admin/AdminTsAdmin.vue");
+  await mount("/admin/ts-admin");
+  const model = state.adminTsAdmin, readable = reactive(model);
+  await readable.connectAndRefresh();
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    state.language = language;
+    const html = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
+    assert.ok(html.includes("WebQuery")); assert.ok(html.includes("https://query.example"));
+    assert.ok(html.includes("Selected user")); assert.ok(html.includes("Lobby"));
+    assert.ok(!html.includes("undefined"));
+  }
+  readable.form.transport = "ssh";
+  let html = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
+  assert.ok(html.includes("SHA256:")); assert.ok(!html.includes('type="url"'));
+  readable.form.transport = "web";
+  await nextTurn();
+  readable.beginAction("client.move", readable.overview.clients[0]);
+  html = await renderToString(createSSRApp(Component, { model, i18n: state.i18n, targetAddress: "voice.example", targetPort: "9987" }));
+  assert.ok(html.includes('class="operation-card ts-admin-editor"')); assert.ok(html.includes("Selected user"));
+});
+
+
+test("WebSpeak routes work in open and fixed modes without any TS management request", async () => {
+  for (const accessMode of ["open", "fixed"]) {
+    const paths = [];
+    handler = (path, init) => {
+      paths.push(path);
+      assert.ok(!path.startsWith("/ts-admin/"), "WebSpeak pages must not depend on Query availability");
+      return Promise.resolve(json(path === "/server" ? init.method === "PUT" ? { ok: true, settings: settings({ accessMode }) } : settings({ accessMode }) : defaults(path)));
+    };
+    await mount("/admin");
+    for (const route of ["/admin/server", "/admin/operations", "/admin/skins", "/admin"]) {
+      await router.push(route); await nextTurn();
+    }
+    serverModel.serverForm.siteName = "Saved without Query";
+    await serverModel.saveServerSettings();
+    assert.equal(state.errorMessage, "");
+    assert.ok(paths.includes("/sessions")); assert.ok(paths.includes("/skins"));
+    app.unmount(); app = null;
+  }
+});
+
+test("TS target presentation uses saved settings rather than an unsaved WebSpeak draft", async () => {
+  await mount("/admin/server");
+  serverModel.serverForm.address = "unsaved.example";
+  serverModel.serverForm.port = "9999";
+  serverModel.serverForm.accessMode = "open";
+  await router.push("/admin/ts-admin"); await nextTurn();
+  assert.deepEqual(state.savedTsTarget, { address: "voice.example", port: "9987" });
+  assert.equal(serverModel.savedSettings.accessMode, "fixed");
+  assert.equal(serverModel.serverForm.address, "unsaved.example");
+  handler = (path, init) => Promise.resolve(json(path === "/server" && init.method === "PUT"
+    ? { ok: true, settings: settings({ target: "new-saved.example:9990", accessMode: "open" }) } : defaults(path)));
+  await serverModel.saveServerSettings();
+  assert.deepEqual(state.savedTsTarget, { address: "new-saved.example", port: "9990" });
+  assert.equal(serverModel.savedSettings.accessMode, "open");
+  serverModel.reset();
+  assert.equal(serverModel.savedSettings, null);
+});
+
+test("TS management is optional and opening its page never connects automatically", async () => {
+  const paths = [];
+  handler = path => {
+    paths.push(path);
+    assert.notEqual(path, "/ts-admin/overview");
+    return Promise.resolve(json(path === "/ts-admin/settings" ? tsSettings({ enabled: false }) : defaults(path)));
+  };
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin);
+  assert.ok(paths.includes("/ts-admin/settings"));
+  await model.connectAndRefresh();
+  assert.equal(model.overview, null);
+  await router.push("/admin/operations"); await nextTurn();
+  assert.equal(state.errorMessage, "");
+});
+
+test("unsaved TS connection changes block both reads and writes until saved", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin);
+  await model.connectAndRefresh();
+  model.beginAction("client.kick", model.overview.clients[0]);
+  model.form.webQueryUrl = "https://replacement.example";
+  let calls = 0;
+  handler = (path, init) => { calls++; return Promise.resolve(json(path === "/ts-admin/settings" && init.method === "PUT"
+    ? { ok: true, settings: tsSettings({ webQueryUrl: "https://replacement.example", configurationRevision: "replacement" }) } : defaults(path))); };
+  assert.equal(model.settingsDirty, true);
+  await model.connectAndRefresh(); await model.runAction();
+  assert.equal(calls, 0);
+  await model.saveSettings();
+  assert.equal(calls, 1); assert.equal(model.settingsDirty, false);
+  assert.equal(model.overview, null); assert.equal(model.editor.action, "");
+});
+
+test("a changed saved TS connection discards an old overview and pending read", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin), oldRead = deferred();
+  await model.connectAndRefresh(); model.beginAction("channel.update", model.overview.channels[0]);
+  handler = path => path === "/ts-admin/overview" ? oldRead.promise : Promise.resolve(json(tsSettings({ configurationRevision: "new-connection" })));
+  const pending = model.connectAndRefresh();
+  await model.loadSettings();
+  assert.equal(model.overview, null); assert.equal(model.editor.action, "");
+  oldRead.resolve(json(tsOverview())); await pending;
+  assert.equal(model.overview, null); assert.equal(model.connecting, false);
+});
+
+test("settings and operations render explicit localized sections with valid deep links", async () => {
+  const { createSSRApp } = await import("vue");
+  const { renderToString } = await import("vue/server-renderer");
+  const { default: Settings } = await vite.ssrLoadModule("/src/components/admin/AdminServerSettings.vue");
+  const { default: Operations } = await vite.ssrLoadModule("/src/components/admin/AdminOperations.vue");
+  const { adminOrganizationCopy } = await vite.ssrLoadModule("/src/i18n/admin-organization.ts");
+  await mount("/admin/server?section=site");
+  assert.equal(state.initialSection, "site");
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    state.language = language;
+    const translations = adminOrganizationCopy[language];
+    assert.deepEqual(Object.keys(translations).sort(), Object.keys(adminOrganizationCopy.zh).sort());
+    const settingsHtml = await renderToString(createSSRApp(Settings, { model: state.serverSettings, i18n: state.i18n, initialSection: "site", welcomeLanguage: "zh" }));
+    assert.ok(settingsHtml.includes(translations.adminSiteAnnouncement));
+    assert.ok(settingsHtml.includes('data-admin-section="site"'));
+    assert.ok(!settingsHtml.includes("undefined"));
+    const operationsHtml = await renderToString(createSSRApp(Operations, { model: state.adminOperations, i18n: state.i18n, initialSection: "maintenance" }));
+    assert.ok(operationsHtml.includes(translations.adminBrowserSessionsLead));
+    assert.ok(operationsHtml.includes('data-admin-section="maintenance"'));
+    assert.ok(!operationsHtml.includes("undefined"));
+  }
+});
+
+
+test("loading saved custom Query ports never treats them as unsaved transport defaults", async () => {
+  for (const [transport, queryPort] of [["ssh", 10011], ["tcp", 10022]]) {
+    handler = path => Promise.resolve(json(path === "/ts-admin/settings" ? tsSettings({ transport, queryPort, username: "serveradmin", hasPassword: true }) : defaults(path)));
+    await mount("/admin/ts-admin");
+    const model = reactive(state.adminTsAdmin);
+    assert.equal(model.form.queryPort, String(queryPort));
+    assert.equal(model.settingsDirty, false);
+    await model.connectAndRefresh();
+    assert.ok(model.overview);
+    app.unmount(); app = null;
+  }
+});
+
+
+test("a pending TS settings load preserves the port selected for a newer transport draft", async () => {
+  await mount("/admin/ts-admin");
+  const model = reactive(state.adminTsAdmin), read = deferred();
+  handler = () => read.promise;
+  const pending = model.loadSettings();
+  model.form.transport = "ssh";
+  read.resolve(json(tsSettings({ queryPort: 10011 })));
+  await pending;
+  assert.equal(model.settings.queryPort, 10011);
+  assert.equal(model.form.transport, "ssh");
+  assert.equal(model.form.queryPort, "10022");
+  assert.equal(model.settingsDirty, true);
 });

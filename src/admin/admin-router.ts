@@ -1,12 +1,13 @@
 import { Router, raw as expressRaw, type NextFunction, type Request, type Response } from "express";
 import { existsSync, readFileSync } from "node:fs";
 import type { Logger } from "../logger.js";
-import { AdminInputError, AdminService, type AdminSettingsInput, type RelayNodeInput } from "./admin-service.js";
+import { AdminInputError, AdminService, type AdminSettingsInput, type RelayNodeInput, type TsAdminSettingsInput } from "./admin-service.js";
 import { AdminSessionStore, isSecureRequest } from "./admin-session.js";
 import { AdminLoginRateLimiter, waitFor } from "./login-rate-limit.js";
 import { TeamSpeakProbeError } from "../server/teamspeak-probe.js";
 import type { AdminSessionSummary } from "../server/voice-bridge.js";
 import { SkinRegistry, SkinRegistryError } from "./skin-registry.js";
+import { SkinStore } from "./skin-store.js";
 
 export interface AdminConnectionRecord {
   id: string;
@@ -36,6 +37,7 @@ export interface AdminRouterOptions {
   version?: string;
   logFile?: string;
   skinRegistry?: SkinRegistry;
+  skinStore?: SkinStore;
   startedAt: number;
 }
 
@@ -43,6 +45,21 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   const router = Router();
   const limiter = new AdminLoginRateLimiter();
   const logger = options.logger.child({ component: "admin-api" });
+  const skinStore = options.skinStore ?? new SkinStore(options.version ?? "0.0.0");
+  // Include uploads, enable/default changes and deletion in the same queue as store installs.
+  let skinMutation: Promise<unknown> = Promise.resolve();
+  function mutateSkins<T>(run: () => Promise<T>): Promise<T> {
+    const next = skinMutation.then(run, run);
+    skinMutation = next.catch(() => undefined);
+    return next;
+  }
+  function sendStoreError(response: Response, error: unknown) {
+    if (error instanceof SkinRegistryError) {
+      const status = error.code === "SKIN_STORE_UNAVAILABLE" ? 502 : error.code === "SKIN_STORE_NOT_FOUND" ? 404
+        : ["SKIN_STORE_CHANGED", "SKIN_STORE_INSTALLED_CHANGED", "SKIN_STORE_NOT_NEWER", "SKIN_STORE_INCOMPATIBLE"].includes(error.code) ? 409 : 400;
+      response.status(status).json({ ok: false, code: error.code });
+    } else sendAdminError(response, error);
+  }
 
   router.use((_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
@@ -122,6 +139,32 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     response.json(options.service.getAdminSettings());
   });
 
+  router.get("/ts-admin/settings", (_request, response) => {
+    response.json(options.service.getTsAdminSettings());
+  });
+
+  router.put("/ts-admin/settings", requireSameOrigin, requireCsrf(options.sessions), (request, response) => {
+    try {
+      options.service.saveTsAdminSettings(readTsAdminSettingsInput(asRecord(request.body)));
+      response.json({ ok: true, settings: options.service.getTsAdminSettings() });
+    } catch (error: unknown) {
+      sendAdminError(response, error);
+    }
+  });
+
+  router.post("/ts-admin/overview", requireSameOrigin, requireCsrf(options.sessions), async (_request, response) => {
+    try {
+      response.json(await options.service.getTsAdminOverview());
+    } catch (error: unknown) {
+      sendAdminError(response, error);
+    }
+  });
+
+  router.post("/ts-admin/action", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    try { response.json(await options.service.runTsAdminAction(request.body)); }
+    catch (error: unknown) { sendAdminError(response, error); }
+  });
+
   router.get("/skins", async (_request, response) => {
     response.json({
       skins: await options.skinRegistry?.list() ?? [],
@@ -129,11 +172,32 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     });
   });
 
+  router.get("/skin-store", async (_request, response) => {
+    try { response.json(await skinStore.list()); }
+    catch (error) { sendStoreError(response, error); }
+  });
+
+  router.post("/skin-store/refresh", requireSameOrigin, requireCsrf(options.sessions), async (_request, response) => {
+    try { response.json(await skinStore.list(true)); }
+    catch (error) { sendStoreError(response, error); }
+  });
+
+  router.post("/skin-store/install", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    try {
+      if (!options.skinRegistry) throw new SkinRegistryError("Skin storage is unavailable.", "SKIN_STORAGE_UNAVAILABLE");
+      const registry = options.skinRegistry;
+      const skin = await mutateSkins(() => skinStore.install(registry, request.body));
+      options.service.database.addAudit("ADMIN_SKIN_INSTALLED", { id: skin.id, version: skin.version, source: "github-store" });
+      response.status(201).json({ ok: true, skin });
+    } catch (error) { sendStoreError(response, error); }
+  });
+
   router.put("/skins/default", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
     try {
       if (!options.skinRegistry) throw new SkinRegistryError("Skin storage is unavailable.", "SKIN_STORAGE_UNAVAILABLE");
       const id = typeof asRecord(request.body).id === "string" ? (asRecord(request.body).id as string).trim() : "";
-      const settings = await options.skinRegistry.setDefaultSkin(id);
+      const registry = options.skinRegistry;
+      const settings = await mutateSkins(() => registry.setDefaultSkin(id));
       response.json({ ok: true, defaultSkinId: settings.defaultSkinId });
     } catch (error: unknown) {
       if (error instanceof SkinRegistryError) {
@@ -149,7 +213,8 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       const id = typeof request.params.id === "string" ? request.params.id : "";
       const body = asRecord(request.body);
       if (!options.skinRegistry || typeof body.enabled !== "boolean") throw new SkinRegistryError("A skin and boolean enabled value are required.", "SKIN_ENABLE_INVALID");
-      const skin = await options.skinRegistry.setEnabled(id, body.enabled);
+      const registry = options.skinRegistry, enabled = body.enabled;
+      const skin = await mutateSkins(() => registry.setEnabled(id, enabled));
       options.service.database.addAudit(body.enabled ? "ADMIN_SKIN_ENABLED" : "ADMIN_SKIN_DISABLED", { id });
       response.json({ ok: true, skin, defaultSkinId: await options.skinRegistry.getDefaultSkinId() });
     } catch (error: unknown) {
@@ -166,7 +231,8 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     try {
       const id = typeof request.params.id === "string" ? request.params.id : "";
       if (!options.skinRegistry || !Buffer.isBuffer(request.body)) throw new SkinRegistryError("Skin storage is unavailable.", "SKIN_STORAGE_UNAVAILABLE");
-      const skin = await options.skinRegistry.save(request.body, id);
+      const registry = options.skinRegistry, bytes = request.body;
+      const skin = await mutateSkins(() => registry.save(bytes, id));
       options.service.database.addAudit("ADMIN_SKIN_INSTALLED", { id: skin.id, version: skin.version });
       response.status(201).json({ ok: true, skin });
     } catch (error: unknown) {
@@ -182,7 +248,8 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   router.delete("/skins/:id", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
     const id = typeof request.params.id === "string" ? request.params.id : "";
     try {
-      if (!options.skinRegistry || !await options.skinRegistry.remove(id)) {
+      const registry = options.skinRegistry;
+      if (!registry || !await mutateSkins(() => registry.remove(id))) {
         response.status(404).json({ ok: false, code: "SKIN_NOT_FOUND" });
         return;
       }
@@ -446,6 +513,7 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
         id: typeof node.id === "string" ? node.id.slice(0, 110) : undefined,
         name: typeof node.name === "string" ? node.name.slice(0, 80) : "",
         target: typeof node.target === "string" ? node.target.slice(0, 300) : "",
+        voiceEndpoint: typeof node.voiceEndpoint === "string" ? node.voiceEndpoint.slice(0, 300) : undefined,
         enabled: node.enabled === true,
         token: typeof node.token === "string" ? node.token.slice(0, 512) : undefined,
         tokenAction: readPasswordAction(node.tokenAction),
@@ -476,6 +544,28 @@ function readSettingsInput(body: Record<string, unknown>): AdminSettingsInput {
     relayToken: typeof body.relayToken === "string" ? body.relayToken.slice(0, 512) : undefined,
     relayTokenAction: readPasswordAction(body.relayTokenAction),
     relayNodes,
+  };
+}
+
+function readTsAdminSettingsInput(body: Record<string, unknown>): TsAdminSettingsInput {
+  if (typeof body.enabled !== "boolean") throw new AdminInputError("INVALID_TS_ADMIN_SETTINGS", "Expected enabled flag");
+  if (body.transport !== undefined && !["web", "ssh", "tcp"].includes(String(body.transport))) throw new AdminInputError("INVALID_TS_ADMIN_SETTINGS", "Invalid transport");
+  for (const key of ["apiKeyAction", "passwordAction"]) {
+    if (body[key] !== undefined && !["keep", "replace", "remove"].includes(String(body[key]))) throw new AdminInputError("INVALID_TS_ADMIN_SETTINGS", "Invalid credential action");
+  }
+  return {
+    enabled: body.enabled === true,
+    transport: body.transport as TsAdminSettingsInput["transport"],
+    queryHost: body.queryHost === undefined ? undefined : readString(body, "queryHost", 253),
+    webQueryUrl: body.webQueryUrl === undefined ? undefined : readString(body, "webQueryUrl", 2048),
+    apiKey: body.apiKey === undefined ? undefined : readString(body, "apiKey", 4096),
+    apiKeyAction: readPasswordAction(body.apiKeyAction),
+    serverId: body.serverId === undefined ? undefined : readOptionalNumber(body, "serverId", 0),
+    queryPort: readOptionalNumber(body, "queryPort", 10022),
+    username: readOptionalString(body, "username", 128),
+    password: readOptionalString(body, "password", 1024),
+    passwordAction: readPasswordAction(body.passwordAction),
+    hostKeyFingerprint: readOptionalString(body, "hostKeyFingerprint", 128),
   };
 }
 

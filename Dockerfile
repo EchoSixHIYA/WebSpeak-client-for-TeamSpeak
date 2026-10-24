@@ -2,14 +2,12 @@ FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ \
+  && apt-get install -y --no-install-recommends ca-certificates python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 COPY web/package.json web/package-lock.json ./web/
 RUN npm ci --ignore-scripts --no-audit --no-fund
-COPY scripts/prepare-sdk.mjs ./scripts/prepare-sdk.mjs
-RUN npm run prepare:sdk
 RUN npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
 RUN npm --prefix web ci
 
@@ -39,7 +37,7 @@ COPY --from=build --chown=node:node /app/scripts/docker-healthcheck.mjs ./script
 
 USER node
 VOLUME ["/data"]
-EXPOSE 3040/tcp 39087/udp 40000-40099/udp
+EXPOSE 3040/tcp 3041/tcp 39087/udp 40000-40099/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["node", "scripts/docker-healthcheck.mjs"]
 

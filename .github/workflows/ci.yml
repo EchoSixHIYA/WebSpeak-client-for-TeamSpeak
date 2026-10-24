@@ -25,7 +25,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          npm run prepare:sdk
           npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
           npm --prefix web ci --no-audit --no-fund
       - name: Test and build application

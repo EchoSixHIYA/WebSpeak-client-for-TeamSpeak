@@ -23,7 +23,7 @@ function object<T extends Record<string, Reader>>(fields: T): AdminResponseReade
 }
 
 const auditEvent = object({ event: text, createdAt: text });
-const relayNode = object({ id: text, name: text, enabled: boolean, target: text, hasToken: boolean });
+const relayNode = object({ id: text, name: text, enabled: boolean, target: text, voiceEndpoint: text, hasToken: boolean });
 const welcomeTexts = object({ zh: text, en: text, de: text, ru: text, ja: text });
 const settings = object({
   target: text, hasPassword: boolean, accessMode: choice("fixed", "open"), siteName: text,
@@ -64,6 +64,33 @@ const skin = object({
   description: optional(text), previewUrl: optional(text), previewMimeType: optional(text),
   builtIn: optional(boolean), enabled: optional(boolean), previewKind: optional(choice("day", "night", "illusia")),
 });
+const storeMetadata = object({
+  schemaVersion: value => value === 1 ? 1 as const : invalid(),
+  id: text, name: text, version: text, author: text, license: text, description: text, minAppVersion: text,
+  package: object({ ref: text, path: text, sha256: text }),
+});
+const skinStore = object({
+  repository: text, appVersion: text, fetchedAt: number,
+  entries: array(object({ id: text, repository: text, metadata: nullable(storeMetadata), revision: text, compatible: boolean, error: nullable(text) })),
+});
+const tsAdminSettings = object({
+  configurationRevision: text,
+  fixedMode: boolean, enabled: boolean, queryPort: number, username: text,
+  transport: choice("web", "ssh", "tcp"), queryHost: text, webQueryUrl: text, serverId: number, hasApiKey: boolean,
+  hasPassword: boolean, hostKeyFingerprint: text, updatedAt: text,
+});
+const tsAdminOverview = object({
+  configurationRevision: text,
+  serverName: text, serverVersion: text, serverFamily: choice("ts3", "ts6", "unknown"),
+  channelCount: number, clientCount: number,
+  welcomeMessage: text, maxClients: number, uptimeSeconds: number,
+  channels: array(object({ id: text, parentID: text, name: text, description: text, totalClients: number, hasPassword: boolean })),
+  clients: array(object({ id: number, uid: text, nickname: text, channelID: text, serverGroups: array(text), away: boolean, inputMuted: boolean, outputMuted: boolean })),
+  groups: array(object({ id: text, name: text })), groupsAvailable: boolean, bansAvailable: boolean,
+  bans: array(object({ id: text, name: text, uid: text, reason: text, durationSeconds: number, createdAt: nullable(text) })),
+  observedAt: text,
+});
+const savedTsAdminSettings = object({ ok: choice(true), settings: tsAdminSettings });
 const sessionStatus = object({ authenticated: boolean, mustChangePassword: optional(boolean), csrfToken: optional(text) });
 
 export const adminResponses = {
@@ -87,6 +114,10 @@ export const adminResponses = {
     database: object({ schemaVersion: number }), sessions: object({ created: number }),
   }),
   skins: object({ skins: array(skin), defaultSkinId: text }),
+  skinStore,
+  tsAdminSettings,
+  savedTsAdminSettings,
+  tsAdminOverview,
   defaultSkin: object({ ok: choice(true), defaultSkinId: text }),
   updatedSkin: object({ ok: choice(true), skin, defaultSkinId: text }),
   uploadedSkin: object({ ok: choice(true), skin }),

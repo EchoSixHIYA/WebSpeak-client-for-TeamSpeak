@@ -1,20 +1,26 @@
 import { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
 import {
-  Client as TS3FullClient,
-  clientMove as tsClientMove,
-  listChannels as tsListChannels,
-  listClients as tsListClients,
-  poke as tsPoke,
-  sendTextMessage as tsSendTextMessage,
-  generateIdentity,
-  type Identity,
-  type VoiceData,
-  type DirectoryClientInfo,
-  type DirectorySnapshot,
-  type RawNotification,
-  type TextMessage,
-} from "@echosixhiya/teamspeak-client";
+  generateIdentitySync,
+} from "@honeybbq/teamspeak/client";
+import type {
+  ClientInfo,
+  DirectoryChannelInfo,
+  DirectoryClientInfo,
+  DirectorySnapshot,
+  Identity,
+  RawNotification,
+  TextMessage,
+  VoiceData,
+} from "./teamspeak-sdk.js";
+import {
+  listChannelsCompat as tsListChannels,
+  listClientsCompat as tsListClients,
+  moveClientCompat as tsClientMove,
+  pokeCompat as tsPoke,
+  sendTextMessageCompat as tsSendTextMessage,
+  TeamSpeakSdkClient,
+} from "./teamspeak-sdk.js";
 import type { Logger } from "../logger.js";
 import { describeTeamSpeakError, normalizeTeamSpeakError, normalizeTeamSpeakKickedReason } from "../errors.js";
 import { TeamSpeakAdapter, type TeamSpeakProtocol } from "./teamspeak-adapter.js";
@@ -23,8 +29,6 @@ import { createAccelerationRelayClient, type AccelerationRelayClient, type Accel
 import {
   applyChannelCapacityNotification,
   applyChannelPasswordProtectionNotification,
-  parseChannelCapacities,
-  parseChannelPasswordProtections,
   type ChannelCapacity,
   type ChannelPasswordProtection,
 } from "./channel-capacity.js";
@@ -69,7 +73,7 @@ const MAX_SERVER_ICON_BYTES = 128 * 1024;
 const MAX_SERVER_BANNER_URL_LENGTH = 2_048;
 const MAX_SERVER_WELCOME_MESSAGE_LENGTH = 4_096;
 
-export type TSDirectoryChannel = DirectorySnapshot["channels"][number] & Partial<ChannelCapacity> & Partial<ChannelPasswordProtection>;
+export type TSDirectoryChannel = DirectoryChannelInfo & Partial<ChannelCapacity> & Partial<ChannelPasswordProtection>;
 export type TSDirectorySnapshot = Omit<DirectorySnapshot, "channels"> & { channels: TSDirectoryChannel[] };
 export type TSDirectoryClient = DirectoryClientInfo;
 export type TSRawNotification = RawNotification;
@@ -102,7 +106,7 @@ export function toTSChatMessage(msg: TextMessage): TSChatMessage {
 }
 
 export class TSClient extends EventEmitter {
-  private client: TS3FullClient | null = null;
+  private client: TeamSpeakSdkClient | null = null;
   private adapter: TeamSpeakAdapter | null = null;
   private logger: Logger;
   private readonly identity: Identity;
@@ -125,7 +129,7 @@ export class TSClient extends EventEmitter {
   constructor(private options: TSClientOptions, logger: Logger) {
     super();
     this.logger = logger.child({ nickname: options.nickname });
-    this.identity = options.identity ?? generateIdentity(8);
+    this.identity = options.identity ?? generateIdentitySync(8);
   }
 
   /**
@@ -199,47 +203,16 @@ export class TSClient extends EventEmitter {
         err: error instanceof Error ? error.message : String(error),
       }, "Could not subscribe to all TeamSpeak channels");
     }
-    // Directory snapshots are dispatched through two setImmediate layers in
-    // the SDK. Let both flush before reconciling with a direct client-protocol
-    // snapshot so the gateway's first connected state contains every member.
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    await new Promise<void>((resolve) => setImmediate(resolve));
-
-    // TS6 can finish the welcome event stream before it has exposed every
-    // existing client to a newly connected session. Pull one authoritative
-    // snapshot through this same client protocol session so users who joined
-    // earlier are visible immediately as well. Realtime events continue to
-    // keep the snapshot current after this reconciliation.
-    try {
-      const [channels, clients] = await Promise.all([
-        tsListChannels(client),
-        tsListClients(client),
-      ]);
-      try {
-        // The high-level SDK directory type intentionally omits channel limit
-        // metadata. Its raw client-protocol rows still include the public
-        // maximum-client properties, so retain those without another SDK API.
-        // TeamSpeak only includes channel flag fields (including the public
-        // password-required bit) when the client asks for flags explicitly.
-        const rows = await client.execCommandWithResponse("channellist -flags", 5_000);
-        const capacities = parseChannelCapacities(rows);
-        for (const [id, capacity] of capacities) this.channelCapacities.set(id, capacity);
-        for (const [id, passwordProtected] of parseChannelPasswordProtections(rows)) {
-          this.channelPasswordProtection.set(id, passwordProtected);
-        }
-      } catch (error: unknown) {
-        this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not read TeamSpeak channel limits");
-      }
-      this.emit("directorySnapshot", {
-        channels: this.applyChannelMetadata(channels),
-        clients,
-      });
-    } catch (error: unknown) {
-      this.logger.warn({
-        failureCode: "DIRECTORY_SNAPSHOT_UNAVAILABLE",
-        failureDetail: error instanceof Error ? error.message : String(error),
-      }, "TeamSpeak directory snapshot unavailable");
-    }
+    // The upstream live view contains the welcome and subscription data,
+    // including channel limits and member status. Reading it needs no list
+    // permissions; a failure must fail initialization instead of parking the
+    // browser in `syncing` forever.
+    const [channels, clients] = await Promise.all([tsListChannels(client), tsListClients(client)]);
+    this.emit("directorySnapshot", {
+      channels: this.applyChannelMetadata(channels),
+      clients,
+      complete: true,
+    } satisfies TSDirectorySnapshot);
 
     const connectedChannelId = client.channelID();
     if (this.preferredChannelId === 0n) {
@@ -284,9 +257,9 @@ export class TSClient extends EventEmitter {
   /**
    * Load a visible client's TeamSpeak avatar through the client protocol.
    *
-   * TeamSpeak does not include the avatar bytes in directory notifications.
-   * `clientinfo` exposes the avatar marker and the per-identity filename; the
-   * file itself is then read through the normal TeamSpeak file-transfer port.
+   * The SDK's live view supplies the avatar marker and identity. Its public
+   * avatar filename helper handles TS3/TS6 identities; the image is read
+   * through the normal TeamSpeak file-transfer port.
    * A missing permission, missing avatar, blocked file-transfer port, or an
    * oversized image is intentionally reported as `null` so the web client can
    * keep its generated initial avatar.
@@ -297,18 +270,11 @@ export class TSClient extends EventEmitter {
     if (!Number.isInteger(clientId) || clientId <= 0 || clientId > 65535) throw new Error("Invalid TeamSpeak client id");
     const generation = this.connectionGeneration;
     const isCurrent = () => this.client === client && this.connected && this.connectionGeneration === generation;
-    const rows = await client.execCommandWithResponse(`clientinfo clid=${clientId}`, 5_000);
+    const info = await client.getClientAvatarMetadata(clientId);
     if (!isCurrent()) return null;
-    const info = rows.find((row) => {
-      if (expectedUid && row.client_unique_identifier !== expectedUid) return false;
-      return typeof row.client_flag_avatar === "string" && typeof row.client_base64HashClientUID === "string";
-    });
-    if (!info) return null;
-    const cacheKey = info.client_flag_avatar?.trim() ?? "";
-    const avatarFileKey = info.client_base64HashClientUID?.trim() ?? "";
-    if (!cacheKey || !/^[A-Za-z0-9+/=_-]{8,256}$/.test(avatarFileKey)) return null;
-
-    const transfer = await client.fileTransferInitDownload(0n, `/avatar_${avatarFileKey}`, "");
+    if (!info || expectedUid && info.uid !== expectedUid) return null;
+    const cacheKey = info.cacheKey;
+    const transfer = await client.fileTransferInitDownload(0n, info.path, "");
     if (!isCurrent()) return null;
     const size = Number(transfer.size);
     if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_CLIENT_AVATAR_BYTES) return null;
@@ -380,7 +346,7 @@ export class TSClient extends EventEmitter {
     return data;
   }
 
-  private attachClientListeners(client: TS3FullClient): void {
+  private attachClientListeners(client: TeamSpeakSdkClient): void {
     client.on("voiceData", (data: VoiceData) => {
       if (this.client !== client) return;
       this.emit("voiceData", {
@@ -390,12 +356,12 @@ export class TSClient extends EventEmitter {
       } as TSVoiceData);
     });
 
-    // The SDK exposes the directory that TeamSpeak sends during the normal
-    // client welcome sequence. The connect path also reconciles this event
-    // stream with a complete client-protocol snapshot.
+    // The SDK publishes its native live view after the welcome and whenever
+    // the visible channels or members change.
     client.on("directorySnapshot", (snapshot) => {
       if (this.client !== client) return;
       this.emit("directorySnapshot", {
+        complete: snapshot.complete,
         channels: this.applyChannelMetadata(snapshot.channels),
         clients: snapshot.clients.slice(),
       });
@@ -625,7 +591,7 @@ export class TSClient extends EventEmitter {
   }
 
   getIdentityString(): string {
-    return this.identity.toString();
+    return this.identity.export();
   }
 
   getChannelId(): bigint {

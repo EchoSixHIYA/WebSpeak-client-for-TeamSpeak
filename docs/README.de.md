@@ -35,12 +35,23 @@ Netzwerkbedingungen und Auslastung können bei beiden Demos schwanken; Latenz, V
 
 ## TeamSpeak-Versionskompatibilität
 
-WebSpeak verwendet das TeamSpeak-Clientprotokoll statt ServerQuery oder WebQuery; Query-Zugangsdaten sind daher nicht erforderlich.
+Sprachverbindungen verwenden das TeamSpeak-Clientprotokoll und benötigen keine Query-Zugangsdaten. Die optionale TS-Verwaltung verwendet eigene WebQuery-/ServerQuery-Zugangsdaten.
 
 - **TeamSpeak 3**: Die Erkennung wertet die führende `3.x`-Versionsnummer aus. Ältere Serverversionen sollten in der jeweiligen Umgebung geprüft werden, da nicht jede historische Version separat getestet wurde.
 - **TeamSpeak 6**: Unterstützt, einschließlich Bildschirmfreigabe mit nativen TeamSpeak-6-Clients.
 - **Automatische Erkennung**: Das Gateway liest die `version`-Antwort des Servers und hält das erkannte Protokoll in der Verbindungsdiagnose fest.
-- Die zugrunde liegende [`@echosixhiya/teamspeak-client`](https://github.com/EchoSixHIYA/teamspeak-js)-Bibliothek unterstützt auch TeamSpeak 5; WebSpeak zielt jedoch auf TeamSpeak 3 und 6.
+- Das Gateway verwendet das Upstream-SDK 1.0 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js); WebSpeak richtet sich an TeamSpeak 3 und 6.
+
+## Optionale TeamSpeak-Verwaltung
+
+WebSpeak-Verwaltung und Sprachverbindungen sind davon unabhängig. Im Modus mit festem Server die TS-Verbindung unter `/admin/ts-admin` einrichten.
+
+1. WebQuery auf dem TS-Server aktivieren und einen berechtigten TS-Administrator einen API-Schlüssel erstellen lassen. HTTP-/HTTPS-URL von WebQuery und Schlüssel eintragen. Gemeint ist der TS-Query-Dienst, nicht die WebSpeak-Webseite. Unterstützt werden TS3 ab 3.12 und TS6.
+2. Virtuelle Server-ID `0` wählt anhand des festen Sprachports aus. Bei eingeschränkten Schlüsseln die freigegebene Server-ID eintragen. Änderungen erfordern einen schreibbaren Geltungsbereich und entsprechende TS-Rechte; Leseschlüssel dienen zur Anzeige.
+3. Alternativ ServerQuery SSH oder bei TS3 ServerQuery TCP wählen. Query-Host (leer: festes Ziel), Query-Port, Benutzername und Passwort eintragen; SSH benötigt einen vertrauenswürdigen Hostschlüssel-Fingerabdruck. Dies ist kein SSH-Zugang zum Betriebssystem. TCP ist unverschlüsselt und nur für vertrauenswürdige Netze geeignet. HTTPS-Zertifikate müssen vom Gateway als vertrauenswürdig erkannt werden.
+4. Speichern und verbinden oder aktualisieren. Verfügbar sind Servereinstellungen, Kanalverwaltung, Verschieben/Ausschließen/Sperren von Mitgliedern, Gruppenzuweisung und Entsperren. Aktionen benötigen Bestätigung und TS-Rechte; Listen werden manuell aktualisiert.
+
+Zugangsdaten werden serverseitig verschlüsselt und nie von der API zurückgegeben. Datenbank und `master.key` gemeinsam sichern. Verbindungsfehler beeinflussen weder WebSpeak-Verwaltung noch Sprache. Sperren verwenden die Benutzer-UID, damit andere Nutzer derselben Gateway-IP nicht betroffen sind.
 
 ## 🖼️ Screenshots
 
@@ -95,7 +106,7 @@ Browsernutzer und native TeamSpeak-6-Clients können Bildschirmfreigaben gegense
 
 Ein Relay hilft, wenn ein TeamSpeak-Server Verbindungen aus einer anderen Region ablehnt oder der direkte Weg instabil ist. Es ist kein VPN, sondern leitet nur den TeamSpeak-Verkehr der aktuellen WebSpeak-Sitzung weiter.
 
-Eine Relay-Instanz ist ein dedizierter Weiterleitungsdienst ohne Besucher- oder Administrationsseite. Sie akzeptiert nur Gateway-Sitzungen mit passendem Token. Ein zufälliges Token mit mindestens 16 Zeichen verwenden.
+Eine Relay-Instanz betreibt sowohl die ältere UDP-Kompatibilitätsweiterleitung als auch ein separates Sprach-Gateway, jedoch keine Besucher- oder Administrationsseite. Das Eingangs-Gateway signiert mit dem gemeinsamen Token ein einmaliges Sprach-Ticket und delegiert es; anschließend verbindet sich der Browser direkt mit dem Relay, das seinerseits TeamSpeak erreicht. Die Seite bleibt unter der URL des Eingangs-Gateways. Ein zufälliges Token mit mindestens 16 Zeichen verwenden.
 
 #### Aus dem Quellcode starten
 
@@ -103,7 +114,6 @@ Eine Relay-Instanz ist ein dedizierter Weiterleitungsdienst ohne Besucher- oder 
 git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm run build
 WEBSPEAK_MODE=relay \
 WEBSPEAK_RELAY_TOKEN='replace-with-a-long-random-token' \
@@ -147,12 +157,20 @@ docker run -d --name webspeak-relay --restart unless-stopped --network host \
   ghcr.io/echosixhiya/webspeak:latest
 ```
 
-Den UDP-Listening-Port des Relay-Hosts freigeben, standardmäßig `39087`.
+Das Sprach-Gateway lauscht standardmäßig auf `127.0.0.1:3041`. Eine HTTPS-Domain für das Relay einrichten und sie mit Caddy oder einem vergleichbaren Proxy an `127.0.0.1:3041` weiterleiten, zum Beispiel:
+
+```caddyfile
+relay.example.com {
+  reverse_proxy 127.0.0.1:3041
+}
+```
+
+In den Relay-Einstellungen des Eingangs-Gateways als **Voice gateway address** diesen HTTPS-Ursprung eintragen, etwa `https://relay.example.com`. Die Seite bleibt auf ihrem ursprünglichen Gateway und öffnet danach eine WSS-Verbindung zum Relay. WebRTC ist auf dem Relay standardmäßig aktiviert. Zusätzlich UDP `40000-40099` freigeben und `WEBSPEAK_RELAY_WEBRTC_PUBLIC_HOST` auf eine öffentliche Relay-IP oder direkt erreichbare Domain setzen. Bei geänderter WebRTC-Portspanne auch die Firewall anpassen. UDP `39087` für ältere Kompatibilitätsweiterleitungen offen lassen.
 
 #### Im Gateway aktivieren
 
 1. **Administration → Server → Relay-Server** öffnen und einen oder mehrere Knoten hinzufügen.
-2. Für jeden Knoten einen Anzeigenamen, einen Endpunkt wie `relay.example.com#39087` und das passende Token eintragen und speichern.
+2. Anzeigename, UDP-Endpunkt wie `relay.example.com#39087`, HTTPS-Ursprung des Sprach-Gateways wie `https://relay.example.com` und das passende Token eintragen und speichern.
 3. Besucher können auf der Willkommensseite Direktzugriff oder einen konfigurierten Relay-Knoten auswählen.
 
 Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entfernen.
@@ -263,7 +281,7 @@ Integriertes WebRTC, aktualisiertes TeamSpeak-SDK und bessere Mitgliedersynchron
 | --- | --- | --- |
 | Docker Compose (empfohlen) | Dauerbetrieb, einfache Updates und persistente Daten | Docker Engine + Docker Compose |
 | Release-Paket | Betrieb ohne Node.js und Build-Werkzeuge | Windows x64 oder Linux x64/ARM64 |
-| Aus dem Quellcode | Entwicklung und Anpassungen | Node.js 22.5+, Git und native Build-Werkzeuge |
+| Aus dem Quellcode | Entwicklung und Anpassungen | Node.js 22.12+, Git und native Build-Werkzeuge |
 
 ### Docker Compose (empfohlen)
 
@@ -303,7 +321,6 @@ Android-APKs für `arm64-v8a`, `armeabi-v7a` und `x86_64` sind ebenfalls verfüg
 git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts
 npm --prefix web ci
 npm --prefix web run build

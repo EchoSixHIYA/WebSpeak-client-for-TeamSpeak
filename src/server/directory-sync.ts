@@ -1,4 +1,4 @@
-import type { ClientInfo, DirectoryClientInfo } from "@echosixhiya/teamspeak-client";
+import type { ClientInfo, DirectoryClientInfo } from "./teamspeak-sdk.js";
 import type { TSDirectorySnapshot } from "./ts-client.js";
 
 type DirectoryDelta =
@@ -28,6 +28,9 @@ export class DirectorySynchronizer {
 
   applySnapshot(snapshot: TSDirectorySnapshot): void {
     this.snapshot = { channels: snapshot.channels.slice(), clients: [] };
+    // A native SDK view is the complete visible roster. In particular, an
+    // unsubscribe removes clients without individual leave notifications.
+    if (snapshot.complete) this.clients.clear();
     for (const client of snapshot.clients) {
       if (this.departedClientIds.has(client.id)) continue;
       const previous = this.clients.get(client.id);

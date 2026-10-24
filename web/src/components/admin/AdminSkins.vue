@@ -33,7 +33,11 @@
         :size="16"
       /><span>{{ tr("skinLibraryScope") }}</span></div
     >
-    <section class="skin-default-control"
+    <nav class="skin-library-tabs" :aria-label="tr('skinLibrary')">
+      <button type="button" :aria-current="skinTab === 'installed' ? 'page' : undefined" @click="selectSkinTab('installed')">{{ tr('skinInstalledTab') }}</button>
+      <button type="button" :aria-current="skinTab === 'store' ? 'page' : undefined" @click="selectSkinTab('store')">{{ tr('skinStore') }}</button>
+    </nav>
+    <section v-if="skinTab === 'installed'" class="skin-default-control"
       ><div
         ><strong>{{ tr("skinDefault") }}</strong
         ><p>{{ tr("skinDefaultLead") }}</p></div
@@ -62,6 +66,8 @@
       role="status"
       >{{ skinManagerNotice }}</div
     >
+    <AdminSkinStore v-if="skinTab === 'store'" :model="model" :i18n="i18n" />
+    <div v-else>
     <div
       v-if="skinLoading"
       class="skin-library-loading"
@@ -153,12 +159,14 @@
       ><strong>{{ tr("skinEmpty") }}</strong
       ><p>{{ tr("skinEmptyLead") }}</p></div
     >
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
 import Icon from "../Icon.vue";
+import AdminSkinStore from "./AdminSkinStore.vue";
 import type { useAdminSkins } from "../../composables/useAdminSkins.js";
 import type { useAdminI18n } from "../../composables/useAdminI18n.js";
 import type { SkinCatalogEntry } from "../../services/skin-catalog.js";
@@ -169,6 +177,7 @@ const props = defineProps<{
 }>();
 const skinFileInput = ref<HTMLInputElement | null>(null);
 const { skinEntries, skinLoading, skinUploading, removingSkinId, skinDefaultId, skinBusy,
+  skinTab, selectSkinTab,
   enabledSkinEntries, skinManagerError, skinManagerNotice, saveSkinDefault, toggleSkinEnabled, onSkinFileChanged, removeSkin } = props.model;
 const { tr } = props.i18n;
 

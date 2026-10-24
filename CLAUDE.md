@@ -144,17 +144,18 @@ Settings responses merge against the submitted snapshot instead of replacing new
 
 The current SQLite schema version is defined in `src/persistence/database.ts`. Keep schema migrations separate from structural refactors. Legacy fields such as `voiceToken`, `tsApiKey`, `tsQueryPort`, `port` and `maxClients` do not configure the current gateway.
 
+Optional TS administration lives in `src/admin/ts-admin-service.ts` and `/admin/ts-admin`. It uses the published SDK's typed commands through `QueryClient` over WebQuery, SSH or TCP, separately from guest voice and WebSpeak administration. Never require these credentials for a voice connection. WebQuery has no notifications: omit `events` entirely; `events: false` is also rejected by this SDK. Bind queued mutations to the reviewed configuration, recheck a member's live UID before acting, and never ban the shared gateway IP. Keep credentials encrypted with distinct purpose strings and return only presence flags. Management writes are not automatically retried; a failed refresh cannot imply an acknowledged write failed.
+
 The gateway HTTP port is `3040`. Its admission ceiling is `100` sessions, defined in `src/constants.ts`; this is an application limit, not a TeamSpeak license allowance or a measured performance guarantee. Target server capacity and permissions still apply.
 
 The server uses HTTPS when `certs/cert.pem` and `certs/key.pem` are supplied; otherwise it starts HTTP. It does not generate certificates. Use an appropriate secure browser origin for microphone and screen capture, typically HTTPS in public deployments. Feature support depends on the browser and selected transport; do not infer a universal minimum browser version from WebCodecs alone.
 
 ## Development and verification
 
-Server deployments require Node.js 22.5 or newer. CI uses Node.js 22.22.2. Root and frontend dependencies are installed separately. The pinned Git SDK and native Opus module require the preparation steps used by CI:
+Server deployments require Node.js 22.12 or newer. CI uses Node.js 22.22.2. Root and frontend dependencies are installed separately. The SDK is installed from the npm registry; only native Opus needs a rebuild after installing with scripts disabled:
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
-npm run prepare:sdk
 npm rebuild @discordjs/opus --foreground-scripts --no-audit --no-fund
 npm --prefix web ci --no-audit --no-fund
 npm run verify

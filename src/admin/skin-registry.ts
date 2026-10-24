@@ -214,7 +214,7 @@ async function writeAtomicJson(filename: string, value: unknown): Promise<void> 
   }
 }
 
-function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: ParsedSkinManifest; previewBytes?: Buffer; previewMime?: string } {
+export function validateSkinArchive(bytes: Buffer, expectedId?: string): { manifest: ParsedSkinManifest; previewBytes?: Buffer; previewMime?: string } {
   const entries = inspectArchive(bytes);
   const regularEntries = entries.filter((entry) => !entry.isDirectory);
   const rootPrefix = singleRootPrefix(regularEntries.map((entry) => entry.path));

@@ -12,9 +12,10 @@ import { createAdminRouter } from "../admin/admin-router.js";
 import type { AdminService } from "../admin/admin-service.js";
 import { AdminSessionStore } from "../admin/admin-session.js";
 import { isSafeOpenTargetForPrefill, resolveSafeOpenTarget, TeamSpeakTargetResolutionError } from "../security/open-target-policy.js";
-import { identityFromString } from "@echosixhiya/teamspeak-client";
+import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
+import { createVoiceGatewayAuthHeaders, type DelegatedVoiceSession } from "./voice-gateway-auth.js";
 import type { SkinRegistry } from "../admin/skin-registry.js";
 import { resolveVisitorTotal } from "./visitor-count.js";
 
@@ -171,7 +172,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
     let identity: string | undefined;
     if (requestedIdentity) {
       try {
-        identityFromString(requestedIdentity);
+        parseIdentity(requestedIdentity);
         identity = requestedIdentity;
       } catch {
         // A stale/corrupt local identity must not block a normal ephemeral join.
@@ -235,13 +236,29 @@ export function createWebServer(options: WebServerOptions): WebServer {
       serverPassword = consumedInvite.serverPassword;
     }
 
-    const ticket = options.voiceBridgeOptions.joinTickets.create({
+    const sessionPayload: DelegatedVoiceSession = {
       target,
       serverPassword,
       nickname,
       ...(channel ? { channel } : {}),
       ...(identity ? { identity, rememberIdentity: true } : body.rememberIdentity === true ? { rememberIdentity: true } : {}),
-      ...(accelerationRequested ? { accelerated: true, ...(requestedRelayId ? { accelerationRelayId: requestedRelayId } : {}) } : {}),
+    };
+    const selectedRelay = accelerationRequested
+      ? requestedRelayId ? acceleration.find((relay) => relay.id === requestedRelayId) : acceleration[0]
+      : undefined;
+    if (selectedRelay?.voiceEndpoint) {
+      try {
+        const ticket = await createRemoteVoiceTicket(selectedRelay, sessionPayload);
+        response.status(201).json({ ok: true, ticket, voiceEndpoint: selectedRelay.voiceEndpoint });
+        return;
+      } catch (error: unknown) {
+        logger.warn({ relayId: selectedRelay.id, err: error instanceof Error ? error.message : String(error) }, "Relay voice gateway ticket request failed; using legacy UDP acceleration");
+      }
+    }
+
+    const ticket = options.voiceBridgeOptions.joinTickets.create({
+      ...sessionPayload,
+      ...(accelerationRequested && selectedRelay ? { accelerated: true, accelerationRelayId: selectedRelay.id } : {}),
     });
     response.status(201).json({ ok: true, ticket });
   });
@@ -296,6 +313,26 @@ function resolveAccelerationOptions(
   const value = typeof configured === "function" ? configured() : configured;
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+async function createRemoteVoiceTicket(relay: ConfiguredAccelerationRelay, payload: DelegatedVoiceSession): Promise<string> {
+  const endpoint = new URL("/api/relay/voice-ticket", relay.voiceEndpoint);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...createVoiceGatewayAuthHeaders(relay.token, payload),
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(5_000),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Relay voice gateway returned HTTP ${response.status}`);
+  const result: unknown = await response.json().catch(() => null);
+  if (!isRecord(result) || result.ok !== true || typeof result.ticket !== "string" || result.ticket.length < 16) {
+    throw new Error("Relay voice gateway returned an invalid ticket");
+  }
+  return result.ticket;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

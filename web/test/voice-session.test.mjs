@@ -249,6 +249,25 @@ async function connect() {
   return socket;
 }
 
+test("accelerated voice signaling connects directly to the configured relay gateway", async () => {
+  globalThis.fetch = async url => {
+    assert.equal(url, "/api/join-ticket", "the page and join-ticket API stay on the ingress gateway");
+    return { ok: true, json: async () => ({ ticket: "relay-ticket", voiceEndpoint: "https://voice-de.example.com" }) };
+  };
+  voice.connect("voice.example:9987", "", "Visitor", "", "", false, "", true, "relay-de");
+  await nextTurn();
+  assert.equal(TestSocket.instances.at(-1)?.url, "wss://voice-de.example.com/ws/voice?ticket=relay-ticket");
+  assert.equal(location.host, "gateway.example", "the browser address remains on the ingress gateway");
+});
+
+test("secure pages reject insecure remote voice gateway endpoints", async () => {
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ ticket: "relay-ticket", voiceEndpoint: "http://voice-de.example.com" }) });
+  voice.connect("voice.example:9987", "", "Visitor", "", "", false, "", true, "relay-de");
+  await nextTurn();
+  assert.equal(TestSocket.instances.length, 0);
+  assert.equal(voice.state.errorCode, "VOICE_GATEWAY_UNAVAILABLE");
+});
+
 test("directory snapshots keep member names, flags and identity-scoped volume in sync", async () => {
   const socket = await connect();
   socket.receive({ type: "connected", tsClientId: 1, members: [{ id: 7, uid: "old-user", nickname: "Before" }] });

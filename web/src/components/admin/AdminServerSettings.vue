@@ -1,33 +1,40 @@
 <template>
-  <section class="page-content server-page">
-    <div class="page-heading"
-      ><div
-        ><h2>{{ tr("serverSettings") }}</h2
-        ><p>{{ tr("serverSettingsLead") }}</p></div
-      ><button
-        class="primary-button"
-        :disabled="serverSaving"
-        @click="saveServerSettings"
-        >{{ serverSaving ? tr("saving") : tr("saveChanges") }}</button
-      ></div
-    >
-    <div class="settings-grid">
-      <details
-        class="settings-card settings-accordion target-accordion"
-        open
-      >
-        <summary class="settings-accordion-header">
-          <span class="settings-accordion-heading"
-            ><strong>{{ tr("teamSpeakTarget") }}</strong
-            ><small>{{ serverForm.address || "—" }} · {{ serverForm.port || "—" }}</small></span
-          >
-          <Icon
-            name="chevron-down"
-            :size="18"
-          />
-        </summary>
-        <div class="settings-accordion-content">
-          <div class="target-settings-layout">
+  <section class="page-content server-page" data-admin-scope="webspeak">
+    <div class="page-heading"><div><h2>{{ tr('adminInstanceSettings') }}</h2><p>{{ tr('adminInstanceLead') }}</p></div>
+      <button class="primary-button" type="button" :disabled="serverSaving" @click="saveServerSettings">{{ serverSaving ? tr('saving') : tr('saveChanges') }}</button>
+    </div>
+    <div class="admin-scope-banner"><Icon name="waveform" :size="20"/><div><strong>{{ tr('adminWsGroup') }}</strong><p>{{ tr('adminWsScopeLead') }}</p></div></div>
+    <nav class="admin-section-nav" :aria-label="tr('adminInstanceSettings')">
+      <button v-for="section in sections" :key="section.id" type="button" :aria-current="activeSection === section.id ? 'page' : undefined" @click="activeSection = section.id">{{ section.label }}</button>
+    </nav>
+    <div v-show="activeSection === 'access'" class="settings-grid admin-settings-section" data-admin-section="access">
+      <article class="settings-card admin-setting-card"><header class="admin-card-heading"><h3>{{ tr('accessMode') }}</h3></header><div class="access-settings-layout"><fieldset class="access-mode-fieldset"
+              ><legend>{{ tr("accessMode") }}</legend
+              ><label
+                class="choice"
+                :class="{ selected: serverForm.accessMode === 'fixed' }"
+                ><input
+                  v-model="serverForm.accessMode"
+                  type="radio"
+                  value="fixed"
+                /><span
+                  ><strong>{{ tr("fixedMode") }}</strong
+                  ><small>{{ tr("fixedModeLead") }}</small></span
+                ></label
+              ><label
+                class="choice"
+                :class="{ selected: serverForm.accessMode === 'open' }"
+                ><input
+                  v-model="serverForm.accessMode"
+                  type="radio"
+                  value="open"
+                /><span
+                  ><strong>{{ tr("openMode") }}</strong
+                  ><small>{{ tr("openModeLead") }}</small></span
+                ></label
+              ></fieldset
+            ></div></article>
+      <article class="settings-card admin-setting-card"><header class="admin-card-heading"><h3>{{ tr('teamSpeakTarget') }}</h3><p>{{ tr('adminTargetScope') }}</p></header><div class="target-settings-layout">
             <div class="target-fields">
               <label
                 ><span>{{ tr("serverAddress") }}</span
@@ -117,53 +124,9 @@
                 ></dl
               ></div
             >
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-card settings-accordion">
-        <summary class="settings-accordion-header">
-          <span class="settings-accordion-heading"
-            ><strong>{{ tr("accessAndIdentity") }}</strong
-            ><small
-              >{{ serverForm.accessMode === "fixed" ? tr("fixedMode") : tr("openMode") }} ·
-              {{ serverForm.siteName || "WebSpeak" }}</small
-            ></span
-          >
-          <Icon
-            name="chevron-down"
-            :size="18"
-          />
-        </summary>
-        <div class="settings-accordion-content">
-          <div class="access-settings-layout">
-            <fieldset class="access-mode-fieldset"
-              ><legend>{{ tr("accessMode") }}</legend
-              ><label
-                class="choice"
-                :class="{ selected: serverForm.accessMode === 'fixed' }"
-                ><input
-                  v-model="serverForm.accessMode"
-                  type="radio"
-                  value="fixed"
-                /><span
-                  ><strong>{{ tr("fixedMode") }}</strong
-                  ><small>{{ tr("fixedModeLead") }}</small></span
-                ></label
-              ><label
-                class="choice"
-                :class="{ selected: serverForm.accessMode === 'open' }"
-                ><input
-                  v-model="serverForm.accessMode"
-                  type="radio"
-                  value="open"
-                /><span
-                  ><strong>{{ tr("openMode") }}</strong
-                  ><small>{{ tr("openModeLead") }}</small></span
-                ></label
-              ></fieldset
-            >
-            <div class="site-identity-fields">
+          </div></article>
+    </div>
+    <article v-show="activeSection === 'site'" class="settings-card admin-setting-card admin-settings-section" data-admin-section="site"><header class="admin-card-heading"><h3>{{ tr('adminSiteSection') }}</h3><p>{{ tr('adminSiteScope') }}</p></header><div class="site-identity-fields">
               <label
                 ><span>{{ tr("siteName") }}</span
                 ><input
@@ -173,7 +136,7 @@
               <div class="welcome-editor"
                 ><div class="welcome-editor-heading"
                   ><label
-                    ><span>{{ tr("welcomeLanguage") }}</span
+                    ><span>{{ tr("adminAnnouncementLanguage") }}</span
                     ><select v-model="welcomeLanguage"
                       ><option
                         v-for="option in welcomeLanguageOptions"
@@ -184,43 +147,17 @@
                     ></label
                   ><small>{{ tr("welcomeLanguageHint") }}</small></div
                 ><label
-                  ><span>{{ tr("welcomeText") }} · {{ selectedWelcomeLanguageLabel }}</span
+                  ><span>{{ tr("adminSiteAnnouncement") }} · {{ selectedWelcomeLanguageLabel }}</span
                   ><textarea
                     v-model="selectedWelcomeText"
                     maxlength="500"
                     rows="4"
                     :placeholder="selectedWelcomeDefault"
                   ></textarea></label
-                ><small class="field-help">{{ tr("welcomeFallbackHint") }}</small></div
+                ><small class="field-help">{{ tr("adminAnnouncementFallback") }}</small></div
               >
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-card settings-accordion advanced-card">
-        <summary class="settings-accordion-header">
-          <span class="settings-accordion-heading"
-            ><strong>{{ tr("advancedSettings") }}</strong
-            ><small>{{ tr("advancedSettingsLead") }}</small></span
-          >
-          <span class="settings-accordion-statuses"
-            ><span class="settings-summary-chip"
-              ><i :class="{ active: serverForm.webRtcEnabled }"></i>{{ tr("webrtcSettings") }} ·
-              {{ serverForm.webRtcEnabled ? tr("enabledStatus") : tr("disabledStatus") }}</span
-            ><span class="settings-summary-chip"
-              ><i :class="{ active: serverForm.relayNodes.some((relay) => relay.enabled) }"></i
-              >{{ tr("relaySettings") }} ·
-              {{ tr("relayNodeCount", { count: serverForm.relayNodes.length }) }}</span
-            ></span
-          >
-          <Icon
-            name="chevron-down"
-            :size="18"
-          />
-        </summary>
-        <div class="settings-accordion-content">
-          <div class="advanced-settings-grid">
+            </div></article>
+    <article v-show="activeSection === 'network'" class="settings-card admin-setting-card admin-settings-section" data-admin-section="network"><header class="admin-card-heading"><h3>{{ tr('adminNetworkSection') }}</h3><p>{{ tr('advancedSettingsLead') }}</p></header><div class="advanced-settings-grid">
             <section class="settings-subsection webrtc-card"
               ><header class="settings-subsection-heading"
                 ><div
@@ -317,6 +254,12 @@
                         v-model.trim="relay.target"
                         maxlength="300"
                         :placeholder="tr('relayTargetPlaceholder')" /></label
+                    ><label
+                      ><span>{{ tr("relayVoiceEndpoint") }}</span
+                      ><input
+                        v-model.trim="relay.voiceEndpoint"
+                        maxlength="300"
+                        :placeholder="tr('relayVoiceEndpointPlaceholder')" /></label
                     ><div class="password-row"
                       ><label
                         ><span>{{ tr("relayToken") }}</span
@@ -352,17 +295,16 @@
                 type="button"
                 @click="addRelayNode"
                 >{{ tr("relayAdd") }}</button
+              ><small class="field-help">{{ tr("relayVoiceEndpointLead") }}</small
               ><small class="field-help">{{ tr("relayManagedHint") }}</small></section
             >
-          </div>
-        </div>
-      </details>
-    </div>
+          </div></article>
+    <p class="admin-save-scope"><Icon name="info" :size="15"/>{{ tr('adminSaveScope') }}</p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import Icon from "../Icon.vue";
 import type { useAdminServerSettings } from "../../composables/useAdminServerSettings.js";
 import type { useAdminI18n } from "../../composables/useAdminI18n.js";
@@ -373,6 +315,7 @@ type WelcomeLanguage = SiteLanguage;
 type WelcomeTextField = "welcomeText" | "welcomeTextEn" | "welcomeTextDe" | "welcomeTextRu" | "welcomeTextJa";
 const props = defineProps<{
   model: ReturnType<typeof useAdminServerSettings>;
+  initialSection?: string;
   i18n: Pick<ReturnType<typeof useAdminI18n>, "tr" | "formatDate" | "connectionFailureText">;
 }>();
 const welcomeLanguage = defineModel<WelcomeLanguage>("welcomeLanguage", { required: true });
@@ -380,6 +323,16 @@ const emit = defineEmits<{ webrtcToggle: [] }>();
 // The page owns one stable feature controller across route changes.
 const { serverForm, serverSaving, testing, testResult, saveServerSettings, testServerConnection, addRelayNode, removeRelayNode } = props.model;
 const { tr, formatDate, connectionFailureText } = props.i18n;
+type SettingsSection = 'access' | 'site' | 'network';
+const normalizeSection = (value?: string): SettingsSection => value === 'site' || value === 'network' ? value : 'access';
+const activeSection = ref<SettingsSection>(normalizeSection(props.initialSection));
+watch(() => props.initialSection, value => { activeSection.value = normalizeSection(value); });
+const sections = computed(() => [
+  { id: 'access' as const, label: tr('adminAccessSection') },
+  { id: 'site' as const, label: tr('adminSiteSection') },
+  { id: 'network' as const, label: tr('adminNetworkSection') },
+]);
+
 function handleWebRtcToggle() { emit("webrtcToggle"); }
 
 const welcomeLanguageOptions: Array<{ value: WelcomeLanguage; label: string }> = [

@@ -1,10 +1,5 @@
-import {
-  Client as TeamSpeakClient,
-  generateIdentity,
-  type ClientOptions,
-  type Identity,
-} from "@echosixhiya/teamspeak-client";
-import { WebSpeakTeamSpeakResolver } from "./teamspeak-resolver.js";
+import { generateIdentitySync } from "@honeybbq/teamspeak/client";
+import { TeamSpeakSdkClient, type Identity, type TeamSpeakClientOptions } from "./teamspeak-sdk.js";
 import type { Logger } from "../logger.js";
 import { normalizeTeamSpeakError } from "../errors.js";
 import { formatTeamSpeakTarget, teamSpeakTargetKey, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
@@ -75,7 +70,7 @@ export interface TeamSpeakAdapterOptions {
  * successfully observed server generation for later connections.
  */
 export class TeamSpeakAdapter {
-  readonly client: TeamSpeakClient;
+  readonly client: TeamSpeakSdkClient;
   readonly identity: Identity;
   private detectedProtocol: TeamSpeakProtocol | null = null;
 
@@ -84,9 +79,8 @@ export class TeamSpeakAdapter {
     private readonly logger: Logger,
     private readonly protocolCache: EndpointProtocolCache = endpointProtocolCache,
   ) {
-    this.identity = options.identity ?? generateIdentity(8);
-    const clientOptions: ClientOptions = {
-      resolver: new WebSpeakTeamSpeakResolver(),
+    this.identity = options.identity ?? generateIdentitySync(8);
+    const clientOptions: TeamSpeakClientOptions = {
       serverPassword: options.serverPassword,
       defaultChannel: options.defaultChannel,
       defaultChannelPassword: options.channelPassword,
@@ -97,7 +91,7 @@ export class TeamSpeakAdapter {
         error: (msg: string) => this.logger.error(msg),
       },
     };
-    this.client = new TeamSpeakClient(
+    this.client = new TeamSpeakSdkClient(
       this.identity,
       formatTeamSpeakTarget(options.target),
       options.nickname,
@@ -112,14 +106,14 @@ export class TeamSpeakAdapter {
     const cachedProtocol = this.protocolCache.get(this.target);
     this.logger.info({ target: formatTeamSpeakTarget(this.target), cachedProtocol }, "Connecting through TeamSpeak adapter");
     try {
-      await this.client.connect();
-      await this.client.waitConnected(AbortSignal.timeout(TEAM_SPEAK_CONNECT_TIMEOUT_MS));
+      await this.client.connect({ signal: AbortSignal.timeout(TEAM_SPEAK_CONNECT_TIMEOUT_MS) });
     } catch (error: unknown) {
       await this.client.disconnect().catch(() => undefined);
       throw normalizeTeamSpeakError(error);
     }
 
-    const observedProtocol = await this.detectProtocol();
+    const family = this.client.serverFamily;
+    const observedProtocol = family === "ts3" || family === "ts6" ? family : null;
     this.detectedProtocol = observedProtocol ?? cachedProtocol ?? null;
     if (observedProtocol) this.protocolCache.set(this.target, observedProtocol);
   }
@@ -136,19 +130,6 @@ export class TeamSpeakAdapter {
     }
   }
 
-  private async detectProtocol(): Promise<TeamSpeakProtocol | null> {
-    try {
-      const rows = await this.client.execCommandWithResponse("version", 3000);
-      const versionText = rows
-        .flatMap((row) => Object.values(row))
-        .filter((value): value is string => typeof value === "string")
-        .join(" ");
-      return detectTeamSpeakProtocol(versionText);
-    } catch {
-      // Version discovery is an optimization; connection success is enough to proceed.
-      return null;
-    }
-  }
 }
 
 export function detectTeamSpeakProtocol(versionText: string): TeamSpeakProtocol | null {
