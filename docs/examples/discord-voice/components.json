@@ -23,7 +23,7 @@
                 "tag": "div",
                 "className": "brand-lockup",
                 "children": [
-                  { "tag": "span", "className": "brand-mark", "children": [{ "text": "W" }] },
+                  { "tag": "span", "className": "dc-brand-mark", "children": [{ "text": "W" }] },
                   {
                     "tag": "div",
                     "children": [
@@ -121,7 +121,7 @@
                       }
                     ]
                   },
-                  { "tag": "div", "className": "visitor-count", "children": [{ "widget": "home.visitor-count", "part": "visitor-count" }] },
+                  { "tag": "div", "className": "dc-visitor-slot", "children": [{ "widget": "home.visitor-count", "part": "visitor-count" }] },
                   { "tag": "div", "className": "announcement-wrap", "children": [{ "widget": "home.server-announcement", "part": "announcement" }] }
                 ]
               },
@@ -195,6 +195,7 @@
         "copy-invite-link": { "type": "session.copyInviteLink", "args": {} },
         "stop-screen-share": { "type": "voice.stopScreenShare", "args": {} },
         "toggle-accompaniment": { "type": "audio.toggleAccompaniment", "args": {} },
+        "open-audio-settings": { "type": "audio.openSettings", "args": {} },
         "toggle-chat": { "type": "ui.toggleState", "args": { "key": "chatopen" } }
       },
       "state": { "chatopen": true },
@@ -299,7 +300,26 @@
                     { "tag": "span", "className": "dc-user-avatar", "children": [{ "tag": "i", "children": [{ "text": "{{session.status.userName}}" }] }] },
                     { "tag": "span", "className": "dc-user-text", "children": [{ "tag": "strong", "children": [{ "text": "{{session.status.userName}}" }] }, { "tag": "small", "children": [{ "text": "{{skin.messages.online}}" }] }] }
                   ] },
-                  { "tag": "div", "className": "dc-user-actions", "children": [{ "widget": "voice.audio-controls", "part": "audio-controls" }] }
+                  { "tag": "div", "className": "dc-user-actions", "children": [
+                    { "widget": "voice.audio-controls", "part": "audio-controls" },
+                    {
+                      "tag": "button",
+                      "part": "mobile-audio-settings",
+                      "className": "dc-mobile-audio-settings",
+                      "attributes": { "type": "button", "aria-label": "{{skin.messages.audioSettings}}", "title": "{{skin.messages.audioSettings}}" },
+                      "events": { "click": "open-audio-settings" },
+                      "children": [{
+                        "tag": "svg",
+                        "attributes": { "width": 20, "height": 20, "viewbox": "0 0 24 24", "fill": "none", "stroke": "currentColor", "stroke-width": 1.8, "stroke-linecap": "round", "aria-hidden": "true" },
+                        "children": [
+                          { "tag": "path", "attributes": { "d": "M4 6h4m4 0h8M4 12h8m4 0h4M4 18h2m4 0h10" } },
+                          { "tag": "circle", "attributes": { "cx": 10, "cy": 6, "r": 2 } },
+                          { "tag": "circle", "attributes": { "cx": 14, "cy": 12, "r": 2 } },
+                          { "tag": "circle", "attributes": { "cx": 8, "cy": 18, "r": 2 } }
+                        ]
+                      }]
+                    }
+                  ] }
                 ]
               }
             ]
@@ -421,7 +441,7 @@
                   }
                 ]
               },
-              { "widget": "voice.chat-panel", "part": "chat" }
+              { "widget": "voice.chat-panel", "part": "chat", "className": "dc-chat-body" }
             ]
           }
         ]

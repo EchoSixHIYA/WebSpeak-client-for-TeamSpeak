@@ -3,7 +3,7 @@
   "packageType": "open-skin",
   "id": "community.discord-voice",
   "name": "Discord Voice",
-  "version": "1.0.5",
+  "version": "1.0.11",
   "author": "WebSpeak Project",
   "license": "AGPL-3.0-only",
   "description": "A Discord-inspired dark voice workspace built with WebSpeak's portable open-skin interface.",
