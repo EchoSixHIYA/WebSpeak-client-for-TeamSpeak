@@ -1,50 +1,163 @@
-# WebSpeak · 简体中文
+<a id="readme-top"></a>
 
-[返回项目首页](../README.md) · [English](./README.en.md) · [Deutsch](./README.de.md) · [Русский](./README.ru.md) · [日本語](./README.ja.md)
+<div align="center">
+  <img src="./assets/webspeak-logo.png" alt="WebSpeak" width="88" />
+  <h1>WebSpeak · 简体中文</h1>
+  <p><strong>打开浏览器，就能加入你的 TeamSpeak。</strong></p>
+  <p><a href="../README.md">项目首页</a> · <a href="./README.en.md">English</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.ja.md">日本語</a></p>
+  <p>
+    <a href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest"><img src="https://img.shields.io/github/v/release/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&amp;color=0f766e" alt="Release" /></a>
+    <a href="../LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square" alt="AGPL-3.0-only" /></a>
+  </p>
+</div>
 
-WebSpeak 是一个可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户无需安装桌面客户端即可从浏览器加入频道，管理员可以在控制台管理目标服务器、访问方式和运行状态。
+WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户通过浏览器加入语音、聊天和屏幕共享；部署者通过管理员控制台管理目标服务器、访问策略和数据。
 
-皮肤开发请从[当前皮肤开发指南](./SKIN_DEVELOPMENT.md)开始。它整合 `.wskin` 包格式、当前运行时接口、权限边界和制作验收流程。Agent 工作流见[WebSpeak Skin Development Skill](../.agents/skills/webspeak-skin-development/SKILL.md)。
+稳定版：[v0.2.9 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。功能插件商店目前仅在 `dev` 分支提供，尚未包含在 v0.2.9 中。
 
-## 在线 Demo
+[在线演示](#demo) · [功能](#features) · [界面预览](#screenshots) · [部署](#deployment) · [管理](#administration) · [高级配置](#advanced) · [皮肤与插件](#extensions) · [常见问题](#troubleshooting) · [更新日志](#changelog)
 
-- 上海节点：<https://shanghai.webspeak.online>
-- 香港节点：<https://webspeak.online>
+<a id="demo"></a>
 
-演示站点的网络和负载可能不稳定；延迟、断线或暂时不可用不代表自行部署后的实际表现。
+## 在线演示
 
-最新版本：[查看本页的 0.2.8 更新日志](#latest-release-notes)。
+- [上海 · shanghai.webspeak.online](https://shanghai.webspeak.online)
+- [香港 · webspeak.online](https://webspeak.online)
 
-## ✨ 特性
+可直接体验欢迎页与语音工作区。演示节点的网络、负载和可用性会变化。
+
+<a id="features"></a>
+
+## 主要功能
 
 | 能力 | 说明 |
 | --- | --- |
-| TeamSpeak 兼容 | 支持 TeamSpeak 3 与 TeamSpeak 6，并根据服务器报告的版本自动探测协议。 |
-| 跨端 P2P 屏幕共享 | 支持浏览器用户与 TeamSpeak 6 原生客户端互相发起和观看屏幕共享；媒体优先通过 WebRTC/ICE 直连，WebSpeak 仅转发协商信令。 |
-| IPv6 目标 | 默认支持 IPv6 TeamSpeak 目标和域名解析出的 IPv6 地址。 |
-| 频道与成员 | 浏览频道树、查看实时成员状态并切换频道。 |
-| 实时语音 | 使用 Opus，支持兼容传输和可选的内置 WebRTC 低延迟传输。 |
-| 音频控制 | 选择麦克风与扬声器、调节音量、测试麦克风、闭麦、VOX 和成员独立音量。 |
-| 浏览器端降噪 | 提供可开关的麦克风降噪，在浏览器采集端处理，不增加服务器端音频处理压力。 |
-| 消息与互动 | 支持频道消息、服务器消息、私聊、戳一戳和耳语目标。 |
-| 桌面端伴奏 | 在桌面浏览器选择带音频的窗口或标签页，将声音分享给当前频道。 |
-| 身份与访问 | 支持身份保持、访客自定义目标、可撤销/可过期邀请链接，以及 TeamSpeak 3 身份导入、转换、校验与导出。 |
-| 工程结构 | 0.2.6 将网关语音、会话事件、音频和屏幕共享拆分为独立模块；前端语音与管理页拆分为组件、composables 和服务，并补充生命周期与重连测试。 |
-| 管理控制台 | 管理目标、访问策略、WebRTC、中继、邀请、会话、日志、诊断和备份。 |
-| 皮肤 | 提供日间、夜间和 ILLUSIA 三款受保护皮肤，并支持实例自定义 `.wskin` 外观与管理员默认/启用管理。 |
-| 界面体验 | 提供中文、English、Deutsch、Русский、日本語及响应式桌面/移动布局。 |
-| 自托管 | 数据由部署者保存，支持 Docker amd64/arm64、Windows x64、Linux x64/ARM64 服务端包和 Android 客户端。 |
+| 实时语音 | Opus 音频、可选 WebRTC、兼容 WebSocket 回退；支持闭麦、VOX、设备选择、浏览器降噪和成员独立音量。 |
+| 频道与消息 | 频道树、TeamSpeak 频道分隔栏、成员状态、频道切换、频道/服务器/私聊消息、戳一戳、耳语及本地聊天历史。 |
+| 屏幕与音频共享 | 浏览器之间及与受支持的 TeamSpeak 6 原生客户端共享屏幕；提供采集质量、码率和统计面板，桌面端还可分享窗口或标签页音频。 |
+| 身份与连接 | 身份保持、TS3 身份导入/导出、收藏和历史连接、SRV 与 Nickname 地址解析、IPv4/IPv6 及邀请链接。 |
+| 实例管理 | 固定或公开目标、访问策略、邀请、会话、日志、诊断、备份及可选的 TeamSpeak 管理连接。 |
+| 皮肤与界面 | 日间、夜间、ILLUSIA 和 KAAK；可通过 GitHub 皮肤商店管理 `.wskin` 包，支持五种语言和响应式布局。 |
+| 分布式语音 | 配置中继后，浏览器直接连接所选中继的语音网关，网页地址仍保留在入口实例。 |
+| 部署方式 | Docker amd64/arm64、Windows x64 与 Linux x64/ARM64 发布包；另有 Android 预览 APK。 |
 
-## TeamSpeak 版本兼容性
+### TeamSpeak 版本兼容性
 
 语音连接使用标准 TeamSpeak 客户端协议，无需 Query 凭据。可选的 TS 管理功能使用独立的 WebQuery / ServerQuery 凭据。
 
 - **TeamSpeak 3**：协议识别会读取版本号开头的 `3.x`。并非所有历史服务器版本都经过独立验证，部署旧版本时请针对实际服务器进行测试。
 - **TeamSpeak 6**：支持，也支持与 TeamSpeak 6 原生客户端进行屏幕共享。
 - **自动探测**：网关读取服务器的 `version` 响应并在连接诊断中记录识别到的协议。
-- 网关使用上游 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) 1.0 SDK；WebSpeak 面向 TeamSpeak 3 和 TeamSpeak 6。
+- 网关使用上游 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) `1.0.0-beta.19` SDK；WebSpeak 面向 TeamSpeak 3 和 TeamSpeak 6。
 
-## 可选的 TeamSpeak 管理
+<a id="screenshots"></a>
+
+## 界面预览
+
+![WebSpeak · 语音工作区](./screenshots/webspeak-zh.png)
+
+<details>
+<summary>展开欢迎页、音频设置与成员菜单</summary>
+
+### 欢迎页
+
+![WebSpeak · 欢迎页](./screenshots/webspeak-zh-home.png)
+
+### 音频设置
+
+![WebSpeak · 音频设置](./screenshots/webspeak-zh-audio.png)
+
+### 成员菜单
+
+![WebSpeak · 成员菜单](./screenshots/webspeak-zh-menu.png)
+
+</details>
+
+<a id="deployment"></a>
+
+## 部署与首次配置
+
+以下 Compose 配置使用 `network_mode: host`，适用于 Linux Docker 主机。Windows 服务端可使用发布包。
+
+| 方案 | 适用场景 | 环境 |
+| --- | --- | --- |
+| Docker Compose（推荐） | 长期运行、升级简单、数据持久化 | Docker Engine + Docker Compose |
+| 发布包 | 不安装 Node.js 和构建依赖 | Windows x64 或 Linux x64/ARM64 |
+| 源码运行 | 开发、调试和二次开发 | Node.js 22.12+、Git 和本地编译工具 |
+
+### Docker Compose（推荐）
+
+```bash
+git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+docker compose pull
+docker compose up -d
+```
+
+启动后访问 `http://<你的主机>:3040`。使用反向代理时将上游指向该地址；启用 WebRTC 时放行控制台显示的 UDP 端口范围。数据保存在 `webspeak-data` volume 中。
+
+```bash
+docker compose ps
+docker compose logs -f webspeak
+```
+
+升级：
+
+```bash
+git pull --ff-only
+docker compose pull
+docker compose up -d
+```
+
+不要执行 `docker compose down -v`，否则会删除数据库和管理员设置。
+
+### 发布包
+
+从 [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 下载与系统和架构匹配的 `windows-x64.zip`、`linux-x64.tar.gz` 或 `linux-arm64.tar.gz`，解压后运行对应启动脚本。发布包自带 Node.js 运行时和生产依赖。Docker 镜像支持 amd64/arm64。
+
+Release 同时提供 Android `arm64-v8a`、`armeabi-v7a` 和 `x86_64` APK。它们使用 debug 签名，可手动侧载测试；不是 Google Play 发布包，Android 真机语音仍需验收。
+
+### 源码运行
+
+```bash
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+npm ci --ignore-scripts
+npm rebuild @discordjs/opus --foreground-scripts
+npm --prefix web ci
+npm --prefix web run build
+npm run build
+npm start
+```
+
+构建 `@discordjs/opus` 需要 Python、Make 和 C/C++ 编译工具。
+
+### 首次配置
+
+1. 打开 `http://<你的主机>:3040/admin`。
+2. 使用默认账号 `admin` / `admin` 登录，并立即设置至少 12 位的新密码。
+3. 在“服务器”页配置 TeamSpeak 目标和访问方式，例如 `voice.example.com#9987`。
+4. 公网使用时配置 HTTPS；启用 WebRTC 时放行控制台显示的 UDP 范围。
+
+### HTTPS 与持久化
+
+公网部署应通过 HTTPS 提供网页和 WebSocket。例如，将已解析到主机的域名配置到 Caddy，反向代理到 WebSpeak：
+
+```caddyfile
+webspeak.example.com {
+  reverse_proxy 127.0.0.1:3040
+}
+```
+
+以上域名仅为配置示例，请替换成自己的域名。网页能通过反向代理或 Tunnel 打开，并不表示 WebRTC 的 UDP 媒体可达；相关配置见[高级配置](#advanced)。发布包和源码的数据默认位于 `data/`，Docker 位于 `webspeak-data` volume；备份和迁移时同时保留 `webspeak.db` 与 `master.key`。
+
+<a id="administration"></a>
+
+## 管理员控制台
+
+实例配置位于 `/admin`：管理服务器与访问策略、WebRTC 与中继、邀请、活动会话、运行日志和备份。皮肤商店位于 `/admin/skins`；功能插件商店（dev）位于 `/admin/plugins`。
+
+### 可选的 TeamSpeak 管理
 
 WebSpeak 后台和访客语音不依赖此功能。在固定服务器模式下，打开 `/admin/ts-admin`，可集中配置 TS 管理连接。
 
@@ -55,31 +168,13 @@ WebSpeak 后台和访客语音不依赖此功能。在固定服务器模式下�
 
 凭据仅加密保存在服务端，接口不返回密码或 API Key；备份时同时保留数据库和 `master.key`。管理连接失败不影响 WebSpeak 后台和普通语音。封禁按 UID 创建，避免误封共用网关 IP 的其他用户。
 
-## 🖼️ 界面截图
+<a id="advanced"></a>
 
-以下截图展示中文界面的欢迎页、语音工作区、音量控制和成员操作菜单。
-
-### 欢迎页
-
-<p align="center"><img src="./screenshots/webspeak-zh-home.png" alt="WebSpeak 中文欢迎页" width="100%" /></p>
-
-### 语音工作区
-
-<p align="center"><img src="./screenshots/webspeak-zh.png" alt="WebSpeak 中文语音工作区" width="100%" /></p>
-
-### 音量控制
-
-<p align="center"><img src="./screenshots/webspeak-zh-audio.png" alt="WebSpeak 中文音量控制" width="100%" /></p>
-
-### 成员菜单
-
-<p align="center"><img src="./screenshots/webspeak-zh-menu.png" alt="WebSpeak 中文成员菜单" width="100%" /></p>
-
-## 🧩 高级功能
+## 高级配置
 
 高级功能均为可选项；关闭时仍可使用兼容语音传输。配置入口在管理员控制台的“服务器”页，保存后对新连接生效。
 
-### 1. WebRTC 低延迟语音
+### WebRTC 低延迟语音
 
 WebRTC 将浏览器语音切换到实时媒体通道，也支持桌面端伴奏。媒体服务由当前 WebSpeak 网关直接提供，不需要另设媒体服务器。
 
@@ -114,11 +209,14 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 
 浏览器用户与 TeamSpeak 6 原生客户端可以互相发现、发起和观看屏幕共享。浏览器之间以及浏览器与原生客户端之间的屏幕媒体优先通过 WebRTC/ICE 端到端传输；WebSpeak 负责会话鉴权、共享状态和 SDP/ICE 信令转发，不承载屏幕媒体流量。页面提供直播状态、观众人数、播放器音量、全屏和退出控制，也可在共享设置窗口中选择最高 1080p 与 60 FPS，并查看 WebRTC 统计。
 
-### 2. 中继模式
+### 中继模式
 
 中继适用于 TeamSpeak 拒绝境外连接或直连不稳定的情况。它不是 VPN，只转发当前 WebSpeak 会话的 TeamSpeak 数据；目标服务器仍由用户在网页中选择。
 
 中继实例同时运行 UDP 兼容转发和独立语音网关，不提供访客首页或管理员后台。网关收到用户的入场请求后，会用共享令牌签名并转交一次性语音票据；浏览器随后直接连接中继节点，语音网关再从中继节点连接 TeamSpeak。网页地址仍保持在入口网关，不需要跳转。令牌至少使用 16 个字符的随机值。
+
+<details>
+<summary>展开中继启动与配置示例</summary>
 
 #### 源码启动
 
@@ -126,6 +224,7 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
+npm rebuild @discordjs/opus --foreground-scripts
 npm run build
 WEBSPEAK_MODE=relay \
 WEBSPEAK_RELAY_TOKEN='replace-with-a-long-random-token' \
@@ -189,15 +288,85 @@ relay.example.com {
 
 关闭并保存中继配置后，访客页面不会显示中继选项。
 
-### 3. 依赖与归属
+</details>
+
+### 依赖与归属
 
 - 中继服务是 WebSpeak 自带实现，使用 Node.js 标准库，不依赖 GOST、sing-box 或其他代理框架。
 - WebRTC 使用 [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`，上游采用 MIT 许可证。
-- TeamSpeak 协议使用项目维护的 [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js) SDK fork。
+- TeamSpeak 协议使用上游 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) 发布的 `@honeybbq/teamspeak@1.0.0-beta.19`，无需构建项目 SDK fork。
 
-## 🧾 更新日志
+<a id="extensions"></a>
+
+## 皮肤与功能插件
+
+### 皮肤包 `.wskin`
+
+皮肤包负责外观、布局及其附属小组件。管理员可安装、启用和设置默认皮肤；开发时遵循公开接口，无需修改 WebSpeak 源码。
+
+[开发指南](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [皮肤索引仓库](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice 示例](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
+
+### 功能插件 `.wplugin`（dev）
+
+功能插件在独立面板中运行，与皮肤包分开。管理员可配置服务器作用域（同一 TS 目标与频道）或实例作用域（同一语音网关）；“一起观看”示例验证播放、暂停、跳转和中途加入的同步。需要当前 dev 运行时，不属于 v0.2.9。
+
+[开发指南](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [分发索引与示例](https://github.com/Huddle-Up-Forge/webspeak-plugin)
+
+<a id="troubleshooting"></a>
+
+## 常见问题
+
+| 现象 | 检查方向 |
+| --- | --- |
+| WebRTC 启用后仍回退 | 检查语音状态中的错误代码、HTTPS、整段 UDP 防火墙规则和公网媒体地址。TCP Tunnel 不能转发这条 UDP 媒体路径。 |
+| 连接目标被本地地址保护拦截 | 公开模式限制回环和私网目标。连接同机 TS 时使用管理员配置的固定服务器模式；面向访客的目标应填实际可访问的地址。 |
+| 屏幕共享超时或黑屏 | 屏幕共享使用独立的 WebRTC 连接；检查共享统计中的协商、ICE 和编码信息。语音 WebRTC 已连接不代表屏幕媒体可达。 |
+| 升级后数据丢失或无法解密 | 复用原数据目录或 volume，并保留匹配的 `master.key`；不要用 `docker compose down -v` 升级。 |
+
+### ⚠️ 要求和注意事项
+
+| 项目 | 要求或注意事项 |
+| --- | --- |
+| 浏览器 | 建议使用最新版 Chrome、Edge 或其他支持 WebRTC 的现代浏览器。麦克风和窗口音频通常要求 HTTPS。 |
+| TeamSpeak 网络 | WebSpeak 主机必须能够访问目标 TeamSpeak；默认语音端口为 `9987`。 |
+| Web 服务网络 | 服务使用 `3040/TCP`，公网建议通过 HTTPS 反向代理提供网页和 WebSocket。 |
+| IPv6 | IPv6 字面量写为 `[2001:db8::1]#9987`。主机/容器需要可路由 IPv6、启用 IPv6 的操作系统和 Node.js，以及相应防火墙放行。 |
+| WebRTC | 默认使用 `40000–40099/UDP`，启用后需放行整个范围；修改范围前先关闭 WebRTC。 |
+| 身份保持 | 同一浏览器身份同时只能保持一条活动连接；并行连接请关闭第二条的身份保持或使用其他浏览器配置文件。 |
+| 伴奏 | 仅桌面端提供且要求 WebRTC；选择窗口或标签页时还要勾选共享音频。 |
+| 数据 | Docker 数据在 `webspeak-data` volume；发布包和源码运行数据在 `data/`。升级前建议备份。 |
+| 会话上限 | 单实例最多允许 100 个活动网页会话；这是应用准入上限，不是性能保证或 TS 许可证额度。 |
+
+<a id="changelog"></a>
+
+## 更新日志
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### 功能增强
+
+- 接入上游 SDK 1.0.0-beta.19，普通语音连接使用客户端实时目录，不再依赖 Query 列表权限。
+- 管理员控制台新增 GitHub 皮肤商店，以及按实例管理、更新和启停皮肤的入口；Discord Voice 作为标准 `.wskin` 示例独立分发。
+- 指定实例模式支持可选 TS 管理面板，可配置 WebQuery、TCP 或 SSH Query 凭据，管理服务器、频道、成员、服务器组和封禁。
+- 中继可配置浏览器直连的语音入口，将语音会话交给中继节点处理，减少网关间的额外转发。
+- 提供通用工作区保留与重连接口，KAAK 同步接入，并新增管理员、项目 GitHub 和 QQ 群入口。
+- 支持 TeamSpeak 频道分隔栏，包括左中右对齐、重复填充、空白及标准线型；向皮肤开放格式化数据。
+
+#### 问题修复
+
+- 修复屏幕共享播放器的全屏尺寸，以及断线成员的状态、播放资源清理。
+- 修复 TS 管理中封禁成功却报错、Query 连接混入成员统计和频道密码标签错误的问题。
+- 区分权限、限流和超时提示；操作完成后的刷新失败单独提示，避免用户重复执行操作。
+- 防止 SDK 将 HTTP 失败响应误判为 WebQuery 成功；修复 DC 首页、聊天区与窄屏控件布局。
+
+#### 已知问题
+
+- [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) 记录的安全加固尚未纳入本版本，关闭该 PR 不代表相关问题已修复。
+
+<details>
+<summary>展开 v0.2.8 及更早版本</summary>
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 
@@ -288,84 +457,14 @@ relay.example.com {
 
 引入内置 WebRTC、迁移 TeamSpeak SDK 并改善成员同步和语音缓冲。
 
+</details>
 
-## 🚀 部署方案
-
-| 方案 | 适用场景 | 环境 |
-| --- | --- | --- |
-| Docker Compose（推荐） | 长期运行、升级简单、数据持久化 | Docker Engine + Docker Compose |
-| 发布包 | 不安装 Node.js 和构建依赖 | Windows x64 或 Linux x64/ARM64 |
-| 源码运行 | 开发、调试和二次开发 | Node.js 22.12+、Git 和本地编译工具 |
-
-### Docker Compose（推荐）
-
-```bash
-git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
-cd WebSpeak-client-for-TeamSpeak
-docker compose pull
-docker compose up -d
-```
-
-启动后访问 `http://<你的主机>:3040`。使用反向代理时将上游指向该地址；启用 WebRTC 时放行控制台显示的 UDP 端口范围。数据保存在 `webspeak-data` volume 中。
-
-```bash
-docker compose ps
-docker compose logs -f webspeak
-```
-
-升级：
-
-```bash
-git pull --ff-only
-docker compose pull
-docker compose up -d
-```
-
-不要执行 `docker compose down -v`，否则会删除数据库和管理员设置。
-
-### 发布包
-
-从 [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 下载与系统和架构匹配的 `windows-x64.zip`、`linux-x64.tar.gz` 或 `linux-arm64.tar.gz`，解压后运行对应启动脚本。发布包自带 Node.js 运行时和生产依赖。Docker 镜像支持 amd64/arm64。
-
-Release 同时提供 Android `arm64-v8a`、`armeabi-v7a` 和 `x86_64` APK。它们使用 debug 签名，可手动侧载测试；不是 Google Play 发布包，Android 真机语音仍需验收。
-
-### 源码运行
-
-```bash
-git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
-cd WebSpeak-client-for-TeamSpeak
-npm ci --ignore-scripts
-npm rebuild @discordjs/opus --foreground-scripts
-npm --prefix web ci
-npm --prefix web run build
-npm run build
-npm start
-```
-
-构建 `@discordjs/opus` 需要 Python、Make 和 C/C++ 编译工具。
-
-### 首次配置
-
-1. 打开 `http://<你的主机>:3040/admin`。
-2. 使用默认账号 `admin` / `admin` 登录，并立即设置至少 12 位的新密码。
-3. 在“服务器”页配置 TeamSpeak 目标和访问方式，例如 `voice.example.com#9987`。
-4. 公网使用时配置 HTTPS；启用 WebRTC 时放行控制台显示的 UDP 范围。
-
-## ⚠️ 要求和注意事项
-
-| 项目 | 要求或注意事项 |
-| --- | --- |
-| 浏览器 | 建议使用最新版 Chrome、Edge 或其他支持 WebRTC 的现代浏览器。麦克风和窗口音频通常要求 HTTPS。 |
-| TeamSpeak 网络 | WebSpeak 主机必须能够访问目标 TeamSpeak；默认语音端口为 `9987`。 |
-| Web 服务网络 | 服务使用 `3040/TCP`，公网建议通过 HTTPS 反向代理提供网页和 WebSocket。 |
-| IPv6 | IPv6 字面量写为 `[2001:db8::1]#9987`。主机/容器需要可路由 IPv6、启用 IPv6 的操作系统和 Node.js，以及相应防火墙放行。 |
-| WebRTC | 默认使用 `40000–40099/UDP`，启用后需放行整个范围；修改范围前先关闭 WebRTC。 |
-| 身份保持 | 同一浏览器身份同时只能保持一条活动连接；并行连接请关闭第二条的身份保持或使用其他浏览器配置文件。 |
-| 伴奏 | 仅桌面端提供且要求 WebRTC；选择窗口或标签页时还要勾选共享音频。 |
-| 数据 | Docker 数据在 `webspeak-data` volume；发布包和源码运行数据在 `data/`。升级前建议备份。 |
-| 会话上限 | 单实例最多允许 100 个活动网页会话。 |
+<a id="contributors"></a>
 
 ## 贡献者与贡献来源
+
+<details>
+<summary>查看上游作者与 PR 贡献说明</summary>
 
 以下列出上游 SDK 作者、已合并的 GitHub PR，以及已移植为独立皮肤包的原始贡献。
 
@@ -374,9 +473,16 @@ npm start
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) 支持 TeamSpeak 注册昵称连接并保留昵称目标；[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) 改进 KAAK 首次连接后的工作区保留与重连；[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) 和 [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) 提供 Discord 皮肤的原始设计与实现（提交署名 **yumi**），后由 WebSpeak 项目移植为[独立分发的 `.wskin` 皮肤](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)。
 
-## 功能插件开发（dev）
+</details>
 
-功能插件系统的开发指南、服务器与实例作用域、同步观影示例和 GitHub 分发：
+## 社区与相关项目
 
-- [插件开发指南](PLUGIN_DEVELOPMENT.md)
-- [插件开发 Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md)
+[GitHub Issues](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/issues) · [QQ 群 869500475](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475) · [Telegram](https://t.me/+8qShpTcuN9A3MWY9)
+
+[NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot)：支持多平台点歌和 Web 控制台的 TeamSpeak 音乐机器人。
+
+## 许可证
+
+WebSpeak 按 [AGPL-3.0-only](../LICENSE) 发布。第三方依赖的许可与归属见各自项目。
+
+<p align="right"><a href="#readme-top">返回顶部 ↑</a></p>

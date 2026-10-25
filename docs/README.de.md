@@ -1,48 +1,163 @@
-# WebSpeak · Deutsch
+<a id="readme-top"></a>
 
-[Projektstartseite](../README.md) · [简体中文](./README.zh-CN.md) · [English](./README.en.md) · [Русский](./README.ru.md) · [日本語](./README.ja.md)
+<div align="center">
+  <img src="./assets/webspeak-logo.png" alt="WebSpeak" width="88" />
+  <h1>WebSpeak · Deutsch</h1>
+  <p><strong>Deiner TeamSpeak-Community im Browser beitreten.</strong></p>
+  <p><a href="../README.md">Projektstartseite</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.en.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.ja.md">日本語</a></p>
+  <p>
+    <a href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest"><img src="https://img.shields.io/github/v/release/EchoSixHIYA/WebSpeak-client-for-TeamSpeak?style=flat-square&amp;color=0f766e" alt="Release" /></a>
+    <a href="../LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-0f766e?style=flat-square" alt="AGPL-3.0-only" /></a>
+  </p>
+</div>
 
-WebSpeak ist ein selbst gehosteter Webclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer können ohne Desktop-Client im Browser Kanälen beitreten; Administratoren verwalten Zielserver, Zugriff und Laufzeitstatus über die Webkonsole.
+WebSpeak ist ein selbst gehosteter Browserclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer verwenden Sprache, Chat und Bildschirmfreigabe im Browser; Betreiber verwalten Zielserver, Zugriff und Daten über die Webkonsole.
 
-Aktuelle Version: [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8).
+Stabile Version: [Hinweise zu v0.2.9](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Der Store für funktionale Plugins ist derzeit auf `dev` verfügbar und nicht in v0.2.9 enthalten.
+
+[Live-Demo](#demo) · [Funktionen](#features) · [Screenshots](#screenshots) · [Bereitstellung](#deployment) · [Verwaltung](#administration) · [Erweiterte Einstellungen](#advanced) · [Skins & Plugins](#extensions) · [Problemlösung](#troubleshooting) · [Änderungsprotokoll](#changelog)
+
+<a id="demo"></a>
 
 ## Live-Demo
 
-- Shanghai: <https://shanghai.webspeak.online>
-- Hongkong: <https://webspeak.online>
+- [Shanghai · shanghai.webspeak.online](https://shanghai.webspeak.online)
+- [Hongkong · webspeak.online](https://webspeak.online)
 
-Netzwerkbedingungen und Auslastung können bei beiden Demos schwanken; Latenz, Verbindungsabbrüche oder kurze Ausfälle beschreiben nicht jede eigene Bereitstellung.
+Willkommensseite und Sprachbereich direkt ausprobieren. Netzwerk, Auslastung und Verfügbarkeit der Demo-Knoten können schwanken.
 
-## ✨ Funktionen
+<a id="features"></a>
+
+## Funktionen
 
 | Funktion | Beschreibung |
 | --- | --- |
-| TeamSpeak-Kompatibilität | Unterstützt TeamSpeak 3 und TeamSpeak 6 und erkennt das Zielprotokoll anhand der gemeldeten Version automatisch. |
-| Plattformübergreifendes P2P-Bildschirmteilen | Browsernutzer und native TeamSpeak-6-Clients können die Bildschirmfreigabe gegenseitig starten und ansehen; WebRTC/ICE überträgt Medien direkt, WebSpeak leitet nur die Signalisierung weiter. |
-| IPv6-Ziele | IPv6-TeamSpeak-Ziele und über DNS aufgelöste IPv6-Adressen werden standardmäßig unterstützt. |
-| Kanäle und Mitglieder | Kanalstruktur und aktuelle Mitglieder anzeigen und Kanäle wechseln. |
-| Echtzeit-Sprache | Opus-Audio mit kompatiblem Transport und optional integriertem WebRTC für geringere Latenz. |
-| Audiosteuerung | Mikrofon und Lautsprecher auswählen, Lautstärke regeln, testen, stummschalten, VOX und individuelle Mitgliedslautstärke. |
-| Browserseitige Geräuschunterdrückung | Optionale Mikrofon-Geräuschunterdrückung in der Browseraufnahme, ohne zusätzliche serverseitige Audioverarbeitung. |
-| Nachrichten und Aktionen | Kanal- und Serverchat, private Nachrichten, Anstupsen und Flüsterziele. |
-| Desktop-Begleitton | Audio eines freigegebenen Fensters oder Browser-Tabs im aktuellen Kanal teilen. |
-| Identität und Zugriff | Gespeicherte Identität, eigene Ziele, widerrufbare Einladungen sowie Import, Konvertierung, Prüfung und Export von TeamSpeak-3-Identitäten. |
-| Administration | Ziele, Zugriff, öffentliche Medienadresse, IPv6-Kandidaten, Sprach-STUN, Relays, Einladungen, Sitzungen, Protokolle, Diagnosen und Backups verwalten. |
-| Projektstruktur | In 0.2.6 wurden Sprach-Gateway, Sitzungsereignisse, Audio und Bildschirmfreigabe in Module aufgeteilt; Sprach- und Admin-Oberflächen in Komponenten, Composables und Dienste zerlegt und um Lebenszyklus- und Wiederverbindungstests ergänzt. |
-| Skins | Geschützte Tages-, Nacht- und ILLUSIA-Skins sowie instanzverwaltete `.wskin`-Designs mit Aktivierungs- und Standardauswahl im Adminbereich. |
-| Oberfläche | Chinesische, englische, deutsche, russische und japanische Oberfläche sowie responsive Desktop-/Mobilansicht. |
-| Selbsthosting | Daten bleiben beim Betreiber; Pakete für Windows x64 und Linux x64/ARM64, Docker für amd64/arm64 und Android-APKs für arm64-v8a, armeabi-v7a und x86_64. |
+| Echtzeit-Sprache | Opus, optionales WebRTC und WebSocket-Fallback; Stummschaltung, VOX, Geräteauswahl, Browser-Geräuschunterdrückung und Lautstärke je Mitglied. |
+| Kanäle & Nachrichten | Kanalbaum und TeamSpeak-Trenner, Mitgliedsstatus, Kanalwechsel, Kanal-/Server-/Privatchat, Anstupsen, Flüstern und lokaler Chatverlauf. |
+| Bildschirm & Audio | Bildschirmfreigabe zwischen Browsern und unterstützten nativen TeamSpeak-6-Clients mit Qualitäts-, Bitraten- und Statistikoptionen; Fenster-/Tab-Audio auf dem Desktop. |
+| Identität & Verbindungen | Gespeicherte Identitäten, TS3-Identitätsimport/-export, Favoriten und Verlauf, SRV-/Nickname-Auflösung, IPv4/IPv6 und Einladungen. |
+| Instanzverwaltung | Feste oder offene Ziele, Zugriffsregeln, Einladungen, Sitzungen, Logs, Diagnosen, Backups und optionale TeamSpeak-Verwaltung. |
+| Skins & Oberfläche | Tag, Nacht, ILLUSIA und KAAK, `.wskin`-Pakete über GitHub, fünf Sprachen und responsive Ansichten. |
+| Verteilte Sprache | Der Browser verbindet sich direkt mit dem gewählten Relay-Sprach-Gateway; die URL der Eingangsinstanz bleibt erhalten. |
+| Bereitstellung | Docker amd64/arm64, Serverpakete für Windows x64 und Linux x64/ARM64 sowie Android-Vorschau-APKs. |
 
-## TeamSpeak-Versionskompatibilität
+### TeamSpeak-Versionskompatibilität
 
 Sprachverbindungen verwenden das TeamSpeak-Clientprotokoll und benötigen keine Query-Zugangsdaten. Die optionale TS-Verwaltung verwendet eigene WebQuery-/ServerQuery-Zugangsdaten.
 
 - **TeamSpeak 3**: Die Erkennung wertet die führende `3.x`-Versionsnummer aus. Ältere Serverversionen sollten in der jeweiligen Umgebung geprüft werden, da nicht jede historische Version separat getestet wurde.
 - **TeamSpeak 6**: Unterstützt, einschließlich Bildschirmfreigabe mit nativen TeamSpeak-6-Clients.
 - **Automatische Erkennung**: Das Gateway liest die `version`-Antwort des Servers und hält das erkannte Protokoll in der Verbindungsdiagnose fest.
-- Das Gateway verwendet das Upstream-SDK 1.0 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js); WebSpeak richtet sich an TeamSpeak 3 und 6.
+- Das Gateway verwendet das Upstream-SDK `1.0.0-beta.19` [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js); WebSpeak richtet sich an TeamSpeak 3 und 6.
 
-## Optionale TeamSpeak-Verwaltung
+<a id="screenshots"></a>
+
+## Screenshots
+
+![WebSpeak · Sprachbereich](./screenshots/webspeak-de.png)
+
+<details>
+<summary>Willkommensseite, Audiosteuerung und Mitgliedermenü anzeigen</summary>
+
+### Willkommensseite
+
+![WebSpeak · Willkommensseite](./screenshots/webspeak-de-home.png)
+
+### Audiosteuerung
+
+![WebSpeak · Audiosteuerung](./screenshots/webspeak-de-audio.png)
+
+### Mitgliedermenü
+
+![WebSpeak · Mitgliedermenü](./screenshots/webspeak-de-menu.png)
+
+</details>
+
+<a id="deployment"></a>
+
+## Bereitstellung & erste Konfiguration
+
+Die Compose-Konfiguration verwendet `network_mode: host` für Linux-Docker-Hosts. Für einen Windows-Server das Release-Paket verwenden.
+
+| Methode | Geeignet für | Umgebung |
+| --- | --- | --- |
+| Docker Compose (empfohlen) | Dauerbetrieb, einfache Updates und persistente Daten | Docker Engine + Docker Compose |
+| Release-Paket | Betrieb ohne Node.js und Build-Werkzeuge | Windows x64 oder Linux x64/ARM64 |
+| Aus dem Quellcode | Entwicklung und Anpassungen | Node.js 22.12+, Git und native Build-Werkzeuge |
+
+### Docker Compose (empfohlen)
+
+```bash
+git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+docker compose pull
+docker compose up -d
+```
+
+Nach dem Start ist WebSpeak unter `http://<dein-host>:3040` erreichbar. Bei einem Reverse Proxy auf diese Adresse zeigen; für WebRTC den im Adminbereich angezeigten UDP-Bereich freigeben. Die Daten liegen im Volume `webspeak-data`.
+
+```bash
+docker compose ps
+docker compose logs -f webspeak
+```
+
+Upgrade:
+
+```bash
+git pull --ff-only
+docker compose pull
+docker compose up -d
+```
+
+`docker compose down -v` nicht ausführen, da dadurch Datenbank und Administratoreinstellungen gelöscht werden.
+
+### Release-Paket
+
+Das passende `windows-x64.zip`, `linux-x64.tar.gz` oder `linux-arm64.tar.gz` aus den [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) herunterladen und den enthaltenen Starter ausführen. Die Pakete enthalten Node.js und Produktionsabhängigkeiten. Docker unterstützt amd64/arm64.
+
+Android-APKs für `arm64-v8a`, `armeabi-v7a` und `x86_64` sind ebenfalls verfügbar. Sie sind für Tests per Sideload debug-signiert, keine Google-Play-Pakete; echte TeamSpeak-Sprachtests auf Geräten stehen noch aus.
+
+### Aus dem Quellcode
+
+```bash
+git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
+cd WebSpeak-client-for-TeamSpeak
+npm ci --ignore-scripts
+npm rebuild @discordjs/opus --foreground-scripts
+npm --prefix web ci
+npm --prefix web run build
+npm run build
+npm start
+```
+
+Für den Bau von `@discordjs/opus` werden Python, Make und eine C/C++-Toolchain benötigt.
+
+### Erste Konfiguration
+
+1. `http://<dein-host>:3040/admin` öffnen.
+2. Mit `admin` / `admin` anmelden und sofort ein neues Passwort mit mindestens 12 Zeichen setzen.
+3. Unter **Server** TeamSpeak-Ziel und Zugriffsmethode konfigurieren, zum Beispiel `voice.example.com#9987`.
+4. Für öffentliche Nutzung HTTPS einrichten; bei aktiviertem WebRTC den im Adminbereich angezeigten UDP-Bereich freigeben.
+
+### HTTPS & persistente Daten
+
+Öffentliche Webseite und WebSocket über HTTPS bereitstellen. Beispielsweise die eigene Domain auf den Host zeigen lassen und Caddy als Reverse Proxy einrichten:
+
+```caddyfile
+webspeak.example.com {
+  reverse_proxy 127.0.0.1:3040
+}
+```
+
+Die Beispieldomain durch die eigene ersetzen. Ein erreichbarer Reverse Proxy oder Tunnel garantiert keine UDP-Medienverbindung; siehe [Erweiterte Einstellungen](#advanced). Release- und Quellcode-Installationen verwenden `data/`, Docker das Volume `webspeak-data`. Bei Backup und Umzug `webspeak.db` und den zugehörigen `master.key` gemeinsam aufbewahren.
+
+<a id="administration"></a>
+
+## Administration
+
+Unter `/admin` werden Server, Zugriff, WebRTC, Relays, Einladungen, aktive Sitzungen, Logs und Backups verwaltet. Der Skin-Store liegt unter `/admin/skins`, der Store für funktionale Plugins (dev) unter `/admin/plugins`.
+
+### Optionale TeamSpeak-Verwaltung
 
 WebSpeak-Verwaltung und Sprachverbindungen sind davon unabhängig. Im Modus mit festem Server die TS-Verbindung unter `/admin/ts-admin` einrichten.
 
@@ -53,31 +168,13 @@ WebSpeak-Verwaltung und Sprachverbindungen sind davon unabhängig. Im Modus mit 
 
 Zugangsdaten werden serverseitig verschlüsselt und nie von der API zurückgegeben. Datenbank und `master.key` gemeinsam sichern. Verbindungsfehler beeinflussen weder WebSpeak-Verwaltung noch Sprache. Sperren verwenden die Benutzer-UID, damit andere Nutzer derselben Gateway-IP nicht betroffen sind.
 
-## 🖼️ Screenshots
+<a id="advanced"></a>
 
-Die Screenshots zeigen die deutsche Willkommensseite, den Sprachbereich, die Audiosteuerung und das Mitgliedermenü.
-
-### Willkommensseite
-
-<p align="center"><img src="./screenshots/webspeak-de-home.png" alt="WebSpeak deutsche Willkommensseite" width="100%" /></p>
-
-### Sprachbereich
-
-<p align="center"><img src="./screenshots/webspeak-de.png" alt="WebSpeak deutscher Sprachbereich" width="100%" /></p>
-
-### Audiosteuerung
-
-<p align="center"><img src="./screenshots/webspeak-de-audio.png" alt="WebSpeak deutsche Audiosteuerung" width="100%" /></p>
-
-### Mitgliedermenü
-
-<p align="center"><img src="./screenshots/webspeak-de-menu.png" alt="WebSpeak deutsches Mitgliedermenü" width="100%" /></p>
-
-## 🧩 Erweiterte Funktionen
+## Erweiterte Einstellungen
 
 Diese Funktionen sind optional. Ohne sie arbeitet WebSpeak weiterhin mit dem kompatiblen Sprachtransport. Die Einstellungen befinden sich unter **Administration → Server** und gelten für neue Verbindungen.
 
-### 1. WebRTC-Sprache mit niedriger Latenz
+### WebRTC-Sprache mit niedriger Latenz
 
 WebRTC verwendet für Browser-Sprache einen Echtzeit-Medienpfad und ermöglicht außerdem Desktop-Begleitton. Das aktuelle WebSpeak-Gateway stellt WebRTC selbst bereit; ein zusätzlicher Medienserver ist nicht erforderlich.
 
@@ -87,6 +184,14 @@ WebRTC verwendet für Browser-Sprache einen Echtzeit-Medienpfad und ermöglicht 
 4. **WebRTC** aktivieren und speichern. Nicht unterstützte Browser oder Netzwerke wechseln automatisch zum kompatiblen Transport.
 
 Der Portbereich ist bei aktiviertem WebRTC gesperrt. Zum Ändern WebRTC zuerst deaktivieren und speichern, danach die Firewall-Regeln anpassen. Für öffentliche Bereitstellungen ist HTTPS erforderlich.
+
+### Sprach-WebRTC hinter Reverse Proxy oder TCP-Tunnel
+
+Unter **Server → Erweiterte Einstellungen** die **öffentliche Medienadresse** als per UDP erreichbare IP oder Domain des Sprach-Gateways eintragen, ohne Schema, Pfad oder Port. Sie ersetzt die aus dem Webseitenaufruf abgeleitete Adresse. Ein Proxy-Hostname ist nicht automatisch eine erreichbare Medienadresse.
+
+**IPv6-Kandidaten** sind optional und behalten IPv4 bei; IPv6-Routing und Firewall müssen passen. Als **Sprach-STUN** kann `stun:turn.teamspeak.com:3478` eingetragen werden. Browser und Gateway verwenden dann denselben Dienst. Leer behält das bisherige Verhalten bei: STUN des Gateway-SDKs, kein Browser-STUN. Zulässig sind IPv4-erreichbare UDP-STUN-Domains oder IPv4-Adressen, keine IPv6-Literale oder TURN-Zugangsdaten.
+
+Speichern und neu verbinden. Den gesamten UDP-Portbereich öffnen und bei statischer Weiterleitung die Portnummern erhalten. STUN findet Adressabbildungen, leitet aber keine Audiodaten weiter. Ein reiner TCP-Tunnel ohne nutzbaren UDP-/IPv6-Pfad führt weiter zum kompatiblen Transport.
 
 ### ICE-Kandidaten für Bildschirmfreigabe
 
@@ -102,11 +207,14 @@ Mit TURN kann die Medienübertragung diesen externen Dienst verwenden, aber niem
 
 Browsernutzer und native TeamSpeak-6-Clients können Bildschirmfreigaben gegenseitig erkennen, starten und ansehen. Zwischen Browsern sowie zwischen Browser und nativem Client werden die Bildschirmmedien möglichst über eine direkte WebRTC/ICE-Peer-to-Peer-Verbindung übertragen; WebSpeak übernimmt Sitzungsberechtigung, Freigabestatus und SDP-/ICE-Signalisierung, transportiert aber keine Bildschirmmedien. Die Oberfläche zeigt Live-Status und Zuschauerzahl und bietet Lautstärke-, Vollbild- und Beenden-Steuerung. Für die Aufnahme stehen bis zu 1080p und 60 FPS sowie WebRTC-Statistiken zur Verfügung.
 
-### 2. Relay-Modus
+### Relay-Modus
 
 Ein Relay hilft, wenn ein TeamSpeak-Server Verbindungen aus einer anderen Region ablehnt oder der direkte Weg instabil ist. Es ist kein VPN, sondern leitet nur den TeamSpeak-Verkehr der aktuellen WebSpeak-Sitzung weiter.
 
 Eine Relay-Instanz betreibt sowohl die ältere UDP-Kompatibilitätsweiterleitung als auch ein separates Sprach-Gateway, jedoch keine Besucher- oder Administrationsseite. Das Eingangs-Gateway signiert mit dem gemeinsamen Token ein einmaliges Sprach-Ticket und delegiert es; anschließend verbindet sich der Browser direkt mit dem Relay, das seinerseits TeamSpeak erreicht. Die Seite bleibt unter der URL des Eingangs-Gateways. Ein zufälliges Token mit mindestens 16 Zeichen verwenden.
+
+<details>
+<summary>Start- und Konfigurationsbeispiele für Relays anzeigen</summary>
 
 #### Aus dem Quellcode starten
 
@@ -114,6 +222,7 @@ Eine Relay-Instanz betreibt sowohl die ältere UDP-Kompatibilitätsweiterleitung
 git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
 cd WebSpeak-client-for-TeamSpeak
 npm ci --ignore-scripts
+npm rebuild @discordjs/opus --foreground-scripts
 npm run build
 WEBSPEAK_MODE=relay \
 WEBSPEAK_RELAY_TOKEN='replace-with-a-long-random-token' \
@@ -175,15 +284,85 @@ In den Relay-Einstellungen des Eingangs-Gateways als **Voice gateway address** d
 
 Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entfernen.
 
-### 3. Abhängigkeiten und Hinweise zur Herkunft
+</details>
+
+### Abhängigkeiten und Hinweise zur Herkunft
 
 - Der Relay-Dienst ist Bestandteil von WebSpeak und verwendet Node.js-Standardbibliotheken; GOST, sing-box oder ein anderes Proxy-Framework werden nicht verwendet.
 - WebRTC verwendet [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`; das Upstream-Projekt steht unter MIT-Lizenz.
-- Die TeamSpeak-Protokollverbindung verwendet den projektgepflegten [EchoSixHIYA/teamspeak-js](https://github.com/EchoSixHIYA/teamspeak-js)-SDK-Fork.
+- TeamSpeak verwendet das Upstream-Paket [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) `@honeybbq/teamspeak@1.0.0-beta.19`; ein eigener SDK-Fork muss nicht gebaut werden.
 
-## 🧾 Änderungsprotokoll
+<a id="extensions"></a>
+
+## Skins & funktionale Plugins
+
+### Skin-Pakete `.wskin`
+
+Skins gestalten Aussehen, Layout und zugehörige Widgets. Administratoren installieren, aktivieren und wählen den Standard-Skin. Autoren verwenden öffentliche Schnittstellen ohne Änderungen am WebSpeak-Quellcode.
+
+[Entwicklungsleitfaden](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [Skin-Katalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord-Voice-Beispiel](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
+
+### Funktionale Plugins `.wplugin` (dev)
+
+Funktionale Plugins laufen getrennt von Skins in einem eigenen Panel. Administratoren wählen Server-Geltungsbereich (gleiches TS-Ziel und gleicher Kanal) oder Instanz-Geltungsbereich (ein Sprach-Gateway). Watch Together zeigt synchrones Abspielen, Pausieren, Springen und spätes Beitreten. Erforderlich ist die aktuelle dev-Laufzeit; v0.2.9 enthält diese Funktion nicht.
+
+[Entwicklungsleitfaden](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [Verteilungskatalog & Beispiel](https://github.com/Huddle-Up-Forge/webspeak-plugin)
+
+<a id="troubleshooting"></a>
+
+## Problemlösung
+
+| Symptom | Prüfen |
+| --- | --- |
+| WebRTC fällt trotz Aktivierung zurück | Fehlercode im Sprachstatus, HTTPS, vollständigen UDP-Portbereich und öffentliche Medienadresse prüfen. Ein TCP-Tunnel transportiert diese UDP-Medien nicht. |
+| Ziel wird als lokale Adresse blockiert | Der offene Modus beschränkt Loopback-/Privatadressen. Für einen TS-Server auf demselben Host den administrativ konfigurierten festen Servermodus verwenden. |
+| Bildschirmfreigabe läuft ab oder bleibt schwarz | Sie verwendet eine eigene WebRTC-Verbindung. Aushandlung, ICE und Codec-Statistik prüfen; verbundenes Sprach-WebRTC bestätigt nicht die Bildschirmverbindung. |
+| Daten fehlen oder lassen sich nach dem Update nicht entschlüsseln | Dasselbe Datenverzeichnis bzw. Volume mit passendem `master.key` verwenden. Nicht mit `docker compose down -v` aktualisieren. |
+
+### ⚠️ Voraussetzungen und Hinweise
+
+| Bereich | Hinweis |
+| --- | --- |
+| Browser | Aktuelles Chrome, Edge oder ein moderner WebRTC-fähiger Browser wird empfohlen. Mikrofon- und Fenster-Audio benötigen normalerweise HTTPS. |
+| TeamSpeak-Netzwerk | Der WebSpeak-Host muss den Zielserver erreichen können; der Standard-Sprachport ist `9987`. |
+| Webnetzwerk | Der Dienst verwendet `3040/TCP`; öffentlich sollte ein HTTPS-Reverse-Proxy für Seite und WebSocket verwendet werden. |
+| IPv6 | Literale Ziele als `[2001:db8::1]#9987` eintragen. Host/Container benötigen geroutetes IPv6, aktiviertes IPv6 in Betriebssystem und Node.js sowie passende Firewall-Regeln. |
+| WebRTC | Standardbereich `40000–40099/UDP`; den gesamten Bereich freigeben und WebRTC vor einer Änderung deaktivieren. |
+| Gespeicherte Identität | Eine Browseridentität kann nur eine aktive gespeicherte Verbindung halten. Für parallele Verbindungen deaktivieren oder ein anderes Browserprofil verwenden. |
+| Begleitton | Nur auf dem Desktop verfügbar und WebRTC erforderlich. Bei Fenster- oder Tab-Freigabe auch Audio freigeben. |
+| Daten | Docker verwendet `webspeak-data`; Release-Pakete und Quellcode verwenden `data/`. Vor Updates sichern. |
+| Sitzungslimit | Bis zu 100 aktive Browser-Sitzungen pro Instanz; dies ist ein Anwendungslimit, keine Leistungszusage oder TS-Lizenzgrenze. |
+
+<a id="changelog"></a>
+
+## Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
+
+#### Erweiterungen
+
+- Umstellung auf das Upstream-SDK 1.0.0-beta.19. Normale Sprachverbindungen verwenden das Live-Clientverzeichnis ohne Query-Listenberechtigungen.
+- Neuer GitHub-Skin-Store mit Installation, Updates und Freigabe pro Instanz. Discord Voice wird als eigenständiges standardkonformes `.wskin`-Beispiel verteilt.
+- Optionale TS-Verwaltung im Modus mit festem Server: WebQuery-, TCP- oder SSH-Query-Zugangsdaten ermöglichen die Verwaltung von Server, Kanälen, Mitgliedern, Servergruppen und Sperren.
+- Relays können einen direkten Sprachendpunkt für Browser bereitstellen und die Sprachsitzung übernehmen; eine zusätzliche Weiterleitung zwischen Gateways entfällt.
+- Allgemeine Schnittstellen zum Beibehalten des Arbeitsbereichs und zur Wiederverbindung; KAAK nutzt diese und bietet Zugänge zur Administration, zum Projekt-GitHub und zur QQ-Gruppe.
+- Unterstützung für TeamSpeak-Kanaltrenner mit Ausrichtung, Wiederholung, Leerzeilen und Standardlinien sowie öffentlichen Darstellungsdaten für Skins.
+
+#### Fehlerbehebungen
+
+- Vollbildgröße der Bildschirmfreigabe und Bereinigung von Status und Wiedergaberessourcen ausgeschiedener Mitglieder korrigiert.
+- Erfolgreiche Sperren werden nicht mehr als Fehler gemeldet; Query-Verbindungen zählen nicht als Mitglieder, und das Kanalpasswort ist korrekt beschriftet.
+- Berechtigungs-, Ratenlimit- und Zeitüberschreitungsfehler werden unterschieden. Schlägt nur die Aktualisierung nach einer erfolgreichen Aktion fehl, erscheint eine eigene Warnung gegen doppelte Ausführung.
+- Verhindert, dass das SDK fehlgeschlagene HTTP-Antworten als erfolgreiche WebQuery-Ergebnisse behandelt; Layoutfehler auf der DC-Startseite, im Chat und bei schmalen Ansichten behoben.
+
+#### Bekannte Probleme
+
+- Die in [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) beschriebene Sicherheitsabsicherung ist nicht enthalten; das Schließen des PRs bedeutet nicht, dass die gemeldeten Probleme behoben sind.
+
+<details>
+<summary>v0.2.8 und frühere Versionen anzeigen</summary>
 
 ### [v0.2.8](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.8) · 2026-10-17
 
@@ -274,84 +453,14 @@ WebRTC und Kanalchat korrigiert sowie Administration, Protokolle und Mobilansich
 
 Integriertes WebRTC, aktualisiertes TeamSpeak-SDK und bessere Mitgliedersynchronisierung und Sprachpufferung.
 
+</details>
 
-## 🚀 Bereitstellung
+<a id="contributors"></a>
 
-| Methode | Geeignet für | Umgebung |
-| --- | --- | --- |
-| Docker Compose (empfohlen) | Dauerbetrieb, einfache Updates und persistente Daten | Docker Engine + Docker Compose |
-| Release-Paket | Betrieb ohne Node.js und Build-Werkzeuge | Windows x64 oder Linux x64/ARM64 |
-| Aus dem Quellcode | Entwicklung und Anpassungen | Node.js 22.12+, Git und native Build-Werkzeuge |
+## Mitwirkende & Herkunft
 
-### Docker Compose (empfohlen)
-
-```bash
-git clone --depth 1 https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
-cd WebSpeak-client-for-TeamSpeak
-docker compose pull
-docker compose up -d
-```
-
-Nach dem Start ist WebSpeak unter `http://<dein-host>:3040` erreichbar. Bei einem Reverse Proxy auf diese Adresse zeigen; für WebRTC den im Adminbereich angezeigten UDP-Bereich freigeben. Die Daten liegen im Volume `webspeak-data`.
-
-```bash
-docker compose ps
-docker compose logs -f webspeak
-```
-
-Upgrade:
-
-```bash
-git pull --ff-only
-docker compose pull
-docker compose up -d
-```
-
-`docker compose down -v` nicht ausführen, da dadurch Datenbank und Administratoreinstellungen gelöscht werden.
-
-### Release-Paket
-
-Das passende `windows-x64.zip`, `linux-x64.tar.gz` oder `linux-arm64.tar.gz` aus den [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) herunterladen und den enthaltenen Starter ausführen. Die Pakete enthalten Node.js und Produktionsabhängigkeiten. Docker unterstützt amd64/arm64.
-
-Android-APKs für `arm64-v8a`, `armeabi-v7a` und `x86_64` sind ebenfalls verfügbar. Sie sind für Tests per Sideload debug-signiert, keine Google-Play-Pakete; echte TeamSpeak-Sprachtests auf Geräten stehen noch aus.
-
-### Aus dem Quellcode
-
-```bash
-git clone https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak.git
-cd WebSpeak-client-for-TeamSpeak
-npm ci --ignore-scripts
-npm rebuild @discordjs/opus --foreground-scripts
-npm --prefix web ci
-npm --prefix web run build
-npm run build
-npm start
-```
-
-Für den Bau von `@discordjs/opus` werden Python, Make und eine C/C++-Toolchain benötigt.
-
-### Erste Konfiguration
-
-1. `http://<dein-host>:3040/admin` öffnen.
-2. Mit `admin` / `admin` anmelden und sofort ein neues Passwort mit mindestens 12 Zeichen setzen.
-3. Unter **Server** TeamSpeak-Ziel und Zugriffsmethode konfigurieren, zum Beispiel `voice.example.com#9987`.
-4. Für öffentliche Nutzung HTTPS einrichten; bei aktiviertem WebRTC den im Adminbereich angezeigten UDP-Bereich freigeben.
-
-## ⚠️ Voraussetzungen und Hinweise
-
-| Bereich | Hinweis |
-| --- | --- |
-| Browser | Aktuelles Chrome, Edge oder ein moderner WebRTC-fähiger Browser wird empfohlen. Mikrofon- und Fenster-Audio benötigen normalerweise HTTPS. |
-| TeamSpeak-Netzwerk | Der WebSpeak-Host muss den Zielserver erreichen können; der Standard-Sprachport ist `9987`. |
-| Webnetzwerk | Der Dienst verwendet `3040/TCP`; öffentlich sollte ein HTTPS-Reverse-Proxy für Seite und WebSocket verwendet werden. |
-| IPv6 | Literale Ziele als `[2001:db8::1]#9987` eintragen. Host/Container benötigen geroutetes IPv6, aktiviertes IPv6 in Betriebssystem und Node.js sowie passende Firewall-Regeln. |
-| WebRTC | Standardbereich `40000–40099/UDP`; den gesamten Bereich freigeben und WebRTC vor einer Änderung deaktivieren. |
-| Gespeicherte Identität | Eine Browseridentität kann nur eine aktive gespeicherte Verbindung halten. Für parallele Verbindungen deaktivieren oder ein anderes Browserprofil verwenden. |
-| Begleitton | Nur auf dem Desktop verfügbar und WebRTC erforderlich. Bei Fenster- oder Tab-Freigabe auch Audio freigeben. |
-| Daten | Docker verwendet `webspeak-data`; Release-Pakete und Quellcode verwenden `data/`. Vor Updates sichern. |
-| Sitzungslimit | Eine Instanz akzeptiert bis zu 100 aktive Browser-Sitzungen. |
-
-## Mitwirkende und Beiträge
+<details>
+<summary>Upstream-Autoren und PR-Beiträge anzeigen</summary>
 
 Diese Liste würdigt den Autor des zugrunde liegenden SDKs, Beiträge aus zusammengeführten GitHub-PRs sowie ursprüngliche Arbeiten, die in eigenständig verteilte Skin-Pakete übernommen wurden.
 
@@ -360,9 +469,16 @@ Diese Liste würdigt den Autor des zugrunde liegenden SDKs, Beiträge aus zusamm
 - [TimmySheep](https://github.com/TimmySheep) — [zusammengeführte PRs #13 und #15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep) zu vorhandenen TS6-Freigaben, Seitenverhältnis, mobiler Sprache/Bildschirm-Wachhalten/Skin-Menü, Kanaloptionen der Identität, PWA/Design, Chatverlauf, Mitglieder-Audiozuständen und Mikrofonberechtigungen.
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) ermöglichte Verbindungen über registrierte TeamSpeak-Nicknames und bewahrte Nickname-Ziele; [PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) verbesserte das Beibehalten des KAAK-Arbeitsbereichs und die Wiederverbindung nach der ersten Verbindung. [PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) und [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) lieferten das ursprüngliche Design und die Implementierung des Discord-Skins (Commit-Autor **yumi**), die das WebSpeak-Projekt in einen [eigenständig verteilten `.wskin`-Skin](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) überführte.
 
-## Funktionale Plugins entwickeln (dev)
+</details>
 
-Plugin-API, Server-/Instanzbereiche, gemeinsamer Videoplayer und GitHub-Verteilung:
+## Community & verwandte Projekte
 
-- [Plugin-Entwicklungsleitfaden](PLUGIN_DEVELOPMENT.md)
-- [Agent Skill für Plugin-Entwicklung](../.agents/skills/webspeak-plugin-development/SKILL.md)
+[GitHub Issues](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/issues) · [QQ-Gruppe 869500475](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475) · [Telegram](https://t.me/+8qShpTcuN9A3MWY9)
+
+[NeteaseTSBot](https://github.com/yichen11818/NeteaseTSBot): TeamSpeak-Musikbot mit plattformübergreifender Wiedergabe und Webkonsole.
+
+## Lizenz
+
+WebSpeak wird unter [AGPL-3.0-only](../LICENSE) veröffentlicht. Lizenzen und Herkunft von Abhängigkeiten stehen in den jeweiligen Upstream-Projekten.
+
+<p align="right"><a href="#readme-top">Nach oben ↑</a></p>
