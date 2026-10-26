@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { BlockList, isIP, SocketAddress } from "node:net";
 import { lookup, resolveSrv } from "node:dns/promises";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { parseTeamSpeakTarget } from "../domain/teamspeak-target.js";
@@ -108,25 +108,28 @@ export async function isSafeOpenTargetForPrefill(
   }
 }
 
+const restrictedIpv6 = new BlockList();
+// Match address bits, not textual compression or the case/width of hex groups.
+for (const [network, prefix] of [
+  ["::", 16], ["64:ff9b::", 96], ["64:ff9b:1::", 48],
+  ["100::", 64], ["100:0:0:1::", 64], ["2001::", 32], ["2002::", 16],
+  ["2001:db8::", 32], ["3fff::", 20], ["fc00::", 7], ["fe80::", 10],
+  ["fec0::", 10], ["ff00::", 8],
+] as const) restrictedIpv6.addSubnet(network, prefix, "ipv6");
+
 export function isRestrictedAddress(address: string): boolean {
+  // Scoped destinations refer to a gateway-local interface and are never public targets.
+  if (address.includes("%")) return true;
   const version = isIP(address);
   if (version === 4) return isRestrictedIpv4(address);
   if (version !== 6) return true;
 
-  const normalized = address.toLocaleLowerCase();
-  if (normalized === "::" || normalized === "::1") return true;
+  const normalized = new SocketAddress({ address, family: "ipv6" }).address;
   if (normalized.startsWith("::ffff:")) {
     const mapped = normalized.slice("::ffff:".length);
     return isIP(mapped) !== 4 || isRestrictedIpv4(mapped);
   }
-  if (normalized.startsWith("::")) return true; // IPv4-compatible and other special compressed forms
-  const first = Number.parseInt(normalized.split(":", 1)[0] || "0", 16);
-  if ((first & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
-  if ((first & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
-  if ((first & 0xffc0) === 0xfec0) return true; // deprecated site-local fec0::/10
-  if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
-  if (normalized.startsWith("2001:db8:")) return true; // documentation range
-  return false;
+  return restrictedIpv6.check(normalized, "ipv6");
 }
 
 function isMihomoFakeIpv4(address: string): boolean {

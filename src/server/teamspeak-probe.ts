@@ -99,7 +99,7 @@ export async function probeTeamSpeak(
 export function toProbeError(error: unknown, password = ""): TeamSpeakProbeError {
   if (error instanceof TeamSpeakProbeError) return error;
   const normalized = normalizeTeamSpeakError(error);
-  const raw = `${extractErrorText(error)} ${extractErrorText(normalized.cause)}`.toLocaleLowerCase();
+  const raw = `${extractErrorText(error)} ${extractErrorText(normalized.cause)}`.toLowerCase();
   if (/enotfound|eai_again|getaddrinfo|host not found/.test(raw)) {
     return new TeamSpeakProbeError("HOST_NOT_FOUND", "TeamSpeak host was not found", error);
   }

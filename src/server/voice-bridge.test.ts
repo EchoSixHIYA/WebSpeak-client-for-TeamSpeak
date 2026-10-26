@@ -238,6 +238,14 @@ function ipRequest(remoteAddress: string | undefined, headers: Record<string, st
   return { headers, socket: { remoteAddress } } as unknown as IncomingMessage;
 }
 
+test("equivalent forwarded IPv6 spellings share one canonical client and rate-limit key", () => {
+  const trusted = createTrustedProxies(["127.0.0.1"]);
+  const resolve = (value: string) => resolveClientIp(ipRequest("127.0.0.1", { "x-forwarded-for": value }), trusted);
+  assert.equal(resolve("2001:0DB9:0000:0000:0000:0000:0000:0001"), resolve("2001:db9::1"));
+  assert.equal(resolve("0:0:0:0:0:ffff:cb00:7109"), "203.0.113.9");
+  assert.equal(resolve("::ffff:203.0.113.9"), "203.0.113.9");
+});
+
 test("a direct client cannot choose the address recorded for it", () => {
   const trusted = createTrustedProxies(["127.0.0.1"]);
   assert.equal(resolveClientIp(ipRequest("192.0.2.7", { "x-forwarded-for": "203.0.113.9" }), trusted), "192.0.2.7");

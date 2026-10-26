@@ -12,6 +12,25 @@ const resolved = (...addresses: string[]) => async () => addresses.map((address)
   family: address.includes(":") ? 6 : 4,
 }));
 
+test("open targets classify equivalent IPv6 spellings and embedded IPv4 before DNS pinning", async () => {
+  const blocked = ["0:0:0:0:0:0:0:1", "0::1", "0:1234::1", "0:0:0:0:0:0:0:0", "0:0:0:0:0:ffff:a00:1",
+    "::ffff:7f00:1", "0::ffff:192.168.1.1", "0:0:0:0:0:0:7f00:1", "fe80::1%1",
+    "64:ff9b::808:808", "64:ff9b:1:abcd::1", "2002:0808:0808::1", "2001:0:4136:e378::1",
+    "0100:0000:0:0:ffff::1", "100:0:0:1::1", "2001:0db8::1", "3fff::1"];
+  for (const host of blocked) {
+    assert.equal(isRestrictedAddress(host), true, host);
+    await assert.rejects(resolveSafeOpenTarget({ host, port: 9987 }), { name: "UnsafeTeamSpeakTargetError" });
+    await assert.rejects(resolveSafeOpenTarget({ host: "voice.example.com", port: 9987 }, {
+      resolveSrv: async () => [], lookup: resolved("8.8.8.8", host),
+    }), { name: "UnsafeTeamSpeakTargetError" });
+  }
+  for (const host of ["0:0:0:0:0:ffff:808:808", "::ffff:1.1.1.1", "2001:4860:0000:0:0:0:0:8888",
+    "64:ff9b:2::1", "100:0:1::1", "2001:db9::1", "2003::1"]) {
+    assert.equal(isRestrictedAddress(host), false, host);
+    assert.deepEqual(await resolveSafeOpenTarget({ host, port: 9987 }), { host, port: 9987 });
+  }
+});
+
 test("Mihomo fake-IP DNS answers remain connectable without allowing literal or mixed fake-IP targets", async () => {
   const target = { host: "ts.twilightly.top", port: 9987 };
 

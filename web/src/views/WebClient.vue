@@ -1464,7 +1464,7 @@ const favoriteSwitchLabel = computed(() => quickServers.value.find((server) =>
 )?.label ?? currentServerTarget());
 
 function isQuickServerTarget(server: QuickServer): boolean {
-  return server.id === currentServerTarget().toLocaleLowerCase()
+  return server.id === currentServerTarget().toLowerCase()
     || quickServerTargetsEqual(server.address, currentServerTarget());
 }
 

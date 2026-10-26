@@ -1,6 +1,6 @@
 import { createSocket } from "node:dgram";
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { BlockList, isIP, SocketAddress } from "node:net";
 import { decodeFrame, encodeFrame, FrameType, jsonPayload, parseJsonPayload, verifyFrame } from "./protocol.mjs";
 
 function endpointKey(address, port) {
@@ -19,27 +19,28 @@ function endpointKey(address, port) {
  * Keep this an exact mirror: fail closed on anything that is not a literal
  * public address.
  */
+const restrictedIpv6 = new BlockList();
+for (const [network, prefix] of [
+  ["::", 16], ["64:ff9b::", 96], ["64:ff9b:1::", 48],
+  ["100::", 64], ["100:0:0:1::", 64], ["2001::", 32], ["2002::", 16],
+  ["2001:db8::", 32], ["3fff::", 20], ["fc00::", 7], ["fe80::", 10],
+  ["fec0::", 10], ["ff00::", 8],
+]) restrictedIpv6.addSubnet(network, prefix, "ipv6");
+
 export function isRestrictedAddress(host) {
+  if (host.includes("%")) return true;
   const version = isIP(host);
   if (version === 4) return isRestrictedIpv4(host);
   if (version !== 6) return true;
 
-  const normalized = host.toLowerCase();
-  if (normalized === "::" || normalized === "::1") return true;
+  const normalized = new SocketAddress({ address: host, family: "ipv6" }).address;
   if (normalized.startsWith("::ffff:")) {
     // IPv4-mapped addresses must be unwrapped before the IPv4 rules apply:
     // ::ffff:10.0.0.1 is private traffic in IPv6 clothing.
     const mapped = normalized.slice("::ffff:".length);
     return isIP(mapped) !== 4 || isRestrictedIpv4(mapped);
   }
-  if (normalized.startsWith("::")) return true; // IPv4-compatible and other special compressed forms
-  const first = Number.parseInt(normalized.split(":", 1)[0] || "0", 16);
-  if ((first & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
-  if ((first & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
-  if ((first & 0xffc0) === 0xfec0) return true; // deprecated site-local fec0::/10
-  if ((first & 0xff00) === 0xff00) return true; // multicast ff00::/8
-  if (normalized.startsWith("2001:db8:")) return true; // documentation range
-  return false;
+  return restrictedIpv6.check(normalized, "ipv6");
 }
 
 function isRestrictedIpv4(host) {

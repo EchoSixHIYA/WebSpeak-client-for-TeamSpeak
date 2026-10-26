@@ -44,6 +44,7 @@ export interface AdminRouterOptions {
   pluginRegistry?: PluginRegistry;
   pluginStore?: PluginStore;
   startedAt: number;
+  clientIp?: (request: Request) => string;
 }
 
 export function createAdminRouter(options: AdminRouterOptions): Router {
@@ -90,25 +91,29 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       response.status(409).json({ ok: false, code: "NOT_INITIALIZED" });
       return;
     }
-    const peer = request.socket.remoteAddress ?? "unknown";
-    const retryAfterMs = limiter.retryAfterMs(peer);
-    if (retryAfterMs > 0) {
-      response.setHeader("Retry-After", String(Math.ceil(retryAfterMs / 1000)));
-      response.status(429).json({ ok: false, code: "RATE_LIMITED", retryAfterMs });
-      return;
-    }
+    const peer = options.clientIp?.(request) ?? request.socket.remoteAddress ?? "unknown";
     const body = asRecord(request.body);
     const username = readString(body, "username", 64).trim();
     const password = readOptionalString(body, "password", 1024);
-    if (!await options.service.verifyPassword(username, password)) {
-      const delayMs = limiter.recordFailure(peer);
+    const reservation = limiter.reserve(peer);
+    if (!reservation.allowed) {
+      response.setHeader("Retry-After", String(Math.ceil(reservation.retryAfterMs / 1000)));
+      response.status(429).json({ ok: false, code: "RATE_LIMITED", retryAfterMs: reservation.retryAfterMs });
+      return;
+    }
+    const revision = options.service.credentialRevision;
+    let verified: boolean;
+    try { verified = await options.service.verifyPassword(username, password); }
+    catch (error) { reservation.finish("cancelled"); sendAdminError(response, error); return; }
+    if (!verified || revision !== options.service.credentialRevision) {
+      const delayMs = reservation.finish("failure");
       await waitFor(delayMs);
       options.service.database.addAudit("ADMIN_LOGIN_FAILED");
       logger.warn("Administrator login failed");
       response.status(401).json({ ok: false, code: "INVALID_PASSWORD" });
       return;
     }
-    limiter.recordSuccess(peer);
+    reservation.finish("success");
     options.service.database.addAudit("ADMIN_LOGIN_SUCCEEDED");
     const session = options.sessions.create(response, isSecureRequest(request));
     response.json({ ok: true, csrfToken: session.csrfToken, expiresAt: session.expiresAt, mustChangePassword: options.service.isPasswordChangeRequired() });
@@ -118,6 +123,7 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
     try {
       const body = asRecord(request.body);
       await options.service.changePassword(readString(body, "newPassword", 1024));
+      options.sessions.revokeOthers(request);
       response.json({ ok: true, mustChangePassword: false });
     } catch (error: unknown) {
       sendAdminError(response, error);
@@ -801,7 +807,7 @@ function logLevelName(level: unknown): string {
 
 function sendAdminError(response: Response, error: unknown): void {
   if (error instanceof AdminInputError) {
-    response.status(400).json({ ok: false, code: error.code });
+    response.status(error.code === "AUTH_REQUIRED" ? 401 : 400).json({ ok: false, code: error.code });
     return;
   }
   response.status(500).json({ ok: false, code: "INTERNAL_ERROR" });

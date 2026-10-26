@@ -72,11 +72,11 @@ export function formatTeamSpeakTarget(target: TeamSpeakTarget): string {
 }
 
 export function teamSpeakTargetKey(target: TeamSpeakTarget): string {
-  return formatTeamSpeakTarget(target).toLocaleLowerCase();
+  return formatTeamSpeakTarget(target).toLowerCase();
 }
 
 function createTarget(hostValue: string, portValue: string | number): TeamSpeakTarget {
-  const host = hostValue.trim().toLocaleLowerCase();
+  const host = hostValue.trim().toLowerCase();
   if (!host || host.length > 255 || /[\s/\\?#@\[\]]/.test(host)) {
     throw new InvalidTeamSpeakTargetError("Invalid TeamSpeak server address");
   }

@@ -45,6 +45,8 @@ type ProbeFunction = typeof probeTeamSpeak;
 
 export class AdminService {
   private readonly tsAdmin: TsAdminService;
+  private revision = 0;
+  get credentialRevision(): number { return this.revision; }
   constructor(
     readonly database: WebSpeakDatabase,
     private readonly masterSecret: Buffer,
@@ -74,8 +76,9 @@ export class AdminService {
   }
 
   async verifyPassword(username: string, password: string): Promise<boolean> {
+    const revision = this.revision;
     const credential = this.database.getAdminCredential();
-    return credential?.username === username && await verifyAdminPassword(password, credential);
+    return credential?.username === username && await verifyAdminPassword(password, credential) && revision === this.revision;
   }
 
   isPasswordChangeRequired(): boolean {
@@ -83,12 +86,15 @@ export class AdminService {
   }
 
   async changePassword(password: string): Promise<void> {
+    const revision = this.revision;
     const credential = this.database.getAdminCredential();
     if (!credential) throw new AdminInputError("NOT_INITIALIZED", "The administrator account is not initialized");
     const passwordError = validateAdminPassword(password);
     if (passwordError) throw new AdminInputError("INVALID_ADMIN_PASSWORD", passwordError);
     const replacement = await hashAdminPassword(password, { username: credential.username, mustChangePassword: false });
+    if (revision !== this.revision) throw new AdminInputError("AUTH_REQUIRED", "Administrator credentials changed during the request");
     this.database.updateAdminCredential(replacement);
+    this.revision++;
     this.database.addAudit("ADMIN_PASSWORD_CHANGED");
   }
 
