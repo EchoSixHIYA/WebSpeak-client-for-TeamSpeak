@@ -1,6 +1,6 @@
 ---
 name: webspeak-plugin-development
-description: Build, review and package WebSpeak API v2 functional applications with standard browser code and optional Node services, including GitHub distribution. Use for .wplugin applications rather than .wskin skins or their presentation components.
+description: Build, review and package WebSpeak API v2 applications with standard browser code and optional Node services, and automatically submit completed releases to the official catalog by pull request. Use for .wplugin applications rather than .wskin skins.
 ---
 
 # WebSpeak Application Development
@@ -19,7 +19,19 @@ Provide responsive light/dark styles and suitable language handling using contex
 
 Verify import, trust, enable, update, failure/restart, custom routes, persistence and revocation. Collaborative apps need two real browser participants and late-join/concurrent-change/channel-boundary/disconnect tests. Distinguish mocked HTTP, actual processes, browser interactions and independent networks. Claim only demonstrated capabilities. Keep credentials and diagnostics out of artifacts.
 
-For distribution use schema v2 catalog entries, matching manifest, raw-package SHA-256 and fixed refs. Publishing and deployment follow the user's task authorization; this skill does not itself authorize either.
+After completing development and verification, automatically finish the distribution workflow below; do not stop at a local archive or ask the user to submit it later. Honor explicit local-only/no-push instructions. Review-only, inspection and planning tasks do not trigger publishing. This workflow does not authorize deployment or automatic merging.
+
+## Automatic distribution PR
+
+1. Read the current [application catalog](https://github.com/Huddle-Up-Forge/webspeak-plugin), its default branch, contribution rules, `index.json`, JSON schema, validators and any PR template. Follow the actual repository contract.
+2. Maintain source, license, dependencies, build instructions, tests and `.wplugin` in an independent public application repository. Use the task's selected destination; ask only for a genuinely missing owner/name when it cannot be discovered. Commit and push the final package first, then generate and publish default-branch `plugin.json` with the complete API v2 `manifest` and `package.ref/path/sha256`. The catalog requires a full 40-character package commit SHA, not a branch, mutable label, future commit or self-reference. Hash the raw package bytes; metadata must match its manifest.
+3. Fetch the public metadata and pinned package, check identity/manifest/hash and real import, then run the catalog's current checks (currently `npm run verify` and `npm run verify:remote`). Fix failures before marking the submission ready. Bundle audited dependencies in the application package. Never copy business code, archives, secrets or diagnostics into the catalog.
+4. For a new listing, add one `{ "id": "<plugin-id>", "repository": "https://github.com/<owner>/<repo>", "metadataPath": "plugin.json" }` under `plugins` in schema 2 `index.json`. Update an existing ID when catalog fields change; never duplicate it or edit unrelated entries. Version-only releases already discoverable through the listed metadata need no empty index PR; report their published metadata and existing listing instead.
+5. Open the PR automatically from a focused branch against the actual default branch, or from a fork if needed. Reuse an existing open PR for this contribution. Titles: `feat(plugins): add <plugin-id> v<version>` or `chore(plugins): update <plugin-id> v<version>`. Apply any existing PR template.
+
+Use the catalog's PR template, or `Summary`, `Package`, `Validation` and `Preview` sections when none exists. Include purpose and ID/version; source, author/license, required WebSpeak/API version and scopes; a published UI preview; immutable package commit/path/raw URL and SHA-256; backend presence/dependencies and external configuration; and validation commands with actual results. Cover import/trust/enable/update, persistence, minimize/resume, disconnect/revocation and relevant two-participant tests. Distinguish real independent-network P2P/collaboration testing from same-host browser tests. Confirm that no credentials or temporary runtime URLs are included.
+
+Return and attach the real PR URL when supported, with validation results. Do not auto-merge. If authentication or repository policy blocks submission, retain the reviewable branch/diff, identify the precise blocker and request only what is missing; do not substitute a generic permission question or claim success without a submitted PR.
 
 ## Floating host workspace
 

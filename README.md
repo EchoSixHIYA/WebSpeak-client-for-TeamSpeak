@@ -99,6 +99,17 @@ Data persists in the `webspeak-data` volume. The Compose file uses host networki
 
 Skins own appearance, layout and attached widgets. Functional plugin API v2 is included in v0.3.0 with a skin-independent floating application workspace.
 
+### 开发与收录 · Develop & contribute
+
+| 扩展 · Extension | 开发 Skill · Development skill | 收录 PR · Catalog PR |
+| --- | --- | --- |
+| 皮肤及附属小组件 · Skins & attached widgets | [Skin Development Skill](./.agents/skills/webspeak-skin-development/SKILL.md) | [webspeak-skins](https://github.com/Huddle-Up-Forge/webspeak-skins) |
+| 独立功能应用 · Functional applications | [Plugin Development Skill](./.agents/skills/webspeak-plugin-development/SKILL.md) | [webspeak-plugin](https://github.com/Huddle-Up-Forge/webspeak-plugin) |
+
+使用对应 Skill 开发时，Agent 会在完成构建与验证后，发布独立仓库中的源码、包及校验元数据，并自动向相应分发仓库提交规范的收录 PR。PR 包含用途、版本与兼容性、许可证、界面预览、不可变包地址、SHA-256 和实际验证结果；完成后返回 PR 链接，交由维护者审查。已收录包的纯版本更新遵循目录的元数据更新规则，不重复添加索引或制造空 PR。
+
+The skills complete the contribution workflow automatically: publish validated source, packages and integrity metadata in an independent repository, then submit a focused catalog PR with compatibility, license, preview, immutable package reference, SHA-256 and test evidence. They return the PR for maintainer review. Version-only updates follow the catalog's metadata policy instead of duplicating entries or creating empty PRs.
+
 ## 社区 · Community
 
 [GitHub Issues](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/issues) · [QQ 群 · QQ group `869500475`](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=yhumUMDD9PmyYFWdXWUb_x7hM5trFQY8&authKey=Pw3HBGT7GwMinTQnuFGfnpf0aRSzXOJKcAiujVP1%2BXMpjheAKrncTRivicBJxpjV&noverify=0&group_code=869500475) · [Telegram](https://t.me/+8qShpTcuN9A3MWY9)
