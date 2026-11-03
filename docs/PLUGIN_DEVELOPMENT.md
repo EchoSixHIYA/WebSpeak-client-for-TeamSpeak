@@ -1,6 +1,6 @@
 # WebSpeak 功能应用开发 / Functional application development
 
-当前 `dev` 使用应用运行时 **API v2**。正式版 v0.2.9 不包含该能力。`.wplugin` 与 `.wskin` 完全独立；旧 API v1、共享房间协议及其两个示例已移除，不兼容旧包。
+WebSpeak **v0.3.0** 使用应用运行时 **API v2**。`.wplugin` 与 `.wskin` 完全独立；旧 API v1、共享房间协议及其两个示例已移除，不兼容旧包。
 
 插件是作者自己的应用：标准 HTML/CSS/JavaScript 前端，加上可选的 Node 后端。可以使用框架、浏览器原生 API、自己的 HTTP/WebSocket 协议、网络客户端和数据模型。宿主不提供按音乐、文件、视频等功能划分的业务 API，也不提供 `room.read/write` 或下载权限表。浏览器原有的安全上下文、用户手势、权限许可、跨域及网络可达性要求仍然适用。
 

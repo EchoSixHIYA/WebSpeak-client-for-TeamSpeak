@@ -13,9 +13,9 @@
 
 WebSpeak ist ein selbst gehosteter Browserclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer verwenden Sprache, Chat und Bildschirmfreigabe im Browser; Betreiber verwalten Zielserver, Zugriff und Daten über die Webkonsole.
 
-Stabile Version: [Hinweise zu v0.2.9](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Der Store für funktionale Plugins ist derzeit auf `dev` verfügbar und nicht in v0.2.9 enthalten.
+Stabile Version: [Hinweise zu v0.3.0](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Mit Plugin-API v2, schwebenden Anwendungen und gemeinsamer Instanzberechtigung.
 
-Sicherheitskorrekturen im Entwicklungszweig: `dev` enthält neu implementierte IPv6-Zielprüfungen, Limits für gleichzeitige Anmeldungen, Sitzungswiderruf nach Passwortwechsel, Proxy-Ratenlimits und PCM-Uplink-Schutz aus PR #48. Die historischen Hinweise zu v0.2.9 beziehen sich auf die ursprüngliche Veröffentlichung, ohne diese noch unveröffentlichten Korrekturen.
+
 
 [Live-Demo](#demo) · [Funktionen](#features) · [Screenshots](#screenshots) · [Bereitstellung](#deployment) · [Verwaltung](#administration) · [Erweiterte Einstellungen](#advanced) · [Skins & Plugins](#extensions) · [Problemlösung](#troubleshooting) · [Änderungsprotokoll](#changelog)
 
@@ -50,7 +50,7 @@ Sprachverbindungen verwenden das TeamSpeak-Clientprotokoll und benötigen keine 
 - **TeamSpeak 3**: Die Erkennung wertet die führende `3.x`-Versionsnummer aus. Ältere Serverversionen sollten in der jeweiligen Umgebung geprüft werden, da nicht jede historische Version separat getestet wurde.
 - **TeamSpeak 6**: Unterstützt, einschließlich Bildschirmfreigabe mit nativen TeamSpeak-6-Clients.
 - **Automatische Erkennung**: Das Gateway liest die `version`-Antwort des Servers und hält das erkannte Protokoll in der Verbindungsdiagnose fest.
-- Das Gateway verwendet das Upstream-SDK `1.0.0-beta.19` [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js); WebSpeak richtet sich an TeamSpeak 3 und 6.
+- Das Gateway verwendet das Upstream-SDK `1.0.0-beta.23` [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js); WebSpeak richtet sich an TeamSpeak 3 und 6.
 
 <a id="screenshots"></a>
 
@@ -157,7 +157,7 @@ Die Beispieldomain durch die eigene ersetzen. Ein erreichbarer Reverse Proxy ode
 
 ## Administration
 
-Unter `/admin` werden Server, Zugriff, WebRTC, Relays, Einladungen, aktive Sitzungen, Logs und Backups verwaltet. Der Skin-Store liegt unter `/admin/skins`, der Store für funktionale Plugins (dev) unter `/admin/plugins`.
+Unter `/admin` werden Server, Zugriff, WebRTC, Relays, Einladungen, aktive Sitzungen, Logs und Backups verwaltet. Der Skin-Store liegt unter `/admin/skins`, der Store für funktionale Plugins unter `/admin/plugins`.
 
 ### Optionale TeamSpeak-Verwaltung
 
@@ -292,7 +292,7 @@ Relay deaktivieren und speichern, um die Option von der Willkommensseite zu entf
 
 - Der Relay-Dienst ist Bestandteil von WebSpeak und verwendet Node.js-Standardbibliotheken; GOST, sing-box oder ein anderes Proxy-Framework werden nicht verwendet.
 - WebRTC verwendet [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`; das Upstream-Projekt steht unter MIT-Lizenz.
-- TeamSpeak verwendet das Upstream-Paket [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) `@honeybbq/teamspeak@1.0.0-beta.19`; ein eigener SDK-Fork muss nicht gebaut werden.
+- TeamSpeak verwendet das Upstream-Paket [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) `@honeybbq/teamspeak@1.0.0-beta.23`; ein eigener SDK-Fork muss nicht gebaut werden.
 
 <a id="extensions"></a>
 
@@ -304,9 +304,9 @@ Skins gestalten Aussehen, Layout und zugehörige Widgets. Administratoren instal
 
 [Entwicklungsleitfaden](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [Skin-Katalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord-Voice-Beispiel](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
 
-### Funktionale Plugins `.wplugin` (dev)
+### Funktionale Plugins `.wplugin`
 
-Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und optionalen Node-Backends, eigenen Routen, Daten und Zusammenarbeit. Administratoren prüfen Code und Abhängigkeiten vor der Aktivierung; Updates erfordern erneutes Vertrauen. Anwendungen unterstützen TS-Server- oder Instanz-Bereiche und eine separate Origin. API v2 benötigt die aktuelle dev-Version und ist nicht in v0.2.9 enthalten.
+Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und optionalen Node-Backends, eigenen Routen, Daten und Zusammenarbeit. Administratoren prüfen Code und Abhängigkeiten vor der Aktivierung; Updates erfordern erneutes Vertrauen. Anwendungen unterstützen TS-Server- oder Instanz-Bereiche und eine separate Origin. API v2 ist ab v0.3.0 enthalten.
 
 [Entwicklungsleitfaden](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [Verteilungskatalog & Beispiel](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 
@@ -340,6 +340,36 @@ Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und opti
 ## Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
+
+#### Plugin-Anwendungen
+
+- Plugin-API v2 für eigenständige Browser-Anwendungen und optionale Node-Backends mit eigenen Routen, Zuständen, Kommunikationswegen und Funktionen.
+- Installation über den GitHub-Store oder lokale `.wplugin`-Pakete. Administratoren verwalten öffentliche/private Konfigurationen, prüfen und aktivieren Anwendungen; Updates erfordern erneutes Vertrauen.
+- Ein vom Design unabhängiger schwebender Einstieg und eine Anwendungsbibliothek. Fenster lassen sich verschieben, skalieren, minimieren, maximieren und wiederherstellen; Minimieren oder der Wechsel zur Bibliothek lädt die Anwendung nicht neu.
+- Anwendungsvorlage, Entwicklungsanleitung und Agent Skill; P2P-Dateiübertragung und gemeinsames Videoschauen werden in eigenen Repositories verteilt.
+
+#### Designs und Berechtigung
+
+- Beim ersten Besuch wird gemeinsam nach der Berechtigung für Designs und Plugins dieser Instanz gefragt; Verbindungszugangsdaten sind ausgeschlossen. Der letzte Eintrag im Designmenü öffnet diese Einstellung erneut.
+- Ohne Zustimmung bleiben nur Tag, Nacht und ILLUSIA verfügbar. KAAK, andere Designs und der Plugin-Einstieg werden ausgeblendet. Ein Widerruf stellt ein integriertes Design wieder her, bricht laufende Ladevorgänge ab und beendet zugehörige Komponenten und Anwendungsseiten.
+- Manifest-Berechtigungen, Datenprojektion, Paketprüfsummen und Prüfungen von Host-Aktionen bleiben erhalten. Die Prüfung durch den Administrator gilt weiterhin separat.
+
+#### Korrekturen und Aktualisierungen
+
+- Native TS-Clients beantworteten reine Videoangebote bei Fenster-, Bildschirm- oder Freigaben ohne Ton nicht. Die erforderliche Audiosektion wird jetzt ausgehandelt, ohne ein Mikrofon aufzunehmen oder Ton zu erzeugen. Fenster- und Bildschirmvideo wurden im Benutzertest bestätigt.
+- SDK auf `@honeybbq/teamspeak@1.0.0-beta.23` aktualisiert; optionale Mitgliedsfelder werden berücksichtigt und leere Pakete am Sprachende übersprungen.
+- Upstream-Korrekturen für TSDNS, Query-Wiederholungen nach Flooding, Dateiübertragungen und Verbindungsabbau übernommen.
+- Korrekturen für IPv6-Zielprüfung, begrenzte parallele Anmeldungen, Sitzungswiderruf nach Passwortwechsel, vertrauenswürdige Proxys und PCM-Uplink-Schutz übernommen.
+- Der Kaltstart von Designs verwendet weiterhin die tatsächliche Build-Version. Desktop, Web und Android verwenden eine einheitliche Anwendungsversion.
+
+#### Aktualisierung
+
+- Plugin-API v2 ist nicht mit v1-Paketen kompatibel. Ersatzanwendungen aktualisieren, prüfen und aktivieren.
+- Öffentliche Plugins benötigen einen separaten HTTPS-Ursprung, der im Administrationsbereich konfiguriert und an den Laufzeitport (Standard `3042`) weitergeleitet wird. Hauptseite und Anwendungen dürfen keinen Ursprung teilen.
+- Die Instanzberechtigung muss neu gewählt werden; frühere Einzelberechtigungen gelten nicht als Zustimmung.
+
 
 ### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
 

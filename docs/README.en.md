@@ -13,9 +13,9 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors join voice, chat and screen sharing in a browser; operators manage target servers, access policy and data through the administration console.
 
-Stable release: [v0.2.9 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). The functional plugin store is currently available on `dev` and is not part of v0.2.9.
+Stable release: [v0.3.0 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Includes plugin API v2, floating applications and unified instance authorization.
 
-Development security fixes: `dev` now reimplements the IPv6 target checks, concurrent login limits, password-rotation session revocation, trusted-proxy rate limits and PCM uplink safeguards reported in PR #48. The historical v0.2.9 notes below describe the original release and do not include these unreleased fixes.
+
 
 [Live demo](#demo) · [Features](#features) · [Screenshots](#screenshots) · [Deployment](#deployment) · [Administration](#administration) · [Advanced settings](#advanced) · [Skins & plugins](#extensions) · [Troubleshooting](#troubleshooting) · [Changelog](#changelog)
 
@@ -50,7 +50,7 @@ Voice uses the standard TeamSpeak client protocol and needs no Query credentials
 - **TeamSpeak 3**: protocol detection recognizes the leading `3.x` version. Older server releases should be validated with the specific deployment because not every historical release has been independently tested.
 - **TeamSpeak 6**: supported, including screen sharing with native TeamSpeak 6 clients.
 - **Auto-detection**: the gateway reads the server's `version` response and records the detected protocol in connection diagnostics.
-- The gateway uses the upstream [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) `1.0.0-beta.19` SDK; WebSpeak targets TeamSpeak 3 and TeamSpeak 6.
+- The gateway uses the upstream [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) `1.0.0-beta.23` SDK; WebSpeak targets TeamSpeak 3 and TeamSpeak 6.
 
 <a id="screenshots"></a>
 
@@ -157,7 +157,7 @@ Replace the example hostname with your own. A working reverse proxy or Tunnel do
 
 ## Administration
 
-Open `/admin` to manage servers and access, WebRTC and relays, invitations, active sessions, logs and backups. The skin store is at `/admin/skins`; the functional plugin store (dev) is at `/admin/plugins`.
+Open `/admin` to manage servers and access, WebRTC and relays, invitations, active sessions, logs and backups. The skin store is at `/admin/skins`; the functional plugin store is at `/admin/plugins`.
 
 ### Optional TeamSpeak administration
 
@@ -292,7 +292,7 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 - The relay service is built into WebSpeak with Node.js standard libraries; it does not use GOST, sing-box, or another proxy framework.
 - WebRTC uses [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`, whose upstream project is licensed under MIT.
-- TeamSpeak connectivity uses the upstream [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) package `@honeybbq/teamspeak@1.0.0-beta.19`; a project SDK fork build is not required.
+- TeamSpeak connectivity uses the upstream [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) package `@honeybbq/teamspeak@1.0.0-beta.23`; a project SDK fork build is not required.
 
 <a id="extensions"></a>
 
@@ -304,9 +304,9 @@ Skins own appearance, layout and their attached widgets. Administrators install,
 
 [Development guide](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [Skin catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice example](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
 
-### Functional plugins `.wplugin` (dev)
+### Functional plugins `.wplugin`
 
-Functional plugins are independent applications using standard browser capabilities and optional Node backends with their own routes, state and collaboration. Administrators review code and dependencies before enabling; updates require renewed trust. Applications support TS server or instance scope and run on a separate origin. API v2 requires current dev and is not included in v0.2.9.
+Functional plugins are independent applications using standard browser capabilities and optional Node backends with their own routes, state and collaboration. Administrators review code and dependencies before enabling; updates require renewed trust. Applications support TS server or instance scope and run on a separate origin. API v2 is included starting with v0.3.0.
 
 [Development guide](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [Distribution catalog & example](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 
@@ -340,6 +340,36 @@ Functional plugins are independent applications using standard browser capabilit
 ## Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
+
+#### Plugin applications
+
+- Release plugin API v2 for independent browser applications and optional Node backends, with author-defined routes, state, communication and business logic.
+- Install applications from the GitHub store or local `.wplugin` packages. Administrators manage public/private configuration, review and enable applications; updates require renewed trust.
+- Add a skin-independent floating launcher and application library. Windows support dragging, resizing, minimize, maximize and restore; minimizing or returning to the library keeps the active application loaded.
+- Provide an application template, development guide and Agent Skill. P2P file transfer and Watch Together are distributed from separate repositories.
+
+#### Skins and authorization
+
+- Ask once on first entry for this instance’s third-party skins and plugins together, excluding connection credentials. The final Authorization item in the skin menu allows changes at any time.
+- Without consent, offer only Day, Night and ILLUSIA; hide KAAK, other third-party skins and plugin access. Revocation restores a built-in skin, cancels pending loads and stops related components and application pages.
+- Retain manifest permissions, data projection, package digests and host action checks. Administrator application review and trust remain independent.
+
+#### Fixes and upgrades
+
+- Fix native TS clients not answering video-only offers when sharing an application window, the entire screen or without shared audio. Negotiate the required audio section without capturing a microphone or fabricating shared sound. Window and full-screen video were confirmed by user retesting.
+- Upgrade to `@honeybbq/teamspeak@1.0.0-beta.23`, handle optional member fields and skip empty audio packets that mark the end of speech.
+- Include upstream TSDNS resolution, Query flooding retries, file transfer and disconnect cleanup fixes.
+- Include IPv6 target validation, bounded concurrent login, password-change session revocation, trusted-proxy rate limiting and PCM uplink protection fixes.
+- Retain and verify the skin cold-start fix that uses the real build version. Align application versions across desktop, web and Android.
+
+#### Upgrading
+
+- Plugin API v2 is incompatible with API v1 packages. Update, review and enable replacement applications.
+- Public plugin deployment requires a separate HTTPS application origin configured in administration and proxied to the runtime port (default `3042`). The application and main site must not share an origin.
+- Users must make a new instance authorization choice; old per-skin approvals do not imply consent.
+
 
 ### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
 

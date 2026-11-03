@@ -5,7 +5,7 @@ description: Build, review and package WebSpeak API v2 functional applications w
 
 # WebSpeak Application Development
 
-Read the current [application runtime guide](../../../docs/PLUGIN_DEVELOPMENT.md). In a standalone checkout, use `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/dev/docs/PLUGIN_DEVELOPMENT.md`. Confirm API v2 support on the target instance; stable v0.2.9 has none. API v1 and its shared-room examples are removed.
+Read the current [application runtime guide](../../../docs/PLUGIN_DEVELOPMENT.md). In a standalone checkout, use `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/master/docs/PLUGIN_DEVELOPMENT.md`. Require WebSpeak v0.3.0 or later for API v2. API v1 and its shared-room examples are removed.
 
 Develop an independent application, not a list of host business RPC calls. Use ordinary HTML/CSS/JavaScript, browser APIs and optional Node services with author-defined routes, dependencies and state. The host provides authenticated context, configuration, package/lifecycle management and a separate origin. It supplies no room API or feature permission list. Keep application business logic in its package; a host defect or missing general runtime primitive is a separate host change.
 

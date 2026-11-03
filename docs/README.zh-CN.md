@@ -13,9 +13,9 @@
 
 WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户通过浏览器加入语音、聊天和屏幕共享；部署者通过管理员控制台管理目标服务器、访问策略和数据。
 
-稳定版：[v0.2.9 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。功能插件商店目前仅在 `dev` 分支提供，尚未包含在 v0.2.9 中。
+稳定版：[v0.3.0 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。包含功能插件 API v2、悬浮应用界面和实例统一授权。
 
-开发分支安全修复：`dev` 已重新实现 PR #48 报告的 IPv6 目标校验、并发登录、改密会话撤销、可信代理限流与 PCM 上行保护。以下 v0.2.9 历史记录描述的是原发布包，不包含这次尚未发布的修复。
+
 
 [在线演示](#demo) · [功能](#features) · [界面预览](#screenshots) · [部署](#deployment) · [管理](#administration) · [高级配置](#advanced) · [皮肤与插件](#extensions) · [常见问题](#troubleshooting) · [更新日志](#changelog)
 
@@ -50,7 +50,7 @@ WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语�
 - **TeamSpeak 3**：协议识别会读取版本号开头的 `3.x`。并非所有历史服务器版本都经过独立验证，部署旧版本时请针对实际服务器进行测试。
 - **TeamSpeak 6**：支持，也支持与 TeamSpeak 6 原生客户端进行屏幕共享。
 - **自动探测**：网关读取服务器的 `version` 响应并在连接诊断中记录识别到的协议。
-- 网关使用上游 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) `1.0.0-beta.19` SDK；WebSpeak 面向 TeamSpeak 3 和 TeamSpeak 6。
+- 网关使用上游 [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) `1.0.0-beta.23` SDK；WebSpeak 面向 TeamSpeak 3 和 TeamSpeak 6。
 
 <a id="screenshots"></a>
 
@@ -157,7 +157,7 @@ webspeak.example.com {
 
 ## 管理员控制台
 
-实例配置位于 `/admin`：管理服务器与访问策略、WebRTC 与中继、邀请、活动会话、运行日志和备份。皮肤商店位于 `/admin/skins`；功能插件商店（dev）位于 `/admin/plugins`。
+实例配置位于 `/admin`：管理服务器与访问策略、WebRTC 与中继、邀请、活动会话、运行日志和备份。皮肤商店位于 `/admin/skins`；功能插件商店位于 `/admin/plugins`。
 
 ### 可选的 TeamSpeak 管理
 
@@ -296,7 +296,7 @@ relay.example.com {
 
 - 中继服务是 WebSpeak 自带实现，使用 Node.js 标准库，不依赖 GOST、sing-box 或其他代理框架。
 - WebRTC 使用 [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`，上游采用 MIT 许可证。
-- TeamSpeak 协议使用上游 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) 发布的 `@honeybbq/teamspeak@1.0.0-beta.19`，无需构建项目 SDK fork。
+- TeamSpeak 协议使用上游 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) 发布的 `@honeybbq/teamspeak@1.0.0-beta.23`，无需构建项目 SDK fork。
 
 <a id="extensions"></a>
 
@@ -308,9 +308,9 @@ relay.example.com {
 
 [开发指南](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [皮肤索引仓库](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice 示例](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
 
-### 功能插件 `.wplugin`（dev）
+### 功能插件 `.wplugin`
 
-功能插件是独立应用，使用标准浏览器能力和可选 Node 后端，自行实现路由、状态与协作。管理员审核代码和依赖后启用；更新须重新信任。支持 TS 服务器或实例范围，运行于独立源。当前 dev 使用 API v2，不属于 v0.2.9。
+功能插件是独立应用，使用标准浏览器能力和可选 Node 后端，自行实现路由、状态与协作。管理员审核代码和依赖后启用；更新须重新信任。支持 TS 服务器或实例范围，运行于独立源。v0.3.0 起提供 API v2。
 
 [开发指南](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [分发索引与示例](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 
@@ -344,6 +344,36 @@ relay.example.com {
 ## 更新日志
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
+
+#### 插件系统
+
+- 发布功能插件 API v2：支持独立浏览器应用和可选 Node 后端，作者可自行实现路由、状态、通信和业务逻辑。
+- 管理员可通过 GitHub 插件商店或本地 `.wplugin` 包安装应用，配置公开/私密设置并审核启用；更新后需要重新信任。
+- 新增独立于皮肤的悬浮入口和应用库。插件窗口支持拖动、调整大小、最小化、最大化与还原，最小化或返回应用库不会重载当前应用。
+- 提供应用模板、插件开发指南与 Agent Skill；P2P 文件传输和视频同看通过独立仓库分发。
+
+#### 皮肤与授权
+
+- 首次进入时统一确认当前实例第三方皮肤与插件的授权，不包含连接凭据；皮肤菜单末尾增加“授权”，可随时更改。
+- 未同意时仅显示日间、夜间、ILLUSIA 三款官方皮肤，隐藏 KAAK 等其他皮肤及插件入口。撤回后切回内置皮肤、取消待完成加载并停止相关组件和插件页面。
+- 保留皮肤清单权限、数据投影、文件摘要及宿主动作校验，管理员的应用审核与信任设置仍独立生效。
+
+#### 修复与升级
+
+- 修复窗口、整个屏幕及关闭共享音频时，TS 原生客户端不应答纯视频 offer 的问题：补充必要的音频协商段，不采集麦克风，也不伪造共享声音。窗口与全屏已由用户复测出画面。
+- SDK 升级至 `@honeybbq/teamspeak@1.0.0-beta.23`，适配可选成员字段，并跳过代表说话结束的空音频数据包。
+- 纳入上游 TSDNS 解析、查询限流重试、文件传输及断开连接清理等修复。
+- 纳入 IPv6 目标校验、并发登录限制、改密后的会话撤销、可信代理限流与 PCM 上行保护修复。
+- 保留并验证皮肤首次加载使用真实构建版本的修复，统一桌面、网页及 Android 的应用版本号。
+
+#### 升级说明
+
+- 插件 API v2 不兼容旧 API v1 应用包，请更新插件后重新审核并启用。
+- 公网使用功能插件时，需要在管理员面板配置独立的 HTTPS 应用源并代理运行端口（默认 `3042`）；主站与应用不能使用同一个源。
+- 本次统一授权需要用户重新选择，旧的逐皮肤授权记录不会自动视为同意。
+
 
 ### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
 

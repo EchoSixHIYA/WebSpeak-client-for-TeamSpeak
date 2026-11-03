@@ -13,9 +13,9 @@
 
 WebSpeak はセルフホスト型の TeamSpeak 3 / TeamSpeak 6 ブラウザークライアント兼音声ゲートウェイです。ユーザーはブラウザーで音声、チャット、画面共有に参加でき、運営者は管理コンソールで接続先、アクセス方針、データを管理できます。
 
-安定版：[v0.2.9 の更新履歴](#latest-release-notes) · [パッケージを取得](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。機能プラグインストアは現在 `dev` ブランチで提供しており、v0.2.9 には含まれません。
+安定版：[v0.3.0 更新内容](#latest-release-notes) · [ダウンロード](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。API v2、フローティングアプリ、インスタンス単位の許可に対応。
 
-開発ブランチのセキュリティ修正：`dev` では PR #48 の IPv6 検証、同時ログイン制限、パスワード変更後のセッション失効、信頼済みプロキシごとの制限、PCM 送信保護を再実装しました。以下の v0.2.9 履歴は元のリリースの内容であり、今回の未リリース修正は含みません。
+
 
 [オンラインデモ](#demo) · [機能](#features) · [画面プレビュー](#screenshots) · [デプロイ](#deployment) · [管理](#administration) · [詳細設定](#advanced) · [スキンとプラグイン](#extensions) · [トラブル対処](#troubleshooting) · [更新履歴](#changelog)
 
@@ -50,7 +50,7 @@ WebSpeak はセルフホスト型の TeamSpeak 3 / TeamSpeak 6 ブラウザー�
 - **TeamSpeak 3**: 先頭の `3.x` バージョンを使ってプロトコルを判定します。すべての旧バージョンを個別に検証しているわけではないため、古いサーバーは実際の環境で確認してください。
 - **TeamSpeak 6**: 対応しています。TeamSpeak 6 ネイティブクライアントとの画面共有も可能です。
 - **自動検出**: ゲートウェイはサーバーの `version` 応答を読み取り、接続診断に判定結果を記録します。
-- ゲートウェイは上流 SDK `1.0.0-beta.19` の [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) を使用し、WebSpeak は TeamSpeak 3 と 6 を対象とします。
+- ゲートウェイは上流 SDK `1.0.0-beta.23` の [`@honeybbq/teamspeak`](https://github.com/HoneyBBQ/teamspeak-js) を使用し、WebSpeak は TeamSpeak 3 と 6 を対象とします。
 
 <a id="screenshots"></a>
 
@@ -153,7 +153,7 @@ webspeak.example.com {
 
 ## 管理コンソール
 
-`/admin` で接続先、アクセス、WebRTC、中継、招待、アクティブセッション、ログ、バックアップを管理します。スキンストアは `/admin/skins`、機能プラグインストア（dev）は `/admin/plugins` です。
+`/admin` で接続先、アクセス、WebRTC、中継、招待、アクティブセッション、ログ、バックアップを管理します。スキンストアは `/admin/skins`、機能プラグインストアは `/admin/plugins` です。
 
 ### 任意の TeamSpeak 管理
 
@@ -228,7 +228,7 @@ relay.example.com {
 
 ### 依存ライブラリ
 
-中継は WebSpeak に組み込まれ、Node.js 標準ライブラリを使います。WebRTC は [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`、TeamSpeak は上流 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) の `@honeybbq/teamspeak@1.0.0-beta.19` を使用し、fork のビルドは不要です。
+中継は WebSpeak に組み込まれ、Node.js 標準ライブラリを使います。WebRTC は [werift](https://github.com/shinyoshiaki/werift-webrtc) `0.24.4`、TeamSpeak は上流 [HoneyBBQ/teamspeak-js](https://github.com/HoneyBBQ/teamspeak-js) の `@honeybbq/teamspeak@1.0.0-beta.23` を使用し、fork のビルドは不要です。
 
 <a id="extensions"></a>
 
@@ -240,9 +240,9 @@ relay.example.com {
 
 [開発ガイド](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [スキン一覧](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice サンプル](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
 
-### 機能プラグイン `.wplugin`（dev）
+### 機能プラグイン `.wplugin`
 
-機能プラグインは標準ブラウザー機能と任意の Node バックエンドを使う独立アプリです。ルート、状態、共同作業は作者が実装します。管理者はコードと依存関係を審査して有効化し、更新後は再び信頼を確認します。TS サーバーまたはインスタンス範囲に対応し、別オリジンで動作します。API v2 は現在の dev が必要で、v0.2.9 には含まれません。
+機能プラグインは標準ブラウザー機能と任意の Node バックエンドを使う独立アプリです。ルート、状態、共同作業は作者が実装します。管理者はコードと依存関係を審査して有効化し、更新後は再び信頼を確認します。TS サーバーまたはインスタンス範囲に対応し、別オリジンで動作します。API v2 は v0.3.0 から利用できます。
 
 [開発ガイド](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [配布一覧とサンプル](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 
@@ -275,6 +275,36 @@ relay.example.com {
 ## 更新履歴
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
+
+#### プラグインアプリ
+
+- 独立したブラウザアプリと任意の Node バックエンドに対応するプラグイン API v2 を公開。作者がルート、状態、通信、機能を実装できます。
+- GitHub ストアまたはローカルの `.wplugin` からインストール。管理者が公開・非公開設定を管理し、確認して有効化します。更新後は再度信頼の確認が必要です。
+- スキンに依存しないフローティング起動ボタンとアプリライブラリを追加。ウィンドウの移動、サイズ変更、最小化、最大化、復元に対応し、最小化やライブラリへの移動でもアプリを再読み込みしません。
+- アプリテンプレート、開発ガイド、Agent Skill を提供。P2P ファイル転送と動画の同時視聴は独立リポジトリで配布します。
+
+#### スキンと許可
+
+- 初回アクセス時に、インスタンスのサードパーティ製スキンとプラグインをまとめて確認します。接続用の認証情報は含みません。スキンメニュー末尾の「許可」から変更できます。
+- 同意しない場合は昼・夜・ILLUSIA のみ利用でき、KAAK、その他のスキン、プラグイン入口は非表示になります。許可を取り消すと内蔵スキンに戻り、読み込み処理、関連コンポーネント、アプリページを停止します。
+- マニフェストの権限、データ投影、ファイルハッシュ、ホスト操作の検証は維持します。管理者による確認と信頼は別途必要です。
+
+#### 修正と更新
+
+- ウィンドウ、画面全体、音声なしの共有で、映像のみの offer にネイティブ TS クライアントが応答しない問題を修正。必要な音声セクションを交渉しますが、マイクの収録や音声の生成は行いません。ウィンドウと画面全体での表示はユーザーの再テストで確認済みです。
+- SDK を `@honeybbq/teamspeak@1.0.0-beta.23` に更新。省略可能なメンバーフィールドに対応し、発話終了を表す空の音声パケットを除外します。
+- upstream の TSDNS、Query の制限時リトライ、ファイル転送、切断処理の修正を取り込みました。
+- IPv6 の接続先検証、並列ログイン制限、パスワード変更時のセッション失効、信頼済みプロキシの制限、PCM 送信保護を修正しました。
+- スキンの初回読み込みに実際のビルドバージョンを使用する修正を維持。デスクトップ、Web、Android のアプリバージョンを統一しました。
+
+#### アップグレード
+
+- API v2 は v1 のプラグインと互換性がありません。対応アプリへ更新し、確認後に有効化してください。
+- 公開環境のプラグインには、管理画面で設定した独立 HTTPS オリジンと実行ポート（既定 `3042`）へのプロキシが必要です。メインサイトと同じオリジンは使用できません。
+- インスタンス単位の許可を改めて選択してください。旧スキン単位の許可は同意として引き継がれません。
+
 
 ### [v0.2.9](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.2.9) · 2026-10-24
 

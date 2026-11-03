@@ -1,11 +1,11 @@
 {
   "name": "webspeak-android-gateway",
-  "version": "0.0.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "index.cjs",
   "dependencies": {
-    "@honeybbq/teamspeak": "1.0.0-beta.19",
+    "@honeybbq/teamspeak": "1.0.0-beta.23",
     "express": "^4.21.2",
     "opusscript": "^0.1.1",
     "pino": "^10.3.1",
