@@ -15,6 +15,8 @@ WebSpeak はセルフホスト型の TeamSpeak 3 / TeamSpeak 6 ブラウザー�
 
 安定版：[v0.2.9 の更新履歴](#latest-release-notes) · [パッケージを取得](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。機能プラグインストアは現在 `dev` ブランチで提供しており、v0.2.9 には含まれません。
 
+開発ブランチのセキュリティ修正：`dev` では PR #48 の IPv6 検証、同時ログイン制限、パスワード変更後のセッション失効、信頼済みプロキシごとの制限、PCM 送信保護を再実装しました。以下の v0.2.9 履歴は元のリリースの内容であり、今回の未リリース修正は含みません。
+
 [オンラインデモ](#demo) · [機能](#features) · [画面プレビュー](#screenshots) · [デプロイ](#deployment) · [管理](#administration) · [詳細設定](#advanced) · [スキンとプラグイン](#extensions) · [トラブル対処](#troubleshooting) · [更新履歴](#changelog)
 
 <a id="demo"></a>
@@ -400,6 +402,7 @@ WebRTC とチャンネルチャットを修正し、管理画面、ログ、モ�
 上流 SDK の作者、マージ済みの GitHub PR、および独立配布のスキンパッケージへ移植された原作の貢献を記載しています。
 
 - [HoneyBBQ](https://github.com/HoneyBBQ) — 上流 SDK [teamspeak-js（`@honeybbq/teamspeak`）](https://github.com/HoneyBBQ/teamspeak-js) の作者。WebSpeak の TeamSpeak プロトコル通信を支えるクライアントライブラリを提供。
+- [ph1gros](https://github.com/ph1gros) — [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) で IPv6 接続先検証、管理者認証とセッション、プロキシ配下の制限、PCM 送信境界の問題を報告し、修正案と回帰テストを提供。元のパッチは直接マージせず、`dev` で改めて修正を実装しました。
 - [LainHE](https://github.com/LainHE) — [マージ済み PR #2、#8、#28、#31–#35、#37、#38、#40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE)。ブラウザのエラー翻訳、拡大縮小とホームのレイアウト、画面共有のビットレートと視聴者アバター、中継先の検証と再接続、信頼済みプロキシの扱い、接続失敗の通知、音声エラー報告、WebRTC 失敗時のリソース解放を改善。
 - [TimmySheep](https://github.com/TimmySheep) — [マージ済み PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)。既存 TS6 共有の検出、画面比率、モバイル音声・画面点灯・スキンメニュー、ID のチャンネル設定、PWA/テーマ、チャット履歴、メンバー音声状態、マイク権限などに貢献。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) で TeamSpeak の登録済みニックネーム接続と接続先の保持に対応し、[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) で初回接続後の KAAK ワークスペース保持と再接続を改善。[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) と [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) では Discord スキンの原作デザインと実装を提供（コミット名義 **yumi**）。その後、WebSpeak プロジェクトが[独立配布の `.wskin` スキン](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)へ移植。

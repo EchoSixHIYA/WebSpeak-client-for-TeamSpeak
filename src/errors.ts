@@ -186,7 +186,7 @@ function createTeamSpeakError(code: WebSpeakErrorCode, cause: unknown, diagnosti
  */
 export function teamSpeakServerErrorCode(id: unknown): WebSpeakErrorCode | null {
   if (id === undefined || id === null) return null;
-  const text = String(id).trim().toLocaleLowerCase();
+  const text = String(id).trim().toLowerCase();
   if (/^\d{1,6}$/.test(text)) return TEAMSPEAK_SERVER_ERROR_IDS[String(Number(text))] ?? null;
   const hexMatch = /^(?:0x)?([0-9a-f]{4,6})$/.exec(text);
   if (hexMatch) return TEAMSPEAK_SERVER_ERROR_IDS[String(parseInt(hexMatch[1], 16))] ?? null;
@@ -199,7 +199,7 @@ export function normalizeTeamSpeakError(error: unknown): WebSpeakError {
   if (error instanceof WebSpeakError) return error;
 
   const diagnostics = collectDiagnostics(error);
-  const text = diagnosticText(error).toLocaleLowerCase();
+  const text = diagnosticText(error).toLowerCase();
 
   // 1) A TeamSpeak server error id names the exact reason, so it outranks every
   //    keyword heuristic below. The inline scan keeps the `id=515` shape
@@ -258,7 +258,7 @@ export function normalizeTeamSpeakError(error: unknown): WebSpeakError {
 
   // 3) SDK handshake/crypto error classes carry no numeric id at all, so match
   //    the class name before falling back to the message text.
-  const errorName = (diagnostics.name ?? "").toLocaleLowerCase();
+  const errorName = (diagnostics.name ?? "").toLowerCase();
   if (/eaxtagmismatch|fakesignaturemismatch|cryptoinit|invalididentity|license/.test(errorName)) {
     return createTeamSpeakError("protocol_negotiation_failed", error, diagnostics);
   }

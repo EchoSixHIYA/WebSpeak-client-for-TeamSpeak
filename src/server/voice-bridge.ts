@@ -11,7 +11,7 @@ import type { ServerEvent as SharedServerEvent } from "../shared/voice-models.js
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
 import { randomUUID, randomBytes } from "node:crypto";
-import { BlockList, isIP } from "node:net";
+import { BlockList, isIP, SocketAddress } from "node:net";
 import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { TSClient, type TSClientOptions } from "./ts-client.js";
 import type { Logger as LoggerType } from "../logger.js";
@@ -1005,6 +1005,9 @@ function normalizeClientIp(value: string | undefined): string | undefined {
   if (!value) return undefined;
   let trimmed = value.trim();
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) trimmed = trimmed.slice(1, -1);
+  const family = isIP(trimmed);
+  if (!family) return undefined;
+  if (family === 6) trimmed = new SocketAddress({ address: trimmed, family: "ipv6" }).address;
   if (trimmed.toLowerCase().startsWith("::ffff:")) {
     const mapped = trimmed.slice("::ffff:".length);
     if (isIP(mapped) === 4) trimmed = mapped;

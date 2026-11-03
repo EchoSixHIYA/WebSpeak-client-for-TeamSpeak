@@ -90,12 +90,12 @@ export function mergeQuickServers(
 }
 
 function serverKey(address: string): string {
-  return address.trim().toLocaleLowerCase();
+  return address.trim().toLowerCase();
 }
 
 function comparableServerKey(address: string): string {
   const target = splitTeamSpeakTarget(address);
-  const host = target.address.trim().toLocaleLowerCase();
+  const host = target.address.trim().toLowerCase();
   const port = target.port.trim() || "9987";
   return host ? `${host}:${port}` : "";
 }

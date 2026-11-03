@@ -35,10 +35,44 @@ function fixture() {
     audio, socket, client, logger, isCurrent: () => state.current, isReady: () => state.ready,
     selfId: () => 1, peer: () => state.peer, whisperTargets: () => state.targets,
     sendJson: message => { notices.push(message); },
-  }, encoder, () => state.now);
+  }, encoder, () => state.now, () => state.now);
   const remote = (clientId = 513) => ({ clientId, codec: 4, data: Buffer.from([11, 12, 13]) });
   return { transport, audio, state, socket, client, encoder, packets, encoded, forwarded, notices, warnings, remote };
 }
+
+test("PCM flooding is bounded before encoding while real-time, jitter and recovery remain usable", t => {
+  const realtime = fixture();
+  for (let i = 0; i < 1_000; i++) { realtime.state.now = i * 20; realtime.transport.receivePcm(Buffer.alloc(1_920)); }
+  assert.equal(realtime.encoded.length, 1_000);
+  const flood = fixture();
+  t.mock.method(flood.encoder, "encode", () => { flood.encoded.push(Buffer.alloc(0)); return Buffer.alloc(10); });
+  for (let i = 0; i < 1_000; i++) flood.transport.receivePcm(Buffer.alloc(1_920));
+  assert.ok(flood.encoded.length <= 50);
+  assert.equal(flood.audio.ingressDroppedFrames, 1_000 - flood.encoded.length);
+  assert.equal(flood.warnings.filter(w => w.code === "AUDIO_RATE_EXCEEDED").length, 1);
+  assert.equal(flood.notices.length, 0);
+  flood.state.now = 10_000;
+  const before = flood.forwarded.length;
+  for (let i = 0; i < 50; i++) flood.transport.receivePcm(Buffer.alloc(1_920));
+  assert.equal(flood.forwarded.length - before, 50, "one-second backlog after a stall is allowed");
+  const recovered = flood.forwarded.length;
+  for (let i = 1; i <= 100; i++) { flood.state.now = 10_000 + i * 20; flood.transport.receivePcm(Buffer.alloc(1_920)); }
+  assert.equal(flood.forwarded.length - recovered, 100, "flood drops do not lock out subsequent real-time audio");
+});
+
+test("PCM budget uses a separate monotonic clock and cannot refill twice after a clock rollback", t => {
+  const f = fixture();
+  t.mock.method(f.encoder, "encode", () => { f.encoded.push(Buffer.alloc(0)); return Buffer.alloc(10); });
+  for (let i = 0; i < 50; i++) f.transport.receivePcm(Buffer.alloc(1_920));
+  f.state.now = -1_000;
+  f.transport.receivePcm(Buffer.alloc(1_920));
+  f.state.now = 0;
+  f.transport.receivePcm(Buffer.alloc(1_920));
+  assert.equal(f.encoded.length, 50);
+  f.state.now = 100;
+  for (let i = 0; i < 20; i++) f.transport.receivePcm(Buffer.alloc(1_920));
+  assert.equal(f.encoded.length, 56);
+});
 
 test("PCM framing preserves codec, whisper routing and timing counters", () => {
   const f = fixture();

@@ -172,7 +172,7 @@ export async function handleCommand(
 
 function classifyOperationError(error: unknown, fallbackCode: string, fallbackMessage: string): { code: string; message: string } {
   const text = error instanceof Error ? error.message : String(error);
-  const normalized = text.toLocaleLowerCase();
+  const normalized = text.toLowerCase();
   // A TeamSpeak server error id is authoritative when the SDK preserved it, so it
   // is consulted before the keyword rules: 781 (channel password), 2568
   // (permissions), 515/2817 (server or slot limit) and friends keep their exact

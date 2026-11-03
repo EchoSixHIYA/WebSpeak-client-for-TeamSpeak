@@ -15,6 +15,8 @@ WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语�
 
 稳定版：[v0.2.9 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。功能插件商店目前仅在 `dev` 分支提供，尚未包含在 v0.2.9 中。
 
+开发分支安全修复：`dev` 已重新实现 PR #48 报告的 IPv6 目标校验、并发登录、改密会话撤销、可信代理限流与 PCM 上行保护。以下 v0.2.9 历史记录描述的是原发布包，不包含这次尚未发布的修复。
+
 [在线演示](#demo) · [功能](#features) · [界面预览](#screenshots) · [部署](#deployment) · [管理](#administration) · [高级配置](#advanced) · [皮肤与插件](#extensions) · [常见问题](#troubleshooting) · [更新日志](#changelog)
 
 <a id="demo"></a>
@@ -469,6 +471,7 @@ relay.example.com {
 以下列出上游 SDK 作者、已合并的 GitHub PR，以及已移植为独立皮肤包的原始贡献。
 
 - [HoneyBBQ](https://github.com/HoneyBBQ) — 上游 [teamspeak-js（`@honeybbq/teamspeak`）](https://github.com/HoneyBBQ/teamspeak-js) SDK 的作者，为 WebSpeak 提供底层 TeamSpeak 协议客户端能力。
+- [ph1gros](https://github.com/ph1gros) — [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) 提供公开目标 IPv6 校验、管理员认证与会话、代理限流及 PCM 上行边界的安全审查、补丁和回归测试；原补丁未直接合并，相关修复已在 `dev` 中重新实现。
 - [LainHE](https://github.com/LainHE) — [已合并 PR #2、#8、#28、#31–#35、#37、#38、#40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE)，涉及浏览器报错翻译、缩放与首页布局、屏幕共享码率与观看者头像、中继目标校验与异常重连、可信代理校验、连接失败传递、音频故障报告及 WebRTC 失败时的资源清理。
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) 支持 TeamSpeak 注册昵称连接并保留昵称目标；[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) 改进 KAAK 首次连接后的工作区保留与重连；[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) 和 [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) 提供 Discord 皮肤的原始设计与实现（提交署名 **yumi**），后由 WebSpeak 项目移植为[独立分发的 `.wskin` 皮肤](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)。

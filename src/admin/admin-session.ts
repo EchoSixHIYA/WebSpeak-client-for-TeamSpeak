@@ -50,6 +50,13 @@ export class AdminSessionStore {
   clear(): void {
     this.sessions.clear();
   }
+
+  /** A credential change retains only the authenticated session that performed it. */
+  revokeOthers(request: Request): void {
+    const token = readCookie(request.headers.cookie, COOKIE_NAME);
+    const keep = token ? hashToken(token) : null;
+    for (const key of this.sessions.keys()) if (key !== keep) this.sessions.delete(key);
+  }
 }
 
 export function isSecureRequest(request: Request): boolean {

@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { performance } from "node:perf_hooks";
 import type { Logger as LoggerType } from "../logger.js";
 import type { ServerMessage } from "../shared/server-messages.js";
 import type { AudioFlowStats } from "./audio-stats.js";
@@ -12,6 +13,8 @@ const MAX_BUFFERED_BYTES = 4_096;
 // frame: the reply is roughly 100x the offending payload, and the browser only
 // ever shows the first one because it writes the same error string.
 const AUDIO_ISSUE_REPORT_MS = 5_000;
+const PCM_BURST_FRAMES = 50; // One second of buffered 20 ms capture after a stall.
+const PCM_FRAMES_PER_MS = 60 / 1_000; // 50 fps capture plus 20% scheduling headroom.
 
 export interface VoiceEncoder {
   encode(frame: Buffer): Buffer;
@@ -39,8 +42,11 @@ export class SessionAudioTransport {
   /** Last report time per audio fault code; see `shouldReportAudioIssue`. */
   private readonly reportedAt = new Map<string, number>();
   private readonly logger: LoggerType | null;
+  private pcmTokens = PCM_BURST_FRAMES;
+  private pcmRefilledAt: number | null = null;
 
-  constructor(private readonly options: SessionAudioOptions, encoder: VoiceEncoder, private readonly clock: () => number = Date.now) {
+  constructor(private readonly options: SessionAudioOptions, encoder: VoiceEncoder, private readonly clock: () => number = Date.now,
+    private readonly rateClock: () => number = performance.now.bind(performance)) {
     this.encoder = encoder;
     this.logger = options.logger ?? null;
   }
@@ -127,6 +133,19 @@ export class SessionAudioTransport {
       this.reportInvalidFrame(frame.length);
       return;
     }
+    const now = this.rateClock();
+    if (this.pcmRefilledAt !== null) {
+      this.pcmTokens = Math.min(PCM_BURST_FRAMES, this.pcmTokens + Math.max(0, now - this.pcmRefilledAt) * PCM_FRAMES_PER_MS);
+    }
+    this.pcmRefilledAt = Math.max(this.pcmRefilledAt ?? now, now);
+    if (this.pcmTokens < 1) {
+      stats.ingressDroppedFrames++;
+      if (this.shouldReportAudioIssue("AUDIO_RATE_EXCEEDED")) {
+        this.logger?.warn({ code: "AUDIO_RATE_EXCEEDED", droppedFrames: stats.ingressDroppedFrames }, "Discarded browser PCM above the real-time budget");
+      }
+      return;
+    }
+    this.pcmTokens--;
     this.recordIngress();
     const startedAt = this.clock();
     let encoded: Buffer;

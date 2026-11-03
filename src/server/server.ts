@@ -3,7 +3,7 @@ import { createServer as createHttpsServer } from "node:https";
 import { createServer as createHttpServer } from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { VoiceBridge, type VoiceBridgeOptions } from "./voice-bridge.js";
+import { VoiceBridge, createTrustedProxies, resolveClientIp, type VoiceBridgeOptions } from "./voice-bridge.js";
 import type { Logger } from "../logger.js";
 import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { formatTeamSpeakConnectionTarget, parseTeamSpeakConnectionTarget } from "../domain/teamspeak-connection-target.js";
@@ -69,6 +69,8 @@ export function createWebServer(options: WebServerOptions): WebServer {
   app.use("/api/plugins", createPluginRuntimeRouter(pluginRuntime));
   const adminSessions = new AdminSessionStore();
   const joinRateLimiter = new JoinRateLimiter();
+  const trustedProxies = createTrustedProxies(options.voiceBridgeOptions.trustedProxies);
+  const clientIp = (request: express.Request) => resolveClientIp(request, trustedProxies);
   const startedAt = Date.now();
 
   const healthHandler: express.RequestHandler = (_request, response) => {
@@ -169,7 +171,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       response.status(503).json({ ok: false, code: "NOT_INITIALIZED" });
       return;
     }
-    if (!joinRateLimiter.allow(request.socket.remoteAddress ?? "unknown")) {
+    if (!joinRateLimiter.allow(clientIp(request))) {
       response.status(429).json({ ok: false, code: "RATE_LIMITED" });
       return;
     }
@@ -287,6 +289,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
     version: options.version,
     logFile: options.logFile,
     startedAt,
+    clientIp,
   }));
 
   // Serve static frontend
