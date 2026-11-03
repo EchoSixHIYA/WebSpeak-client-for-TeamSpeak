@@ -26,6 +26,7 @@ export class SkinRuntimePluginWasmError extends Error {
 }
 
 export interface SkinRuntimePluginWasmOptions {
+  signal?: AbortSignal;
   skinId: string;
   skinVersion: string;
   plugin: SkinRuntimePlugin;
@@ -43,6 +44,7 @@ const WASM_PROTOTYPE_PERMISSIONS = new Set([...SKIN_RUNTIME_PLUGIN_DATA_PERMISSI
 export async function createSkinRuntimePluginWasmSandbox(
   options: SkinRuntimePluginWasmOptions,
 ): Promise<SkinExtensionWasmSandboxHandle> {
+  options.signal?.throwIfAborted();
   const plugin = parseSkinRuntimePluginDocument({ schemaVersion: 1, plugins: [options.plugin] }).plugins[0];
   if (plugin.runtime !== "wasm") throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_ENTRY_INVALID", "Only a Wasm plugin entry can use the bounded Wasm runner.");
 
@@ -52,6 +54,7 @@ export async function createSkinRuntimePluginWasmSandbox(
   }
 
   const digest = await computeSkinRuntimePluginDigest(plugin, options.files);
+  options.signal?.throwIfAborted();
   let approval: SkinRuntimePluginApproval;
   try { approval = parseSkinRuntimePluginApproval(options.approval); }
   catch { throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_APPROVAL_INVALID", "The Wasm plugin does not have a valid local approval."); }
@@ -62,6 +65,7 @@ export async function createSkinRuntimePluginWasmSandbox(
   const entry = options.files[plugin.entry];
   if (!(entry instanceof Blob)) throw new SkinRuntimePluginWasmError("SKIN_EXTENSION_WASM_ENTRY_INVALID", "The approved Wasm entry is unavailable.");
   const wasmBytes = new Uint8Array(await entry.arrayBuffer());
+  options.signal?.throwIfAborted();
   const baseInput = parseSkinExtensionUiInput(options.uiInput ?? { schemaVersion: 1, state: {}, event: null });
   const uiInput = parseSkinExtensionUiInput({
     ...baseInput,

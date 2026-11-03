@@ -1,0 +1,19 @@
+{
+  "apiVersion": 2,
+  "id": "community.application-starter",
+  "name": "Application starter",
+  "version": "1.0.0",
+  "author": "Your community",
+  "license": "AGPL-3.0-only",
+  "description": "A starting point for an independent browser application and optional Node service.",
+  "scopes": [
+    "server",
+    "instance"
+  ],
+  "client": {
+    "entry": "client/index.html"
+  },
+  "server": {
+    "entry": "server/main.mjs"
+  }
+}

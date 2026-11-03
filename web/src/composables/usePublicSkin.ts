@@ -1,4 +1,5 @@
-import { onScopeDispose, ref, shallowRef, type Ref } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
+import { canUseSkin, thirdPartyAllowed } from '../services/instance-authorization.js';
 import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 import { BUILTIN_SKIN_CATALOG, getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, clearCustomSkinStyle, getStoredSkinId } from "../services/skin-runtime.js";
@@ -19,7 +20,8 @@ const fallbackId = () => isDarkTheme(getStoredTheme()) ? BUILTIN_DARK_SKIN : BUI
 /** One page owns initialization, choices and their late responses, including persistence. */
 export function usePublicSkin(options: PublicSkinOptions = {}) {
   const activeSkin = options.activeSkin ?? shallowRef<InstalledSkin | null>(null);
-  const stored = getStoredSkinId();
+  const candidate = getStoredSkinId();
+  const stored = candidate && canUseSkin(candidate) ? candidate : null;
   const activeSkinId = ref(stored ?? fallbackId());
   const skinReady = ref(Boolean(stored && builtin(stored)));
   const skinLoadError = shallowRef<{ skinId: string } | null>(null);
@@ -37,6 +39,7 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
 
   async function apply(id: string, operation: ReturnType<typeof createSkinOperation>, persist = true, updateTheme = false, clearLoadError = true) {
     operation.check();
+    if (!canUseSkin(id)) id = fallbackId();
     const entry = catalogSkins.value.find(skin => skin.id === id);
     const skin = await operation.wait(activateSkin(id, entry?.version, options.appVersion?.(), { signal: operation.signal }));
     if (!owns(operation)) return;
@@ -119,5 +122,19 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     await select(fallbackId());
   }
 
-  return { activeSkin, activeSkinId, skinReady, skinLoadError, installedSkins, catalogSkins, initialize, select, cancel, reset, switchToBuiltIn, switchToBuiltInAfterLoadError };
+  watch(thirdPartyAllowed, allowed => {
+    if (disposed) return;
+    if (allowed) { void initialize(); return; }
+    cancel();
+    activeSkin.value = null;
+    skinLoadError.value = null;
+    clearCustomSkinStyle();
+    activeSkinId.value = fallbackId();
+    skinReady.value = true;
+    void select(fallbackId());
+  }, { flush: 'sync' });
+  return { activeSkin, activeSkinId, skinReady, skinLoadError,
+    installedSkins: computed(() => installedSkins.value.filter(skin => canUseSkin(skin.id))),
+    catalogSkins: computed(() => catalogSkins.value.filter(skin => canUseSkin(skin.id))),
+    initialize, select, cancel, reset, switchToBuiltIn, switchToBuiltInAfterLoadError };
 }

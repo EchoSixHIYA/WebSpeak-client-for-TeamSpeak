@@ -240,7 +240,7 @@ relay.example.com {
 
 ### 機能プラグイン `.wplugin`（dev）
 
-機能プラグインはスキンと分離した専用パネルで動作します。管理者はサーバー単位（同じ TS 接続先とチャンネル）かインスタンス単位（1 つの音声ゲートウェイ）を選択できます。Watch Together は再生、一時停止、シーク、途中参加の同期例です。現在の dev ランタイムが必要で、v0.2.9 には含まれません。
+機能プラグインは標準ブラウザー機能と任意の Node バックエンドを使う独立アプリです。ルート、状態、共同作業は作者が実装します。管理者はコードと依存関係を審査して有効化し、更新後は再び信頼を確認します。TS サーバーまたはインスタンス範囲に対応し、別オリジンで動作します。API v2 は現在の dev が必要で、v0.2.9 には含まれません。
 
 [開発ガイド](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [配布一覧とサンプル](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 

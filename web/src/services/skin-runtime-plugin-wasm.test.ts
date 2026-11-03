@@ -35,6 +35,19 @@ async function approvedFiles(source = createSkinExtensionWasmPrefixByteImmediate
   return { files, digest, approval: createSkinRuntimePluginApproval("community.sample", "2.0.0", plugin, digest) };
 }
 
+test('revocation while package bytes are being verified prevents worker startup', async () => {
+  const { files, approval } = await approvedFiles();
+  const controller = new AbortController(), original = files[plugin.entry];
+  class RevokedBlob extends Blob {
+    override async arrayBuffer(): Promise<ArrayBuffer> { controller.abort(); return super.arrayBuffer(); }
+  }
+  await assert.rejects(createSkinRuntimePluginWasmSandbox({
+    skinId: 'community.sample', skinVersion: '2.0.0', plugin, approval,
+    files: { [plugin.entry]: new RevokedBlob([original]) }, signal: controller.signal,
+    readSessionStatus: async () => ({ connected: true, channelName: 'Test', memberCount: 1 }),
+  }), { name: 'AbortError' });
+});
+
 test("Wasm plugin startup rechecks the exact digest approval before creating a Worker", async () => {
   const { files, approval } = await approvedFiles();
   const staleApproval = { ...approval, digest: "0".repeat(64) };

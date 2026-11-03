@@ -304,7 +304,7 @@ Skins gestalten Aussehen, Layout und zugehörige Widgets. Administratoren instal
 
 ### Funktionale Plugins `.wplugin` (dev)
 
-Funktionale Plugins laufen getrennt von Skins in einem eigenen Panel. Administratoren wählen Server-Geltungsbereich (gleiches TS-Ziel und gleicher Kanal) oder Instanz-Geltungsbereich (ein Sprach-Gateway). Watch Together zeigt synchrones Abspielen, Pausieren, Springen und spätes Beitreten. Erforderlich ist die aktuelle dev-Laufzeit; v0.2.9 enthält diese Funktion nicht.
+Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und optionalen Node-Backends, eigenen Routen, Daten und Zusammenarbeit. Administratoren prüfen Code und Abhängigkeiten vor der Aktivierung; Updates erfordern erneutes Vertrauen. Anwendungen unterstützen TS-Server- oder Instanz-Bereiche und eine separate Origin. API v2 benötigt die aktuelle dev-Version und ist nicht in v0.2.9 enthalten.
 
 [Entwicklungsleitfaden](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [Verteilungskatalog & Beispiel](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 

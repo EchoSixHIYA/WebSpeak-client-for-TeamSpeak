@@ -29,3 +29,7 @@ Develop the skin as a portable `.wskin` package. A skin task should not require 
 
 - `docs/SKIN_DEVELOPMENT.md` — the single current reference for skin formats, runtime APIs, permissions, data, actions, CSS hooks, security, and QA.
 - `docs/examples/ILLUSIA-VOICE.md` and `docs/examples/OPEN-VOICE-SURFACE.md` — full skin and surface examples.
+
+## Instance authorization
+
+Current development builds replace per-skin consent dialogs with one origin-scoped user decision covering third-party skins and functional apps. Without consent only the fixed official Day, Night and ILLUSIA skins are available; bundled KAAK also requires consent. The host skin switcher owns the final authorization item. Packages must not duplicate or bypass it. Revocation must cancel pending activation, remove third-party CSS/components and stop workers. Continue enforcing manifest permissions, credential redaction, trusted action validation and package digests internally; one-time consent does not extend the public API. See the current guide for release compatibility.

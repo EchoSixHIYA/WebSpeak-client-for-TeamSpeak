@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { before, after, beforeEach, afterEach, test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { createServer } from "vite";
 import { effectScope, ref } from "vue";
 
-let vite, runtime, catalog, handler, installed, writes, storage, elements, root, usePublicSkin, scope;
+let vite, runtime, catalog, authorization, handler, installed, writes, storage, elements, root, usePublicSkin, useWebClientPublicConfig, scope;
+const { version: appVersion } = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
 const globals = new Map();
 function global(name, value) {
   if (!globals.has(name)) globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
@@ -41,7 +43,9 @@ before(async () => {
     optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom" });
   runtime = await vite.ssrLoadModule("/src/services/skin-runtime.ts");
   catalog = await vite.ssrLoadModule("/src/services/skin-catalog.ts");
+  authorization = await vite.ssrLoadModule('/src/services/instance-authorization.ts');
   ({ usePublicSkin } = await vite.ssrLoadModule("/src/composables/usePublicSkin.ts"));
+  ({ useWebClientPublicConfig } = await vite.ssrLoadModule("/src/composables/useWebClientPublicConfig.ts"));
 });
 beforeEach(async () => {
   installed = new Map(); writes = []; storage = new Map(); elements = new Map(); root = new Element();
@@ -56,6 +60,8 @@ beforeEach(async () => {
     preferences: async () => ({ schemaVersion: 1 }), persist: async value => writes.push(value) });
   handler = async () => json({ skins: [] });
   global("fetch", (...args) => handler(...args));
+  // Existing lifecycle cases exercise explicitly authorized custom skins.
+  authorization.setInstanceAuthorization(true);
   // A failed directory load keeps locally installed packages available.
   handler = async () => { throw new Error("offline"); };
   await catalog.listPublicSkins();
@@ -67,6 +73,35 @@ after(async () => {
     if (descriptor) Object.defineProperty(globalThis, name, descriptor);
     else delete globalThis[name];
   }
+});
+
+test('without instance consent, cached third-party packages are never read or installed', async () => {
+  authorization.setInstanceAuthorization(false);
+  let reads = 0;
+  globalThis.skinStorage.get = async () => { reads++; return skin('community.kaak-voice'); };
+  storage.set('webspeak:skin-choice', 'community.kaak-voice');
+  storage.set('webspeak:active-skin', 'community.kaak-voice');
+  const view = page(); await view.initialize(); await view.select('community.kaak-voice');
+  assert.equal(reads, 0);
+  assert.equal(view.activeSkinId.value, 'builtin.light');
+  assert.equal(view.activeSkin.value, null);
+  assert.deepEqual(view.catalogSkins.value.map(skin => skin.id), ['builtin.light', 'builtin.dark', 'community.illusia-voice']);
+  assert.equal(view.skinLoadError.value, null, 'declining is not a skin loading error');
+});
+
+test('revoking consent cancels an in-flight custom load and removes an already active skin', async () => {
+  installed.set('sample.a', skin('sample.a'));
+  const view = page({ timeoutMs: 3000 }); await view.select('sample.a');
+  assert.equal(elements.has('webspeak-active-custom-skin'), true);
+  const read = deferred(); globalThis.skinStorage.get = () => read.promise;
+  const loading = view.select('sample.b');
+  authorization.setInstanceAuthorization(false);
+  await loading; await nextTurn();
+  read.resolve(skin('sample.b')); await nextTurn();
+  assert.equal(view.activeSkin.value, null);
+  assert.equal(view.activeSkinId.value, 'builtin.light');
+  assert.equal(elements.has('webspeak-active-custom-skin'), false);
+  assert.equal(elements.has('webspeak-active-custom-skin-base'), false);
 });
 
 test("a late custom activation cannot replace a newer built-in choice", async () => {
@@ -200,6 +235,52 @@ test("normal initialization uses the instance default and cached custom content"
   assert.equal(themeMode.value, "system", "initializing a default custom skin must not override the saved system theme");
   assert.equal(storage.has("webspeak:skin-choice"), false);
   assert.equal(root.dataset.wsSkin, item.id);
+});
+test("first entry activates a compatible remembered skin before public config arrives", async () => {
+  const item = { ...skin("sample.current"), minAppVersion: appVersion, author: "test", license: "MIT" };
+  installed.set(item.id, item);
+  storage.set("webspeak:skin-choice", item.id);
+  const response = deferred();
+  global("location", { search: "" });
+  handler = async url => url === "/api/public-config" ? response.promise
+    : json({ skins: [item], defaultSkinId: "builtin.light" });
+  const config = useWebClientPublicConfig({ serverHost: ref(""), serverPort: ref("9987"),
+    accelerationRelayId: ref(""), language: ref("en"), t: key => key });
+  const loading = config.loadPublicConfig();
+  const view = page({ timeoutMs: 1_000, appVersion: () => config.appVersion.value });
+  try {
+    await view.initialize();
+    assert.equal(config.serverConfigLoading.value, true, "the config response is still pending");
+    assert.equal(view.activeSkinId.value, item.id);
+    assert.equal(view.skinLoadError.value, null);
+    assert.equal(root.dataset.wsSkin, item.id);
+    await view.select("builtin.dark");
+    await view.select(item.id);
+    assert.equal(view.activeSkinId.value, item.id, "initial entry and manual selection use the same version");
+  } finally {
+    response.resolve(json({ version: appVersion }));
+    await loading;
+  }
+});
+test("demo initialization uses the running build version without a public config provider", async () => {
+  const item = { ...skin("sample.current"), minAppVersion: appVersion, author: "test", license: "MIT" };
+  installed.set(item.id, item);
+  handler = async () => json({ skins: [item], defaultSkinId: item.id });
+  const view = page({ timeoutMs: 1_000 });
+  await view.initialize();
+  assert.equal(view.activeSkinId.value, item.id);
+  assert.equal(view.skinLoadError.value, null);
+});
+test("using the running build version still rejects a skin requiring a newer runtime", async () => {
+  const item = { ...skin("sample.future"), minAppVersion: "999.0.0", author: "test", license: "MIT" };
+  installed.set(item.id, item);
+  storage.set("webspeak:skin-choice", item.id);
+  handler = async () => json({ skins: [item], defaultSkinId: item.id });
+  const view = page({ timeoutMs: 1_000 });
+  await view.initialize();
+  assert.equal(view.activeSkinId.value, "builtin.light");
+  assert.equal(view.skinLoadError.value.skinId, item.id);
+  assert.equal(storage.get("webspeak:skin-choice"), item.id);
 });
 test("reset prevents outstanding choices from restoring cleared state", async () => {
   const read = deferred(); globalThis.skinStorage.get = () => read.promise;

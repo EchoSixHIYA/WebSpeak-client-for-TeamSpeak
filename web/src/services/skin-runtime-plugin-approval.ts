@@ -51,7 +51,7 @@ export function getSkinRuntimePluginApproval(
   return grant && isSkinRuntimePluginApproved(grant, skinId, skinVersion, plugin, digest) ? grant : null;
 }
 
-/** Called only by the host consent UI after a user explicitly approves this exact package. */
+/** Internal digest-bound record. The host must first allow this skin through instance authorization. */
 export function approveSkinRuntimePlugin(
   skinId: string,
   skinVersion: string,

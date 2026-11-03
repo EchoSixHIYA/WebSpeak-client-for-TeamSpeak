@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
+import { setInstanceAuthorization } from './instance-authorization.js';
 import { createRenderer, createSSRApp, defineComponent, h, nextTick, ref } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import { parseSkinPluginDocument, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
@@ -11,6 +12,7 @@ import {
   SkinExtensionUiOutputError,
 } from "../../../src/shared/skin-extension-ui.js";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
+beforeEach(() => setInstanceAuthorization(true));
 
 function outputDocument(componentId = "runtime-ui", root?: Record<string, unknown>, permissions: string[] = [], actions: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
   return JSON.stringify({

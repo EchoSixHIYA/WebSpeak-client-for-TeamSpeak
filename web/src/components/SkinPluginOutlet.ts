@@ -20,6 +20,7 @@ import { parseSkinExtensionUiInput } from "../../../src/shared/skin-extension-ui
 import { approveSkinPluginComponents, getMissingSkinPluginApprovals, isSkinPluginComponentApproved, revokeSkinPluginApprovals } from "../services/skin-plugin-approval.js";
 import { createSkinPluginAssetUrlCache } from "../services/skin-plugin-asset-urls.js";
 import { PROMPT_FOR_SKIN_PERMISSIONS } from "../services/skin-permission-policy.js";
+import { canUseSkin, openInstanceAuthorization } from '../services/instance-authorization.js';
 import { useSkinEditorMode } from "../services/skin-editor-mode.js";
 
 type Scalar = string | number | boolean;
@@ -108,14 +109,14 @@ export default defineComponent({
     const matchingComponents = computed(() => validatedDocument.value.components.filter((component) => component.page === props.page));
     const pendingApproval = computed(() => {
       refresh.value;
-      return denied.value ? [] : getMissingSkinPluginApprovals(props.skinId, props.skinVersion, { ...validatedDocument.value, components: matchingComponents.value });
+      return denied.value || !canUseSkin(props.skinId) ? [] : getMissingSkinPluginApprovals(props.skinId, props.skinVersion, { ...validatedDocument.value, components: matchingComponents.value });
     });
     const accessComponents = computed(() => pendingApproval.value.length
       ? pendingApproval.value
       : matchingComponents.value.filter((component) => component.permissions.length > 0));
     const activeComponents = computed(() => {
       refresh.value;
-      return matchingComponents.value.filter((component) => isSkinPluginComponentApproved(props.skinId, props.skinVersion, component));
+      return canUseSkin(props.skinId) ? matchingComponents.value.filter((component) => isSkinPluginComponentApproved(props.skinId, props.skinVersion, component)) : [];
     });
     const surfaceCandidate = computed(() => activeComponents.value.find((component) => component.mode === "surface") ?? null);
     const activeSurface = computed(() => surfaceSuppressed.value ? null : surfaceCandidate.value);
@@ -220,7 +221,7 @@ export default defineComponent({
 
     function dispatch(component: SkinPluginComponent, actionId: string, context: SafeContext, state: Record<string, Scalar>): void {
       const definition = component.actions[actionId];
-      if (!definition || !isSkinPluginComponentApproved(props.skinId, props.skinVersion, component)) return;
+      if (!definition || !canUseSkin(props.skinId) || !isSkinPluginComponentApproved(props.skinId, props.skinVersion, component)) return;
       const args = resolveActionArgs(definition, context, state);
       if (definition.type === "ui.setState") {
         if (typeof args.key === "string" && component.state && Object.hasOwn(component.state, args.key) && "value" in args) {
@@ -244,7 +245,7 @@ export default defineComponent({
     }
 
     function dispatchRuntimeCallback(component: SkinPluginComponent, handlerId: string, eventName: string, event: Event, state: Record<string, Scalar>): void {
-      if (!component.runtimeCallbacks) return;
+      if (!canUseSkin(props.skinId) || !component.runtimeCallbacks) return;
       const callbackEvent: Record<string, unknown> = { componentId: component.id, handlerId, eventName };
       if (typeof KeyboardEvent !== "undefined" && event instanceof KeyboardEvent) callbackEvent.key = event.key;
       const mayReadUserInput = props.extensionPermissions.includes("ui.input.read");
@@ -419,8 +420,7 @@ export default defineComponent({
     }
 
     function openAccessManager(): void {
-      denied.value = false;
-      manageOpen.value = true;
+      openInstanceAuthorization();
     }
 
     function closeOrDisable(): void {

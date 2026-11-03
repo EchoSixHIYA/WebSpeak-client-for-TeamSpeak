@@ -8,6 +8,7 @@ import { SKIN_RUNTIME_PLUGIN_DATA_PERMISSIONS } from "../../../src/shared/skin-r
 import SkinPluginOutlet from "./SkinPluginOutlet.js";
 import { approveSkinRuntimePlugin, getSkinRuntimePluginApproval, revokeSkinRuntimePluginApprovals } from "../services/skin-runtime-plugin-approval.js";
 import { PROMPT_FOR_SKIN_PERMISSIONS } from "../services/skin-permission-policy.js";
+import { canUseSkin, openInstanceAuthorization } from '../services/instance-authorization.js';
 import { useSkinEditorMode } from "../services/skin-editor-mode.js";
 import { createSkinRuntimePluginSession } from "../services/skin-runtime-plugin-session.js";
 import { createSkinRuntimePluginWasmSandbox } from "../services/skin-runtime-plugin-wasm.js";
@@ -63,6 +64,7 @@ function createRun(
         skinVersion,
         plugin,
         approval,
+        signal: abortController.signal,
         files,
         uiInput: input,
         context,
@@ -133,6 +135,7 @@ export default defineComponent({
 
     const pagePlugins = computed(() => props.plugins?.plugins.filter((plugin) => plugin.page === props.page) ?? []);
     const approved = (plugin: SkinRuntimePlugin): SkinRuntimePluginApproval | null => {
+      if (!canUseSkin(props.skinId)) return null;
       const digest = digests.value[plugin.id];
       if (!digest) return null;
       const memoryGrant = inMemoryApprovals.get(plugin.id);
@@ -243,6 +246,7 @@ export default defineComponent({
           await handler(action.args);
         },
         onOutput: () => {
+          if (!canUseSkin(props.skinId) || disposed || sessions.get(plugin.id) !== session) return;
           installStyle(plugin);
           outputs.value = { ...outputs.value, [plugin.id]: session.output };
           digestErrors.value = { ...digestErrors.value, [plugin.id]: "" };
@@ -257,6 +261,7 @@ export default defineComponent({
 
     function reconcile(): void {
       if (disposed) return;
+      if (!canUseSkin(props.skinId)) { stopAll('instance-authorization-revoked'); return; }
       const currentIds = new Set(pagePlugins.value.map((plugin) => plugin.id));
       for (const pluginId of [...sessions.keys()]) if (!currentIds.has(pluginId)) stopPlugin(pluginId, "page-changed");
       for (const plugin of pagePlugins.value) {
@@ -266,6 +271,7 @@ export default defineComponent({
     }
 
     function approvePending(): void {
+      if (!canUseSkin(props.skinId)) return;
       for (const plugin of pending.value) {
         const digest = digests.value[plugin.id];
         if (!digest) continue;
@@ -294,7 +300,7 @@ export default defineComponent({
     }
 
     function openManager(): void {
-      managerOpen.value = true;
+      openInstanceAuthorization();
     }
 
     function dispatch(pluginId: string, value: unknown): void {
@@ -342,6 +348,10 @@ export default defineComponent({
     }, { immediate: true });
 
     watch(() => [props.page, digests.value, revision.value], reconcile, { deep: true });
+    watch(() => canUseSkin(props.skinId), allowed => {
+      if (!allowed) { stopAll('instance-authorization-revoked'); managerOpen.value = false; }
+      else approvePending();
+    }, { flush: 'sync' });
     watch(editorMode.isEnabled, (enabled) => { if (!enabled) managerOpen.value = false; });
     watch(() => props.context, () => {
       if (disposed) return;

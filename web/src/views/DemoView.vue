@@ -58,11 +58,13 @@
     <div v-if="poke" class="demo-poke" data-ws-part="demo.poke-notification" role="status"><Icon name="bell" :size="17" /><span><strong>msicbot</strong> {{ copy.pokedYou }}</span><button type="button" data-ws-part="demo.poke.dismiss" @click="poke = false"><Icon name="close" :size="14" /></button></div>
   </div>
   <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
+  <InstanceAuthorization :language="language" />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
+import InstanceAuthorization from '../components/InstanceAuthorization.vue';
 import "../styles/skin-plugin.css";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";

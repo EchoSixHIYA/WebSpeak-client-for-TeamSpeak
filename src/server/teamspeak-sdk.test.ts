@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import test from "node:test";
-import { asChannelGroupID, asChannelID, asClientID, asUID, avatarFileName, type Channel, type ClientEntry } from "@honeybbq/teamspeak";
+import { asChannelGroupID, asChannelID, asClientID, asClientDBID, asUID, avatarFileName, type Channel, type ClientEntry } from "@honeybbq/teamspeak";
 import { Client, generateIdentitySync, type ServerView } from "@honeybbq/teamspeak/client";
 import { TeamSpeakSdkClient, type DirectorySnapshot } from "./teamspeak-sdk.js";
 
@@ -13,7 +13,7 @@ function channel(id = 1): Channel {
     description: "", hasPassword: true, isPermanent: true, maxClients: 12, isMaxClientsUnlimited: false } as Channel;
 }
 function member(id = 1): ClientEntry {
-  return { id: asClientID(id), nickname: `Member ${id}`, uid: asUID(uid), channelID: asChannelID(1n), type: 0,
+  return { id: asClientID(id), databaseID: asClientDBID(BigInt(id)), nickname: `Member ${id}`, uid: asUID(uid), channelID: asChannelID(1n), type: 0,
     serverGroups: [], isAway: true, awayMessage: "Away", isInputMuted: true, isOutputMuted: false,
     isChannelCommander: true, avatar: "avatar-hash", isRecording: false, isTalker: false,
     channelGroupID: asChannelGroupID(0n), createdAt: undefined, lastConnectedAt: undefined, idleTimeMs: undefined };
@@ -51,6 +51,28 @@ test("ordinary-client directories and avatar metadata use the live view without 
   assert.deepEqual(sdk.serverInfo, { name: "Shanghai", iconId: null, hostBannerGfxUrl: "https://example.invalid/banner", welcomeMessage: "Welcome" });
   assert.equal(sdk.serverFamily, "ts6");
   assert.deepEqual(native.queries, []);
+});
+
+test('partial SDK records preserve unknown status and channel descriptions without querying', async () => {
+  const { sdk, native } = fixture();
+  const { uid: _uid, serverGroups: _groups, isAway: _away, awayMessage: _message,
+    isInputMuted: _input, isOutputMuted: _output, isChannelCommander: _commander, ...partial } = member();
+  native.view.clients.set(partial.id, partial);
+  const { description: _description, ...room } = channel(); native.view.channels.set(room.id, room);
+  assert.deepEqual(await sdk.listDirectoryClients(), [{ id: 1, nickname: 'Member 1', uid: '', serverGroups: [], channelID: 1n, type: 0 }]);
+  assert.equal((await sdk.listDirectoryChannels())[0].description, undefined);
+  assert.equal(await sdk.getClientAvatarMetadata(1), null);
+  assert.deepEqual(native.queries, []);
+});
+
+test('SDK end-of-speech markers are not sent into the audio decoder or browser transport', () => {
+  const { sdk, native } = fixture(), received: unknown[] = [];
+  sdk.on('voiceData', frame => received.push(frame));
+  native.emit('voiceData', { clientID: asClientID(1), codec: 4, data: new Uint8Array() });
+  assert.deepEqual(received, []);
+  const data = Uint8Array.of(1, 2);
+  native.emit('voiceData', { clientID: asClientID(1), codec: 4, data });
+  assert.deepEqual(received, [{ clientId: 1, codec: 4, data }]);
 });
 
 test("live-view snapshots include channel edits and remove clients that went out of view", () => {

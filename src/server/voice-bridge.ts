@@ -10,7 +10,7 @@ import { resolveVoiceMediaAddresses } from "./webrtc-config.js";
 import type { ServerEvent as SharedServerEvent } from "../shared/voice-models.js";
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage, Server } from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { BlockList, isIP } from "node:net";
 import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { TSClient, type TSClientOptions } from "./ts-client.js";
@@ -27,8 +27,7 @@ import type { AccelerationRelayOptions, ConfiguredAccelerationRelay } from "./ac
 import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenShareIceServer } from "./screen-share.js";
 import { OpusEncoder } from "./opus-codec.js";
 import { avatarDataUrl } from "./directory-view.js";
-import { PluginCoordinator } from "../plugins/coordinator.js";
-import type { PluginRegistry } from "../plugins/registry.js";
+import type { PluginParticipant } from "../shared/plugins.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_MISSED_HEARTBEATS = 2;
@@ -51,7 +50,7 @@ function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>):
 }
 
 export interface VoiceBridgeOptions {
-  pluginRegistry?: PluginRegistry;
+  pluginRuntimeEnabled?: boolean;
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
   screenShareIceServers?: ScreenShareIceServer[] | (() => ScreenShareIceServer[]);
@@ -110,13 +109,13 @@ interface WebClientEntry extends SessionDirectoryState {
   lastAudioStatsProbeAt: number;
   connectionFailureCode?: string;
   screenPeerId: string;
+  pluginSession?: string;
 }
 
 export class VoiceBridge {
   private readonly sessionManager = new SessionManager();
   private readonly entries = new Map<string, WebClientEntry>();
   private readonly screenShares: ScreenShareCoordinator;
-  private readonly plugins: PluginCoordinator;
   private readonly identityLeases = new IdentityLeaseStore();
   private wss: WebSocketServer | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -131,14 +130,6 @@ export class VoiceBridge {
   ) {
     this.logger = logger.child({ component: "voice-bridge" });
     this.trustedProxies = createTrustedProxies(options.trustedProxies);
-    this.plugins = new PluginCoordinator(options.pluginRegistry, this.entries, (id, message) => {
-      const ws = this.entries.get(id)?.ws;
-      // Optional plugin traffic must not build an unbounded queue on the voice socket.
-      // A slow participant can request a fresh snapshot or reopen after draining.
-      if (ws?.readyState === WebSocket.OPEN && ws.bufferedAmount <= 512 * 1024) {
-        try { ws.send(JSON.stringify(message)); } catch { /* retired socket */ }
-      }
-    });
     this.screenShares = new ScreenShareCoordinator(this.entries, (entryId, message) => {
       const entry = this.entries.get(entryId);
       if (entry?.ws.readyState === WebSocket.OPEN) {
@@ -331,6 +322,7 @@ export class VoiceBridge {
           }, "Web client connected to TeamSpeak");
         }
         session.transition("connected");
+        if (this.options.pluginRuntimeEnabled) entry!.pluginSession = randomBytes(32).toString("base64url");
         sendJson({
           type: "connected",
           tsClientId: events.selfId,
@@ -342,6 +334,7 @@ export class VoiceBridge {
           webRtcStunServer: this.getWebRtcOptions()?.stunServer ?? "",
           screenShareIceServers: this.getScreenShareIceServers(),
           accelerated: Boolean(entry!.acceleration),
+          ...(entry!.pluginSession ? { pluginSession: entry!.pluginSession } : {}),
           ...(entry!.rememberIdentity ? { identity: tsClient.getIdentityString() } : {}),
         });
         sendJson({ type: "channelList", channels: entry!.channelTree });
@@ -506,7 +499,6 @@ export class VoiceBridge {
         },
         onClientMove: (id, channelId) => {
           this.screenShares.onClientMove(entry!, id, channelId);
-          if (id === entry!.tsClient.getClientId()) queueMicrotask(() => this.plugins.reconcile(entry!));
         },
         onNotification: notification => this.screenShares.handleNotification(entry!, notification),
         onVoice: data => entry!.audioTransport?.receiveTeamSpeak(data),
@@ -559,7 +551,6 @@ export class VoiceBridge {
           }
           if (session.state !== "connected") return;
           this.screenShares.removePeer(entryId);
-          this.plugins.remove(entryId);
           resetDirectoryForReconnect();
           sendJson({ type: "disconnected", recoverable: isRecoverable(normalized) });
           scheduleReconnect(normalized);
@@ -581,12 +572,6 @@ export class VoiceBridge {
         }
 
         const rawMessage = typeof data === "string" ? data : data.toString("utf-8");
-        try {
-          const value: unknown = JSON.parse(rawMessage);
-          if (value && typeof value === "object" && "type" in value && value.type === "pluginRequest") {
-            this.plugins.reconcile(entry!); this.plugins.handle(entry!, value); return;
-          }
-        } catch { /* Existing command parser owns malformed messages. */ }
         const webRtcMessage = parseWebRtcClientMessage(rawMessage);
         if (webRtcMessage?.type === "webrtcOffer") {
           if (this.getWebRtcOptions()?.enabled !== true) {
@@ -670,7 +655,6 @@ export class VoiceBridge {
   }
 
   async shutdown(): Promise<void> {
-    this.plugins.dispose();
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -723,6 +707,21 @@ export class VoiceBridge {
       });
   }
 
+  resolvePluginParticipant(token: string): PluginParticipant | null {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    for (const entry of this.entries.values()) {
+      if (entry.pluginSession !== token || entry.session.state !== "connected" || entry.ws.readyState !== WebSocket.OPEN) continue;
+      try {
+        const selfId = entry.tsClient.getClientId(), channelId = entry.tsClient.getChannelId().toString();
+        const uid = entry.members.get(selfId)?.uid;
+        const members = entry.channelTree.find(channel => channel.id === channelId)?.members ?? [];
+        return { id: entry.id, nickname: entry.nickname, ...(uid ? { uid } : {}), target: teamSpeakTargetKey(entry.target), channelId,
+          members: members.map(member => ({ id: member.id, nickname: member.nickname, ...(member.uid ? { uid: member.uid } : {}) })) };
+      } catch { return null; }
+    }
+    return null;
+  }
+
   async terminateSession(entryId: string): Promise<boolean> {
     if (!this.entries.has(entryId)) return false;
     await this.sessionManager.teardown(entryId, "admin-terminated");
@@ -735,7 +734,6 @@ export class VoiceBridge {
 
   private async cleanupEntry(entry: WebClientEntry, reason: SessionTeardownReason): Promise<void> {
     this.screenShares.removePeer(entry.id);
-    this.plugins.remove(entry.id);
     if (this.entries.get(entry.id) === entry) this.entries.delete(entry.id);
     entry.events?.close();
     entry.events = null;

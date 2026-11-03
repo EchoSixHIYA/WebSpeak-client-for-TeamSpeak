@@ -870,7 +870,7 @@
       <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
 
-    <PluginPanel :transport="plugins" :connected="voiceState.connected" :language="language" />
+    <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" />
     <IdentityImportDialog
       v-if="identityImportOpen"
       v-model="identityImportText"
@@ -958,6 +958,7 @@
     >
   </div>
   <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
+  <InstanceAuthorization :language="language" />
 </template>
 
 <script setup lang="ts">
@@ -1003,6 +1004,7 @@ import { useWebClientChannels, type TreeChannel } from "../composables/useWebCli
 import { useWebClientConnection } from "../composables/useWebClientConnection.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import PluginPanel from "../components/PluginPanel.vue";
+import InstanceAuthorization from '../components/InstanceAuthorization.vue';
 import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
 import { useWebClientScreenShare } from "../composables/useWebClientScreenShare.js";
 import { useWebClientPerformance } from "../composables/useWebClientPerformance.js";
@@ -1104,7 +1106,8 @@ const {
   leaveScreenShare,
   checkSupport,
   clearError,
-  plugins,
+  pluginSession,
+  ws: pluginVoiceSocket,
   measureVoiceAudioStatus,
 } = useVoiceWebSocket();
 const performance = useWebClientPerformance(computed(() => voiceState.connected), measureVoiceAudioStatus);

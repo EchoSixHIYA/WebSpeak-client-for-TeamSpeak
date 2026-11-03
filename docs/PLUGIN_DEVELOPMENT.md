@@ -1,158 +1,152 @@
-# WebSpeak 功能插件开发 / Functional plugin development
+# WebSpeak 功能应用开发 / Functional application development
 
-本文描述 dev 分支的功能插件 API v1。实例需要包含插件商店；正式版 v0.2.9 尚无此接口。功能包 `.wplugin` 与外观包 `.wskin`、皮肤内部组件及其 API 独立。
+当前 `dev` 使用应用运行时 **API v2**。正式版 v0.2.9 不包含该能力。`.wplugin` 与 `.wskin` 完全独立；旧 API v1、共享房间协议及其两个示例已移除，不兼容旧包。
 
-## 使用与作用域
+插件是作者自己的应用：标准 HTML/CSS/JavaScript 前端，加上可选的 Node 后端。可以使用框架、浏览器原生 API、自己的 HTTP/WebSocket 协议、网络客户端和数据模型。宿主不提供按音乐、文件、视频等功能划分的业务 API，也不提供 `room.read/write` 或下载权限表。浏览器原有的安全上下文、用户手势、权限许可、跨域及网络可达性要求仍然适用。
 
-管理员进入 `/admin/plugins`，从 [GitHub 分发仓库](https://github.com/Huddle-Up-Forge/webspeak-plugin) 安装或导入本地 `.wplugin`。检查作者、许可证和权限后，选择作用域、保存公开配置并启用。安装、更新后默认禁用，不能静默获取新权限。管理写操作受管理员会话、同源和 CSRF 保护，并记录审计。
+## 管理与部署
 
-用户连接语音工作台后，通过独立的“插件功能”入口打开隔离面板，不依赖皮肤的挂载位置。关闭面板或返回列表会退出插件房间、销毁 iframe 并停止媒体；插件不修改原生工作台 DOM。
+管理员在 `/admin/plugins` 从 GitHub 安装或导入包，审核代码和依赖，配置作用域，勾选信任后启用。每次安装、更新均撤销信任并禁用，需要重新审核。审核是人工准入流程，校验包哈希不等于审核代码。写操作继续使用管理员认证、同源检查、CSRF 和审计。
 
-| 类型 | 配置和房间边界 |
+**信任边界：** 前端运行在独立源，和工作台 DOM 分离，使用真实浏览器环境。Node 后端运行于独立子进程，拥有 WebSpeak 服务账户的操作系统权限，能够访问该账户可访问的网络和文件。独立进程、目录和 JS 堆上限用于生命周期与故障控制，不是恶意代码安全沙箱。仅安装审核且信任的应用。
+
+运行时默认监听 `0.0.0.0:3042`：
+
+| 环境变量 | 用途 |
 | --- | --- |
-| `server` 服务器插件 | 配置允许的 TS `host:port`，用户按实际 TS 目标及频道进入各自房间 |
-| `instance` WebSpeak 实例插件 | 同一网关的已连接用户共享一个插件房间，跨 TS 服务器和频道 |
+| `WEBSPEAK_PLUGIN_PORT` | 应用端口，默认 3042 |
+| `WEBSPEAK_PLUGIN_HOST` | 监听地址，默认 0.0.0.0 |
+| `WEBSPEAK_PLUGIN_PUBLIC_ORIGIN` | 初始公开源，例如 `https://apps.example.com` |
 
-服务器绑定使用网关解析后的实际连接地址，不接受插件或浏览器自报的目标。使用 SRV、Nickname 或别名时，在实例连接列表核对实际目标。配置支持 `host:port`、`host#port`、`[IPv6]:port`，保存时规范化。服务器插件未配置目标时不能启用。切频道会退出旧服务器插件房间，实例插件保留房间。断线、重连、卸载、更新或管理员修改配置会关闭旧上下文，需重新打开。
+本地工作台为 `127.0.0.1` 时自动使用 `localhost:3042`，反向亦然，以保持源分离。公网部署必须给应用配置独立 HTTPS 源，在管理页“应用运行时”保存；该设置优先于环境变量。代理应将该源的全部路径转发至应用端口，支持 WebSocket 升级和 SSE 长连接，关闭 SSE 缓冲。不要让代理记录 `/apps/…` 中的访问凭证，也不要与主站共用域 Cookie。
 
-“所有人”指打开插件的 WebSpeak 浏览器参与者，TS 原生客户端不会运行网页插件。不同 WebSpeak 网关目前不共享插件房间。使用浏览器直连中继网关时，插件目录和房间属于实际连接的语音网关，需要在那里安装配置；只使用 UDP 加速不会改变房间归属。
+```caddyfile
+apps.example.com {
+    reverse_proxy 127.0.0.1:3042
+}
+```
 
-## 包格式
+容器需映射应用端口，或让代理接入相同容器网络。端口/监听地址改变需重启；公开源可在后台更新，会撤销已有应用会话。主站直接使用 TLS 时，运行端口使用相同证书；TLS 在代理终止时，上游使用 HTTP。监听失败会保留主站和语音服务，后台显示不可用，修复后需重启。配置为主站自身源时拒绝打开应用。
 
-`.wplugin` 是 UTF-8 JSON，最多 512 KiB，不是 ZIP；不包含服务端可执行文件、原生模块或任意路径。
+## 作用域与身份
+
+`server`：管理员配置允许的实际 TS `host:port`，用户按真实 TS 目标和频道获得作用域标识。`instance`：当前语音网关的已连接用户获得同一实例标识。作用域负责宿主准入和提供上下文，**不会替作者创建共享房间或自动同步数据**。应用后端应按 `request.webspeak.scope.key` 分组，并自行实现业务授权和同步。
+
+TS 目标由实际语音连接解析，插件不能自报身份或频道。目标支持 `host:port`、`host#port`、`[IPv6]:port`，保存时规范化；SRV/Nickname 场景应核对实际目标。服务器范围切换频道后需重开；实例范围的频道变更通过上下文更新。断开、重连、更新、禁用、重启、配置修改或卸载会撤销旧凭证并关闭连接。服务端可以在没有打开面板时执行后台任务，直到禁用或停止。
+
+入口属于实际语音网关；浏览器直连另一中继网关时，在那个网关安装配置。原生 TS 客户端不会执行网页应用，不同网关不会自动共享状态。作者可自行实现跨实例服务。
+
+## 包格式与构建
+
+复制 [通用起点](templates/plugin-app/manifest.json)，修改 ID、元数据和业务代码。它只展示上下文及自定义计数路由，不是商店预装插件。
+
+```text
+my-app/
+  manifest.json
+  client/index.html
+  client/main.js
+  client/style.css
+  server/main.mjs       # 可选
+  server/node_modules/  # 可选，已审核的运行依赖
+```
 
 ```json
 {
-  "manifest": {
-    "apiVersion": 1, "id": "community.example", "name": "Example",
-    "version": "1.0.0", "author": "Author", "license": "MIT",
-    "description": "Collaborative panel",
-    "scopes": ["server", "instance"],
-    "permissions": ["room.read", "room.write"]
-  },
-  "html": "<main id='app'></main>",
-  "script": "(async () => { const context = await webspeak.ready; })();",
-  "styles": {
-    "light": "body { background: #fff; color: #16332e; }",
-    "dark": "body { background: #20242b; color: #edf5f2; }"
-  }
+  "apiVersion": 2,
+  "id": "community.my-app",
+  "name": "My application",
+  "version": "1.0.0",
+  "author": "Author",
+  "license": "MIT",
+  "description": "An independently implemented application",
+  "scopes": ["server", "instance"],
+  "client": { "entry": "client/index.html" },
+  "server": { "entry": "server/main.mjs" }
 }
 ```
 
-两个基础样式都必须提供。宿主根据当前皮肤文字明暗推断基础配色，发送 `context.theme`，一次只启用一个样式表。iframe 不继承皮肤 CSS，无需适配每款皮肤的组件位置。语言为 `zh/en/de/ru/ja`，建议五种文案和英文回退。每段 HTML、脚本或样式最多 256 KiB，总包仍受 512 KiB 限制。ID 为小写字母、数字、点和连字符，最长 80 字符。
-
-完整示例源文件在 [watch-together](examples/watch-together/manifest.json)：`manifest.json`、`panel.html`、`player.js`、`light.css`、`dark.css`。
+纯前端应用删除 `server` 声明。前端框架产物放入 `client/`，静态引用使用相对路径，不能假设根路径为 `/`。后端入口支持 `.mjs/.cjs`，依赖放在 `server/` 内或打包为自包含文件。宿主不会执行 `npm install`、安装脚本或原生编译；原生依赖需匹配目标 Node ABI/操作系统，不一定跨平台。运行环境为宿主 Node，当前项目要求 Node 22 或更高。
 
 ```sh
-node --import tsx scripts/build-plugin.mjs docs/examples/watch-together docs/examples/watch-together.wplugin
-node --import tsx --test src/plugins/plugins.test.ts
+node scripts/build-plugin.mjs docs/templates/plugin-app /tmp/application.wplugin
 ```
 
-构建器读取上述五个文件。其他工具链只需生成同格式 JSON。独立插件仓库不需要 WebSpeak 源码即可生成包；宿主导入时也会校验。
+构建器是独立 Node 脚本，可复制到插件仓库，无需导入 WebSpeak 源码。`.wplugin` 是 UTF-8 JSON：`{manifest,files}`；`files` 是路径到 `{encoding:"utf8"|"base64",data:string}` 的映射。支持普通 `client/`、`server/` 文件；禁止越界路径、符号链接、Windows 设备名、大小写冲突及文件/目录别名。入口必须是 UTF-8。封装上限 48 MiB、解码内容 32 MiB、单文件 16 MiB、4096 个文件，安装上限 50 个。宿主导入时完整校验。
 
-## 公共浏览器 API
+## 浏览器上下文
 
-脚本开始前，宿主提供只读 `window.webspeak`，不需要导入内部 Vue 组件。
+宿主在入口 HTML 注入外部脚本，在应用模块运行前提供：
 
-```ts
-type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-interface Snapshot {
-  roomId: string;
-  revision: number;
-  state: JsonValue; // 空房间初始为 null
-  serverTime: number; // 网关 Unix 毫秒时间
-  participants: { id: string; nickname: string }[];
-}
-interface Context {
-  self: { id: string; nickname: string }; // 临时会话 ID，不是 TS 私钥或 UID
-  config: JsonValue; // 管理员提供的公开配置
-  scope: "server" | "instance";
-  snapshot: Snapshot;
-  theme: "light" | "dark";
-  language: "zh" | "en" | "de" | "ru" | "ja";
-}
-interface WebSpeakPluginAPI {
-  apiVersion: 1;
-  ready: Promise<Context>;
-  room: {
-    snapshot(): Promise<Snapshot>;
-    update(expectedRevision: number, state: JsonValue): Promise<Snapshot>;
-    subscribe(listener: (snapshot: Snapshot) => void): () => void;
+```js
+const context = await window.webspeak.ready;
+const unsubscribe = webspeak.onContextChange(next => render(next));
+const latest = webspeak.getContext();
+const response = await fetch(context.serverUrl + '/my-route', {
+  method: 'POST', body: JSON.stringify({anything: 'defined by the application'}),
+  signal: webspeak.signal
+});
+const socket = new WebSocket(context.socketUrl + '/my-socket');
+```
+
+| 上下文字段 | 内容 |
+| --- | --- |
+| `apiVersion` | 2 |
+| `plugin` | manifest |
+| `self` | 当前公开 `id/nickname/uid?` |
+| `connection` | 真实 `target/channelId` 和当前频道公开 `members`（`id/nickname/uid?`） |
+| `scope` | `{type:"server"|"instance",key:string}`；分组标识不能直接当文件路径 |
+| `config` | 管理员公开 JSON，所有参与者可读 |
+| `theme/language` | `light/dark` 和 `zh/en/de/ru/ja`，同步到 `<html data-theme>` 与 `lang` |
+| `appId` | 本次打开的公开标识，不是长期身份或认证凭据 |
+| `serverUrl/socketUrl` | 此会话的后端 HTTP/WS 根；纯前端为 `null` |
+| `contextUrl` | 此会话最新上下文地址 |
+
+运行时 URL 含临时凭证，不应持久化、广播或记录。`webspeak.signal` 在撤销或退出时中止，仍需清理自己的定时器、网络、媒体和订阅。应用应提供两种基础配色及适合的语言回退。
+
+用原生 `fetch`、`WebSocket`、`RTCPeerConnection`、文件选择/下载、IndexedDB、Canvas 等编写功能。独立源存储遵循原生规则；同一运行源的应用共享该源存储，请按插件 ID 命名，不能把此设计当作互不信任插件间的隔离。服务端持久化使用 `dataDir`。
+
+关闭面板会销毁 iframe 并取消未完成的打开操作。宿主每秒检查会话有效性，撤销后终止 HTTP、SSE、WS 和旧页面。控制平面只传上下文与生命周期；业务数据使用独立应用服务，不经过语音 WebSocket。
+
+## 可选 Node 后端
+
+```js
+export default async function activate({ dataDir, config, publicConfig, events, signal, log }) {
+  return {
+    handle(req, res) {
+      // req.webspeak is verified by the host; req.url is your own route.
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({participant: req.webspeak.self.id}));
+    },
+    upgrade(req, socket, head) { /* your WebSocket protocol */ },
+    async stop() { /* flush data and release resources */ }
   };
 }
 ```
 
-`room.read` 允许读房间和订阅状态；`room.write` 允许替换共享状态，必须同时声明读权限。不需要共享数据的独立功能面板可声明空权限数组：仍可打开并获得公开配置，但上下文仅含空快照，不能读写或订阅其他参与者。当前所有已加入且拥有写权限的参与者都能操作，没有隐含主持人角色或 TS 管理权限。API 不提供 TS Query、宿主 DOM、系统文件、管理员凭据或任意宿主方法。需要新能力时另行提议接口，不能访问内部实现绕过。
+也可直接返回 `(req,res)=>…`。这是 Node 原生请求/响应，可适配 Express、WS 等库。`req.webspeak` 含 `apiVersion/appId/self/connection/scope`，不含临时 URL 或管理凭据；服务端 `connection` 只有目标和频道。代理剥离主站 Cookie、Authorization 和伪造的 `x-webspeak-*` 头；应用自行认证可使用自定义头或自己的外部服务。后端不会收到主站管理员/Query 密钥，除非管理员主动在插件配置中提供。
 
-更新使用比较并交换：读取 N 后提交 N，成功返回 N+1；冲突返回 `PLUGIN_REVISION_CONFLICT`。重新读取，让用户重试或基于新状态重算，不能盲目覆盖。
+`dataDir` 为本插件持久目录，更新/重启/卸载保留。代码提取目录会清理，不可持久化。包文件没有可执行位；额外子程序需作者自行处理权限和平台。Node 网络、文件、子程序和第三方服务同样属于审核范围。
 
-```js
-const api = window.webspeak;
-const context = await api.ready;
-let snapshot = context.snapshot;
-const unsubscribe = api.room.subscribe(next => {
-  if (next.roomId !== snapshot.roomId || next.revision < snapshot.revision) return;
-  snapshot = next;
-  render(next.state);
-});
-async function update(next) {
-  try { snapshot = await api.room.update(snapshot.revision, next); }
-  catch (error) {
-    if (error.message === "PLUGIN_REVISION_CONFLICT") snapshot = await api.room.snapshot();
-    else throw error;
-  }
-}
-addEventListener("pagehide", unsubscribe, { once: true });
-```
+`config` 是后端私密 JSON，`publicConfig` 是公开 JSON。私密配置在管理页仅显示是否已保存，支持保留/替换/删除，用实例主密钥加密存储；启用的 Node 代码获得明文。它不是针对恶意插件的秘密保险箱。不要把私密配置写入响应或日志。
 
-共享状态上限 16 KiB、16 层嵌套、4096 个节点，只接受 JSON，不接受非有限数、原型键或二进制媒体。公开配置上限 8 KiB。每会话每秒最多 20 个插件请求，每个房间每秒最多 10 次共享写入，关闭操作不受频率限制。最多 8 个已打开插件（当前面板一次打开一个）；每网关最多 800 个非空房间、50 个已安装插件。读取快照不触发广播。不要通过高频写状态传视频帧。服务端只保存通用状态与成员，不执行插件代码。
+`events` 为 Node `EventEmitter`：`participantJoined/contextChanged` 提供服务端公开上下文，`participantLeft` 为 `{appId,selfId,scopeKey}`。加入指打开应用面板，不是全体 TS 成员。`signal` 在停止时中止；`log(level,message)` 提供限流日志，宿主当前以 debug 级别记录。
 
-最后一位参与者离开立即销毁房间，重启也会丢失临时房间。安装和配置持久化于数据目录 `plugins/*.json`，原子替换；实例备份应包含此目录。需要持久业务数据或外部适配器时，应定义额外能力协议。
+每个后端一个进程，默认最多 8 个；启动超时 10 秒、停止宽限 2 秒、JS 堆上限 256 MiB（不是总 RSS 限额）。失败显示错误、撤销会话，可手动重启，无无限重试。每个语音连接最多 8 个打开会话，全局 800 个，每会话最多 32 条代理连接及 4 条上下文 SSE。普通 HTTP 空闲超时 120 秒，无上下文 SSE 且 90 秒无活动的会话回收。作者负责消息大小、业务授权、并发、存储一致性和依赖资源用量。
 
-主要错误：`PLUGIN_NOT_CONNECTED`、`PLUGIN_NOT_ALLOWED`、`PLUGIN_DISABLED`、`PLUGIN_NOT_OPEN`、`PLUGIN_PERMISSION_DENIED`、`PLUGIN_REVISION_CONFLICT`、`PLUGIN_RATE_LIMITED`、`PLUGIN_TOO_LARGE`、`PLUGIN_TIMEOUT`。配置或包变化会关闭旧上下文并提示重新打开。
+## 分发与验证
 
-为避免可选插件消息挤占语音连接的内存，出站队列超过 512 KiB 时跳过插件消息。恢复连接质量后可请求快照或重新打开插件；请求无响应会超时，不代表共享写入一定没有执行。
+[分发仓库](https://github.com/Huddle-Up-Forge/webspeak-plugin) 目录为 `{"schemaVersion":2,"plugins":[{"id":"community.my-app","repository":"https://github.com/OWNER/REPO","metadataPath":"plugin.json"}]}`。插件仓库 `plugin.json` 包含同一 `manifest` 和 `package:{ref,path,sha256}`。`ref` 使用固定提交/不可变标签，`path` 指向已提交包，SHA-256 为包原始字节哈希。宿主限制 GitHub 内容来源、核验哈希与 manifest；目录或安装修订改变会拒绝覆盖，需重新加载。空目录不默认安装插件。
 
-## 同步观影示例
+验证实际构建包的导入、审核、启用、自定义 HTTP/WS、依赖加载、持久化和关闭/断线/禁用/更新撤销；检查明暗、语言、窄屏。协作另测两位真实参与者及并发/离开/重连。区分模拟身份、真实 TS、浏览器交互与跨网络证据。宿主回归：`npm run verify`。
 
-状态为 `{ url, position, playing, updatedAt }`。加载、播放、暂停、跳转共享；音量、全屏与播放许可仅影响自己。使用快照 `serverTime` 估算网关时钟，推算播放 elapsed time，定时校正漂移，大偏移跳转、小偏移暂调速。后来加入读取同一快照追上进度，不依赖过去的操作事件。
+## 悬浮应用窗口 / Floating application workspace
 
-视频由每个浏览器直接从 URL 加载，不经过 WebSpeak 中转。支持浏览器可解码的 MP4/WebM 等直链，不支持播放网页、DRM、登录后 URL 或嵌入式平台播放器。HTTPS 实例一般需要 HTTPS 视频。自动播放受浏览器策略限制，可能需要点击“允许播放”。源端带宽、网络和缓冲会影响误差，不承诺逐帧同步。
+功能插件入口由宿主的独立悬浮层提供，不属于默认主题或任何皮肤插槽。入口可拖动，避免遮挡工作台控件。应用库和应用内容使用非模态窗口：打开后仍可操作工作台；标题栏可拖动，支持最小化、最大化、还原和关闭，小屏幕自动限制在可视区域内。宿主窗口优先读取标准 `color-scheme` 来选择日间/夜间配色，不继承皮肤组件样式。
 
-## 隔离与清理
+最小化、切换到应用库、再返回当前应用均保留同一个 iframe 与会话，传输、播放等任务不会因收起窗口而重置。关闭窗口、切换至另一个应用或语音会话撤销时，宿主结束当前应用会话。当前同时承载一个前端应用；不要把窗口最小化当成退出事件。
 
-使用 opaque-origin `sandbox="allow-scripts"` iframe，不授予 `allow-same-origin`、顶部导航、弹窗、表单、麦克风或摄像头。宿主 RPC 校验 `event.source`、随机通道和面板生命周期；插件不能选择另一个 ID 或房间。CSP 禁止 fetch/WebSocket、外部脚本、嵌套 iframe，仅允许直接媒体及 HTTPS 图片。媒体源仍会收到浏览器请求，配置、共享状态和视频 URL 都不能包含管理员密钥。
+应用只负责 iframe 内部内容，使用自身响应式日间/夜间样式和上下文中的主题、语言。不读取或改写皮肤 DOM，不绘制覆盖宿主的全屏遮罩，不自行重复宿主的标题栏、最小化和关闭按钮。需要自有导航时可在内容区实现。应用界面优先显示功能与实际状态，不重复运行环境、权限或免责说明；管理员启用时的信任与权限信息保留在管理流程中。
 
-隔离不是恶意代码审核、CPU/内存配额的替代品。管理员应审查来源。插件在 `pagehide` 清理计时器、订阅和媒体；宿主关闭时销毁 iframe，后端移除房间成员，迟到响应不能重开已关闭面板。
+## 实例级用户授权
 
-## GitHub 分发协议
-
-根仓库 `main/index.json`：
-
-```json
-{
-  "schemaVersion": 1,
-  "plugins": [{
-    "id": "community.example",
-    "repository": "https://github.com/OWNER/REPOSITORY",
-    "metadataPath": "plugin.json"
-  }]
-}
-```
-
-`metadataPath` 默认 `plugin.json`，也支持子目录。同一个仓库可以分发多个插件。对应仓库默认分支的元数据：
-
-```json
-{
-  "manifest": { "apiVersion": 1, "id": "community.example", "name": "Example", "version": "1.0.0", "author": "Author", "license": "MIT", "description": "Example", "scopes": ["server"], "permissions": ["room.read", "room.write"] },
-  "package": { "ref": "IMMUTABLE_COMMIT_OR_TAG", "path": "example.wplugin", "sha256": "64_lowercase_hex_digits" }
-}
-```
-
-使用真实 SHA-256，推荐固定提交或发布标签；不要上传占位值。只访问 `raw.githubusercontent.com`，拒绝重定向、非法地址/路径、超时和超限数据。安装时重读目录和元数据，核对管理员看到的 revision，再下载校验摘要及清单；installedRevision 也作并发保护。失败保留旧包。摘要是内容一致性校验，不是作者签名或安全认证。
-
-## English quick start
-
-Functional plugins are portable UTF-8 `.wplugin` JSON bundles, independent of skins. Install under `/admin/plugins`, review permissions, select `server` (target + channel) or `instance` (one room across connected users of this gateway), and explicitly enable. Open the common Plugins panel after joining voice. Native TS clients and separate WebSpeak gateways do not share this runtime.
-
-Await `window.webspeak.ready`, subscribe with `webspeak.room.subscribe`, and write with revision-checked `room.update`. The API types, limits and distribution schemas above are normative. Both light/dark styles are required. The [Watch Together example](examples/watch-together/player.js) implements clock-based progress, late joining, conflict recovery, autoplay handling and cleanup without host-specific player code. Build using the command above and import into an isolated development instance. Develop plugins without modifying WebSpeak runtime files; propose missing capabilities separately.
+首次访问时，宿主统一征求第三方皮肤与功能应用的使用授权；决定按浏览器源保存，不迁移旧的逐皮肤授权。拒绝或未选择时，只显示日间、夜间、ILLUSIA 三款官方皮肤，KAAK 和功能应用入口均隐藏。皮肤菜单最后的“授权”可随时更改。撤回会关闭 iframe 并撤销当前打开操作/应用会话，不停止管理员启用的全实例后台服务。应用不得以入口以外的方式绕过宿主授权，也无需重复询问同一份宿主上下文授权；相机、麦克风等浏览器原生许可仍由浏览器处理。

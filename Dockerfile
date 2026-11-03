@@ -37,7 +37,7 @@ COPY --from=build --chown=node:node /app/scripts/docker-healthcheck.mjs ./script
 
 USER node
 VOLUME ["/data"]
-EXPOSE 3040/tcp 3041/tcp 39087/udp 40000-40099/udp
+EXPOSE 3040/tcp 3041/tcp 3042/tcp 39087/udp 40000-40099/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["node", "scripts/docker-healthcheck.mjs"]
 

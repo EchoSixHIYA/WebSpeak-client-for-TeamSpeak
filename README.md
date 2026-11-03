@@ -91,9 +91,9 @@ Data persists in the `webspeak-data` volume. The Compose file uses host networki
 | 类型 · Type | 入口 · Resources |
 | --- | --- |
 | 皮肤包 · Skin packages | [皮肤索引 · Catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) |
-| 功能插件 · Functional plugins **(dev)** | [分发仓库与一起观看示例 · Catalog & Watch Together](https://github.com/Huddle-Up-Forge/webspeak-plugin) · [开发指南 · Guide](./docs/PLUGIN_DEVELOPMENT.md) · [Agent Skill](./.agents/skills/webspeak-plugin-development/SKILL.md) |
+| 功能插件 · Functional plugins **(dev)** | [应用目录与开发起点 · Catalog & application starter](https://github.com/Huddle-Up-Forge/webspeak-plugin) · [开发指南 · Guide](./docs/PLUGIN_DEVELOPMENT.md) · [Agent Skill](./.agents/skills/webspeak-plugin-development/SKILL.md) |
 
-皮肤包负责界面、布局及其附属小组件；功能插件在独立面板中提供协作能力。功能插件需要当前 `dev` 运行时，尚未包含在 v0.2.9 中。
+皮肤包负责界面、布局及其附属小组件；功能插件使用标准浏览器环境和可选 Node 后端，自行实现业务功能。功能插件需要当前 `dev` 运行时，尚未包含在 v0.2.9 中。
 
 Skins own appearance, layout and attached widgets. Functional plugins provide collaboration in an independent panel and currently require the `dev` runtime; they are not included in v0.2.9.
 

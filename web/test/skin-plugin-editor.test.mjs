@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { after, before, test } from "node:test";
+import { after, before, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import * as Vue from "vue";
 import { createRenderer, nextTick, ssrContextKey, createSSRApp } from "vue";
@@ -15,6 +15,7 @@ let SkinPluginEditor;
 let SkinPluginOutlet;
 let authoring;
 let approvals;
+let authorization;
 let focusedNode;
 let supportsPopoverApi = true;
 const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
@@ -148,6 +149,7 @@ before(async () => {
   ({ default: SkinPluginEditor } = await vite.ssrLoadModule("/src/components/SkinPluginEditor.vue"));
   ({ default: SkinPluginOutlet } = await vite.ssrLoadModule("/src/components/SkinPluginOutlet.ts"));
   approvals = await vite.ssrLoadModule("/src/services/skin-plugin-approval.ts");
+  authorization = await vite.ssrLoadModule('/src/services/instance-authorization.ts');
   const require = createRequire(import.meta.url);
   const { parse, compileScript, compileTemplate } = require("../node_modules/@vue/compiler-sfc");
   const filename = fileURLToPath(new URL("../src/components/SkinPluginEditor.vue", import.meta.url));
@@ -169,6 +171,25 @@ after(async () => {
   await vite?.close();
   if (localStorageDescriptor) Object.defineProperty(globalThis, "localStorage", localStorageDescriptor);
   else Reflect.deleteProperty(globalThis, "localStorage");
+});
+beforeEach(() => authorization.setInstanceAuthorization(true));
+
+test('instance refusal overrides cached component grants and revocation removes mounted UI', async () => {
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: new MemoryStorage() });
+  const skinId = 'community.consent-regression', skinVersion = '1.0.0';
+  const component = { id: 'private-panel', name: 'Panel', page: 'voice', accessibleName: 'Panel', permissions: ['session.status.read'], actions: {}, root: { tag: 'div', children: [{ text: 'Third-party channel content' }] } };
+  approvals.approveSkinPluginComponents(skinId, skinVersion, [component]);
+  authorization.setInstanceAuthorization(false);
+  const root = hostNode('root');
+  const app = renderer.createApp({ render: () => Vue.h(SkinPluginOutlet, { skinId, skinVersion, page: 'voice', document: { schemaVersion: 3, components: [component] }, assets: {}, data: {}, actions: {} }) });
+  app.mount(root);
+  try {
+    await nextTick(); assert.doesNotMatch(nodeText(root), /Third-party channel content/);
+    authorization.setInstanceAuthorization(true);
+    await nextTick(); await nextTick(); assert.match(nodeText(root), /Third-party channel content/);
+    authorization.setInstanceAuthorization(false);
+    await nextTick(); assert.doesNotMatch(nodeText(root), /Third-party channel content/);
+  } finally { app.unmount(); }
 });
 
 test("component editor creates, changes, and deletes a skin component tree through its UI", async () => {
@@ -939,7 +960,7 @@ test("deleting the last surface component immediately restores the host page", a
   }
 });
 
-test("surface permissions auto-approve in development without showing prompts or recovery controls", async () => {
+test("authorized instance grants declared surface permissions without per-skin prompts or recovery controls", async () => {
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: new MemoryStorage() });
   const skinId = "community.access-lifecycle";
   const skinVersion = "1.0.0";
@@ -993,7 +1014,7 @@ test("surface permissions auto-approve in development without showing prompts or
     await nextTick();
     await nextTick();
     const activeSurface = visit(root, node => node.props["data-ws-plugin-surface"] === "voice");
-    assert.ok(activeSurface, "the validated surface receives its declared access in development");
+    assert.ok(activeSurface, "the validated surface receives access after the instance decision");
     assert.match(nodeText(activeSurface), /Protected custom page/);
     assert.equal(visit(root, node => node.props["data-native-host"] === "true"), null);
     assert.equal(visit(teleportRoot, node => node.props["data-ws-plugin-consent"] === "true"), null,

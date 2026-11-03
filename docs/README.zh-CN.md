@@ -308,7 +308,7 @@ relay.example.com {
 
 ### 功能插件 `.wplugin`（dev）
 
-功能插件在独立面板中运行，与皮肤包分开。管理员可配置服务器作用域（同一 TS 目标与频道）或实例作用域（同一语音网关）；“一起观看”示例验证播放、暂停、跳转和中途加入的同步。需要当前 dev 运行时，不属于 v0.2.9。
+功能插件是独立应用，使用标准浏览器能力和可选 Node 后端，自行实现路由、状态与协作。管理员审核代码和依赖后启用；更新须重新信任。支持 TS 服务器或实例范围，运行于独立源。当前 dev 使用 API v2，不属于 v0.2.9。
 
 [开发指南](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [分发索引与示例](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 

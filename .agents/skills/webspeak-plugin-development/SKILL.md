@@ -1,20 +1,32 @@
 ---
 name: webspeak-plugin-development
-description: Develop, review, package, and validate portable WebSpeak functional .wplugin plugins through the public API. Use for server or instance plugins and GitHub plugin distribution, not .wskin appearance packages or their internal components.
+description: Build, review and package WebSpeak API v2 functional applications with standard browser code and optional Node services, including GitHub distribution. Use for .wplugin applications rather than .wskin skins or their presentation components.
 ---
 
-# WebSpeak Plugin Development
+# WebSpeak Application Development
 
-Build a functional package without editing WebSpeak runtime, SDK, skins, or administration code. A missing host capability needs a separate API change authorized by the user; do not invent methods or reach into Vue instances.
+Read the current [application runtime guide](../../../docs/PLUGIN_DEVELOPMENT.md). In a standalone checkout, use `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/dev/docs/PLUGIN_DEVELOPMENT.md`. Confirm API v2 support on the target instance; stable v0.2.9 has none. API v1 and its shared-room examples are removed.
 
-Read the current [plugin development guide](../../../docs/PLUGIN_DEVELOPMENT.md) before implementing. In a standalone checkout, use the guide at `https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/blob/dev/docs/PLUGIN_DEVELOPMENT.md`. Confirm that the target instance supports API v1; released v0.2.9 does not.
+Develop an independent application, not a list of host business RPC calls. Use ordinary HTML/CSS/JavaScript, browser APIs and optional Node services with author-defined routes, dependencies and state. The host provides authenticated context, configuration, package/lifecycle management and a separate origin. It supplies no room API or feature permission list. Keep application business logic in its package; a host defect or missing general runtime primitive is a separate host change.
 
-Choose the scope that matches the user's intent: `server` uses actual TS target + channel rooms; `instance` shares a room across connected users of one gateway. Neither synchronizes separate gateways or TS native clients. Public plugin config is not secret storage. Do not repurpose TS administration credentials.
+Start with `docs/templates/plugin-app/` or the distribution repository's `template/`. Put frontend output under `client/` with relative assets and optional `.mjs/.cjs` activation code under `server/`. Include audited dependencies or bundle them; the host does not run package installers. Native dependencies must match target OS and Node ABI. Build with `node scripts/build-plugin.mjs SOURCE_DIR OUTPUT.wplugin`, or the standalone distribution builder, then import the actual output.
 
-Keep UI/behavior in `.wplugin` JSON: validated manifest, HTML, script, complete light and dark styles. Use only `window.webspeak.ready` and the documented `room` API. Never assume a particular skin DOM or CSS selector. Use an independent panel, responsive layout, translated labels, and accessible controls. Media autoplay needs participant action when blocked.
+Use `webspeak.ready`, `getContext()`, `onContextChange()` and `signal` for generic context; implement functionality through native browser/Node code. Scope provides admission and a grouping key, not synchronization. Server logic must enforce scope and business access. Prefer host-verified `req.webspeak` over browser-supplied identities or channels. Temporary runtime URLs are credentials: do not persist, broadcast or log them. Backend private configuration is encrypted at rest and omitted from admin reads; public configuration is user-visible.
 
-Represent collaboration as small JSON state. Use revision CAS, recover conflicts from a fresh snapshot, reject old room IDs/versions, and derive playback progress from gateway time rather than sending frames or high-frequency ticks. Clean timers, subscriptions and media on pagehide. The example is `docs/examples/watch-together/` in the host repo and `examples/watch-together/` in the distribution repo.
+Treat applications as trusted code. Node services have the WebSpeak OS account's privileges; process separation and heap limits are not a hostile-code sandbox. Frontends use a separate origin with standard browser capabilities. Browser permission, secure-context, user-gesture, CORS and network requirements apply. The shared application origin does not isolate mutually hostile plugins. Explain these boundaries accurately and review dependencies rather than inventing host feature permissions.
 
-Build with `node --import tsx scripts/build-plugin.mjs SOURCE_DIR OUTPUT.wplugin` in a host checkout (the provided template reads manifest.json, panel.html, player.js, light.css and dark.css), or use the standalone distribution repo builder. Validate the actual resulting package through host import. For GitHub distribution provide real package SHA-256 and a fixed commit/tag, then add the repository to the catalog. Publishing or deploying requires the user's task authorization; do not infer it from this skill.
+Provide responsive light/dark styles and suitable language handling using context. Keep UI in the application panel without relying on skin DOM. Clean timers, subscriptions, media and sockets on exit/revocation. Persist backend state in `dataDir`, never extracted code directories. Implement concurrency and atomic writes appropriate to the application.
 
-Verify two independent participants: load/play/pause/seek, late join, concurrent writes, target/channel isolation, disconnect, close, administrator disable/update and re-open. Check both themes and narrow layout. Distinguish mocked gateway tests from a real browser playback test and real TS connectivity. Only claim capabilities the evidence demonstrates. Keep private credentials and diagnostic recordings outside published artifacts.
+Verify import, trust, enable, update, failure/restart, custom routes, persistence and revocation. Collaborative apps need two real browser participants and late-join/concurrent-change/channel-boundary/disconnect tests. Distinguish mocked HTTP, actual processes, browser interactions and independent networks. Claim only demonstrated capabilities. Keep credentials and diagnostics out of artifacts.
+
+For distribution use schema v2 catalog entries, matching manifest, raw-package SHA-256 and fixed refs. Publishing and deployment follow the user's task authorization; this skill does not itself authorize either.
+
+## Floating host workspace
+
+The host owns a skin-independent draggable launcher, application library and non-modal app window. Do not add launch controls to a particular skin or inspect its DOM. Apps render their responsive light/dark UI inside the supplied iframe; the host supplies dragging, minimize/maximize/restore and close controls. The host window uses the standard `color-scheme` for its light/dark fallback without inheriting skin component styles. Do not duplicate host window chrome or block the workspace with a page-wide modal backdrop.
+
+Minimizing or switching to the library retains the same iframe and app session. Transfers and playback must survive those actions. Closing the window, replacing the active app or host context revocation ends that session; only one frontend app is currently hosted at a time. Do not equate a hidden iframe with app exit. Verify resize, narrow screens, theme changes, minimize/resume without reload and close/revocation cleanup. Keep the user-facing window focused on functionality and actionable status; omit repeated runtime/permission disclaimers. Administrator trust and security review remain part of enablement.
+
+## Instance authorization
+
+The public host asks once per browser origin for third-party skins and functional applications together. No decision or refusal allows only Day, Night and ILLUSIA; KAAK also requires consent. The last item in the skin menu reopens this setting. Revocation must close/revoke the active frontend application while preserving independently enabled backend services. Do not add per-app copies of the same host authorization prompt, bypass the host gate or confuse this user decision with administrator package trust or browser-native permission prompts.

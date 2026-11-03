@@ -30,6 +30,7 @@ class Peer {
   parameters: RTCRtpSendParameters | null = null;
   codecPreferences: RTCRtpCodecCapability[] = [];
   private readonly transceivers: Array<{
+    direction?: RTCRtpTransceiverDirection;
     sender: { track: { kind: string } | null };
     receiver: { track: { kind: string } | null };
     setCodecPreferences: (codecs: RTCRtpCodecCapability[]) => void;
@@ -41,8 +42,9 @@ class Peer {
   setLocalDescription(description: unknown) { this.localDescription = description; return Promise.resolve(); }
   setRemoteDescription() { return Promise.resolve(); }
   addIceCandidate() { return Promise.resolve(); }
-  addTransceiver(kind: string) {
+  addTransceiver(kind: string, options?: RTCRtpTransceiverInit) {
     const transceiver = {
+      direction: options?.direction ?? 'sendrecv',
       sender: { track: null },
       receiver: { track: { kind } },
       setCodecPreferences: (codecs: RTCRtpCodecCapability[]) => { this.codecPreferences = codecs; },
@@ -65,7 +67,7 @@ class Peer {
 }
 
 let controller: ReturnType<typeof createScreenShareController>;
-let sent: Array<{ type: string; requestId?: string }>;
+let sent: Array<{ type: string; requestId?: string; audio?: boolean }>;
 const globals = new Map<string, PropertyDescriptor | undefined>();
 function replaceGlobal(name: string, value: unknown) {
   globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
@@ -208,6 +210,44 @@ test("native TeamSpeak viewers prefer VP8 for decoder compatibility", async () =
     "video/av1",
     "video/rtx",
   ]);
+});
+
+for (const surface of ['window', 'monitor', 'browser']) {
+  test(`native viewing of ${surface} capture without audio still negotiates an audio section`, async () => {
+    const capture = stream();
+    Object.assign(capture.track, { getSettings: () => ({ displaySurface: surface }) });
+    Object.assign(navigator.mediaDevices, { getDisplayMedia: async () => capture });
+    await controller.api.startScreenShare(false); confirmStart('local');
+    assert.equal(sent.find(message => message.type === 'screenShareStart')?.audio, false);
+    controller.handleMessage({ type: 'screenShareNativeViewerJoined', streamId: 'local', viewerPeerId: 'ts-viewer-7' });
+    await nextTurn();
+    const transceivers = Peer.instances[0].getTransceivers();
+    assert.equal(transceivers.length, 2);
+    assert.equal(transceivers[0].sender.track?.kind, 'video');
+    assert.equal(transceivers[1].receiver.track?.kind, 'audio');
+    assert.equal(transceivers[1].direction, 'sendonly');
+    assert.equal(transceivers[1].sender.track, null, 'negotiating audio must not start a microphone or synthesize captured audio');
+    assert.equal(capture.getTracks().length, 1);
+  });
+}
+
+test('native viewing retains actual captured audio without adding a duplicate audio section', async () => {
+  const capture = stream(), audio = new Track(); audio.kind = 'audio';
+  Object.assign(navigator.mediaDevices, { getDisplayMedia: async () => ({ ...capture, getTracks: () => [audio, capture.track], getAudioTracks: () => [audio] }) });
+  await controller.api.startScreenShare(); confirmStart('local');
+  controller.handleMessage({ type: 'screenShareNativeViewerJoined', streamId: 'local', viewerPeerId: 'ts-viewer-7' });
+  await nextTurn();
+  const transceivers = Peer.instances[0].getTransceivers();
+  assert.deepEqual(transceivers.map(item => item.sender.track?.kind), ['video', 'audio']);
+  assert.equal(sent.find(message => message.type === 'screenShareStart')?.audio, true);
+});
+
+test('browser viewers do not get a synthetic audio section for video-only sharing', async () => {
+  await controller.api.startScreenShare(false); confirmStart('local');
+  controller.handleMessage({ type: 'screenShareSignal', streamId: 'local', fromPeerId: 'web-viewer', signal: { kind: 'offer', sdp: 'browser offer' } });
+  await nextTurn();
+  assert.equal(Peer.instances[0].getTransceivers().length, 1);
+  assert.equal(Peer.instances[0].getTransceivers()[0].sender.track?.kind, 'video');
 });
 
 test("viewer visibility follows the selected stream so the player and card cannot disagree", async () => {

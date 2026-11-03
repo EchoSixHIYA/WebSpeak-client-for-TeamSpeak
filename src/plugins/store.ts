@@ -32,7 +32,7 @@ export class PluginStore {
   }
   private async sources() {
     const root = await this.json(PLUGIN_STORE_INDEX);
-    pluginAssert(pluginRecord(root) && root.schemaVersion === 1 && Array.isArray(root.plugins) && root.plugins.length <= 50);
+    pluginAssert(pluginRecord(root) && root.schemaVersion === 2 && Array.isArray(root.plugins) && root.plugins.length <= 50,"PLUGIN_CATALOG_UNSUPPORTED");
     const seen = new Set<string>();
     return root.plugins.map(item => {
       pluginAssert(pluginRecord(item) && pluginId(item.id) && !seen.has(item.id)); seen.add(item.id);

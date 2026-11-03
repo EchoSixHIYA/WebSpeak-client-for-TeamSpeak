@@ -1,5 +1,6 @@
 import { computed, reactive, ref, type Ref } from "vue";
 import { DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
+import { APP_VERSION } from "../services/app-version.js";
 import type { Language } from "../i18n/web-client.js";
 
 interface RelayOption {
@@ -28,7 +29,7 @@ export function useWebClientPublicConfig({
   const initialized = ref(false);
   const mobileMode = ref(false);
   const siteName = ref("WebSpeak");
-  const appVersion = ref("0.2.7");
+  const appVersion = ref(APP_VERSION);
   const visitorNumber = ref<number | null>(null);
   const visitorTotal = ref<number | null>(null);
   const accelerationRelays = ref<RelayOption[]>([]);

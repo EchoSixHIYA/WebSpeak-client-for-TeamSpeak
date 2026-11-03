@@ -46,7 +46,7 @@ export interface DirectoryChannelInfo {
   parentID: bigint;
   order: bigint;
   name: string;
-  description: string;
+  description?: string;
   passwordProtected?: boolean;
   isPermanent?: boolean;
   maxClients?: number;
@@ -230,7 +230,8 @@ export class TeamSpeakSdkClient extends EventEmitter implements CommandExecutor 
     client.on("viewReady", () => this.publishDirectory(client));
     client.on("viewChanged", () => this.publishDirectory(client));
     client.on("voiceData", (event) => {
-      if (!isCurrent()) return;
+      // beta.20+ reports an empty payload for end-of-speech, not an Opus frame.
+      if (!isCurrent() || event.data.byteLength === 0) return;
       this.emit("voiceData", { clientId: Number(event.clientID), codec: event.codec, data: event.data } satisfies VoiceData);
     });
     client.on("textMessage", (event) => {
@@ -328,8 +329,8 @@ function toDirectoryClient(entry: ClientEntry): DirectoryClientInfo {
   return {
     id: Number(entry.id),
     nickname: entry.nickname,
-    uid: entry.uid,
-    serverGroups: entry.serverGroups.map(String),
+    uid: entry.uid ?? "",
+    serverGroups: (entry.serverGroups ?? []).map(String),
     channelID: BigInt(entry.channelID),
     type: entry.type,
     ...(entry.isAway !== undefined ? { away: entry.isAway } : {}),

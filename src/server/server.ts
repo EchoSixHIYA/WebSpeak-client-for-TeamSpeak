@@ -19,6 +19,8 @@ import { createVoiceGatewayAuthHeaders, type DelegatedVoiceSession } from "./voi
 import type { SkinRegistry } from "../admin/skin-registry.js";
 import { resolveVisitorTotal } from "./visitor-count.js";
 import type { PluginRegistry } from "../plugins/registry.js";
+import { PluginRuntime } from "../plugins/runtime.js";
+import { createPluginRuntimeRouter } from "../plugins/runtime-router.js";
 
 export interface WebServerOptions {
   port: number;
@@ -30,6 +32,7 @@ export interface WebServerOptions {
   adminService: AdminService;
   skinRegistry?: SkinRegistry;
   pluginRegistry?: PluginRegistry;
+  pluginRuntime?: { port?: number; host?: string; publicOrigin?: string; maxWorkers?: number };
   logger: Logger;
   nextVisitorNumber?: () => number;
   visitorCount?: () => number;
@@ -57,10 +60,13 @@ export function createWebServer(options: WebServerOptions): WebServer {
     server = createHttpServer(app);
   }
 
-  app.use("/api/admin/plugins/upload", express.json({ limit: "600kb" }));
-  app.use(express.json({ limit: "100kb" }));
+  const json = express.json({ limit: "100kb" });
+  app.use((request, response, next) => request.path.startsWith("/api/admin/plugins") ? next() : json(request, response, next));
 
-  const voiceBridge = new VoiceBridge({ ...options.voiceBridgeOptions, pluginRegistry: options.pluginRegistry }, logger);
+  const voiceBridge = new VoiceBridge({ ...options.voiceBridgeOptions, pluginRuntimeEnabled: !!options.pluginRegistry }, logger);
+  const pluginRuntime = options.pluginRegistry ? new PluginRuntime({ registry: options.pluginRegistry, participant: token => voiceBridge.resolvePluginParticipant(token), logger,
+    ...options.pluginRuntime, ...(options.certDir ? { tls: { cert: readFileSync(path.join(options.certDir,"cert.pem")), key: readFileSync(path.join(options.certDir,"key.pem")) } } : {}) }) : undefined;
+  app.use("/api/plugins", createPluginRuntimeRouter(pluginRuntime));
   const adminSessions = new AdminSessionStore();
   const joinRateLimiter = new JoinRateLimiter();
   const startedAt = Date.now();
@@ -277,6 +283,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
     terminateSession: (id) => voiceBridge.terminateSession(id),
     skinRegistry: options.skinRegistry,
     pluginRegistry: options.pluginRegistry,
+    pluginRuntime,
     version: options.version,
     logFile: options.logFile,
     startedAt,
@@ -293,15 +300,18 @@ export function createWebServer(options: WebServerOptions): WebServer {
   voiceBridge.attach(server);
 
   return {
-    start(): Promise<void> {
-      return new Promise((resolve) => {
-        server.listen(options.port, () => {
-          logger.info({ port: options.port }, "Web server started");
-          resolve();
-        });
+    async start(): Promise<void> {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(options.port, () => { server.off("error", reject); logger.info({ port: options.port }, "Web server started"); resolve(); });
       });
+      if (pluginRuntime) {
+        try { await pluginRuntime.start(); }
+        catch { logger.warn({code:"PLUGIN_RUNTIME_UNAVAILABLE"},"Plugin application origin could not start; voice and administration remain available"); }
+      }
     },
     async stop(): Promise<void> {
+      await pluginRuntime?.close();
       await voiceBridge.shutdown();
       adminSessions.clear();
       return new Promise((resolve) => {

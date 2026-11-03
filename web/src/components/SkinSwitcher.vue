@@ -35,6 +35,9 @@
         <span>{{ option.label }}</span>
         <Icon v-if="modelValue === option.value" name="check" :size="14" />
       </button>
+      <button type="button" class="skin-option skin-authorization" role="option" :aria-selected="false" @click="authorization">
+        <Icon name="shield" :size="16" /><span>{{ authorizationCopy.menu }}</span><small>{{ thirdPartyAllowed ? authorizationCopy.enabled : authorizationCopy.disabled }}</small>
+      </button>
     </div>
   </div>
 </template>
@@ -42,6 +45,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Icon from "./Icon.vue";
+import { authorizationLanguage, canUseSkin, openInstanceAuthorization, thirdPartyAllowed } from '../services/instance-authorization.js';
+import { instanceAuthorizationCopy } from '../i18n/instance-authorization.js';
 
 export interface SkinOption {
   value: string;
@@ -60,7 +65,9 @@ const emit = defineEmits<{
   change: [value: string];
 }>();
 
-const options = computed(() => props.options);
+const options = computed(() => props.options.filter(option => canUseSkin(option.value)));
+const authorizationCopy = computed(() => instanceAuthorizationCopy[authorizationLanguage.value]);
+function authorization() { close(); openInstanceAuthorization(); }
 const selectedOption = computed(() => options.value.find((option) => option.value === props.modelValue) ?? options.value[0] ?? {
   value: props.modelValue,
   label: props.menuLabel,
@@ -92,6 +99,8 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
   flex: 0 0 auto;
   color: var(--text-muted);
 }
+.skin-authorization{margin-top:6px;border-top:1px solid #8bdad8!important}
+.skin-authorization small{margin-left:auto;font-size:10px;opacity:.75}
 
 .skin-trigger {
   display: inline-flex;

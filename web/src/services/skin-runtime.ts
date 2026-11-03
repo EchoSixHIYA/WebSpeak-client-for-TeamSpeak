@@ -1,10 +1,12 @@
 import { getInstalledSkin, saveInstalledSkin } from "./local-persistence.js";
+import { APP_VERSION } from "./app-version.js";
 import type { InstalledSkin } from "./skin-pack.js";
 import { applyTheme, getBuiltinSkinCss, getStoredTheme, isDarkTheme } from "./theme.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
 import { getBundledSkinPackageUrl, isPublicSkinEnabled } from "./skin-catalog.js";
 import { createSkinOperation, type SkinLoadOptions } from "./skin-operation.js";
 import { setSkinLayoutPackage } from "./skin-layout-runtime.js";
+import { canUseSkin } from './instance-authorization.js';
 
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
@@ -34,7 +36,7 @@ export async function activateStoredSkin(): Promise<InstalledSkin | null> {
   return activateSkin(selectedId);
 }
 
-export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.7", options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
+export async function activateSkin(id: string, expectedVersion?: string, appVersion = APP_VERSION, options: SkinLoadOptions = {}): Promise<InstalledSkin | null> {
   // An already retired page must not cancel a newer page's activation.
   options.signal?.throwIfAborted();
   pendingActivation?.cancel();
@@ -51,6 +53,7 @@ export async function activateSkin(id: string, expectedVersion?: string, appVers
 async function prepareAndActivate(id: string, expectedVersion: string | undefined, appVersion: string,
   operation: ReturnType<typeof createSkinOperation>): Promise<InstalledSkin | null> {
   operation.check();
+  if (!canUseSkin(id)) return fallBackToBuiltin();
   if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN) {
     removeCustomSkinStyle();
     setSkinLayoutPackage(id, null);
@@ -92,6 +95,7 @@ async function prepareAndActivate(id: string, expectedVersion: string | undefine
     const compiled = resolveSkinCssAssets(skin.css, skin.assets);
     candidateUrls = compiled.objectUrls;
     operation.check();
+    if (!canUseSkin(id)) { candidateUrls.forEach(url => URL.revokeObjectURL(url)); return fallBackToBuiltin(); }
     // A community skin is a complete appearance choice, not an overlay on the
     // previously selected day/night skin. Keep the document theme (used by the
     // independent admin appearance) but give unstyled public parts a light,

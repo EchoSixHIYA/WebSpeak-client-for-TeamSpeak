@@ -337,7 +337,7 @@ export function createScreenShareController(transport: ScreenShareTransport) {
     startScreenShareStatsPolling();
     traceScreenShare("peer-created", { streamId, peerId, role });
     if (role === "owner") {
-      // Match TeamSpeak's screen-share offer shape: video is MID 0, optional
+      // Match TeamSpeak's screen-share offer shape: video is MID 0,
       // audio follows it, and a publisher only sends media.
       const localTracks = [...(screenShareLocalStream?.getTracks() ?? [])];
       localTracks.sort((left, right) => left.kind === right.kind ? 0 : left.kind === "video" ? -1 : 1);
@@ -346,6 +346,13 @@ export function createScreenShareController(transport: ScreenShareTransport) {
         const transceiver = peer.getTransceivers().find((candidate) => candidate.sender === sender);
         if (transceiver) transceiver.direction = "sendonly";
         if (track.kind === "video") void configureScreenShareVideoSender(sender, track);
+      }
+      // The native receiver does not answer video-only offers. Window/monitor
+      // capture (or audio disabled by the user) often returns no audio track.
+      // Negotiate the required audio section without capturing a microphone,
+      // fabricating a track or claiming that shared audio is available.
+      if (peerId.startsWith("ts-viewer-") && !localTracks.some(track => track.kind === "audio")) {
+        peer.addTransceiver("audio", { direction: "sendonly" });
       }
     } else {
       peer.addTransceiver("video", { direction: "recvonly" });
@@ -537,12 +544,19 @@ export function createScreenShareController(transport: ScreenShareTransport) {
       await peer.setLocalDescription(offer);
       if (!isCurrentPeer(peerId, peer)) return;
       armScreenSharePeerTimer(peerId);
-      traceScreenShare("native-viewer-offer-ready", { streamId, peerId });
+      const sdp = peer.localDescription?.sdp ?? offer.sdp ?? "";
+      traceScreenShare("native-viewer-offer-ready", {
+        streamId, peerId,
+        hasAudioSection: /^m=audio\s/m.test(sdp),
+        hasVideoSection: /^m=video\s/m.test(sdp),
+        capturedAudio: (screenShareLocalStream?.getAudioTracks().length ?? 0) > 0,
+        displaySurface: screenShareLocalStream?.getVideoTracks()[0]?.getSettings().displaySurface ?? null,
+      });
       sendScreenShareMessage({
         type: "screenShareSignal",
         streamId,
         targetPeerId: peerId,
-        signal: { kind: "offer", sdp: peer.localDescription?.sdp ?? offer.sdp ?? "" },
+        signal: { kind: "offer", sdp },
       });
     } catch (error: unknown) {
       traceScreenShare("native-viewer-offer-failed", { streamId, peerId, errorName: error instanceof Error ? error.name : "unknown" });

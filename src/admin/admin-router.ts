@@ -11,6 +11,7 @@ import { SkinStore } from "./skin-store.js";
 import { createPluginAdminRouter } from "../plugins/admin-router.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import type { PluginStore } from "../plugins/store.js";
+import type { PluginRuntime } from "../plugins/runtime.js";
 
 export interface AdminConnectionRecord {
   id: string;
@@ -43,6 +44,7 @@ export interface AdminRouterOptions {
   skinStore?: SkinStore;
   pluginRegistry?: PluginRegistry;
   pluginStore?: PluginStore;
+  pluginRuntime?: PluginRuntime;
   startedAt: number;
 }
 
@@ -131,7 +133,7 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
   });
 
   router.use(requireAdmin(options.sessions, options.service));
-  router.use("/plugins", createPluginAdminRouter({ registry: options.pluginRegistry, store: options.pluginStore,
+  router.use("/plugins", createPluginAdminRouter({ registry: options.pluginRegistry, store: options.pluginStore, runtime: options.pluginRuntime,
     protect: [requireSameOrigin, requireCsrf(options.sessions)],
     audit: (event, data) => options.service.database.addAudit(event, data),
   }));

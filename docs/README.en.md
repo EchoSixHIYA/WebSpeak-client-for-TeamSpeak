@@ -304,7 +304,7 @@ Skins own appearance, layout and their attached widgets. Administrators install,
 
 ### Functional plugins `.wplugin` (dev)
 
-Functional plugins run in an independent panel, separately from skins. Administrators choose server scope (the same TS target and channel) or instance scope (one voice gateway). The Watch Together example demonstrates synchronized play, pause, seek and late joining. This requires the current dev runtime and is not included in v0.2.9.
+Functional plugins are independent applications using standard browser capabilities and optional Node backends with their own routes, state and collaboration. Administrators review code and dependencies before enabling; updates require renewed trust. Applications support TS server or instance scope and run on a separate origin. API v2 requires current dev and is not included in v0.2.9.
 
 [Development guide](./PLUGIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-plugin-development/SKILL.md) · [Distribution catalog & example](https://github.com/Huddle-Up-Forge/webspeak-plugin)
 

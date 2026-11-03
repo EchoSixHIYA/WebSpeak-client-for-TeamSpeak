@@ -46,7 +46,7 @@ async function main() {
   await adminService.initialize();
   removeObsoleteBootstrapFile();
   const joinTickets = new JoinTicketStore();
-  const pluginRegistry = new PluginRegistry(path.join(DATA_DIR, "plugins"));
+  const pluginRegistry = new PluginRegistry(path.join(DATA_DIR, "plugins"), masterSecret);
   await pluginRegistry.initialize();
 
   logger.info({ dataDir: DATA_DIR }, "Starting WebSpeak server");
@@ -74,6 +74,7 @@ async function main() {
     adminService,
     skinRegistry: new SkinRegistry(path.join(DATA_DIR, "skins")),
     pluginRegistry,
+    pluginRuntime: { port: parsePort(process.env.WEBSPEAK_PLUGIN_PORT, 3042), host: process.env.WEBSPEAK_PLUGIN_HOST?.trim() || "0.0.0.0", publicOrigin: process.env.WEBSPEAK_PLUGIN_PUBLIC_ORIGIN?.trim() },
     logger,
     nextVisitorNumber: () => database.nextVisitorNumber(),
     visitorCount: () => database.getVisitorCount(),
