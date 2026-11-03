@@ -31,7 +31,7 @@ app.get("/api/health", (_request, response) => response.json({ status: "ok", eng
 app.get("/api/public-config", (_request, response) => {
   response.setHeader("Cache-Control", "no-store");
   response.json({
-    version: process.env.WEBSPEAK_VERSION ?? "0.2.6",
+    version: process.env.WEBSPEAK_VERSION ?? "0.3.0",
     initialized: true,
     siteName: "WebSpeak",
     welcomeText: DEFAULT_WELCOME_TEXTS.zh,
