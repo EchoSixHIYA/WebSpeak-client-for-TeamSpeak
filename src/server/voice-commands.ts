@@ -11,6 +11,7 @@ import { teamSpeakServerErrorCode } from "../errors.js";
 export interface VoiceCommandContext extends AudioStatsSource {
   tsClient: Pick<TSClient, "execCommandWithResponse" | "switchChannel" | "getClientId" | "getChannelId" | "moveClient" | "sendTextMessage" | "poke" | "setAway" | "setInputMuted" | "setAccompanimentActive">;
   channelTree: ChannelInfo[];
+  rememberChannelPassword?: (id: string, password: string) => void;
   members: ReadonlyMap<number, { uid?: string }>;
   whisperTargetIds: Set<number>;
   whisperActive: boolean;
@@ -63,6 +64,7 @@ export async function handleCommand(
     const channelPassword = typeof command.payload.password === "string" ? command.payload.password : "";
     try {
       await entry.tsClient.switchChannel(BigInt(rawId), channelPassword || undefined);
+      if (channelPassword) entry.rememberChannelPassword?.(rawId, channelPassword);
     } catch (error: unknown) {
       const rawMessage = error instanceof Error ? error.message : String(error);
       if (/already member/i.test(rawMessage)) {

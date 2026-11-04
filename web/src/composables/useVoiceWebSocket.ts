@@ -1168,6 +1168,11 @@ export function useVoiceWebSocket() {
           }
         }
         break;
+      case "inviteCreated": {
+        createdInvite = { token: msg.token, expiresAt: msg.expiresAt };
+        commands.settle(msg.requestId ?? "");
+        break;
+      }
       case "commandCompleted": {
         const requestId = typeof msg.requestId === "string" ? msg.requestId : "";
         commands.settle(requestId);
@@ -1203,6 +1208,14 @@ export function useVoiceWebSocket() {
 
   function sendCmd<K extends ClientCommandType>(type: K, payload: ClientCommandPayloads[K]): void {
     commands.send(type, payload);
+  }
+
+  let createdInvite: { token: string; expiresAt: number } | null = null;
+  async function createInvite(expiresInMinutes: number, channelPassword = "", serverPassword = ""): Promise<{ token: string; expiresAt: number }> {
+    createdInvite = null;
+    await sendCommandAndWait("createInvite", { expiresInMinutes, ...(channelPassword ? { channelPassword } : {}), ...(serverPassword ? { serverPassword } : {}) });
+    if (!createdInvite) throw new Error("Invitation was not created");
+    return createdInvite;
   }
 
   function sendCommandAndWait<K extends ClientCommandType>(type: K, payload: ClientCommandPayloads[K], timeoutMs = 8_000): Promise<void> {
@@ -1473,6 +1486,7 @@ export function useVoiceWebSocket() {
     playNotification,
     connect,
     reconnectNow,
+    createInvite,
     disconnect,
     switchChannel,
     moveClient,

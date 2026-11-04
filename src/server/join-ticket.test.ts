@@ -49,3 +49,10 @@ test("expired tickets do not evict a still-valid join when capacity is reclaimed
   assert.deepEqual(tickets.consume(live, 100), payload);
   assert.deepEqual(tickets.consume(latest, 100), payload);
 });
+
+
+test("invitation expiry also bounds a previously issued one-use join ticket", () => {
+  const store = new JoinTicketStore();
+  const token = store.create({ target: { host: "1.1.1.1", port: 9987 }, serverPassword: "secret", nickname: "Guest", inviteExpiresAt: 2000 }, 1000);
+  assert.equal(store.consume(token,2000),null);
+});

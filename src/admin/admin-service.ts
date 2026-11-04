@@ -1,3 +1,4 @@
+import { WorkspaceInvites, type WorkspaceInviteCredentials } from "../server/workspace-invites.js";
 import type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput, TsAdminSettingsInput } from "../shared/admin-inputs.js";
 export type { AdminSettingsInput, RelayNodeInput, ManagedInviteInput, TsAdminSettingsInput } from "../shared/admin-inputs.js";
 import type { AdminOverview, AdminSettings } from "../shared/admin-responses.js";
@@ -293,6 +294,14 @@ export class AdminService {
       recentEvents: this.database.recentAudit(),
       legacyConfigImported: this.database.getMeta("legacy_import_notice_pending") === "1",
     };
+  }
+
+  createWorkspaceInvite(credentials: WorkspaceInviteCredentials, expiresInMinutes: number, now = Date.now()) {
+    return new WorkspaceInvites(this.database, this.masterSecret).create(credentials, expiresInMinutes, now);
+  }
+
+  getWorkspaceInvite(token: string, now = Date.now()) {
+    return new WorkspaceInvites(this.database, this.masterSecret).get(token, now);
   }
 
   createManagedInvite(input: ManagedInviteInput): { invite: ManagedInviteView; token: string } {

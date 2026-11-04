@@ -9,6 +9,7 @@ const stream = {
 };
 const event = { id: "event-1", kind: "joined", message: "Member joined", timestamp: 1_000 };
 const samples: Record<ServerMessage["type"], ServerMessage> = {
+  inviteCreated: { type: "inviteCreated", requestId: "test", token: "wi_" + "a".repeat(43), expiresAt: 1800000000000 },
   connected: { type: "connected", tsClientId: 1, members: [{ id: 1, nickname: "Owner" }], serverEventLog: [event] },
   serverInfo: {
     type: "serverInfo", name: "兄弟们的teamspeak", icon: "data:image/png;base64,iVBORw0KGgo=",

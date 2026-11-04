@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -130,11 +131,11 @@ test("schema 8 settings and invites survive the nickname migration", async (cont
   });
   database.close();
   const legacy = new DatabaseSync(file);
-  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; PRAGMA user_version = 8;");
+  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; DROP TABLE workspace_invites; PRAGMA user_version = 8;");
   legacy.close();
   const migrated = new WebSpeakDatabase(file);
   try {
-    assert.equal(migrated.schemaVersion, 12);
+    assert.equal(migrated.schemaVersion, 13);
     assert.equal(migrated.getSettings().tsHost, "127.0.0.1");
     assert.equal(migrated.getSettings().tsTarget, null);
     const invite = migrated.consumeManagedInvite("legacy-token");
@@ -162,3 +163,56 @@ async function availablePort(): Promise<number> {
   await new Promise<void>((resolve, reject) => socket.close((error) => error ? reject(error) : resolve()));
   return address.port;
 }
+
+
+test("workspace invite credentials persist encrypted and redeem as opaque channel-bound join tickets", async context => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-workspace-invite-"));
+  const file = path.join(directory, "webspeak.db"), key = Buffer.alloc(32, 7);
+  let database = new WebSpeakDatabase(file);
+  let service = new AdminService(database, key, logger, path.join(directory, "missing.json"));
+  await service.initialize();
+  const credentials = { target: { host: "1.1.1.1", port: 9987 }, serverPassword: "private-server-password", channelId: "123", channelPassword: "private-channel-password" };
+  const now = Date.now();
+  const created = service.createWorkspaceInvite(credentials, 60, now);
+  assert.ok(!JSON.stringify(created).includes("private-"));
+  assert.deepEqual(service.getWorkspaceInvite(created.token, now), { ...credentials, expiresAt: now+3600000 });
+  assert.equal(service.getWorkspaceInvite(created.token, now+3600000), null);
+  assert.equal(service.getWorkspaceInvite(created.token.slice(0,-1)+"!", now), null);
+  for (const expiry of [0, -1, 0.5, 43201, NaN]) assert.throws(() => service.createWorkspaceInvite(credentials, expiry));
+  const legacyToken = "wi_" + "z".repeat(29);
+  const legacyAdminInvite = service.createManagedInvite({ channel: "Lobby", expiresInHours: 1, maxUses: 0 });
+  const raw = new DatabaseSync(file);
+  raw.prepare("UPDATE managed_invites SET token_hash = ? WHERE id = ?").run(createHash("sha256").update(legacyToken).digest("hex"), legacyAdminInvite.invite.id);
+  const row = raw.prepare("SELECT payload_encrypted, token_hash FROM workspace_invites").get()!;
+  assert.ok(!String(row.payload_encrypted).includes("private-"));
+  assert.notEqual(row.token_hash, created.token);
+  raw.close();
+  database.close();
+  database = new WebSpeakDatabase(file);
+  service = new AdminService(database, key, logger, path.join(directory, "missing.json"));
+  await service.initialize();
+  assert.deepEqual(service.getWorkspaceInvite(created.token, now), { ...credentials, expiresAt: now+3600000 });
+  const tickets = new JoinTicketStore(), port = await availablePort(), origin = `http://127.0.0.1:${port}`;
+  const server = createWebServer({ port, adminService: service, voiceBridgeOptions: { joinTickets: tickets }, logger });
+  context.after(async () => { await server.stop(); database.close(); await rm(directory, {recursive:true,force:true}); });
+  await server.start();
+  const response = await fetch(origin+"/api/join-ticket", { method: "POST", headers: {origin,"content-type":"application/json"}, body: JSON.stringify({nickname:"Invitee", invite:created.token, target:"127.0.0.1:9987", channel:"other-channel", serverPassword:"attacker-password"}) });
+  assert.equal(response.status,201);
+  const result = await response.json() as {ok: boolean; ticket:string};
+  assert.deepEqual(Object.keys(result).sort(),["ok","ticket"]);
+  assert.ok(!JSON.stringify(result).includes("private-"));
+  const payload = tickets.consume(result.ticket)!;
+  assert.deepEqual(payload.target,credentials.target);
+  assert.equal(payload.serverPassword,credentials.serverPassword);
+  assert.equal(payload.channelId,credentials.channelId);
+  assert.equal(payload.channelPassword,credentials.channelPassword);
+  assert.equal(payload.channel,undefined);
+  assert.equal(payload.inviteExpiresAt,created.expiresAt);
+  assert.equal(tickets.consume(result.ticket),null);
+  const expired = service.createWorkspaceInvite(credentials,1,now-120000);
+  const denied = await fetch(origin+"/api/join-ticket",{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify({nickname:"Invitee",invite:expired.token})});
+  assert.equal(denied.status,400);
+  assert.equal((await denied.json() as {code:string}).code,"INVITE_INVALID");
+  const legacy = await fetch(origin+"/api/join-ticket", {method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify({nickname:"Legacy invitee",invite:legacyToken})});
+  assert.equal(legacy.status,201,"an administrator token that happens to start with wi_ must remain valid");
+});

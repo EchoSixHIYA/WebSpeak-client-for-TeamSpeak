@@ -6,7 +6,7 @@ import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE } from "../server/webrtc-config.js";
 
-export const DATABASE_SCHEMA_VERSION = 12;
+export const DATABASE_SCHEMA_VERSION = 13;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
@@ -188,6 +188,18 @@ export class WebSpeakDatabase {
     this.database = new DatabaseSync(path);
     this.database.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
     this.migrate(existed);
+  }
+
+  saveWorkspaceInvite(tokenHash: string, encrypted: string, expiresAt: number, now = Date.now()): void {
+    this.database.prepare("DELETE FROM workspace_invites WHERE expires_at <= ?").run(now);
+    const count = this.database.prepare("SELECT COUNT(*) AS n FROM workspace_invites").get() as { n: number };
+    if (count.n >= 4096) throw new Error("INVITE_LIMIT_REACHED");
+    this.database.prepare("INSERT INTO workspace_invites(token_hash, payload_encrypted, expires_at) VALUES (?, ?, ?)").run(tokenHash, encrypted, expiresAt);
+  }
+
+  getWorkspaceInvite(tokenHash: string, now = Date.now()): string | null {
+    const row = this.database.prepare("SELECT payload_encrypted FROM workspace_invites WHERE token_hash = ? AND expires_at > ?").get(tokenHash, now) as { payload_encrypted: string } | undefined;
+    return row?.payload_encrypted ?? null;
   }
 
   close(): void {
@@ -730,6 +742,17 @@ export class WebSpeakDatabase {
           UPDATE ts_admin_settings SET transport = 'ssh' WHERE enabled = 1 OR password_encrypted IS NOT NULL OR host_key_fingerprint <> '';
           PRAGMA user_version = 12;
         `);
+      });
+      version = 12;
+    }
+    if (version === 12) {
+      this.transaction(() => {
+        this.database.exec(`CREATE TABLE workspace_invites (
+          token_hash TEXT PRIMARY KEY,
+          payload_encrypted TEXT NOT NULL,
+          expires_at INTEGER NOT NULL
+        ); CREATE INDEX workspace_invites_expiry ON workspace_invites(expires_at);
+        PRAGMA user_version = 13;`);
       });
     }
   }

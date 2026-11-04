@@ -526,3 +526,19 @@ test("a live relay tunnel survives the reconnect guard untouched", () => {
   assert.notEqual(f.state.adapter, null, "an open tunnel's adapter stays usable");
   assert.notEqual(f.state.client, null, "an open tunnel's SDK client stays usable");
 });
+
+
+test("reconnecting to a protected channel uses its successful password rather than a failed attempt", async () => {
+ const f=fixture();
+ await f.client.switchChannel(10n,"correct-secret");
+ const first=f.sdk.inputCommands.find(c=>c.startsWith("clientmove "))!;
+ f.sdk.inputUpdate=async command=>{if(command.includes("cid=20"))throw new Error("invalid channel password");};
+ await assert.rejects(f.client.switchChannel(20n,"wrong-password"));
+ (f.client as unknown as {adapter:unknown}).adapter={connect:async()=>{}};
+ await f.client.connect();
+ const moves=f.sdk.inputCommands.filter(c=>c.startsWith("clientmove "));
+ assert.equal(moves.length,3);
+ assert.match(moves[2],/cid=10(?:\s|$)/);
+ assert.equal(moves[2].match(/cpw=([^\s]+)/)?.[1],first.match(/cpw=([^\s]+)/)?.[1]);
+ assert.ok(first.includes("cpw="));
+});

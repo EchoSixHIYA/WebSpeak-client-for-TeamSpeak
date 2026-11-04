@@ -5,6 +5,7 @@ import { normalizeScreenShareIceServers, parseScreenShareMessage } from "./scree
 
 test("all command payloads preserve request IDs through the shared parser", () => {
   const payloads: ClientCommandPayloads = {
+    createInvite: { expiresInMinutes: 60 },
     switchChannel: { channelId: "18446744073709551615", password: "secret" },
     moveClient: { clientId: 2, channelId: "1" }, sendTextMessage: { message: "hello" },
     sendServerMessage: { message: "hello" }, sendPrivateMessage: { clientId: 2, message: "hello" },
@@ -65,3 +66,10 @@ test("screen signal bounds and ICE filtering are identical in both environments"
 // @ts-expect-error A microphone payload must never type-check as a move request.
 const invalidCommand: ClientCommand = { type: "moveClient", payload: { muted: true } };
 void invalidCommand;
+
+
+test("invitation commands bound both expiry and optional creator credentials", () => {
+ for(const payload of [{expiresInMinutes:0},{expiresInMinutes:43201},{expiresInMinutes:1.5},{expiresInMinutes:60,serverPassword:1},{expiresInMinutes:60,serverPassword:"x".repeat(513)},{expiresInMinutes:60,channelPassword:"x".repeat(513)}]) {
+  assert.ok("error" in parseClientCommand(JSON.stringify({type:"createInvite",payload})));
+ }
+});

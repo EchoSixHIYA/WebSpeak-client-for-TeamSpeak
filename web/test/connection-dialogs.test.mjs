@@ -17,20 +17,21 @@ function mount(t) {
   const scope = effectScope(), errors = ref(""), message = ref(""), switched = ref(""), connected = ref(false), connecting = ref(false), calls = [], connectCalls = [], disconnectCalls = [], toasts = [];
   const dialog = reactive({ open: true, channelId: "2", password: "draft", error: "", submitting: false });
   const serverPasswordDialog = reactive({ open: false, password: "", errorCode: "" });
+  const inviteToken = ref("");
   const serverHost = ref("fixture.invalid"), serverPort = ref("9987");
   const connection = scope.run(() => useWebClientConnection({
     initialized: ref(true), accessMode: ref("fixed"), isConnecting: connecting, isConnected: connected, errorCode: errors,
     errorMessage: message, channelSwitchedChannelId: switched,
     nickname: ref("Preview"), channelName: ref("Room"), serverHost, serverPort,
     serverPassword: ref(""), rememberIdentity: ref(false), identityMaterial: ref(""), accelerationRelayId: ref(""),
-    inviteToken: "", selectedChannelId: ref("2"), channels: ref([]), clientId: ref(1),
+    inviteToken, selectedChannelId: ref("2"), channels: ref([]), clientId: ref(1),
     channelPasswordDialog: dialog, serverPasswordDialog,
     chatTab: ref("channel"), switchChannel: (...args) => calls.push(args),
     connect: (...args) => connectCalls.push(args), disconnect() { disconnectCalls.push(true); connecting.value = false; }, saveNickname() {}, showToast: message => toasts.push(message),
     clearError: () => { errors.value = ""; message.value = ""; }, t: key => key,
   }));
   t.after(() => scope.stop());
-  return { dialog, serverPasswordDialog, connection, errors, message, switched, calls, connectCalls, disconnectCalls, toasts, connecting, connected, serverHost, serverPort };
+  return { dialog, serverPasswordDialog, connection, errors, message, switched, calls, connectCalls, disconnectCalls, toasts, connecting, connected, serverHost, serverPort, inviteToken };
 }
 
 test("pasting a nickname clears the prefilled port and preserves a custom override", t => {
@@ -121,4 +122,14 @@ test("saved-password lookup stays pending without duplicate connects and cancell
   connection.doDisconnect(false);
   await nextTurn();
   assert.equal(connectCalls.length, 1);
+});
+
+
+test("an invitation never asks the recipient to supply its server password", async t => {
+ const f=mount(t);
+ f.inviteToken.value="wi_"+"a".repeat(43);
+ f.errors.value="SERVER_PASSWORD_REQUIRED";
+ await nextTick();
+ assert.equal(f.serverPasswordDialog.open,false);
+ assert.ok(f.toasts.includes("inviteCredentialFailure"));
 });

@@ -118,6 +118,7 @@ export class TSClient extends EventEmitter {
   private inputStateQueue: Promise<void> = Promise.resolve();
   private channelSwitchQueue: Promise<void> = Promise.resolve();
   private preferredChannelId = 0n;
+  private readonly channelPasswords = new Map<bigint, string>();
   private accelerationClient: AccelerationRelayClient | null = null;
   private readonly channelCapacities = new Map<bigint, ChannelCapacity>();
   private readonly channelPasswordProtection = new Map<bigint, boolean>();
@@ -219,7 +220,7 @@ export class TSClient extends EventEmitter {
       this.preferredChannelId = connectedChannelId;
     } else if (connectedChannelId !== this.preferredChannelId) {
       try {
-        await tsClientMove(client, this.clientId, this.preferredChannelId);
+        await tsClientMove(client, this.clientId, this.preferredChannelId, this.channelPasswords.get(this.preferredChannelId));
       } catch (error: unknown) {
         // The old channel may have been deleted or become inaccessible. The
         // SDK has already left us in the server/default channel, which is the
@@ -530,6 +531,7 @@ export class TSClient extends EventEmitter {
       await tsClientMove(client, clientId, channelId, password);
       if (!isCurrent()) throw new Error("TeamSpeak session changed while switching channels");
       this.preferredChannelId = channelId;
+      if (password) this.channelPasswords.set(channelId, password);
     };
 
     // Rapid clicks used to issue overlapping clientmove commands. The SDK and

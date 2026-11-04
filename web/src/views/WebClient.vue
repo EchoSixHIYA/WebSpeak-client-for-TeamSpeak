@@ -901,6 +901,8 @@
       @volume-input="onVolInput"
     />
 
+    <WorkspaceInviteDialog v-if="inviteDialogOpen && voiceState.connected" :t="t" :create="createInvite" @close="inviteDialogOpen = false" />
+
     <!-- Protected channel password modal -->
     <ChannelPasswordDialog
       v-if="channelPasswordDialog.open"
@@ -1005,6 +1007,7 @@ import { useWebClientConnection } from "../composables/useWebClientConnection.js
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import PluginPanel from "../components/PluginPanel.vue";
 import InstanceAuthorization from '../components/InstanceAuthorization.vue';
+import WorkspaceInviteDialog from "../components/web-client/WorkspaceInviteDialog.vue";
 import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
 import { useWebClientScreenShare } from "../composables/useWebClientScreenShare.js";
 import { useWebClientPerformance } from "../composables/useWebClientPerformance.js";
@@ -1108,6 +1111,7 @@ const {
   clearError,
   pluginSession,
   ws: pluginVoiceSocket,
+  createInvite,
   measureVoiceAudioStatus,
 } = useVoiceWebSocket();
 const performance = useWebClientPerformance(computed(() => voiceState.connected), measureVoiceAudioStatus);
@@ -2209,16 +2213,10 @@ function channelLabel(item: TreeChannel) {
   return `${"　".repeat(item.depth)}${item.name}`;
 }
 
+const inviteDialogOpen = ref(false);
+watch(() => voiceState.connected, connected => { if (!connected) inviteDialogOpen.value = false; });
 function doShare() {
-  const invite = new URL(location.href);
-  invite.searchParams.delete("token");
-  invite.searchParams.delete("target");
-  invite.searchParams.delete("tsHost");
-  invite.searchParams.delete("tsPort");
-  invite.searchParams.delete("server");
-  if (accessMode.value === "open" && serverHost.value.trim()) invite.searchParams.set("server", currentServerTarget());
-  if (channel.value) invite.searchParams.set("channel", channel.value);
-  navigator.clipboard?.writeText(invite.toString()).then(() => showToast(t("copiedToast")), () => showToast(t("copyFailedToast")));
+  if (voiceState.connected) inviteDialogOpen.value = true;
 }
 
 async function clearBrowserData(): Promise<void> {

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { VoiceBridge, createTrustedProxies, resolveClientIp, type VoiceBridgeOptions } from "./voice-bridge.js";
 import type { Logger } from "../logger.js";
-import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
+import { formatTeamSpeakTarget, type TeamSpeakTarget } from "../domain/teamspeak-target.js";
 import { formatTeamSpeakConnectionTarget, parseTeamSpeakConnectionTarget } from "../domain/teamspeak-connection-target.js";
 import { resolveTeamSpeakTarget, TeamSpeakAliasLookupError } from "./teamspeak-alias.js";
 import { createAdminRouter } from "../admin/admin-router.js";
@@ -15,7 +15,7 @@ import { isSafeOpenTargetForPrefill, resolveSafeOpenTarget, TeamSpeakTargetResol
 import { parseIdentity } from "@honeybbq/teamspeak/client";
 import { JoinRateLimiter } from "./join-rate-limit.js";
 import type { ConfiguredAccelerationRelay } from "./acceleration-relay.js";
-import { createVoiceGatewayAuthHeaders, type DelegatedVoiceSession } from "./voice-gateway-auth.js";
+import { parseDelegatedVoiceSession, createVoiceGatewayAuthHeaders, type DelegatedVoiceSession } from "./voice-gateway-auth.js";
 import type { SkinRegistry } from "../admin/skin-registry.js";
 import { resolveVisitorTotal } from "./visitor-count.js";
 import type { PluginRegistry } from "../plugins/registry.js";
@@ -63,7 +63,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
   const json = express.json({ limit: "100kb" });
   app.use((request, response, next) => request.path.startsWith("/api/admin/plugins") ? next() : json(request, response, next));
 
-  const voiceBridge = new VoiceBridge({ ...options.voiceBridgeOptions, pluginRuntimeEnabled: !!options.pluginRegistry }, logger);
+  const voiceBridge = new VoiceBridge({ ...options.voiceBridgeOptions, createWorkspaceInvite: (credentials, minutes) => options.adminService.createWorkspaceInvite(credentials, minutes), pluginRuntimeEnabled: !!options.pluginRegistry }, logger);
   const pluginRuntime = options.pluginRegistry ? new PluginRuntime({ registry: options.pluginRegistry, participant: token => voiceBridge.resolvePluginParticipant(token), logger,
     ...options.pluginRuntime, ...(options.certDir ? { tls: { cert: readFileSync(path.join(options.certDir,"cert.pem")), key: readFileSync(path.join(options.certDir,"key.pem")) } } : {}) }) : undefined;
   app.use("/api/plugins", createPluginRuntimeRouter(pluginRuntime));
@@ -195,15 +195,23 @@ export function createWebServer(options: WebServerOptions): WebServer {
     }
 
     const policy = options.adminService.getConnectionPolicy();
-    const managedInvite = inviteToken ? options.adminService.getManagedInvite(inviteToken) : null;
-    if (inviteToken && !managedInvite) {
+    const isWorkspaceInvite = /^wi_[A-Za-z0-9_-]{43}$/.test(inviteToken);
+    let workspaceInvite = isWorkspaceInvite ? options.adminService.getWorkspaceInvite(inviteToken) : null;
+    if (!workspaceInvite && isWorkspaceInvite) {
+      const relays = resolveAccelerationOptions(options.voiceBridgeOptions.acceleration).filter(relay => relay.voiceEndpoint);
+      const accesses = await Promise.all(relays.map(relay => resolveRemoteWorkspaceInvite(relay, inviteToken)));
+      workspaceInvite = accesses.find(access => access !== null) ?? null;
+    }
+    const managedInvite = inviteToken && !isWorkspaceInvite ? options.adminService.getManagedInvite(inviteToken) : null;
+    if (inviteToken && !managedInvite && !workspaceInvite) {
       response.status(400).json({ ok: false, code: "INVITE_INVALID" });
       return;
     }
-    let targetText = managedInvite?.target ?? policy.defaultTarget;
+    let targetText = workspaceInvite ? formatTeamSpeakTarget(workspaceInvite.target) : managedInvite?.target ?? policy.defaultTarget;
     let target: TeamSpeakTarget;
-    let serverPassword = policy.serverPassword;
-    const channel = requestedChannel || managedInvite?.channel || "";
+    let invitationTarget: TeamSpeakTarget;
+    let serverPassword = workspaceInvite?.serverPassword ?? policy.serverPassword;
+    const channel = workspaceInvite ? "" : requestedChannel || managedInvite?.channel || "";
     const requestedRelayId = typeof body.accelerationRelayId === "string" ? body.accelerationRelayId.trim().slice(0, 110) : "";
     const accelerationRequested = body.accelerated === true || Boolean(requestedRelayId);
     const acceleration = resolveAccelerationOptions(options.voiceBridgeOptions.acceleration);
@@ -216,7 +224,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       return;
     }
     try {
-      if (!managedInvite) {
+      if (!managedInvite && !workspaceInvite) {
         if (policy.accessMode === "open" && typeof body.target === "string" && body.target.trim()) {
           targetText = formatTeamSpeakConnectionTarget(parseTeamSpeakConnectionTarget(body.target));
           const isDefault = targetText === policy.defaultTarget;
@@ -230,6 +238,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
         }
       }
       target = await resolveTeamSpeakTarget(targetText);
+      invitationTarget = { ...target };
       // Open-mode defaults are user targets too; validate the resolved address
       // and pass that exact IP to the voice connection to prevent DNS rebinding.
       if (!managedInvite && policy.accessMode === "open") target = await resolveSafeOpenTarget(target);
@@ -238,7 +247,7 @@ export function createWebServer(options: WebServerOptions): WebServer {
       return;
     }
 
-    if (inviteToken) {
+    if (managedInvite) {
       const consumedInvite = options.adminService.consumeManagedInvite(inviteToken);
       if (!consumedInvite) {
         response.status(400).json({ ok: false, code: "INVITE_INVALID" });
@@ -249,9 +258,11 @@ export function createWebServer(options: WebServerOptions): WebServer {
 
     const sessionPayload: DelegatedVoiceSession = {
       target,
+      invitationTarget,
       serverPassword,
       nickname,
       ...(channel ? { channel } : {}),
+      ...(workspaceInvite ? { channelId: workspaceInvite.channelId, channelPassword: workspaceInvite.channelPassword, inviteExpiresAt: workspaceInvite.expiresAt } : {}),
       ...(identity ? { identity, rememberIdentity: true } : body.rememberIdentity === true ? { rememberIdentity: true } : {}),
     };
     const selectedRelay = accelerationRequested
@@ -330,6 +341,23 @@ function resolveAccelerationOptions(
   const value = typeof configured === "function" ? configured() : configured;
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+async function resolveRemoteWorkspaceInvite(relay: ConfiguredAccelerationRelay, token: string): Promise<import("./workspace-invites.js").WorkspaceInviteAccess | null> {
+  const body = { token, purpose: "workspace-invite" };
+  try {
+    const response = await fetch(new URL("/api/relay/workspace-invite", relay.voiceEndpoint), {
+      method: "POST", headers: { "content-type": "application/json", ...createVoiceGatewayAuthHeaders(relay.token, body) },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(4000), cache: "no-store", redirect: "error",
+    });
+    if (!response.ok) return null;
+    const result: unknown = await response.json();
+    if (!isRecord(result) || result.ok !== true || !isRecord(result.access)) return null;
+    const value = result.access;
+    const session = parseDelegatedVoiceSession({ ...value, nickname: "Invite validation", inviteExpiresAt: value.expiresAt });
+    if (!session?.channelId || session.channelPassword === undefined || typeof value.expiresAt !== "number") return null;
+    return { target: session.target, serverPassword: session.serverPassword, channelId: session.channelId, channelPassword: session.channelPassword, expiresAt: value.expiresAt };
+  } catch { return null; }
 }
 
 async function createRemoteVoiceTicket(relay: ConfiguredAccelerationRelay, payload: DelegatedVoiceSession): Promise<string> {

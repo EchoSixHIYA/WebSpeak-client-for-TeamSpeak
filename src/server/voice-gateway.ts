@@ -8,6 +8,7 @@ import type { WebRtcAudioOptions } from "./webrtc-audio.js";
 import type { ScreenShareIceServer } from "./screen-share.js";
 
 export interface VoiceGatewayServerOptions {
+  workspaceInvites?: import("./workspace-invites.js").WorkspaceInvites;
   host: string;
   port: number;
   sharedToken: string;
@@ -30,6 +31,7 @@ export function createVoiceGatewayServer(options: VoiceGatewayServerOptions): Vo
   const verifier = new VoiceGatewayRequestVerifier();
   const voiceBridgeOptions: VoiceBridgeOptions = {
     joinTickets: tickets,
+    ...(options.workspaceInvites ? { createWorkspaceInvite: (credentials, minutes) => options.workspaceInvites!.create(credentials, minutes) } : {}),
     webRtc: options.webRtc,
     screenShareIceServers: options.screenShareIceServers,
     trustedProxies: options.trustedProxies,
@@ -59,6 +61,19 @@ export function createVoiceGatewayServer(options: VoiceGatewayServerOptions): Vo
       return;
     }
     response.status(201).json({ ok: true, ticket: tickets.create(session) });
+  });
+
+  app.post("/api/relay/workspace-invite", (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    const authenticated = verifier.verify(options.sharedToken, {
+      timestamp: request.get("x-webspeak-relay-timestamp"), nonce: request.get("x-webspeak-relay-nonce"), signature: request.get("x-webspeak-relay-signature"),
+    }, request.body);
+    if (!authenticated) { response.status(401).json({ ok: false, code: "RELAY_AUTH_REJECTED" }); return; }
+    const body = request.body;
+    if (body?.purpose !== "workspace-invite" || typeof body.token !== "string" || !/^wi_[A-Za-z0-9_-]{43}$/.test(body.token)) { response.status(400).json({ ok: false }); return; }
+    const access = options.workspaceInvites?.get(body.token);
+    if (!access) { response.status(404).json({ ok: false }); return; }
+    response.json({ ok: true, access });
   });
 
   bridge.attach(server);

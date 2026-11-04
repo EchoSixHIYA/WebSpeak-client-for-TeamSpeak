@@ -12,6 +12,7 @@ type ChatFields = { invokerId?: number; invokerName?: string; message: string; t
 
 /** Public JSON messages. Internal sockets, SDK clients and media objects stay out. */
 export type ServerMessage =
+  | Message<"inviteCreated", Request & { token: string; expiresAt: number }>
   | Message<"connected", { tsClientId: number; pluginSession?: string; members?: ChannelMember[]; serverEventLog?: ServerEvent[]; identity?: string; webrtcAvailable?: boolean; webRtcStunServer?: string; whisperTargetIds?: number[]; whisperActive?: boolean; screenShareIceServers?: ScreenShareIceServer[]; accelerated?: boolean }>
   | Message<"serverInfo", { name: string; icon?: string | null; bannerUrl?: string | null; welcomeMessage?: string }>
   | Message<"memberEnter", ChannelMember>
@@ -151,6 +152,7 @@ const valid: Record<ServerMessage["type"], (message: RecordValue) => boolean> = 
     && optional(m.scope, text) && optional(m.senderUid, text) && optional(m.targetId, channelId),
   pokeReceived: m => text(m.message) && optional(m.invokerId, finite) && optional(m.invokerName, text) && optional(m.timestamp, finite) && optional(m.invokerUid, text),
   serverEvent: m => event(m.event),
+  inviteCreated: m => text(m.token) && /^wi_[A-Za-z0-9_-]{43}$/.test(m.token) && typeof m.expiresAt === "number" && Number.isSafeInteger(m.expiresAt),
   channelSwitched: m => channelId(m.channelId),
   audioStats: m => text(m.sequence) && m.sequence.length <= 64 && isRecord(m.stats),
   latencyPong: m => text(m.sequence) && (m.teamSpeakLatencyMs === null || finite(m.teamSpeakLatencyMs)) && boolean(m.teamSpeakReachable)

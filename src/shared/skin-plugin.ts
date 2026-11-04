@@ -15,7 +15,7 @@ export const SKIN_PLUGIN_PERMISSIONS = Object.freeze({
   "ui.surface.replace": Object.freeze({ policyVersion: 1, description: "Replace the built-in public page with a custom skin surface; the host recovery controls remain available." }),
   "ui.input.read": Object.freeze({ policyVersion: 1, description: "Read values entered or autofilled in this plugin's own input fields. Never enter passwords or other secrets." }),
   "session.status.read": Object.freeze({ policyVersion: 1, description: "Read the current connection and channel summary." }),
-  "session.invite.copy": Object.freeze({ policyVersion: 1, description: "Copy a WebSpeak invite link for the current public server and channel; credentials are excluded." }),
+  "session.invite.copy": Object.freeze({ policyVersion: 1, description: "Open the trusted invitation dialog for the current session; ticket creation, expiry and credentials remain host-owned." }),
   "session.channels.read": Object.freeze({ policyVersion: 1, description: "Read the public TeamSpeak channel tree; the demo page uses synthetic sample data." }),
   "session.members.read": Object.freeze({ policyVersion: 1, description: "Read visible member names, initials derived from those names, and speaking states; the demo page uses synthetic sample data." }),
   "session.memberAvatars.read": Object.freeze({ policyVersion: 1, description: "Display cached TeamSpeak profile pictures for visible members inside trusted host member-card or channel-tree widgets. Images are not exposed to skin markup or plugin runtimes." }),

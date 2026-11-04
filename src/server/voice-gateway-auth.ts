@@ -7,9 +7,13 @@ const MAX_NONCES = 10_000;
 
 export interface DelegatedVoiceSession {
   target: TeamSpeakTarget;
+  invitationTarget?: TeamSpeakTarget;
   serverPassword: string;
   nickname: string;
   channel?: string;
+  channelId?: string;
+  channelPassword?: string;
+  inviteExpiresAt?: number;
   identity?: string;
   rememberIdentity?: boolean;
 }
@@ -72,17 +76,29 @@ export function parseDelegatedVoiceSession(value: unknown): DelegatedVoiceSessio
   const { host, port } = value.target;
   if (typeof host !== "string" || host.length < 1 || host.length > 253 || /[\s\u0000-\u001f\u007f\/#@?]/.test(host)) return null;
   if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+  if (value.invitationTarget !== undefined) {
+    const original = value.invitationTarget;
+    if (!isRecord(original) || typeof original.host !== "string" || !original.host || original.host.length > 253 || /[\s\u0000-\u001f\u007f\/#@?]/.test(original.host)
+      || typeof original.port !== "number" || !Number.isInteger(original.port) || original.port < 1 || original.port > 65535) return null;
+  }
   if (typeof value.serverPassword !== "string" || value.serverPassword.length > 512) return null;
   if (typeof value.nickname !== "string" || !value.nickname.trim() || value.nickname.length > 30) return null;
   if (value.channel !== undefined && (typeof value.channel !== "string" || value.channel.length > 100)) return null;
+  if (value.inviteExpiresAt !== undefined && (typeof value.inviteExpiresAt !== "number" || !Number.isSafeInteger(value.inviteExpiresAt) || value.inviteExpiresAt <= Date.now())) return null;
+  if (value.channelId !== undefined && (typeof value.channelId !== "string" || !/^[1-9]\d{0,19}$/.test(value.channelId))) return null;
+  if (value.channelPassword !== undefined && (typeof value.channelPassword !== "string" || value.channelPassword.length > 512)) return null;
   if (value.identity !== undefined && (typeof value.identity !== "string" || value.identity.length > 8192)) return null;
   if (value.rememberIdentity !== undefined && typeof value.rememberIdentity !== "boolean") return null;
 
   return {
     target: { host, port },
+    ...(isRecord(value.invitationTarget) ? { invitationTarget: { host: value.invitationTarget.host as string, port: value.invitationTarget.port as number } } : {}),
     serverPassword: value.serverPassword,
     nickname: value.nickname.trim(),
     ...(typeof value.channel === "string" && value.channel ? { channel: value.channel } : {}),
+    ...(typeof value.inviteExpiresAt === "number" ? { inviteExpiresAt: value.inviteExpiresAt } : {}),
+    ...(typeof value.channelId === "string" ? { channelId: value.channelId } : {}),
+    ...(typeof value.channelPassword === "string" ? { channelPassword: value.channelPassword } : {}),
     ...(typeof value.identity === "string" && value.identity ? { identity: value.identity } : {}),
     ...(value.rememberIdentity === true ? { rememberIdentity: true } : {}),
   };

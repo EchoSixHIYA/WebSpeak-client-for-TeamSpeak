@@ -321,6 +321,11 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.screen-player.viewers",
   "voice.screen-player.volume",
   "voice.screen-share-error",
+  "voice.invite.backdrop",
+  "voice.invite.dialog",
+  "voice.invite.form",
+  "voice.invite.create",
+  "voice.invite.copy",
   "voice.screen-share-settings",
   "voice.screen-share-settings.actions",
   "voice.screen-share-settings.fields",
@@ -375,6 +380,7 @@ const ACTION_PART_IDS = new Set([
   "voice.channel-tree.expander", "voice.channel-tree.row", "demo.skin-switcher", "demo.language-switcher",
 ]);
 const INTERACTIVE_PART_IDS = new Set([
+  "voice.invite.create", "voice.invite.copy",
   "voice.connection-status.nickname.input", "voice.connection-status.reconnect",
   "demo.action.poke", "demo.action.reconnect", "demo.action.speaking", "demo.channel.select",
   "demo.chat.input", "demo.chat.send", "demo.chat.tab", "demo.home-link", "demo.poke.dismiss",

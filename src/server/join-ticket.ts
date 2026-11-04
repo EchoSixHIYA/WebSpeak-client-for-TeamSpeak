@@ -3,9 +3,13 @@ import type { TeamSpeakTarget } from "../domain/teamspeak-target.js";
 
 export interface JoinTicketPayload {
   target: TeamSpeakTarget;
+  invitationTarget?: TeamSpeakTarget;
   serverPassword: string;
   nickname: string;
   channel?: string;
+  channelId?: string;
+  channelPassword?: string;
+  inviteExpiresAt?: number;
   identity?: string;
   rememberIdentity?: boolean;
   accelerated?: boolean;
@@ -30,7 +34,7 @@ export class JoinTicketStore {
       this.tickets.delete(oldest);
     }
     const token = randomBytes(24).toString("base64url");
-    this.tickets.set(token, { payload, expiresAt: now + this.ttlMs });
+    this.tickets.set(token, { payload, expiresAt: Math.min(now + this.ttlMs, payload.inviteExpiresAt ?? Infinity) });
     return token;
   }
 

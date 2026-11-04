@@ -23,7 +23,7 @@ test("schema 7 upgrades preserve the previously unused public host and initializ
   const original = new WebSpeakDatabase(filename);
   original.close();
   const legacy = new DatabaseSync(filename);
-  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; PRAGMA user_version = 7;");
+  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; DROP TABLE workspace_invites; PRAGMA user_version = 7;");
   legacy.prepare("UPDATE settings SET webrtc_public_host = ?").run("media.example.com");
   legacy.close();
   const migrated = new WebSpeakDatabase(filename);

@@ -222,7 +222,7 @@ components.json 顶层接受 schemaVersion 1、2 或 3 和 components 数组。s
 
 首页访客统计使用公开宿主控件 `home.visitor-count`：它展示当前访客序号与累计访客数，文本跟随当前界面语言，并在统计数据尚不可用时隐藏；不需声明权限。该控件复用 WebSpeak 日间首页的同一结构与基础样式，皮肤通过包内 CSS 定位，不需要自建统计逻辑。组件节点可用稳定的 `part` 名称（例如 `visitor-stats`）控制位置；内部 `home.visitors`、`home.visitors.orbit`、`home.visitors.icon`、`home.visitors.label`、`home.visitors.divider`、`home.visitors.total` 和 `home.visitors.spark` 是稳定样式部件。控件只能放在 `home` 页面。
 
-可信语音导航控件包括 `voice.channel-tree`、`voice.server-switcher` 和 `voice.server-header`。频道树要求 `session.channels.read`、`session.members.read`、`session.memberAvatars.read` 与 `session.channel.join`；头像只由宿主读取并在频道树中绘制。它可选 `layout: "server-sidebar"` 展示频道成员并让频道行与成员行分别控制折叠；未指定时保留默认呈现。独立服务器切换器要求 `servers.quickList.read` 与 `servers.quickList.switch`。服务器头部还要求 `session.status.read`，并在同一可信部件中组合服务器身份、状态、频道搜索和快速切换。两种入口都只接收不透明本地标识，点击后复用 WebSpeak 当前连接流程。v3 还可用 `session.invite.copy` 授权 `session.copyInviteLink`，让宿主复制当前公开服务器与频道的邀请链接并排除连接凭据。语音状态投影中的 `serverLabel` 会在看起来像 IP、域名或连接目标时省略，避免把地址显示为服务器名称。
+可信语音导航控件包括 `voice.channel-tree`、`voice.server-switcher` 和 `voice.server-header`。频道树要求 `session.channels.read`、`session.members.read`、`session.memberAvatars.read` 与 `session.channel.join`；头像只由宿主读取并在频道树中绘制。它可选 `layout: "server-sidebar"` 展示频道成员并让频道行与成员行分别控制折叠；未指定时保留默认呈现。独立服务器切换器要求 `servers.quickList.read` 与 `servers.quickList.switch`。服务器头部还要求 `session.status.read`，并在同一可信部件中组合服务器身份、状态、频道搜索和快速切换。两种入口都只接收不透明本地标识，点击后复用 WebSpeak 当前连接流程。v3 还可用 `session.invite.copy` 授权 `session.copyInviteLink`，让宿主打开当前会话的邀请对话框，生成限时票据链接；皮肤不能读取票据或连接凭据。语音状态投影中的 `serverLabel` 会在看起来像 IP、域名或连接目标时省略，避免把地址显示为服务器名称。
 
 示例包见 [KAAK voice 示例](./examples/KAAK-VOICE.md)，其 components.json 使用完整首页与语音工作区 surface，展示收藏服务器、频道树、在线成员、聊天和可信语音控制的组合；[Open Voice Surface](./examples/OPEN-VOICE-SURFACE.md) 保留为通用格式验证脚手架。KAAK 的语音视觉参考来自用户授权进入的前两个语音房间；只记录布局，不保留服务器/房间标识、成员名或聊天内容。组件按本地用户授权后才渲染；权限对每个皮肤版本、页面和组件分别保存，可在宿主权限入口撤销。页面替换时，宿主会额外显示“返回标准界面”和“恢复内置皮肤”入口；拒绝授权或离开 surface 后，普通页面可立即恢复。
 
@@ -287,7 +287,8 @@ widget 的可选 `mount` 只接受这些公开锚点：`home.header.after`、`ho
 
 宿主动作只允许从公开运行时 API 中选择，并在调用时重新核对权限、参数和当前会话：
 
-- `session.copyInviteLink`（`session.invite.copy`）复制不含连接凭据的当前服务器/频道邀请链接。
+- `session.copyInviteLink`（`session.invite.copy`）打开宿主邀请对话框，生成并复制当前服务器/频道的限时票据链接。有效期为 1–43200 分钟；服务器密码及已成功使用的频道密码仅由服务端加密保存和使用，不传给皮肤或受邀浏览器。若本次会话尚未提供所需服务器密码或当前上锁频道密码，由宿主对话框向创建者收集。邀请凭据失效时提示受邀者联系创建者，不要求受邀者补输服务器密码。受邀者只需输入昵称，不能用链接参数覆盖票据绑定的服务器和频道。
+  邀请对话框公开样式部件：`voice.invite.backdrop`、`voice.invite.dialog`、`voice.invite.form`、`voice.invite.create`、`voice.invite.copy`。这些钩子仅用于外观；输入值与票据不进入皮肤数据投影。
 - `voice.joinChannel`（`session.channel.join`）仅请求加入当前公开可见的频道，继续使用宿主的频道密码和权限流程。
 - `favorites.switch`（`favorites.switch`）与 `quickServers.switch`（`servers.quickList.switch`）使用不透明令牌选择本机已有目标，并复用宿主连接流程。
 - `chat.sendMessage`（`chat.channel.send`）只向当前公开文字频道发送消息，不包括私聊。

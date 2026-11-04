@@ -1,5 +1,6 @@
 /** Payloads stay correlated with their command names across both runtimes. */
 export interface ClientCommandPayloads {
+  createInvite: { expiresInMinutes: number; channelPassword?: string; serverPassword?: string };
   switchChannel: { channelId: string; password?: string };
   moveClient: { clientId: number; channelId: string; password?: string };
   sendTextMessage: { message: string; channelId?: string };
@@ -36,12 +37,18 @@ export function parseClientCommand(raw: string): ClientCommandResult {
   if (value.requestId !== undefined && (typeof value.requestId !== "string" || value.requestId.length > 64)) {
     return { error: { code: "INVALID_REQUEST_ID", message: "请求标识无效" } };
   }
-  const supportedTypes = new Set(["switchChannel", "moveClient", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway", "setWhisperTargets", "setWhisperActive", "setMicrophoneMuted", "setAccompanimentActive", "setMemberVolume", "latencyProbe", "audioStatsProbe"]);
+  const supportedTypes = new Set(["createInvite", "switchChannel", "moveClient", "sendTextMessage", "sendServerMessage", "sendPrivateMessage", "poke", "setAway", "setWhisperTargets", "setWhisperActive", "setMicrophoneMuted", "setAccompanimentActive", "setMemberVolume", "latencyProbe", "audioStatsProbe"]);
   if (!supportedTypes.has(value.type)) {
     return { error: { code: "UNKNOWN_MESSAGE_TYPE", message: "不支持的消息类型" } };
   }
   if (!isRecord(value.payload)) {
     return { error: { code: "INVALID_PAYLOAD", message: "消息参数无效" } };
+  }
+  if (value.type === "createInvite" && (!Number.isInteger(value.payload.expiresInMinutes) || Number(value.payload.expiresInMinutes) < 1 || Number(value.payload.expiresInMinutes) > 43200 || (value.payload.channelPassword !== undefined && (typeof value.payload.channelPassword !== "string" || value.payload.channelPassword.length > 512)))) {
+    return { error: { code: "INVALID_INVITE", message: "Invalid invitation expiry or credentials" } };
+  }
+  if (value.type === "createInvite" && value.payload.serverPassword !== undefined && (typeof value.payload.serverPassword !== "string" || value.payload.serverPassword.length > 512)) {
+    return { error: { code: "INVALID_INVITE", message: "Invalid invitation credentials" } };
   }
   if (value.type === "switchChannel" && (typeof value.payload.channelId !== "string" || !/^\d{1,20}$/.test(value.payload.channelId))) {
     return { error: { code: "INVALID_CHANNEL_ID", message: "频道标识无效" } };

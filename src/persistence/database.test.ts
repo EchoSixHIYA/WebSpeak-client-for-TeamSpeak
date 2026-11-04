@@ -15,7 +15,7 @@ test("relay voice endpoint is stored by the current database migration", (contex
     rmSync(directory, { recursive: true, force: true });
   });
 
-  assert.equal(DATABASE_SCHEMA_VERSION, 12);
+  assert.equal(DATABASE_SCHEMA_VERSION, 13);
   assert.equal(database.schemaVersion, DATABASE_SCHEMA_VERSION);
   assert.equal(database.getTsAdminSettings().transport, "web");
   assert.equal(database.getTsAdminSettings().enabled, false);
@@ -38,13 +38,13 @@ test("schema 11 migration preserves encrypted SSH credentials and does not silen
   const original = new WebSpeakDatabase(filename);
   original.close();
   const old = new DatabaseSync(filename);
-  old.exec("ALTER TABLE ts_admin_settings DROP COLUMN transport; ALTER TABLE ts_admin_settings DROP COLUMN query_host; ALTER TABLE ts_admin_settings DROP COLUMN web_query_url; ALTER TABLE ts_admin_settings DROP COLUMN api_key_encrypted; ALTER TABLE ts_admin_settings DROP COLUMN server_id; PRAGMA user_version = 11;");
+  old.exec("ALTER TABLE ts_admin_settings DROP COLUMN transport; ALTER TABLE ts_admin_settings DROP COLUMN query_host; ALTER TABLE ts_admin_settings DROP COLUMN web_query_url; ALTER TABLE ts_admin_settings DROP COLUMN api_key_encrypted; ALTER TABLE ts_admin_settings DROP COLUMN server_id; DROP TABLE workspace_invites; PRAGMA user_version = 11;");
   old.prepare("UPDATE ts_admin_settings SET enabled=1, query_port=10222, username='query-owner', password_encrypted=?, host_key_fingerprint=?").run(encrypted, `SHA256:${"A".repeat(43)}`);
   old.close();
   const migrated = new WebSpeakDatabase(filename);
   t.after(() => { migrated.close(); rmSync(directory, { recursive: true, force: true }); });
   const settings = migrated.getTsAdminSettings();
-  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.schemaVersion, 13);
   assert.equal(settings.transport, "ssh"); assert.equal(settings.enabled, true);
   assert.equal(settings.queryPort, 10222); assert.equal(settings.username, "query-owner");
   assert.equal(settings.passwordEncrypted, encrypted);

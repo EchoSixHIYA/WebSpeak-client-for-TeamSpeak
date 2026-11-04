@@ -50,6 +50,7 @@ function publicFailureDetail(error: ReturnType<typeof normalizeTeamSpeakError>):
 }
 
 export interface VoiceBridgeOptions {
+  createWorkspaceInvite?: (credentials: import("./workspace-invites.js").WorkspaceInviteCredentials, minutes: number) => { token: string; expiresAt: number };
   pluginRuntimeEnabled?: boolean;
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
@@ -83,6 +84,7 @@ export interface AdminSessionSummary {
 type ServerEvent = SharedServerEvent & { kind: "joined" | "left" | "moved" | "poke" | "connection" };
 
 interface WebClientEntry extends SessionDirectoryState {
+  rememberChannelPassword?: (id: string, password: string) => void;
   id: string;
   session: ManagedSession;
   tsClient: TSClient;
@@ -168,6 +170,8 @@ export class VoiceBridge {
 
       const { target, serverPassword, nickname } = connection;
       const channelName = connection.channel;
+      const channelPasswords = new Map<string, string>();
+      let lastInviteAt = 0;
       const acceleration = connection.accelerated ? this.getAccelerationOptions(connection.accelerationRelayId) : undefined;
       if (connection.accelerated && !acceleration) {
         ws.close(4006, "ACCELERATION_UNAVAILABLE");
@@ -231,6 +235,7 @@ export class VoiceBridge {
       }
       entry = {
         id: entryId,
+        rememberChannelPassword: (id, password) => channelPasswords.set(id, password),
         session,
         tsClient,
         ws,
@@ -450,6 +455,11 @@ export class VoiceBridge {
       const connectTeamSpeak = async (isReconnect: boolean): Promise<void> => {
         try {
           await tsClient.connect();
+          if (connection.channelId && !isReconnect) {
+            if (tsClient.getChannelId().toString() !== connection.channelId) await tsClient.switchChannel(BigInt(connection.channelId), connection.channelPassword || undefined);
+            if (tsClient.getChannelId().toString() !== connection.channelId) throw new Error("Invited channel could not be joined");
+            if (connection.channelPassword) channelPasswords.set(connection.channelId, connection.channelPassword);
+          }
           if (session.state !== "authenticating") return;
           session.transition("syncing");
           tsReady = true;
@@ -610,6 +620,19 @@ export class VoiceBridge {
         }
         if (!tsReady || session.state !== "connected") {
           sendProtocolError(sendJson, "SESSION_NOT_READY", "TeamSpeak 会话尚未就绪", command.requestId);
+          return;
+        }
+        if (command.type === "createInvite") {
+          if (!this.options.createWorkspaceInvite) { sendProtocolError(sendJson, "INVITE_UNAVAILABLE", "Invitations are unavailable on this gateway", command.requestId); return; }
+          if (Date.now() - lastInviteAt < 1000) { sendProtocolError(sendJson, "RATE_LIMITED", "Please wait before creating another invitation", command.requestId); return; }
+          const channelId = tsClient.getChannelId().toString();
+          const password = command.payload.channelPassword || channelPasswords.get(channelId) || "";
+          if (entry!.channelTree.find(c => c.id === channelId)?.passwordProtected && !password) { sendProtocolError(sendJson, "CHANNEL_PASSWORD_REQUIRED", "Enter the current channel password to share access", command.requestId); return; }
+          try {
+            const result = this.options.createWorkspaceInvite({ target: connection.invitationTarget ?? target, serverPassword: command.payload.serverPassword ?? serverPassword, channelId, channelPassword: password }, command.payload.expiresInMinutes);
+            lastInviteAt = Date.now();
+            sendJson({ type: "inviteCreated", requestId: command.requestId, ...result });
+          } catch { sendProtocolError(sendJson, "INVITE_CREATE_FAILED", "Could not create invitation", command.requestId); }
           return;
         }
         void handleCommand(entry!, command, sendJson);

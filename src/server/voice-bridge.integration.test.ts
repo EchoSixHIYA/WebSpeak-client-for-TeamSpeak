@@ -27,7 +27,10 @@ class TeamSpeakStub extends EventEmitter {
   async connect() { this.connectCalls++; this.disconnected = false; if (this.emitDirectorySnapshotOnConnect) this.emit("directorySnapshot", this.directory); }
   async disconnect() { this.disconnected = true; }
   getClientId() { return 1; }
-  getChannelId() { return 1n; }
+  channelId = 1n;
+  lastChannelPassword = "";
+  async switchChannel(id: bigint, password?: string) { this.channelId = id; this.lastChannelPassword = password ?? ""; }
+  getChannelId() { return this.channelId; }
   isConnected() { return !this.disconnected; }
   async getServerInfo() { this.serverInfoCalls++; return { name: "兄弟们的teamspeak", iconId: null }; }
   async getServerPresentation() {
@@ -43,15 +46,17 @@ class TeamSpeakStub extends EventEmitter {
 }
 
 async function fixture(t: TestContext, overrides: {
-  createTeamSpeakClient?: () => TSClient;
+  createTeamSpeakClient?: (options: import("./ts-client.js").TSClientOptions) => TSClient;
   createEncoder?: () => Pick<OpusEncoder, "encode" | "dispose">;
   configureSdk?: (sdk: TeamSpeakStub) => void;
   waitForFirstMessage?: boolean;
+  createWorkspaceInvite?: import("./voice-bridge.js").VoiceBridgeOptions["createWorkspaceInvite"];
+  connection?: Partial<import("./join-ticket.js").JoinTicketPayload>;
 } = {}) {
   const sdk = new TeamSpeakStub();
   overrides.configureSdk?.(sdk);
   const tickets = new JoinTicketStore();
-  const bridge = new VoiceBridge({ joinTickets: tickets }, pino({ enabled: false }), undefined, {
+  const bridge = new VoiceBridge({ joinTickets: tickets, createWorkspaceInvite: overrides.createWorkspaceInvite }, pino({ enabled: false }), undefined, {
     createTeamSpeakClient: overrides.createTeamSpeakClient ?? (() => sdk as unknown as TSClient),
     ...(overrides.createEncoder ? { createEncoder: overrides.createEncoder } : {}),
   });
@@ -62,7 +67,7 @@ async function fixture(t: TestContext, overrides: {
   await once(server, "listening");
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  const ticket = tickets.create({ target: { host: "voice.example.invalid", port: 9987 }, nickname: "Test", serverPassword: "" });
+  const ticket = tickets.create({ target: { host: "voice.example.invalid", port: 9987 }, nickname: "Test", serverPassword: "", ...overrides.connection });
   const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws/voice?ticket=${ticket}`);
   const messages: Array<{ data: Buffer; binary: boolean }> = [];
   socket.on("message", (data, binary) => messages.push({ data: data as Buffer, binary }));
@@ -80,6 +85,7 @@ async function fixture(t: TestContext, overrides: {
   const entries = (bridge as unknown as { entries: Map<string, {
     id: string; ws: WebSocket; audio: AudioFlowStats; webrtc: WebRtcAudioSession | null;
     isAlive: boolean; lastPongAt: number; missedHeartbeats: number; avatarCache: Map<string, string | null>;
+    channelTree: import("../shared/voice-models.js").ChannelInfo[];
     members: Map<number, { id: number; uid: string }>; eventLog: unknown[];
   }> }).entries;
   return { bridge, sdk, socket, messages, entries, wss };
@@ -428,3 +434,53 @@ for (const order of ["kick-first", "disconnect-first"] as const) {
     assert.match(failures[0].detail, /Removed by operator/);
   });
 }
+
+
+test("workspace invitations use authenticated session credentials and remember only successful channel passwords", async t => {
+  let credentials: unknown;
+  const f = await fixture(t, { connection: { serverPassword: "server-secret", invitationTarget: { host: "original.example.com", port: 9987 } },
+    createWorkspaceInvite: (value, minutes) => { credentials = value; assert.equal(minutes, 60); return { token: "wi_" + "x".repeat(43), expiresAt: Date.now()+3600000 }; },
+  });
+  while (!messageTypes(f.messages).includes("connected")) await nextTurn();
+  const entry = [...f.entries.values()][0]!;
+  entry.channelTree.push({ id: "1", parentID: "0", name: "Locked", passwordProtected: true });
+  let reply = waitForMessage(f.socket, "error");
+  f.socket.send(JSON.stringify({ type: "createInvite", requestId: "missing-password", payload: { expiresInMinutes: 60 } }));
+  assert.equal(((await reply).error as { code: string }).code, "CHANNEL_PASSWORD_REQUIRED");
+  const switched = waitForMessage(f.socket, "channelSwitched");
+  f.socket.send(JSON.stringify({ type: "switchChannel", requestId: "switch", payload: { channelId: "1", password: "channel-secret" } }));
+  await switched;
+  reply = waitForMessage(f.socket, "inviteCreated");
+  f.socket.send(JSON.stringify({ type: "createInvite", requestId: "invite", payload: { expiresInMinutes: 60, target: "127.0.0.1", channelId: "999" } }));
+  const result = await reply;
+  assert.equal(result.requestId, "invite");
+  assert.deepEqual(credentials, { target: { host: "original.example.com", port: 9987 }, serverPassword: "server-secret", channelId: "1", channelPassword: "channel-secret" });
+  assert.ok(!JSON.stringify(f.messages).includes("server-secret"));
+  assert.ok(!JSON.stringify(f.messages).includes("channel-secret"));
+});
+
+test("an invited connection joins its bound channel using server-only credentials before reporting connected", async t => {
+  let sdk: TeamSpeakStub;
+  const f = await fixture(t, { connection: { serverPassword: "private-server", channelId: "9", channelPassword: "private-channel" },
+    configureSdk: value => { sdk = value; },
+    createTeamSpeakClient: options => { assert.equal(options.serverPassword, "private-server"); return sdk as unknown as TSClient; },
+  });
+  while (!messageTypes(f.messages).includes("connected")) await nextTurn();
+  assert.equal(f.sdk.channelId, 9n);
+  assert.equal(f.sdk.lastChannelPassword, "private-channel");
+  assert.ok(!JSON.stringify(f.messages).includes("private-channel"));
+  assert.ok(!JSON.stringify(f.messages).includes("private-server"));
+});
+
+
+test("an authenticated creator may supply a missing server password without disclosing it to the recipient", async t => {
+ const f=await fixture(t,{createWorkspaceInvite: credentials=>{
+  assert.equal(credentials.serverPassword,"creator-provided");
+  return {token:"wi_"+"a".repeat(43),expiresAt:Date.now()+60000};
+ }});
+ while(!messageTypes(f.messages).includes("connected"))await nextTurn();
+ const reply=waitForMessage(f.socket,"inviteCreated");
+ f.socket.send(JSON.stringify({type:"createInvite",requestId:"provided",payload:{expiresInMinutes:1,serverPassword:"creator-provided"}}));
+ assert.equal((await reply).requestId,"provided");
+ assert.ok(!JSON.stringify(f.messages).includes("creator-provided"));
+});

@@ -93,7 +93,7 @@ export function useWebClientConnection({
   const canJoin = computed(() => Boolean(
     initialized.value
     && nickname.value.trim()
-    && (accessMode.value === "fixed" || (serverHost.value.trim() && isValidTeamSpeakPort(serverPort.value))),
+    && (inviteToken.value || accessMode.value === "fixed" || (serverHost.value.trim() && isValidTeamSpeakPort(serverPort.value))),
   ));
 
   watch(serverHost, (address, previousAddress) => {
@@ -136,11 +136,11 @@ export function useWebClientConnection({
     resolvingServerPassword = true;
     void (async () => {
       try {
-        const savedPassword = serverPassword.value ? "" : await loadStoredServerPassword(target);
+        const savedPassword = inviteToken.value || serverPassword.value ? "" : await loadStoredServerPassword(target);
         if (attempt !== serverPasswordLookupAttempt || target !== currentServerTarget()) return;
         // A password entered while IndexedDB was being read takes precedence.
-        const password = serverPassword.value || savedPassword;
-        attemptedServerCredential = { target, password };
+        const password = inviteToken.value ? "" : serverPassword.value || savedPassword;
+        attemptedServerCredential = inviteToken.value ? null : { target, password };
         // Keep the in-memory value available for the existing reconnect flow.
         serverPassword.value = password;
         connect(
@@ -257,6 +257,11 @@ export function useWebClientConnection({
   });
   watch(errorCode, (code) => {
     if (code !== "SERVER_PASSWORD_REQUIRED" && code !== "INVALID_SERVER_PASSWORD") return;
+    if (inviteToken.value) {
+      clearError();
+      showToast(t("inviteCredentialFailure"));
+      return;
+    }
     if (attemptedServerCredential) void removeStoredServerPassword(attemptedServerCredential.target);
     attemptedServerCredential = null;
     serverPassword.value = "";

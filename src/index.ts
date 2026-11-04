@@ -109,7 +109,13 @@ async function runRelayMode(): Promise<void> {
     import("./server/voice-gateway.js"),
   ]);
   const logger = createLogger(LOG_DIR);
+  const [{ WebSpeakDatabase }, { loadOrCreateMasterSecret }, { WorkspaceInvites }] = await Promise.all([
+    import("./persistence/database.js"), import("./security/master-secret.js"), import("./server/workspace-invites.js"),
+  ]);
+  const inviteDatabase = new WebSpeakDatabase(path.join(DATA_DIR, "webspeak.db"));
+  const workspaceInvites = new WorkspaceInvites(inviteDatabase, loadOrCreateMasterSecret(path.join(DATA_DIR, "master.key")));
   const voiceGateway = createVoiceGatewayServer({
+    workspaceInvites,
     host: voiceHost,
     port: voicePort,
     sharedToken: token,
@@ -144,7 +150,7 @@ async function runRelayMode(): Promise<void> {
     if (stopping) return;
     stopping = true;
     relay.close();
-    void voiceGateway.stop().finally(() => process.exit(0));
+    void voiceGateway.stop().finally(() => { inviteDatabase.close(); process.exit(0); });
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);

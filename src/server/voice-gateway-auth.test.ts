@@ -45,3 +45,14 @@ test("delegated voice session parser accepts only bounded TeamSpeak session data
   assert.equal(parseDelegatedVoiceSession({ ...payload, nickname: "" }), null);
   assert.equal(parseDelegatedVoiceSession({ ...payload, serverPassword: "x".repeat(513) }), null);
 });
+
+
+test("relay sessions retain invitation channel credentials and reject expired authorization", () => {
+ const inviteExpiresAt=Date.now()+60000;
+ const session={...payload,invitationTarget:{host:"original.example.com",port:9987},channelId:"9",channelPassword:"private",inviteExpiresAt};
+ assert.deepEqual(parseDelegatedVoiceSession(session),session);
+ assert.equal(parseDelegatedVoiceSession({...session,inviteExpiresAt:Date.now()-1}),null);
+ assert.equal(parseDelegatedVoiceSession({...session,channelPassword:"x".repeat(513)}),null);
+ assert.equal(parseDelegatedVoiceSession({...session,channelId:"0"}),null);
+ assert.equal(parseDelegatedVoiceSession({...session,invitationTarget:{host:"http://bad",port:9987}}),null);
+});

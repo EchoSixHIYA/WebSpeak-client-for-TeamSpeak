@@ -3896,6 +3896,7 @@
   [data-ws-plugin-part="kaak-workspace.server-banner"] [data-ws-part="voice.server-banner.body"] { margin-top: 3px; font-size: 10px; line-height: 14px; }
 }
 
+[data-ws-part="voice.invite.backdrop"],
 [data-ws-part="auth.password.backdrop"] {
   padding: 16px;
   background: rgba(10, 11, 13, .54);
@@ -3904,6 +3905,7 @@
 [data-ws-part="auth.password.backdrop"][data-ws-state="server-password"] {
   background: rgba(29, 40, 34, .3);
 }
+[data-ws-part="voice.invite.dialog"],
 [data-ws-part="auth.password.dialog"] {
   position: relative;
   display: flex;
@@ -4702,4 +4704,14 @@
 }
 @media (prefers-reduced-motion: reduce) {
   [data-ws-plugin-part="kaak-workspace.rail-links"] a { transition: none; }
+}
+
+[data-ws-part="voice.invite.create"], [data-ws-part="voice.invite.copy"] {
+  color: #172008;
+  background: var(--skin-kaak-accent);
+}
+
+[data-ws-part="voice.invite.dialog"] {
+  height: auto;
+  max-height: calc(100dvh - 32px);
 }
