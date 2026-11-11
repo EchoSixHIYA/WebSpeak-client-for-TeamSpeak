@@ -1,6 +1,7 @@
 import { computed, reactive, ref, type Ref } from "vue";
 import { DEFAULT_TEAM_SPEAK_PORT, splitTeamSpeakTarget } from "../services/teamspeak-target.js";
 import { APP_VERSION } from "../services/app-version.js";
+import { setInstanceHiddenParts } from "../services/host-chrome.js";
 import type { Language } from "../i18n/web-client.js";
 
 interface RelayOption {
@@ -58,7 +59,11 @@ export function useWebClientPublicConfig({
         visitorNumber?: unknown;
         visitorTotal?: unknown;
         accelerationRelays?: unknown;
+        hiddenHostParts?: unknown;
       };
+      if (Array.isArray(config.hiddenHostParts)) {
+        setInstanceHiddenParts(config.hiddenHostParts.filter((part): part is string => typeof part === "string"));
+      }
       if (typeof config.version === "string" && config.version.trim()) appVersion.value = config.version.trim();
       visitorNumber.value = Number.isSafeInteger(config.visitorNumber) && Number(config.visitorNumber) > 0 ? Number(config.visitorNumber) : null;
       visitorTotal.value = Number.isSafeInteger(config.visitorTotal) && Number(config.visitorTotal) > 0 ? Number(config.visitorTotal) : null;

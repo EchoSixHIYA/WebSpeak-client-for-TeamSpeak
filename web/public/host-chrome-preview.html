@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="voice">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WebSpeak · Host chrome preview</title>
+<link rel="stylesheet" href="/src/styles/plugin-overlay.css" />
+<style id="skin-style"></style>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font: 12px/1.5 Tahoma, "Segoe UI", sans-serif; color: #1b2825; background: #eef2f1; }
+  .ws-skin-root { min-height: 100dvh; display: flex; flex-direction: column; }
+  .ws-header { height: 44px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid #d5dedc; background: #f7faf9; }
+  .ws-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #006a64; }
+  .ws-brand i { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg,#006a64,#32cdb7); }
+  .ws-toolbar { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .ws-trigger, .ws-icon-button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 4px 9px; border: 1px solid #cfd9d7; border-radius: 5px; background: #fff; color: #35514d; cursor: pointer; font: inherit; }
+  .ws-icon-button { width: 30px; padding: 4px; justify-content: center; }
+  .ws-icon-slot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; }
+  .ws-icon-slot svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .ws-columns { flex: 1; display: grid; grid-template-columns: 230px 1fr 280px; min-height: 0; }
+  .ws-tree, .ws-info { border-right: 1px solid #d5dedc; background: #fff; padding: 10px; }
+  .ws-info { border-right: 0; border-left: 1px solid #d5dedc; }
+  .ws-main { padding: 14px; overflow: auto; }
+  .ws-card { padding: 12px; margin-bottom: 10px; border: 1px solid #dde5e3; border-radius: 6px; background: #fff; }
+  .ws-card h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: #6e8a86; }
+  .ws-status { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px solid #bfd8d3; border-radius: 5px; background: #f0faf7; color: #225b53; }
+  .ws-dock { flex: none; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px; border-top: 1px solid #d5dedc; background: #f7faf9; }
+  .ws-dock strong { display: block; font-size: 12px; }
+  .ws-dock small { color: #6b8480; }
+  .ws-dock-actions { margin-left: auto; display: flex; gap: 8px; }
+  .ws-footer { flex: none; padding: 6px 14px; border-top: 1px solid #d5dedc; background: #f2f6f5; color: #6b8480; font-size: 11px; }
+  .ws-footer span { margin-right: 6px; }
+  /* Teleported host chrome */
+  .ws-host-chrome { position: fixed; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+  .ws-host-watermark { position: absolute; top: 64px; right: 56px; color: #8ab9cf; font: 800 clamp(40px,7vw,104px)/1 ui-sans-serif,system-ui,sans-serif; letter-spacing: -.06em; opacity: .14; }
+  .ws-host-hint { position: absolute; bottom: 10px; left: 14px; margin: 0; max-width: 50vw; color: #6d8b88; font-size: 11px; opacity: .8; }
+  .ws-host-voice-status-decoration { position: absolute; top: 0; right: 0; display: flex; align-items: center; gap: 8px; width: 280px; height: 28px; padding: 0 12px; opacity: .28; }
+  .ws-host-voice-status-decoration span { display: block; height: 6px; border-radius: 3px; background: #95b6b1; }
+  .ws-host-voice-status-decoration span:first-child { width: 64px; }
+  .ws-host-voice-status-decoration span:last-child { flex: 1; opacity: .6; }
+  .ws-host-recovery { position: fixed; inset: auto auto 38px 12px; margin: 0; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid #9db6b2; border-radius: 999px; background: #fff; color: #31524f; font: inherit; pointer-events: auto; }
+  .ws-host-recovery:popover-open { display: flex; }
+  .ws-host-recovery button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 5px 10px; border: 1px solid #9db6b2; border-radius: 999px; background: #fff; color: #31524f; font: inherit; cursor: pointer; }
+  .ws-host-recovery button:hover, .ws-host-recovery button:focus-visible { outline: 2px solid #4c8f88; }
+  .ws-host-recovery-layer { position: fixed; inset: 0; z-index: 2147483647; overflow: visible; pointer-events: none; }
+  .ws-plugin-overlay { font-family: inherit; }
+  /* Preview-only legend */
+  .ws-legend { position: fixed; z-index: 12000; top: 56px; left: 12px; width: 320px; padding: 10px 12px; border: 1px solid #b9cfcb; border-radius: 8px; background: #fffffff2; box-shadow: 0 8px 24px #0f2a2633; font-size: 11px; }
+  .ws-legend h2 { margin: 0 0 6px; font-size: 12px; color: #006a64; }
+  .ws-legend p { margin: 0 0 4px; }
+  .ws-legend code { background: #eef4f2; padding: 0 3px; border-radius: 3px; }
+  .ws-legend .ws-ok { color: #0a7a2f; font-weight: 700; }
+  .ws-legend .ws-hidden { color: #a33; font-weight: 700; }
+  .ws-entry-marker { outline: 3px solid #d2600a !important; outline-offset: 3px !important; }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-page="voice" data-ws-part="app">
+  <header class="ws-header" data-ws-part="voice.header">
+    <div class="ws-brand" data-ws-part="home.brand"><i></i><span>WebSpeak</span></div>
+    <div class="ws-toolbar" data-ws-part="voice.header-actions">
+      <button type="button" class="ws-trigger" data-ws-part="language.trigger"><span class="ws-icon-slot" data-ws-icon-slot="language.trigger"><svg viewBox="0 0 24 24"><path d="M4 5h9M8 5v2c0 5-2 8-4 10M6 10c1 3 4 5 7 6M13 19l4-10 4 10M14.5 16h5"/></svg></span><span>EN</span></button>
+      <button type="button" class="ws-trigger" data-ws-part="skin.trigger"><span class="ws-icon-slot" data-ws-icon-slot="skin.trigger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/></svg></span><span>Skin</span></button>
+      <button type="button" class="ws-icon-button" title="Settings" data-ws-part="home.toolbar.settings"><span class="ws-icon-slot" data-ws-icon-slot="home.toolbar.settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg></span></button>
+      <button type="button" class="ws-icon-button" title="Voice status" data-ws-part="voice.performance"><span class="ws-icon-slot" data-ws-icon-slot="voice.performance"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></span></button>
+    </div>
+  </header>
+
+  <div class="ws-columns">
+    <aside class="ws-tree"><strong>demo.example</strong><p>◈ Lobby</p><p>&nbsp;&nbsp;👤 Demo User</p><p>&nbsp;&nbsp;♫ Demo Bot</p></aside>
+    <main class="ws-main">
+      <div class="ws-status" data-ws-part="voice.connection-status" role="status">Connected · Demo User · 17 ms</div>
+      <div class="ws-card"><h3>Server information</h3><p>Address: demo.example · Channel: Lobby · Skin: host chrome demo</p></div>
+      <div class="ws-card"><h3>Server log</h3><p>Conversation and session events appear below.</p></div>
+    </main>
+    <aside class="ws-info"><strong>Voice status</strong><p>Connection transport: WebSockets</p><p>Ping: 17 ms</p></aside>
+  </div>
+
+  <div class="ws-dock" data-ws-part="voice.audio-dock" role="toolbar" aria-label="Audio controls">
+    <div><strong>Audio controls</strong><small>Microphone and output remain available</small></div>
+    <div class="ws-dock-actions">
+      <button type="button" class="ws-trigger" data-ws-part="voice.audio-dock.microphone">🎤 Microphone</button>
+      <button type="button" class="ws-trigger" data-ws-part="voice.audio-dock.output">🔊 Output</button>
+      <button type="button" class="ws-trigger" data-ws-part="voice.connection-status.reconnect">Reconnect</button>
+    </div>
+  </div>
+  <footer class="ws-footer" data-ws-part="home.footer"><span data-ws-part="home.footer.decoration">WebSpeak · TeamSpeak Client</span><button type="button" data-ws-part="home.footer.clear">Clear local data</button><span data-ws-part="home.footer.decoration">Browser support</span></footer>
+</div>
+
+<!-- Teleported host chrome, outside .ws-skin-root -->
+<div class="ws-host-chrome" data-ws-host-chrome>
+  <div class="ws-host-watermark" data-ws-part="host.watermark" aria-hidden="true">WebSpeak</div>
+  <p class="ws-host-hint" data-ws-part="host.hint">Audio controls remain available in the toolbar and voice workspace.</p>
+  <div class="ws-host-voice-status-decoration" data-ws-part="host.voice-status-decoration" aria-hidden="true"><span></span><span></span></div>
+</div>
+<!-- Recovery is displayed only when the launcher is hidden/unreachable, mirroring
+     the client's closed-shadow top-layer entry rather than a watermark sibling.
+     The node deliberately has no data-ws-part: there is no skin hook for it. -->
+<div class="ws-host-recovery-layer" data-ws-host-recovery-layer>
+  <div class="ws-host-recovery" id="recovery-popover" popover="manual"><span aria-hidden="true">◈</span><button type="button" id="recovery-entry">Use built-in skin (recovery)</button></div>
+</div>
+
+<div class="ws-plugin-overlay" data-plugin-theme="light">
+  <button type="button" id="plugin-launcher" class="ws-plugin-launcher" data-ws-part="host.plugins.launcher">
+    <svg viewBox="0 0 24 24" data-ws-icon-slot="host.plugins.launcher" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    <span>Plugins</span>
+  </button>
+  <section id="plugin-window" class="ws-plugin-window" data-ws-part="host.plugins.overlay" role="dialog" aria-label="Application library" style="display:none;left:50%;top:16%;transform:translateX(-50%);width:min(720px,80vw);height:min(420px,60vh)">
+    <header class="ws-plugin-titlebar"><span class="ws-plugin-mark" aria-hidden="true">◈</span><div class="ws-plugin-window-title"><strong>Application library</strong><small>WebSpeak</small></div></header>
+    <nav class="ws-plugin-navigation"><button type="button" class="active">Application library</button></nav>
+    <div class="ws-plugin-library"><div class="ws-plugin-library-heading"><div><h2>Application library</h2><span>1 available</span></div></div>
+      <div class="ws-plugin-grid"><article class="ws-plugin-entry"><div class="ws-plugin-app-mark">D</div><div class="ws-plugin-entry-copy"><h3>Demo application</h3><small>v1.0.0 · instance</small><p>Local demo entry used to verify the recovery path.</p></div><button type="button">Open ↗</button></article></div>
+    </div>
+  </section>
+</div>
+
+<div class="ws-legend" id="legend"><h2>Host chrome preview</h2><p id="status">Loading skin…</p></div>
+
+<script type="module">
+const params = new URLSearchParams(location.search);
+const skinUrl = params.get("skin") || "/host-chrome-themed.wskin";
+const state = params.get("state") || "themed";
+const legend = document.getElementById("legend");
+const status = document.getElementById("status");
+const launcher = document.getElementById("plugin-launcher");
+const libraryWindow = document.getElementById("plugin-window");
+const recovery = document.getElementById("recovery-entry");
+const recoveryPopover = document.getElementById("recovery-popover");
+const recoveryLayer = document.querySelector("[data-ws-host-recovery-layer]");
+const decorations = ["host.watermark", "host.hint", "host.voice-status-decoration"];
+
+function setLibraryOpen(open) {
+  libraryWindow.style.display = open ? "flex" : "none";
+}
+launcher.addEventListener("click", () => setLibraryOpen(libraryWindow.style.display === "none"));
+recovery.addEventListener("click", () => { setLibraryOpen(true); recovery.classList.add("ws-entry-marker"); });
+
+try {
+  const { resolveHiddenHostParts, isHostPartReachable } = await import("/src/services/host-chrome-preview.ts");
+  let chromeData;
+  if (skinUrl !== "none") {
+    const { importSkinPack, resolveSkinCssAssets } = await import("/src/services/skin-pack.ts");
+    const response = await fetch(skinUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    const name = skinUrl.split("/").pop() || "skin.wskin";
+    const skin = await importSkinPack(new File([blob], name, { type: "application/octet-stream" }));
+    const resolved = resolveSkinCssAssets(skin.css, skin.assets);
+    document.getElementById("skin-style").textContent = resolved.css;
+    document.documentElement.setAttribute("data-ws-host-skin", skin.id);
+    document.querySelector(".ws-skin-root").setAttribute("data-ws-skin", skin.id);
+    chromeData = skin.chromeData;
+    status.innerHTML = `Active skin: <code>${skin.id}</code> v${skin.version}<br>hiddenParts: <code>${JSON.stringify(skin.chromeData?.hiddenParts ?? [])}</code><br>visibleParts: <code>${JSON.stringify(skin.chromeData?.visibleParts ?? [])}</code><br>icon overrides: <code>${Object.keys(skin.chromeData?.icons ?? {}).length}</code>`;
+  } else {
+    status.textContent = "Baseline: no skin active.";
+  }
+
+  // Decorations follow the client's opt-in rule: only visibleParts keeps them
+  // in the DOM. hiddenParts-only and icon-only chrome.json stay clean, and
+  // skin=none behaves like a built-in skin.
+  const hiddenParts = resolveHiddenHostParts(chromeData, []);
+  const decorationVisible = Object.fromEntries(decorations.map((part) => {
+    const element = document.querySelector(`[data-ws-part="${part}"]`);
+    const visible = Boolean(element) && !hiddenParts.has(part);
+    if (!visible) element?.remove();
+    return [part, visible];
+  }));
+
+  // Recovery follows the same reachability rule as the client, with
+  // ?state=recovery kept as an explicit demo override.
+  const launcherStyle = getComputedStyle(launcher);
+  const rect = launcher.getBoundingClientRect();
+  const launcherReachable = isHostPartReachable({
+    display: launcherStyle.display,
+    visibility: launcherStyle.visibility,
+    opacity: launcherStyle.opacity,
+    pointerEvents: launcherStyle.pointerEvents,
+    clipPath: launcherStyle.clipPath,
+    clip: launcherStyle.clip,
+    rect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+  });
+  if (state !== "recovery" && launcherReachable) recoveryLayer.remove();
+  else recoveryPopover.showPopover?.();
+
+  const line = document.createElement("p");
+  line.innerHTML = `<span class="${decorationVisible["host.watermark"] ? "ws-ok" : "ws-hidden"}">watermark ${decorationVisible["host.watermark"] ? "visible" : "hidden"}</span> · <span class="${decorationVisible["host.hint"] ? "ws-ok" : "ws-hidden"}">hint ${decorationVisible["host.hint"] ? "visible" : "hidden"}</span> · <span class="${launcherReachable ? "ws-ok" : "ws-hidden"}">launcher ${launcherReachable ? "themed" : "hidden"}</span>`;
+  legend.append(line);
+  const note = document.createElement("p");
+  note.innerHTML = '<span class="ws-ok">✓</span> authorization / recovery / audio dock still present';
+  legend.append(note);
+
+  if (state === "recovery") {
+    setLibraryOpen(true);
+    recovery.classList.add("ws-entry-marker");
+  }
+  if (state === "icons") {
+    document.querySelectorAll('[data-ws-icon-slot]').forEach((slot) => slot.closest("button")?.classList.add("ws-entry-marker"));
+  }
+  window.__previewReady = true;
+} catch (error) {
+  status.textContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+  status.className = "ws-hidden";
+  window.__previewError = String(error);
+  window.__previewReady = true;
+}
+</script>
+</body>
+</html>

@@ -105,15 +105,19 @@ test("all public skin parts are documented and the admin console is outside skin
   const [components, adminComponents] = await Promise.all([
     componentSources("../components/web-client/"), componentSources("../components/admin/"),
   ]);
-  const [webClient, demo, skinSwitcher, languageSwitcher, admin, documentation] = await Promise.all([
+  const [webClient, demo, skinSwitcher, languageSwitcher, hostChrome, pluginPanel, authorization, recoveryNotice, admin, documentation] = await Promise.all([
     readFile(new URL("../views/WebClient.vue", import.meta.url), "utf8"),
     readFile(new URL("../views/DemoView.vue", import.meta.url), "utf8"),
     readFile(new URL("../components/SkinSwitcher.vue", import.meta.url), "utf8"),
     readFile(new URL("../components/LanguageSwitcher.vue", import.meta.url), "utf8"),
+    readFile(new URL("../components/HostChrome.vue", import.meta.url), "utf8"),
+    readFile(new URL("../components/PluginPanel.vue", import.meta.url), "utf8"),
+    readFile(new URL("../components/InstanceAuthorization.vue", import.meta.url), "utf8"),
+    readFile(new URL("../components/SkinLoadRecoveryNotice.vue", import.meta.url), "utf8"),
     readFile(new URL("../views/AdminView.vue", import.meta.url), "utf8"),
     readFile(new URL("../../../docs/SKIN_DEVELOPMENT.md", import.meta.url), "utf8"),
   ]);
-  const publicParts = new Set([...`${webClient}\n${components}\n${demo}\n${skinSwitcher}\n${languageSwitcher}`.matchAll(/data-ws-part="([^"]+)"/g)].map((match) => match[1]));
+  const publicParts = new Set([...`${webClient}\n${components}\n${demo}\n${skinSwitcher}\n${languageSwitcher}\n${hostChrome}\n${pluginPanel}\n${authorization}\n${recoveryNotice}`.matchAll(/data-ws-part="([^"]+)"/g)].map((match) => match[1]));
   for (const part of publicParts) assert.ok(documentation.includes(`\`${part}\``), `Undocumented skin part: ${part}`);
   assert.match(skinSwitcher, /data-ws-skin-id/);
   assert.match(skinSwitcher, /data-ws-state/);
@@ -1097,3 +1101,73 @@ function makeSkinV4(
   const bytes = zipSync(packageFiles);
   return new File([bytes.slice().buffer as ArrayBuffer], "skin-v4.wskin", { type: "application/octet-stream" });
 }
+
+function makeChromeSkin(
+  chrome: unknown,
+  options: { schemaVersion?: number; css?: string; icons?: Record<string, Uint8Array>; manifestChanges?: Record<string, unknown> } = {},
+): File {
+  const schemaVersion = options.schemaVersion ?? 3;
+  const icons = options.icons ?? { "assets/icons/language.png": new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]) };
+  const packageFiles: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify({
+      ...manifest,
+      schemaVersion,
+      ...(schemaVersion >= 3 ? { packageType: "open-skin" } : {}),
+      chrome: "chrome.json",
+      ...options.manifestChanges,
+    })),
+    "skin.css": strToU8(options.css ?? '[data-ws-part="host.plugins.launcher"] { background: #1d4f9c; }'),
+    "chrome.json": strToU8(JSON.stringify(chrome)),
+    ...icons,
+  };
+  const bytes = zipSync(packageFiles);
+  return new File([bytes.slice().buffer as ArrayBuffer], "skin-chrome.wskin", { type: "application/octet-stream" });
+}
+
+test("open skins can theme host chrome and declare hidden parts plus bitmap icon overrides", async () => {
+  const skin = await importSkinPack(makeChromeSkin({
+    schemaVersion: 1,
+    hiddenParts: ["host.watermark", "host.hint"],
+    icons: { "language.trigger": "assets/icons/language.png" },
+  }));
+  assert.deepEqual(skin.chromeData?.hiddenParts, ["host.watermark", "host.hint"]);
+  assert.equal(skin.chrome, "chrome.json");
+  assert.match(skin.css, /:root\[data-ws-host-skin="ocean-night"\] \[data-ws-part="host\.plugins\.launcher"\]/);
+  assert.match(skin.css, /:root\[data-ws-host-skin="ocean-night"\] \[data-ws-part="host\.watermark"\] \{ display: none !important; \}/);
+  assert.match(skin.css, /\[data-ws-icon-slot="language\.trigger"\] \{ background-image: url\("wskin-asset:assets%2Ficons%2Flanguage\.png"\)/);
+  const resolved = resolveSkinCssAssets(skin.css, skin.assets);
+  assert.match(resolved.css, /blob:/);
+  resolved.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+});
+
+test("chrome.json rejects protected hidden parts, unsafe icon paths, oversized bitmaps and old schema versions", async () => {
+  const protectedPart = makeChromeSkin({ schemaVersion: 1, hiddenParts: ["voice.audio-dock"], icons: { "language.trigger": "assets/icons/language.png" } });
+  await assert.rejects(importSkinPack(protectedPart), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_CHROME_HIDDEN_INVALID");
+
+  const badPath = makeChromeSkin({ schemaVersion: 1, icons: { "language.trigger": "../icons/language.png" } });
+  await assert.rejects(importSkinPack(badPath), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_ICON_PATH");
+
+  const missingIcon = makeChromeSkin({ schemaVersion: 1, icons: { "language.trigger": "assets/icons/missing.png" } }, { icons: {} });
+  await assert.rejects(importSkinPack(missingIcon), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_ICON_MISSING");
+
+  const oversized = makeChromeSkin({ schemaVersion: 1, icons: { "language.trigger": "assets/icons/language.png" } }, {
+    icons: { "assets/icons/language.png": new Uint8Array(64 * 1024 + 1) },
+  });
+  await assert.rejects(importSkinPack(oversized), (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_ICON_SIZE");
+
+  await assert.rejects(importSkinPack(makeChromeSkin({ schemaVersion: 1 }, { schemaVersion: 1 })),
+    (error: unknown) => error instanceof SkinPackError);
+  await assert.rejects(importSkinPack(makeChromeSkin({ schemaVersion: 1 }, { schemaVersion: 2 })),
+    (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_MANIFEST_INVALID");
+});
+
+test("open skin CSS cannot escape the host scope or hide essential controls", async () => {
+  await assert.rejects(
+    importSkinPack(makeChromeSkin({ schemaVersion: 1 }, { css: 'html [data-ws-part="host.watermark"] { color: red; }' })),
+    (error: unknown) => error instanceof SkinPackError && /cannot target html or body/.test(error.message),
+  );
+  await assert.rejects(
+    importSkinPack(makeChromeSkin({ schemaVersion: 1 }, { css: '[data-ws-part="voice.audio-dock"] { display: none; }' })),
+    (error: unknown) => error instanceof SkinPackError && /must remain available/.test(error.message),
+  );
+});

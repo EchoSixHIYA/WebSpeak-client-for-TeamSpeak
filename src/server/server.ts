@@ -21,6 +21,7 @@ import { resolveVisitorTotal } from "./visitor-count.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import { PluginRuntime } from "../plugins/runtime.js";
 import { createPluginRuntimeRouter } from "../plugins/runtime-router.js";
+import { parseHiddenHostParts } from "../shared/skin-chrome.js";
 
 export interface WebServerOptions {
   port: number;
@@ -123,6 +124,9 @@ export function createWebServer(options: WebServerOptions): WebServer {
       ...(visitorTotal === null ? {} : { visitorTotal }),
       accelerationAvailable: acceleration.length > 0,
       accelerationRelays: acceleration.map((relay) => ({ id: relay.id, name: relay.name })),
+      // Instance-level default for non-critical host decorations. Unknown or
+      // protected names are ignored by the shared validator.
+      hiddenHostParts: parseHiddenHostParts(process.env.WEBSPEAK_HOST_CHROME_HIDDEN_PARTS),
     });
   });
 

@@ -259,15 +259,16 @@
         data-ws-part="home.footer"
       >
         <div class="ws-skin-mount-slot" data-ws-skin-mount="home.footer.before"></div>
-        <span>WebSpeak</span><span class="footer-separator">·</span
-        ><span>{{ t("teamSpeakClient") }}</span
+        <span data-ws-part="home.footer.decoration">WebSpeak</span><span class="footer-separator" data-ws-part="home.footer.decoration">·</span
+        ><span data-ws-part="home.footer.decoration">{{ t("teamSpeakClient") }}</span
         ><span class="footer-spacer"></span
         ><button
           type="button"
           class="clear-local-button"
+          data-ws-part="home.footer.clear"
           @click="clearBrowserData"
           >{{ t("clearLocalData") }}</button
-        ><span class="footer-separator">·</span><span>{{ t("browserSupport") }}</span>
+        ><span class="footer-separator" data-ws-part="home.footer.decoration">·</span><span data-ws-part="home.footer.decoration">{{ t("browserSupport") }}</span>
       </footer>
 
       <!-- QQ community modal -->
@@ -871,6 +872,7 @@
     </div>
 
     <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" />
+    <HostChrome :language="language" :connected="voiceState.connected" />
     <IdentityImportDialog
       v-if="identityImportOpen"
       v-model="identityImportText"
@@ -1004,6 +1006,7 @@ import { useWebClientChannels, type TreeChannel } from "../composables/useWebCli
 import { useWebClientConnection } from "../composables/useWebClientConnection.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import PluginPanel from "../components/PluginPanel.vue";
+import HostChrome from "../components/HostChrome.vue";
 import InstanceAuthorization from '../components/InstanceAuthorization.vue';
 import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
 import { useWebClientScreenShare } from "../composables/useWebClientScreenShare.js";
