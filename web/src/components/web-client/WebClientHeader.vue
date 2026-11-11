@@ -92,6 +92,7 @@
         <Icon
           name="settings"
           :size="15"
+          data-ws-icon-slot="home.toolbar.settings"
         /><span>{{ t("adminConsole") }}</span>
       </a>
       <SkinSwitcher

@@ -1,6 +1,14 @@
 import { parseSkinWorkspacePolicy, type SkinWorkspacePolicy } from "../../../src/shared/skin-workspace.js";
 import { unzipSync } from "fflate";
 import { compileSkinCss as compileSharedSkinCss, rewriteSkinCssAssets, SkinCssValidationError } from "../../../src/shared/skin-css.js";
+import {
+  compileSkinChromeCss,
+  parseSkinChromeDocument,
+  SKIN_CHROME_MAX_BYTES,
+  SkinChromeError,
+  validateSkinChromeAssets,
+  type SkinChromeDocument,
+} from "../../../src/shared/skin-chrome.js";
 
 import { parseSkinLayoutJson, type SkinLayoutDocument } from "../../../src/shared/skin-layout.js";
 import { listSkinPluginAssetPaths, parseSkinPluginJson, type SkinPluginDocument } from "../../../src/shared/skin-plugin.js";
@@ -39,6 +47,7 @@ export interface SkinManifest {
   content?: string;
   components?: string;
   plugins?: string;
+  chrome?: string;
   workspace?: SkinWorkspacePolicy;
   minAppVersion: string;
   preview?: string;
@@ -75,6 +84,7 @@ export interface InstalledSkin extends SkinManifest {
   runtimePluginFiles?: Record<string, Blob>;
   runtimePluginStyles?: Record<string, string>;
   previewBlob?: Blob;
+  chromeData?: SkinChromeDocument;
   warnings: string[];
   installedAt: number;
 }
@@ -145,7 +155,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
   const assets: Record<string, Blob> = Object.create(null) as Record<string, Blob>;
   const runtimePluginPaths = runtimePlugins ? listSkinRuntimePluginFilePaths(runtimePlugins) : [];
   const runtimePluginPathSet = new Set(runtimePluginPaths.map((path) => path.toLowerCase()));
-  const manifestPathSet = ["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins, manifest.preview]
+  const manifestPathSet = ["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins, manifest.chrome, manifest.preview]
     .filter((path): path is string => Boolean(path)).map((path) => path.toLowerCase());
   if (runtimePluginPaths.some((path) => manifestPathSet.includes(path))) {
     throw new SkinPackError("Plugin files cannot reuse skin manifest, CSS, content, component, or preview paths.", "SKIN_RUNTIME_PLUGIN_FILE_DUPLICATE");
@@ -184,7 +194,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
   }
 
   for (const [path, bytes] of files) {
-    if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins].includes(path)
+    if (["manifest.json", manifest.entry, manifest.layout, manifest.content, manifest.components, manifest.plugins, manifest.chrome].includes(path)
       || runtimePluginPathSet.has(path.toLowerCase())) continue;
     const mimeType = assetMimeType(path);
     if (!mimeType) throw new SkinPackError(`Unsupported package file: ${path}`, "SKIN_FILE_UNSUPPORTED");
@@ -233,6 +243,26 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     catch (error) { throw new SkinPackError("layout.json is invalid: " + (error instanceof Error ? error.message : "unknown layout error"), "SKIN_LAYOUT_INVALID"); }
   }
 
+  let chromeData: SkinChromeDocument | undefined;
+  if (manifest.chrome) {
+    const chromeBytes = files.get(manifest.chrome);
+    if (!chromeBytes || chromeBytes.byteLength > SKIN_CHROME_MAX_BYTES) {
+      throw new SkinPackError("chrome.json is missing or exceeds 32 KiB.", "SKIN_CHROME_SIZE");
+    }
+    try {
+      chromeData = parseSkinChromeDocument(decoder.decode(chromeBytes));
+      validateSkinChromeAssets(chromeData, (path) => {
+        const asset = assets[path];
+        return asset ? { bytes: asset.size, mime: asset.type } : undefined;
+      });
+    } catch (error) {
+      const chromeError = error instanceof SkinChromeError
+        ? error
+        : new SkinChromeError(error instanceof Error ? error.message : "Invalid chrome.json.", "SKIN_CHROME_INVALID");
+      throw new SkinPackError(chromeError.message, chromeError.code);
+    }
+  }
+
   let previewBlob: Blob | undefined;
   if (manifest.preview) {
     const previewBytes = files.get(manifest.preview);
@@ -248,9 +278,12 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     && runtimePlugins?.plugins.some((plugin) => plugin.mode === "surface" && plugin.page === component.page));
   if (hasConflictingSurface) throw new SkinPackError("A page cannot declare both a v3 and v4 surface.", "SKIN_PLUGIN_SURFACE_DUPLICATE");
 
+  // Host-owned additions are appended after author CSS so they win ties, and
+  // use wskin-asset markers resolved by resolveSkinCssAssets at activation.
+  const chromeCss = chromeData ? compileSkinChromeCss(chromeData, manifest.id) : "";
   return {
     ...manifest,
-    css: compiled.css,
+    css: chromeCss ? `${compiled.css}\n${chromeCss}` : compiled.css,
     assets,
     contentData,
     layoutData,
@@ -259,6 +292,7 @@ export async function importSkinPack(file: File): Promise<InstalledSkin> {
     runtimePluginFiles,
     runtimePluginStyles,
     previewBlob,
+    ...(chromeData ? { chromeData } : {}),
     warnings: [...compiled.warnings, ...runtimePluginWarnings],
     installedAt: Date.now(),
   };
@@ -407,7 +441,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) throw new SkinPackError("This skin package version is not supported.", "SKIN_SCHEMA_VERSION");
   if (schemaVersion >= 2) {
     const fields = new Set(["schemaVersion", "packageType", "id", "name", "version", "author", "license", "description", "entry", "layout", "permissions", "content", "minAppVersion", "preview"]);
-    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); fields.add("workspace"); }
+    if (schemaVersion >= 3) { fields.delete("permissions"); fields.add("components"); fields.add("workspace"); fields.add("chrome"); }
     if (schemaVersion === 4) fields.add("plugins");
     const unknown = Object.keys(raw).find((key) => !fields.has(key));
     if (unknown) throw new SkinPackError(`Version 2 skin manifest contains an unsupported field: ${unknown}.`, "SKIN_MANIFEST_INVALID");
@@ -427,8 +461,8 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   if (schemaVersion === 4 && raw.packageType !== "open-skin") {
     throw new SkinPackError("Version 4 skin packages must declare the open-skin type.", "SKIN_MANIFEST_INVALID");
   }
-  if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined || raw.components !== undefined || raw.plugins !== undefined)) {
-    throw new SkinPackError("Version 1 skin packages cannot declare layout or plugin fields.", "SKIN_SCHEMA_VERSION");
+  if (schemaVersion === 1 && (raw.layout !== undefined || raw.packageType !== undefined || raw.permissions !== undefined || raw.components !== undefined || raw.plugins !== undefined || raw.chrome !== undefined)) {
+    throw new SkinPackError("Version 1 skin packages cannot declare layout, chrome or plugin fields.", "SKIN_SCHEMA_VERSION");
   }
   let workspace: SkinWorkspacePolicy | undefined;
   try { workspace = parseSkinWorkspacePolicy(raw.workspace, schemaVersion); }
@@ -439,17 +473,18 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
   const layout = schemaVersion >= 2 ? stringField("layout", 120, schemaVersion === 2)! : undefined;
   const components = schemaVersion >= 3 ? stringField("components", 120, false) : undefined;
   const plugins = schemaVersion === 4 ? stringField("plugins", 120)! : undefined;
+  const chrome = schemaVersion >= 3 ? stringField("chrome", 120, false) : undefined;
   const content = stringField("content", 120, false);
   const preview = stringField("preview", 120, false);
-  for (const path of [entry, layout, content, components, plugins, preview].filter((item): item is string => Boolean(item))) {
+  for (const path of [entry, layout, content, components, plugins, chrome, preview].filter((item): item is string => Boolean(item))) {
     if (path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === "..")) throw new SkinPackError(`manifest.json has an unsafe path: ${path}`, "SKIN_PATH_INVALID");
   }
   const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
   const version = stringField("version", 32)!;
   const minAppVersion = stringField("minAppVersion", 32)!;
   if (!semver.test(version) || !semver.test(minAppVersion)) throw new SkinPackError("Skin and minimum app versions must use semantic version format.", "SKIN_MANIFEST_INVALID");
-  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (components && !components.toLowerCase().endsWith(".json")) || (plugins && !plugins.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The CSS entry, layout, content, plugin, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
-  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(components ? [components] : []), ...(plugins ? [plugins] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
+  if (!entry.toLowerCase().endsWith(".css") || (layout && !layout.toLowerCase().endsWith(".json")) || (content && !content.toLowerCase().endsWith(".json")) || (components && !components.toLowerCase().endsWith(".json")) || (plugins && !plugins.toLowerCase().endsWith(".json")) || (chrome && !chrome.toLowerCase().endsWith(".json")) || (preview && !assetMimeType(preview)?.startsWith("image/"))) throw new SkinPackError("The CSS entry, layout, content, chrome, plugin, or preview path is invalid.", "SKIN_MANIFEST_INVALID");
+  const declaredFiles = ["manifest.json", entry, ...(layout ? [layout] : []), ...(content ? [content] : []), ...(components ? [components] : []), ...(plugins ? [plugins] : []), ...(chrome ? [chrome] : []), ...(preview ? [preview] : [])].map((item) => item.toLowerCase());
   if (new Set(declaredFiles).size !== declaredFiles.length) throw new SkinPackError("Manifest files must use separate package paths.", "SKIN_MANIFEST_INVALID");
   return {
     schemaVersion,
@@ -465,6 +500,7 @@ function parseManifest(bytes: Uint8Array): SkinManifest {
     content,
     components,
     plugins,
+    chrome,
     minAppVersion,
     ...(workspace ? { workspace } : {}),
     preview,

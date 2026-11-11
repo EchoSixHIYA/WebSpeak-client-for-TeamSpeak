@@ -59,12 +59,14 @@
   </div>
   <SkinLoadRecoveryNotice :error="skinLoadError" :language="language" @use-built-in="switchToBuiltInAfterLoadError" />
   <InstanceAuthorization :language="language" />
+  <HostChrome :language="language" />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
 import InstanceAuthorization from '../components/InstanceAuthorization.vue';
+import HostChrome from '../components/HostChrome.vue';
 import "../styles/skin-plugin.css";
 import SkinPluginOutlet from "../components/SkinPluginOutlet.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.vue";

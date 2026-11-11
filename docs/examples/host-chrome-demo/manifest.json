@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "packageType": "open-skin",
+  "id": "community.host-chrome-demo",
+  "name": "Host Chrome Demo",
+  "version": "1.0.0",
+  "author": "WebSpeak Project",
+  "license": "AGPL-3.0-only",
+  "description": "Minimal open skin demonstrating host chrome theming, declarative hiding and bitmap icon overrides.",
+  "entry": "skin.css",
+  "chrome": "chrome.json",
+  "minAppVersion": "0.3.0"
+}

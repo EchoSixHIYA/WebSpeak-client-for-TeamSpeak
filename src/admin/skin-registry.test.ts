@@ -449,3 +449,55 @@ function crc32(bytes: Buffer): number {
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
+
+test("the registry validates chrome.json hidden parts and icon bitmaps without executing skin code", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "webspeak-skin-chrome-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const registry = new SkinRegistry(directory);
+  const chromeManifest = {
+    ...manifest,
+    schemaVersion: 3,
+    packageType: "open-skin",
+    content: undefined,
+    preview: undefined,
+    chrome: "chrome.json",
+  };
+  const chrome = (hiddenParts: string[], iconPath = "assets/icons/language.png") => JSON.stringify({
+    schemaVersion: 1,
+    hiddenParts,
+    icons: { "language.trigger": iconPath },
+  });
+  const goodFiles: Array<[string, Buffer]> = [
+    ["manifest.json", Buffer.from(JSON.stringify(chromeManifest))],
+    ["skin.css", Buffer.from('[data-ws-part="host.plugins.launcher"] { color: teal; }')],
+    ["chrome.json", Buffer.from(chrome(["host.watermark", "host.hint"]))],
+    ["assets/icons/language.png", Buffer.from([137, 80, 78, 71, 1, 2, 3])],
+  ];
+  const saved = await registry.save(createZip(goodFiles), "sample-skin");
+  assert.equal((saved as unknown as { chrome?: string }).chrome, "chrome.json");
+
+  const protectedChrome = [...goodFiles];
+  protectedChrome[2] = ["chrome.json", Buffer.from(chrome(["voice.audio-dock"]))];
+  await assert.rejects(registry.save(createZip(protectedChrome), "sample-skin"),
+    (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_CHROME_HIDDEN_INVALID");
+
+  const missingIcon = goodFiles.filter(([name]) => name !== "assets/icons/language.png");
+  await assert.rejects(registry.save(createZip(missingIcon), "sample-skin"),
+    (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_ICON_MISSING");
+
+  const badIconPath = [...goodFiles];
+  badIconPath[2] = ["chrome.json", Buffer.from(chrome(["host.hint"], "../../escape.png"))];
+  await assert.rejects(registry.save(createZip(badIconPath), "sample-skin"),
+    (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_ICON_PATH");
+
+  const oversizedIcon = [...goodFiles];
+  oversizedIcon[3] = ["assets/icons/language.png", Buffer.alloc(64 * 1024 + 1)];
+  await assert.rejects(registry.save(createZip(oversizedIcon), "sample-skin"),
+    (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_ICON_SIZE");
+
+  // v1/v2 packages cannot declare host chrome options.
+  const legacy = [...goodFiles];
+  legacy[0] = ["manifest.json", Buffer.from(JSON.stringify({ ...manifest, content: undefined, preview: undefined, chrome: "chrome.json" }))];
+  await assert.rejects(registry.save(createZip(legacy), "sample-skin"),
+    (error: unknown) => error instanceof SkinRegistryError && error.code === "SKIN_SCHEMA_VERSION");
+});

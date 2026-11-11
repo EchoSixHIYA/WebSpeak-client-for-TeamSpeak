@@ -4,6 +4,7 @@ import { listInstalledSkins, loadLocalPreferences, saveLocalPreferences } from "
 import { BUILTIN_SKIN_CATALOG, getPublicDefaultSkinId, isPublicSkinEnabled, listPublicSkins, type SkinCatalogEntry } from "../services/skin-catalog.js";
 import { activateSkin, BUILTIN_DARK_SKIN, BUILTIN_LIGHT_SKIN, clearCustomSkinStyle, getStoredSkinId } from "../services/skin-runtime.js";
 import { createSkinOperation } from "../services/skin-operation.js";
+import { setSkinHostChromeParts, setHostChromeActiveSkin, hostBuiltInSkinRequests } from "../services/host-chrome.js";
 import { getStoredTheme, isDarkTheme, saveTheme, type ThemeMode } from "../services/theme.js";
 import type { InstalledSkin } from "../services/skin-pack.js";
 
@@ -36,6 +37,14 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     return current = createSkinOperation({ timeoutMs: options.timeoutMs });
   }
   onScopeDispose(() => { disposed = true; cancel(); });
+  // Host decorations depend on the active skin's chrome.json opt-in. Built-in
+  // skins leave `activeSkin` empty, which keeps host chrome hidden by default.
+  // Only `visibleParts` opts in: chrome.json hiddenParts/icons generate host
+  // CSS containing `data-ws-part="host.…"`, so inspecting the combined stylesheet
+  // would wrongly treat every hiddenParts-only pack as host-chrome themed.
+  watch(activeSkin, (skin) => setSkinHostChromeParts(skin?.chromeData), { immediate: true, flush: "sync" });
+  // The recovery affordance is persistent while a non-bundled skin is applied.
+  watch(activeSkinId, (id) => setHostChromeActiveSkin(id), { immediate: true, flush: "sync" });
 
   async function apply(id: string, operation: ReturnType<typeof createSkinOperation>, persist = true, updateTheme = false, clearLoadError = true) {
     operation.check();
@@ -133,6 +142,10 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     skinReady.value = true;
     void select(fallbackId());
   }, { flush: 'sync' });
+  // Host-owned recovery's guaranteed action: reset to the built-in skin. It is
+  // independent of the skinnable plugin overlay, so it also works when that
+  // overlay is hidden with `display: none`.
+  watch(hostBuiltInSkinRequests, () => { if (!disposed) void switchToBuiltIn(); }, { flush: 'sync' });
   return { activeSkin, activeSkinId, skinReady, skinLoadError,
     installedSkins: computed(() => installedSkins.value.filter(skin => canUseSkin(skin.id))),
     catalogSkins: computed(() => catalogSkins.value.filter(skin => canUseSkin(skin.id))),

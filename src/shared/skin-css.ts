@@ -1,6 +1,14 @@
 import postcss, { type AtRule, type Declaration, type Node, type Rule } from "postcss";
 import selectorParser from "postcss-selector-parser";
 import valueParser from "postcss-value-parser";
+import {
+  DECORATIVE_PART_IDS as OPTIONAL_VISUAL_PARTS,
+  HOST_CHROME_PART_IDS,
+  HOST_SKIN_ATTRIBUTE,
+  PROTECTED_PART_IDS,
+} from "./skin-visual-parts.js";
+
+export { OPTIONAL_VISUAL_PARTS };
 
 export type SkinCssSchemaVersion = 1 | 2 | 3 | 4;
 export type SkinCssAssets = Readonly<Record<string, unknown>> | Map<string, unknown> | Set<string>;
@@ -36,25 +44,55 @@ const LAYOUT_AFFECTING_PROPERTIES = new Set([
   "writing-mode", "direction", "unicode-bidi", "vertical-align", "appearance", "zoom", "scrollbar-gutter", "touch-action", "user-select", "cursor", "content",
   "position-anchor", "position-area", "position-try-fallbacks", "position-try-order", "anchor-name", "anchor-scope",
 ]);
-const OPTIONAL_VISUAL_PARTS = new Set([
-  "home.hero.eyebrow",
-  "home.gateway-status",
-  "home.features",
-  "home.feature",
-  "home.visitors",
-  "home.join-card.waveform",
-  "home.join-card.sonar",
-  "voice.activity-heading",
-  "voice.member.avatar",
-  "voice.member.live-indicator",
-  "voice.member-row.avatar",
-  "voice.screen-player.viewer-avatar",
-  "voice.screen-player.live",
-  "demo.badge",
-  "demo.wave",
-  "demo.avatar",
-  "demo.member-status",
-  "demo.note",
+/**
+ * Properties that let a skin move a host-chrome part into a viewport-sized
+ * overlay or out from under the host's own layout. Appearance properties
+ * (colors, borders, radius, shadows, artwork) stay available.
+ */
+const HOST_CHROME_LOCKED_PROPERTIES = new Set([
+  "all", "position", "top", "right", "bottom", "left", "inset", "inset-block", "inset-inline",
+  "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end",
+  "z-index", "transform", "translate", "scale", "rotate", "zoom", "float", "clear",
+  "clip", "clip-path", "mask", "mask-image", "perspective", "contain",
+]);
+/**
+ * The plugin library shell additionally owns its footprint: without a locked
+ * size a skin could still stretch it over the recovery entry even though
+ * `position`/`inset`/`z-index` are frozen.
+ */
+const HOST_OVERLAY_LOCKED_PROPERTIES = new Set([
+  ...HOST_CHROME_LOCKED_PROPERTIES,
+  "width", "height", "min-width", "min-height", "max-width", "max-height",
+  "inline-size", "block-size", "min-inline-size", "min-block-size", "max-inline-size", "max-block-size",
+  "aspect-ratio", "margin", "margin-block", "margin-inline", "margin-block-start", "margin-block-end",
+  "margin-inline-start", "margin-inline-end",
+]);
+/** Properties whose indirect values could smuggle a hidden or moved control past the static checks. */
+const INDIRECT_VALUE_PROPERTIES = new Set([
+  "all", "display", "visibility", "opacity", "pointer-events", "clip-path", "mask", "mask-image",
+  "position", "top", "right", "bottom", "left", "inset",
+  "inset-block", "inset-inline", "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end",
+  "transform", "translate", "scale", "rotate", "zoom",
+  // Margins move a subject just like insets do; a variable could resolve to a
+  // viewport-sized negative value, so protected controls may not use them.
+  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+  "margin-block", "margin-block-start", "margin-block-end",
+  "margin-inline", "margin-inline-start", "margin-inline-end",
+]);
+/** Attributes a skin author must never use to reach outside the public hooks. */
+const FORBIDDEN_SCOPE_ATTRIBUTES = new Set([
+  HOST_SKIN_ATTRIBUTE,
+  "data-ws-skin",
+  "data-ws-route",
+  "data-theme",
+  "data-ws-hidden-host-parts",
+  // Host-owned recovery layer internals. They are deliberately not skin hooks,
+  // and naming them keeps `:root [data-ws-host-layer]` / mixed selectors from
+  // opting into the element by attribute.
+  "data-ws-host-layer",
+  "data-ws-host-recovery",
+  "data-ws-host-layer-content",
+  "data-ws-recovery-action",
 ]);
 export function compileSkinCss(source: string, id: string, assets: SkinCssAssets, schemaVersion: SkinCssSchemaVersion, pluginId?: string): { css: string; warnings: string[] } {
   const size = new TextEncoder().encode(source).byteLength;
@@ -67,6 +105,12 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
   const scope = pluginId
     ? `${skinScope} .ws-plugin-component[data-ws-runtime-plugin="${pluginId}"]`
     : skinScope;
+  // Host chrome is Teleported outside `.ws-skin-root`. Rules that target only
+  // registered host parts use a second, document-level scope anchored to an
+  // attribute the host sets while this exact skin is active. Author CSS never
+  // names html/body: the host generates the scope itself.
+  const hostSkinScope = `:root[${HOST_SKIN_ATTRIBUTE}="${id}"]`;
+  const hostScopeNodes = selectorParser().astSync(hostSkinScope).first!.nodes.map((node) => node.clone());
   const namespace = `ws-${id.replace(/[^a-z0-9_-]/gi, "-")}${pluginId ? `-${pluginId}` : ""}`;
   const scopeNodes = selectorParser().astSync(scope).first!.nodes.map((node) => node.clone());
   const warnings = new Set<string>();
@@ -117,12 +161,15 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
           const text = selector.toString().trim();
           if (!text) throw new SkinCssValidationError("Empty selectors are not allowed.", "SKIN_CSS_SELECTOR");
           if (/:global\s*\(|:host(?:-context)?\b/i.test(text)) throw new SkinCssValidationError("Shadow and global escape selectors are not allowed.", "SKIN_CSS_SELECTOR");
+          const hostScope = assertHostChromeSelector(text, schemaVersion, Boolean(pluginId));
+          const activeScope = hostScope ? hostSkinScope : scope;
+          const activeNodes = hostScope ? hostScopeNodes : scopeNodes;
           if (/^:root\b/.test(text)) {
-            selector.replaceWith(selectorParser().astSync(text.replace(/^:root\b/, scope)).first!.clone());
+            selector.replaceWith(selectorParser().astSync(text.replace(/^:root\b/, activeScope)).first!.clone());
             return;
           }
           selector.prepend(selectorParser.combinator({ value: " " }));
-          for (let index = scopeNodes.length - 1; index >= 0; index -= 1) selector.prepend(scopeNodes[index].clone());
+          for (let index = activeNodes.length - 1; index >= 0; index -= 1) selector.prepend(activeNodes[index].clone());
         });
       }).processSync(rule.selector);
     } catch (error) {
@@ -157,6 +204,7 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
 
   root.walkDecls((declaration: Declaration) => {
     const property = decodeCssEscapes(declaration.prop).toLowerCase();
+    const unprefixedProperty = property.replace(/^-(?:webkit|moz|ms|o)-/, "");
     const value = declaration.value.trim();
     const decodedValue = decodeCssEscapes(value);
     const owningRule = findOwningRule(declaration);
@@ -164,6 +212,16 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     const canHideTarget = owningRule
       ? hideableRules.has(owningRule) || Boolean(keyframesRule && optionalOnlyKeyframes.has(keyframesRule.params.trim()))
       : false;
+    // Trusted UI and essential audio/recovery controls stay available even for
+    // open skins. The host also draws authorization and recovery UI outside the
+    // skin root, so a container-level hide cannot remove them either.
+    const protectedTarget = owningRule && !keyframesRule ? selectorSubjectProtectedPart(owningRule.selector) : null;
+    // Every themeable host part referenced anywhere in the selector. A rule may
+    // target a descendant of the overlay (for example with `*`), so the subject
+    // alone is not enough to decide whether host chrome layout is at stake.
+    const hostChromeParts = owningRule && !keyframesRule ? selectorHostChromeParts(owningRule.selector) : [];
+    const inHostChromeScope = hostChromeParts.length > 0;
+    const inOverlayScope = hostChromeParts.includes("host.plugins.overlay");
     if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)
       && !(pluginId && property.startsWith(`--plugin-${pluginId}-`))) {
       throw declaration.error(pluginId
@@ -173,13 +231,26 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     if (schemaVersion < 3 && isLayoutAffectingProperty(property)) {
       throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");
     }
+    // Host chrome lives outside the skin root and owns its own placement. A
+    // skin may repaint it (colors, borders, radius, artwork) but must not turn
+    // it — or any of its descendants — into a viewport-sized overlay above
+    // authorization/recovery UI.
+    if (inHostChromeScope && HOST_CHROME_LOCKED_PROPERTIES.has(unprefixedProperty)) {
+      throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition or restack host controls.");
+    }
+    if (inOverlayScope && HOST_OVERLAY_LOCKED_PROPERTIES.has(unprefixedProperty)) {
+      throw declaration.error("The application library shell cannot be resized into a fullscreen overlay; theme its colors, borders, radius and artwork instead.");
+    }
     if (property === "font-family") warnings.add("Custom fonts can change localized text wrapping; verify every WebSpeak language before publishing.");
     if (["behavior", "-moz-binding"].includes(property) || /expression\s*\(|javascript\s*:|vbscript\s*:/i.test(decodedValue)) {
       throw declaration.error("Executable CSS values are not allowed.");
     }
     const compactValue = decodeCssEscapes(valueParser(value).nodes.filter((node) => node.type !== "space" && node.type !== "comment").map((node) => node.value ?? "").join("")).toLowerCase();
-    if (schemaVersion < 3 && ["display", "visibility", "opacity", "pointer-events", "clip-path", "mask", "mask-image"].includes(property) && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
-      if (!canHideTarget) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
+    if (INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
+      if (protectedTarget) {
+        throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
+      }
+      if (!canHideTarget && schemaVersion < 3) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
     }
     const removesVisual = property === "all"
       || (property === "display" && compactValue === "none")
@@ -188,16 +259,25 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
       || (property === "pointer-events" && compactValue === "none")
       || (property === "clip-path" && /inset\(\s*50%/.test(compactValue))
       || (property === "mask" && /(?:alpha\(0\)|luminance\(0\))/.test(compactValue));
+    if (removesVisual && protectedTarget) {
+      throw declaration.error(`The required control "${protectedTarget}" must remain available; permission, recovery and essential audio paths cannot be hidden.`);
+    }
     if (removesVisual && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be hidden or reset; required controls and their containers must remain available.");
     }
     const visuallyRemoves = (property === "transform" && /scale(?:3d)?\(\s*0(?:\s*[,)]|\s*\))/i.test(decodedValue))
       || (property === "clip-path" && /inset\(\s*50%/i.test(decodedValue))
       || (property === "filter" && /(?:opacity|brightness)\(\s*0(?:%|\s*[,)]|\s*\))/i.test(decodedValue));
+    if (visuallyRemoves && protectedTarget) {
+      throw declaration.error(`The required control "${protectedTarget}" must remain visible.`);
+    }
     if (visuallyRemoves && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be visually removed.");
     }
-    if (schemaVersion >= 3 && removesVisual) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
+    if (protectedTarget && valueMovesOffscreen(unprefixedProperty, decodedValue)) {
+      throw declaration.error(`The required control "${protectedTarget}" must remain on screen and reachable.`);
+    }
+    if (schemaVersion >= 3 && removesVisual && !protectedTarget) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
     if (/\bz-index\s*:\s*(?:[1-9]\d{4,}|-\d{4,})\b/i.test(`${property}:${decodedValue}`) || (property === "position" && decodedValue === "fixed")) warnings.add("Fixed positioning or extreme stacking may cover important controls; check the preview on desktop and mobile.");
     const withScopedNames = rewriteScopedNames(value, property, keyframeNames, fontFamilyNames);
     declaration.value = rewriteAssetUrls(withScopedNames, (assetPath) => {
@@ -250,6 +330,136 @@ function selectorUsesPublicHook(selector: string, allowCustomClasses = false): b
   }
 }
 
+/**
+ * A leading `:root` is rewritten in place to `.ws-skin-root[data-ws-skin=…]`.
+ * With a sibling combinator (`+` / `~`) that would select siblings of the
+ * skin root — for example the host-owned layer, which is a body child and a
+ * sibling of the skin root in the preview fixture. Skin scope must only apply
+ * to the root's own subtree, so reject that shape structurally. A leading
+ * `:root` followed by a descendant combinator (`:root [data-ws-part="…"]`)
+ * remains valid.
+ */
+function assertNoRootSiblingEscape(parsed: selectorParser.Root): void {
+  for (const item of parsed.nodes) {
+    const first = item.nodes[0];
+    if (!first || first.type !== "pseudo" || first.value.toLowerCase() !== ":root") continue;
+    const combinator = item.nodes.find((node) => node.type === "combinator");
+    if (combinator && (combinator.value === "+" || combinator.value === "~")) {
+      throw new SkinCssValidationError(
+        "Skin selectors cannot use a sibling combinator after :root; the scope must stay inside the skin root.",
+        "SKIN_CSS_SELECTOR",
+      );
+    }
+  }
+}
+
+/**
+ * Decide whether one selector of an author rule targets host chrome, and
+ * enforce the boundary around the extended document-level scope.
+ *
+ * Returns true when the compiled rule must use `:root[data-ws-host-skin=…]`.
+ * Author CSS can never name html/body or the host marker attribute itself; the
+ * host generates that anchor. Host parts are only available to open (v3/v4)
+ * skins and may not be mixed with page parts in the same selector.
+ */
+function assertHostChromeSelector(selector: string, schemaVersion: SkinCssSchemaVersion, isPluginStyle: boolean): boolean {
+  let parsed: selectorParser.Root;
+  try { parsed = selectorParser().astSync(selector); }
+  catch { throw new SkinCssValidationError("A CSS selector is invalid.", "SKIN_CSS_SELECTOR"); }
+  assertNoRootSiblingEscape(parsed);
+  const partNames: string[] = [];
+  parsed.walk((node) => {
+    if (node.type === "tag" && ["html", "body"].includes(node.value.toLowerCase())) {
+      throw new SkinCssValidationError("Skin selectors cannot target html or body elements.", "SKIN_CSS_SELECTOR");
+    }
+    if (node.type === "attribute" && FORBIDDEN_SCOPE_ATTRIBUTES.has(node.attribute.toLowerCase())) {
+      throw new SkinCssValidationError(`Skin selectors cannot reference the host attribute ${node.attribute}.`, "SKIN_CSS_SELECTOR");
+    }
+    if (node.type === "attribute" && node.attribute.toLowerCase() === "data-ws-part" && node.value) {
+      partNames.push(node.value.replace(/^['"]|['"]$/g, ""));
+    }
+  });
+  const hostParts = partNames.filter((part) => HOST_CHROME_PART_IDS.has(part));
+  const unknownHostParts = partNames.filter((part) => part.startsWith("host.") && !HOST_CHROME_PART_IDS.has(part));
+  if (unknownHostParts.length) {
+    throw new SkinCssValidationError(`Trusted or unknown host part cannot be styled: ${unknownHostParts[0]}.`, "SKIN_CSS_SELECTOR");
+  }
+  if (!hostParts.length) return false;
+  if (hostParts.length !== partNames.length) {
+    throw new SkinCssValidationError("Host chrome parts cannot be mixed with page parts in one selector.", "SKIN_CSS_SELECTOR");
+  }
+  if (isPluginStyle) throw new SkinCssValidationError("Plugin styles cannot target host chrome parts.", "SKIN_CSS_SELECTOR");
+  if (schemaVersion < 3) throw new SkinCssValidationError("Host chrome theming requires an open (schemaVersion 3 or 4) skin.", "SKIN_CSS_SELECTOR");
+  assertHostChromeSubject(parsed);
+  return true;
+}
+
+/**
+ * A host-scope rule is promoted to the document root. To keep that promotion
+ * from turning the root/html/body (or an arbitrary ancestor) into the rule's
+ * subject, every host-scope selector must be anchored on a themeable host part
+ * in its first compound and must never end in `:root`.
+ */
+function assertHostChromeSubject(parsed: selectorParser.Root): void {
+  for (const item of parsed.nodes) {
+    if (!item.nodes.length) continue;
+    const firstCombinator = item.nodes.findIndex((node) => node.type === "combinator");
+    if (firstCombinator === 0) {
+      throw new SkinCssValidationError("Host chrome rules must start from a themeable host part.", "SKIN_CSS_SELECTOR");
+    }
+    const firstCompound = firstCombinator === -1 ? item.nodes : item.nodes.slice(0, firstCombinator);
+    const anchored = firstCompound.some((node) => node.type === "attribute"
+      && node.attribute.toLowerCase() === "data-ws-part"
+      && HOST_CHROME_PART_IDS.has((node.value ?? "").replace(/^['"]|['"]$/g, "")));
+    if (!anchored) {
+      throw new SkinCssValidationError("Host chrome rules must start from a themeable [data-ws-part=\"host.…\"] selector; the document root cannot be themed or hidden.", "SKIN_CSS_SELECTOR");
+    }
+    let subjectStart = 0;
+    for (let index = item.nodes.length - 1; index >= 0; index -= 1) {
+      if (item.nodes[index].type === "combinator") { subjectStart = index + 1; break; }
+    }
+    for (let index = subjectStart; index < item.nodes.length; index += 1) {
+      const node = item.nodes[index];
+      if (node.type === "pseudo" && node.value.toLowerCase() === ":root") {
+        throw new SkinCssValidationError("Host chrome rules cannot make the document root the subject of a rule.", "SKIN_CSS_SELECTOR");
+      }
+    }
+  }
+}
+
+/** Find a protected part in the subject (last compound) of any selector in a rule. */
+function selectorSubjectProtectedPart(selector: string): string | null {
+  try {
+    const parsed = selectorParser().astSync(selector);
+    for (const item of parsed.nodes) {
+      let start = 0;
+      for (let index = item.nodes.length - 1; index >= 0; index -= 1) {
+        if (item.nodes[index].type === "combinator") { start = index + 1; break; }
+      }
+      for (let index = start; index < item.nodes.length; index += 1) {
+        const node = item.nodes[index];
+        if (node.type !== "attribute" || node.attribute.toLowerCase() !== "data-ws-part" || !node.value) continue;
+        const part = node.value.replace(/^['"]|['"]$/g, "");
+        if (PROTECTED_PART_IDS.has(part)) return part;
+      }
+    }
+  } catch { /* A malformed selector is rejected elsewhere. */ }
+  return null;
+}
+
+/** Find every themeable host part referenced by a selector, in any compound. */
+function selectorHostChromeParts(selector: string): string[] {
+  const parts: string[] = [];
+  try {
+    selectorParser().astSync(selector).walk((node) => {
+      if (node.type !== "attribute" || node.attribute.toLowerCase() !== "data-ws-part" || !node.value) return;
+      const part = node.value.replace(/^['"]|['"]$/g, "");
+      if (HOST_CHROME_PART_IDS.has(part) && !parts.includes(part)) parts.push(part);
+    });
+  } catch { /* A malformed selector is rejected elsewhere. */ }
+  return parts;
+}
+
 function isLayoutAffectingProperty(property: string): boolean {
   const unprefixed = property.replace(/^-(?:webkit|moz|ms|o)-/, "");
   if (LAYOUT_AFFECTING_PROPERTIES.has(unprefixed)) return true;
@@ -257,6 +467,62 @@ function isLayoutAffectingProperty(property: string): boolean {
   if (/^border(?:-|$)/.test(unprefixed) && !/^border-(?:color(?:-|$)|radius(?:-|$))/.test(unprefixed)) return true;
   if (/^(?:grid|flex|align-(?:content|items|self)|justify-(?:content|items|self)|place-(?:content|items|self)|offset|transform|overscroll|overflow|column)(?:-|$)/.test(unprefixed)) return true;
   return /^font-(?!family$|weight$|style$|synthesis$|palette$)/.test(unprefixed);
+}
+
+/**
+ * True when a positioning/margin/transform value can push a protected control
+ * off-screen. Thresholds are deliberately low: a protected control has a
+ * minimum 44 px hit target, so an offset of a hundred pixels is already enough
+ * to make it unreachable. Percentages and viewport units are compared against a
+ * full viewport/containing block.
+ */
+const OFFSET_PROPERTY_PATTERN = /^(?:margin|inset|left|right|top|bottom|translate|transform|scale|rotate)(?:-|$)/;
+const ABSOLUTE_OFFSET_LIMIT_PX = 100;
+const RELATIVE_OFFSET_LIMIT = 100;
+
+function absoluteLengthToPixels(magnitude: number, unit: string): number | null {
+  switch (unit) {
+    case "px": return magnitude;
+    case "rem": case "em": return magnitude * 16;
+    case "ex": case "rex": case "ch": return magnitude * 8;
+    case "cm": return magnitude * 37.8;
+    case "mm": return magnitude * 3.78;
+    case "q": return magnitude * 0.945;
+    case "in": return magnitude * 96;
+    case "pt": return magnitude * 1.333;
+    case "pc": return magnitude * 16;
+    default: return null;
+  }
+}
+
+function valueMovesOffscreen(property: string, value: string): boolean {
+  if (!OFFSET_PROPERTY_PATTERN.test(property)) return false;
+  let offscreen = false;
+  valueParser(value).walk((node) => {
+    if (node.type !== "word") return;
+    const match = /^(-?(?:\d+|\d*\.\d+))(px|rem|em|r?ex|ch|%|cm|mm|q|in|pt|pc|(?:s|l|d)?v(?:w|h|min|max)|cq(?:w|h|min|max|i|b))$/i.exec(node.value);
+    if (!match) return;
+    const magnitude = Math.abs(Number(match[1]));
+    const unit = match[2].toLowerCase();
+    if (unit === "%" || /^(?:s|l|d)?v(?:w|h|min|max)$/.test(unit) || /^cq(?:w|h|min|max|i|b)$/.test(unit)) {
+      if (magnitude >= RELATIVE_OFFSET_LIMIT) offscreen = true;
+      return;
+    }
+    const pixels = absoluteLengthToPixels(magnitude, unit);
+    if (pixels !== null && pixels >= ABSOLUTE_OFFSET_LIMIT_PX) offscreen = true;
+  });
+  // A matrix transform can smuggle a large translation in unitless numbers.
+  if (property === "transform") {
+    valueParser(value).walk((node) => {
+      if (node.type !== "function") return;
+      const name = node.value.toLowerCase();
+      if (name !== "matrix" && name !== "matrix3d") return;
+      const numbers = valueParser.stringify(node.nodes).split(",").map((item) => Number(item.trim()));
+      const translations = name === "matrix" ? [numbers[4], numbers[5]] : [numbers[12], numbers[13]];
+      if (translations.some((translation) => Number.isFinite(translation) && Math.abs(translation) >= ABSOLUTE_OFFSET_LIMIT_PX)) offscreen = true;
+    });
+  }
+  return offscreen;
 }
 
 function findOwningRule(node: Node): Rule | null {
