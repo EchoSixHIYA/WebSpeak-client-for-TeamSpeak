@@ -75,6 +75,21 @@ WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语�
 
 </details>
 
+<details>
+<summary>展开日间、夜间、ILLUSIA、KAAK 与 Discord Voice 皮肤预览</summary>
+
+| 日间 | 夜间 |
+| --- | --- |
+| ![日间皮肤](./screenshots/skin-day.png) | ![夜间皮肤](./screenshots/skin-night.png) |
+
+| ILLUSIA | KAAK |
+| --- | --- |
+| ![ILLUSIA 皮肤](./screenshots/skin-illusia.png) | ![KAAK 皮肤](./screenshots/skin-kaak.png) |
+
+![Discord Voice 社区皮肤](./screenshots/skin-discord.png)
+
+</details>
+
 <a id="deployment"></a>
 
 ## 部署与首次配置
@@ -342,6 +357,16 @@ relay.example.com {
 <a id="changelog"></a>
 
 ## 更新日志
+
+<a id="live-update-2026-11-13"></a>
+
+### 2026-11-13 · 在线演示更新
+
+- 修复 WebSocket 语音播放丢失声道信息和固定按 20 毫秒处理 Opus 包的问题，并在 WebRTC 下行混音中保留立体声。关联 #54。
+- 音频设置提供关闭、标准和强三档降噪。强档在浏览器降噪基础上使用 RNNoise。关联 #53。
+- 语音性能面板支持导出最近两分钟的连接与音频诊断。记录包括页面切换和麦克风状态，便于定位切到后台后语音中断的原因。后台采音仍受操作系统和浏览器限制。关联 #49、#55。
+- 插件入口移至语音工作区顶部工具栏。管理员可以将可用插件固定为快捷入口。关联 #56。
+- 支持有有效期的私密工作区邀请，恢复 KAAK 欢迎页，并补充五款皮肤的截图。
 
 <a id="latest-release-notes"></a>
 

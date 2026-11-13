@@ -21,6 +21,8 @@
 
 当前版本 / Current version: **[v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
 
+[在线演示更新 · 2026-11-13 / Live demo update](./docs/README.zh-CN.md#live-update-2026-11-13)
+
 ## 关于 WebSpeak · Overview
 
 WebSpeak 将 TeamSpeak 3 / TeamSpeak 6 带到浏览器：无需安装桌面客户端，即可加入语音频道、发送消息和分享屏幕。你可以自行部署网关，并通过网页后台管理服务器、访问策略、皮肤和运行数据。
@@ -51,7 +53,16 @@ Join voice channels, chat and share your screen from a browser. Deploy your own 
 <summary>更多界面与语言 · More screenshots & languages</summary>
 
 - [简体中文](./docs/README.zh-CN.md#screenshots) · [English](./docs/README.en.md#screenshots) · [Deutsch](./docs/README.de.md#screenshots) · [Русский](./docs/README.ru.md#screenshots) · [日本語](./docs/README.ja.md#screenshots)
-- 日间、夜间、ILLUSIA、KAAK 与社区皮肤 / Day, Night, ILLUSIA, KAAK and community skins
+
+| 日间 · Day | 夜间 · Night |
+| --- | --- |
+| ![日间皮肤 · Day skin](./docs/screenshots/skin-day.png) | ![夜间皮肤 · Night skin](./docs/screenshots/skin-night.png) |
+
+| ILLUSIA | KAAK |
+| --- | --- |
+| ![ILLUSIA 皮肤 · ILLUSIA skin](./docs/screenshots/skin-illusia.png) | ![KAAK 皮肤 · KAAK skin](./docs/screenshots/skin-kaak.png) |
+
+![Discord Voice 社区皮肤 · Discord Voice community skin](./docs/screenshots/skin-discord.png)
 
 </details>
 
