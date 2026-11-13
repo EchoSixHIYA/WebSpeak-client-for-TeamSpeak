@@ -55,7 +55,8 @@ after(async () => {
   else delete globalThis.window;
 });
 async function mount() {
-  app = renderer.createApp({ setup() { monitor = useWebClientPerformance(connected, () => measure()); return () => null; } });
+  const trace = { events: ref([]), record() {}, snapshot: () => [] };
+  app = renderer.createApp({ setup() { monitor = useWebClientPerformance(connected, () => measure(), trace); return () => null; } });
   app.mount({});
   await nextTurn();
 }

@@ -469,6 +469,7 @@
               :screen-share-web-rtc-stats="screenShareWebRtcStats"
               :t="t"
             />
+            <div id="webspeak-plugin-toolbar" class="webspeak-plugin-toolbar-host" data-ws-part="voice.plugin-toolbar"></div>
             <button
               class="header-action"
               :title="t('copyInvite')"
@@ -1042,6 +1043,7 @@ const {
   pokeNotifications,
   microphoneMuted,
   noiseSuppressionEnabled,
+  noiseSuppressionLevel,
   inputVolume,
   outputVolume,
   outputMuted,
@@ -1064,7 +1066,7 @@ const {
   whisperActive,
   setVolume,
   setInputVolume,
-  setNoiseSuppressionEnabled,
+  setNoiseSuppressionLevel,
   setOutputVolume,
   toggleOutputMute,
   setVoxThreshold,
@@ -1113,8 +1115,9 @@ const {
   ws: pluginVoiceSocket,
   createInvite,
   measureVoiceAudioStatus,
+  sessionTrace,
 } = useVoiceWebSocket();
-const performance = useWebClientPerformance(computed(() => voiceState.connected), measureVoiceAudioStatus);
+const performance = useWebClientPerformance(computed(() => voiceState.connected), measureVoiceAudioStatus, sessionTrace);
 const { panelOpen: performancePanelOpen } = performance;
 
 const query = new URLSearchParams(location.search);
@@ -1256,7 +1259,7 @@ const skinHomeFeatures = computed(() => {
 const audioControls = useWebClientAudioControls({
   settingsOpen,
   microphoneMuted,
-  noiseSuppressionEnabled,
+  noiseSuppressionLevel,
   inputVolume,
   voxThreshold,
   notificationVolume,
@@ -1267,7 +1270,7 @@ const audioControls = useWebClientAudioControls({
   whisperTargetIds,
   prepareInputDevices,
   setInputVolume,
-  setNoiseSuppressionEnabled,
+  setNoiseSuppressionLevel,
   setOutputVolume,
   setVoxThreshold,
   setNotificationVolume,
@@ -1291,7 +1294,7 @@ function reconnectMobile(): void {
   reconnectNow();
 }
 const { toggleMicrophone, stopWhisperTalk } = audioControls;
-const audioDockState = { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionEnabled, accompanimentActive };
+const audioDockState = { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionLevel, accompanimentActive };
 const audioSettingsState = {
   inputDevices,
   outputDevices,
@@ -1301,7 +1304,7 @@ const audioSettingsState = {
   audioPermission,
   audioContextState,
   microphoneMuted,
-  noiseSuppressionEnabled,
+  noiseSuppressionLevel,
   inputVolume,
   outputVolume,
   voxThreshold,

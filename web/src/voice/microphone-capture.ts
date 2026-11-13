@@ -22,7 +22,7 @@ export interface MicrophoneCapture {
 interface CaptureOptions {
   context: AudioContext;
   stream: MediaStream;
-  noiseSuppression: boolean;
+  rnnoiseEnabled: boolean;
   volume: number;
   signal: AbortSignal;
   assertCurrent(): void;
@@ -92,7 +92,7 @@ export function createMicrophoneCaptureFactory() {
       const settings = track.getSettings();
       source = ctx.createMediaStreamSource(stream);
       const supportsWorklet = typeof AudioWorkletNode !== "undefined" && Boolean(ctx.audioWorklet);
-      if (options.noiseSuppression && supportsWorklet) {
+      if (options.rnnoiseEnabled && supportsWorklet) {
         try {
           if (!wasmPromise) wasmPromise = loadRnnoise({ url: rnnoiseWasmUrl, simdUrl: rnnoiseSimdWasmUrl }).catch(error => {
             wasmPromise = null;

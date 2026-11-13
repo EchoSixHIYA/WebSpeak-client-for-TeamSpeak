@@ -34,5 +34,5 @@ export function createSkinOperation({ signal: parent, timeoutMs = SKIN_LOAD_TIME
       if (signal.aborted) { done(); aborted(); }
     });
   }
-  return { signal, check, wait, cancel, finish };
+  return { signal, timeoutMs, check, wait, cancel, finish };
 }

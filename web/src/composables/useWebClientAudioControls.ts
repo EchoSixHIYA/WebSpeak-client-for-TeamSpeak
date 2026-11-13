@@ -1,9 +1,11 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
+import type { LocalPreferences } from "../services/local-persistence.js";
+type NoiseSuppressionLevel = NonNullable<LocalPreferences["noiseSuppressionLevel"]>;
 
 interface UseWebClientAudioControlsOptions {
   settingsOpen: Ref<boolean>;
   microphoneMuted: Readonly<Ref<boolean>>;
-  noiseSuppressionEnabled: Readonly<Ref<boolean>>;
+  noiseSuppressionLevel: Readonly<Ref<NoiseSuppressionLevel>>;
   inputVolume: Readonly<Ref<number>>;
   voxThreshold: Readonly<Ref<number>>;
   notificationVolume: Readonly<Ref<number>>;
@@ -14,7 +16,7 @@ interface UseWebClientAudioControlsOptions {
   whisperTargetIds: Set<number>;
   prepareInputDevices: () => Promise<void>;
   setInputVolume: (value: number) => void;
-  setNoiseSuppressionEnabled: (enabled: boolean) => Promise<void>;
+  setNoiseSuppressionLevel: (level: NoiseSuppressionLevel) => Promise<void>;
   setOutputVolume: (value: number) => void;
   setVoxThreshold: (value: number) => void;
   setNotificationVolume: (value: number) => void;
@@ -34,7 +36,7 @@ interface UseWebClientAudioControlsOptions {
 export function useWebClientAudioControls({
   settingsOpen,
   microphoneMuted,
-  noiseSuppressionEnabled,
+  noiseSuppressionLevel,
   inputVolume,
   voxThreshold,
   notificationVolume,
@@ -45,7 +47,7 @@ export function useWebClientAudioControls({
   whisperTargetIds,
   prepareInputDevices,
   setInputVolume,
-  setNoiseSuppressionEnabled,
+  setNoiseSuppressionLevel,
   setOutputVolume,
   setVoxThreshold,
   setNotificationVolume,
@@ -92,12 +94,13 @@ export function useWebClientAudioControls({
     setInputVolume(Number((event.target as HTMLInputElement).value) / 100);
   }
 
-  function onNoiseSuppressionToggle(event: Event): void {
-    void setNoiseSuppressionEnabled((event.target as HTMLInputElement).checked);
+  function onNoiseSuppressionChange(event: Event): void {
+    const level = (event.target as HTMLSelectElement).value;
+    if (level === "off" || level === "standard" || level === "strong") void setNoiseSuppressionLevel(level);
   }
 
   function toggleNoiseSuppression(): void {
-    void setNoiseSuppressionEnabled(!noiseSuppressionEnabled.value);
+    void setNoiseSuppressionLevel(noiseSuppressionLevel.value === "off" ? "strong" : "off");
   }
 
   function onOutputVolume(event: Event): void {
@@ -244,7 +247,7 @@ export function useWebClientAudioControls({
     whisperPttActive,
     micMeterBars,
     onInputVolume,
-    onNoiseSuppressionToggle,
+    onNoiseSuppressionChange,
     toggleNoiseSuppression,
     onOutputVolume,
     onVoxThreshold,

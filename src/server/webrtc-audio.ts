@@ -11,13 +11,15 @@ import type { TSVoiceData } from "./ts-client.js";
 import { WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
 import { OpusEncoder } from "./opus-codec.js";
 import type { WebRtcSessionDescription } from "../shared/webrtc.js";
+import { addOpusFmtpParameters } from "../shared/opus-sdp.js";
 export type { WebRtcSessionDescription } from "../shared/webrtc.js";
 
 export { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
 
 const AUDIO_SAMPLE_RATE = 48_000;
 const AUDIO_FRAME_SAMPLES = 960;
-const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * 2;
+const AUDIO_CHANNELS = 2;
+const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS * 2;
 const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
@@ -102,6 +104,7 @@ export class WebRtcAudioSession {
   private readonly onVoiceActivity: (clientIds: number[]) => void;
   private readonly outgoingTrack: MediaStreamTrack;
   private readonly decoderByClient = new Map<number, OpusEncoder>();
+  private readonly decoderCodecByClient = new Map<number, 4 | 5>();
   private readonly partialPcmByClient = new Map<number, Buffer>();
   private readonly pendingFrames = new Map<number, PendingAudioFrame[]>();
   private readonly memberVolumes = new Map<number, number>();
@@ -198,7 +201,7 @@ export class WebRtcAudioSession {
       this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not prepare WebRTC output track");
     });
 
-    const createEncoder = options.createEncoder ?? (() => new OpusEncoder(AUDIO_SAMPLE_RATE, 1));
+    const createEncoder = options.createEncoder ?? (() => new OpusEncoder(AUDIO_SAMPLE_RATE, AUDIO_CHANNELS));
     try {
       this.encoder = createEncoder();
     } catch (error: unknown) {
@@ -240,22 +243,37 @@ export class WebRtcAudioSession {
     this.outgoingPayloadType = opus[0]!.payloadType;
     await transceiver.sender.replaceTrack(this.outgoingTrack);
     const answer = await this.peer.createAnswer();
-    await this.peer.setLocalDescription(answer);
+    await this.peer.setLocalDescription({
+      ...answer,
+      sdp: addOpusFmtpParameters(answer.sdp ?? "", ["stereo=1", "sprop-stereo=1"]),
+    });
     const description = this.peer.localDescription;
     if (!description) throw new Error("WebRTC answer was not created");
     if (description.type !== "answer" && description.type !== "offer") throw new Error("Unexpected WebRTC answer type");
-    return { type: description.type, sdp: description.sdp };
+    return {
+      type: description.type,
+      sdp: addOpusFmtpParameters(description.sdp, ["stereo=1", "sprop-stereo=1"]),
+    };
   }
 
   pushTeamSpeakVoice(data: TSVoiceData): void {
     if (this.closed || (data.codec !== 4 && data.codec !== 5)) return;
     let decoder = this.decoderByClient.get(data.clientId);
+    if (decoder && this.decoderCodecByClient.get(data.clientId) !== data.codec) {
+      try { decoder.dispose(); } catch { /* a codec transition must still reset queued PCM */ }
+      this.decoderByClient.delete(data.clientId);
+      this.decoderCodecByClient.delete(data.clientId);
+      this.partialPcmByClient.delete(data.clientId);
+      this.pendingFrames.delete(data.clientId);
+      decoder = undefined;
+    }
     if (!decoder) {
       try {
         // @discordjs/opus exposes decoding on OpusEncoder instances too;
         // there is no separate OpusDecoder constructor in that package.
-        decoder = new OpusEncoder(AUDIO_SAMPLE_RATE, 1);
+        decoder = new OpusEncoder(AUDIO_SAMPLE_RATE, data.codec === 4 ? 1 : 2);
         this.decoderByClient.set(data.clientId, decoder);
+        this.decoderCodecByClient.set(data.clientId, data.codec);
       } catch (error: unknown) {
         this.logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Could not create WebRTC mixer decoder");
         return;
@@ -264,16 +282,26 @@ export class WebRtcAudioSession {
     try {
       const pcm = decoder.decode(data.data);
       this.stats.webrtcDownlinkDecodedFrames++;
-      if (pcm.length < 2) {
+      const inputChannels = data.codec === 4 ? 1 : 2;
+      if (pcm.length < inputChannels * 2 || pcm.length % (inputChannels * 2) !== 0) {
         this.stats.webrtcDownlinkShortFrames++;
         return;
+      }
+      let stereoPcm = pcm;
+      if (inputChannels === 1) {
+        stereoPcm = Buffer.allocUnsafe(pcm.length * AUDIO_CHANNELS);
+        for (let inputOffset = 0, outputOffset = 0; inputOffset < pcm.length; inputOffset += 2, outputOffset += 4) {
+          const sample = pcm.readInt16LE(inputOffset);
+          stereoPcm.writeInt16LE(sample, outputOffset);
+          stereoPcm.writeInt16LE(sample, outputOffset + 2);
+        }
       }
       // TeamSpeak may deliver 10/20/40/60 ms Opus frames. Keep a partial
       // decoded frame per speaker and split every decoded buffer into the
       // fixed 20 ms cadence used by the WebRTC mixer instead of discarding
       // anything after the first 20 ms.
       const pendingPcm = this.partialPcmByClient.get(data.clientId);
-      const combined = pendingPcm ? Buffer.concat([pendingPcm, pcm]) : pcm;
+      const combined = pendingPcm ? Buffer.concat([pendingPcm, stereoPcm]) : stereoPcm;
       const rms = this.calculateRms(pcm);
       // RMS is used only for the UI speaking indicator. Every decoded frame,
       // including quiet/comfort-noise frames, continues into the queue so the
@@ -326,6 +354,7 @@ export class WebRtcAudioSession {
     this.closePromise = Promise.resolve().then(async () => {
       const decoders = [...this.decoderByClient.values()];
       this.decoderByClient.clear();
+      this.decoderCodecByClient.clear();
       for (const decoder of decoders) {
         try { decoder.dispose(); } catch { /* continue releasing other resources */ }
       }
@@ -368,13 +397,13 @@ export class WebRtcAudioSession {
         this.stats.webrtcQueueUnderrunTicks++;
       }
     }
-    const mixed = new Int32Array(AUDIO_FRAME_SAMPLES);
+    const mixed = new Int32Array(AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS);
     for (const [clientId, queue] of this.pendingFrames) {
       const frame = queue.shift();
       if (queue.length === 0) this.pendingFrames.delete(clientId);
       if (!frame) continue;
       const volume = this.memberVolumes.get(clientId) ?? 1;
-      for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) {
+      for (let index = 0; index < AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS; index++) {
         mixed[index] += Math.round(frame.pcm.readInt16LE(index * 2) * volume);
       }
     }
@@ -383,7 +412,7 @@ export class WebRtcAudioSession {
     // source packets with our encoded silence/mixes corrupts decoder history
     // and can suppress otherwise valid speech without any packet loss.
     const pcm = Buffer.allocUnsafe(AUDIO_FRAME_BYTES);
-    for (let index = 0; index < AUDIO_FRAME_SAMPLES; index++) {
+    for (let index = 0; index < AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS; index++) {
       // Keep a fixed gain for the mixed path. Per-sample soft limiting changes
       // the waveform's apparent loudness as the source level changes, which
       // is especially noticeable on music. Only clip actual overflow caused
@@ -450,6 +479,7 @@ export class WebRtcAudioSession {
     const decoder = this.decoderByClient.get(clientId);
     if (!decoder) return;
     this.decoderByClient.delete(clientId);
+    this.decoderCodecByClient.delete(clientId);
     try { decoder.dispose(); } catch { /* continue after codec cleanup failures */ }
   }
 

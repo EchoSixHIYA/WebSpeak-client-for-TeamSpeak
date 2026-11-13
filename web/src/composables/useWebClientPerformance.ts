@@ -1,5 +1,6 @@
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import type { VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
+import type { VoiceSessionTrace } from "../voice/session-trace.js";
 
 const SAMPLE_INTERVAL_MS = 2_000;
 
@@ -19,6 +20,21 @@ function ratePerSecond(current: number, previous: number | undefined, elapsedMs:
 function bitrateKbps(current: number | null, previous: number | null | undefined, elapsedMs: number): number | null {
   if (current === null || previous == null || current < previous || elapsedMs < 250) return null;
   return Math.round(((current - previous) * 8) / elapsedMs);
+}
+
+function browserLabel(userAgent: string): string {
+  const candidates: Array<[RegExp, string]> = [
+    [/\bEdg(?:A|iOS)?\/([\d.]+)/, "Edge"],
+    [/\bOPR\/([\d.]+)/, "Opera"],
+    [/\b(?:CriOS|Chrome)\/([\d.]+)/, "Chrome"],
+    [/\b(?:FxiOS|Firefox)\/([\d.]+)/, "Firefox"],
+  ];
+  for (const [pattern, name] of candidates) {
+    const version = userAgent.match(pattern)?.[1];
+    if (version) return `${name}/${version}`;
+  }
+  const safariVersion = userAgent.match(/\bVersion\/([\d.]+)/)?.[1];
+  return safariVersion && /\bSafari\//.test(userAgent) ? `Safari/${safariVersion}` : "Other";
 }
 
 function intervalLossPercent(
@@ -47,11 +63,13 @@ function downlinkCounter(sample: VoiceAudioStatusSample | null) {
 export function useWebClientPerformance(
   connected: Readonly<Ref<boolean>>,
   measureAudioStatus: () => Promise<VoiceAudioStatusSample | null>,
+  sessionTrace: VoiceSessionTrace,
 ) {
   const panelOpen = ref(false);
   const running = ref(false);
   const latestSample = ref<VoiceAudioStatusSample | null>(null);
   const previousSample = ref<VoiceAudioStatusSample | null>(null);
+  const traceEvents = sessionTrace.events;
   let timer: number | null = null;
   let generation = 0;
   let disposed = false;
@@ -142,6 +160,22 @@ export function useWebClientPerformance(
       if (expectedGeneration !== generation || !connected.value) return;
       previousSample.value = sample ? latestSample.value : null;
       latestSample.value = sample;
+      if (sample) sessionTrace.record("audio.sample", {
+        transport: sample.transport,
+        connection: sample.connectionState ?? "unknown",
+        microphone: sample.microphoneReady ? "ready" : sample.microphonePermission,
+        playback: sample.playbackState ?? "unknown",
+        sentFrames: sample.bridge.tsSendFrames,
+        receivedFrames: sample.transport === "webrtc" ? sample.browser?.inboundPackets ?? 0 : sample.fallbackPlayback.framesReceived,
+        sendErrors: sample.bridge.tsSendErrors,
+        droppedFrames: sample.bridge.ingressDroppedFrames + sample.bridge.egressDroppedFrames + sample.bridge.webrtcQueueDroppedFrames + sample.fallbackPlayback.framesDropped,
+        uplinkPackets: sample.browser?.outboundPackets ?? null,
+        uplinkLost: sample.browser?.outboundPacketsLost ?? null,
+        downlinkPackets: sample.browser?.inboundPackets ?? null,
+        downlinkLost: sample.browser?.inboundPacketsLost ?? null,
+        rttMs: sample.browser?.outboundRttMs ?? null,
+        jitterMs: sample.browser?.inboundJitterMs ?? null,
+      });
     } catch {
       if (expectedGeneration === generation) {
         latestSample.value = null;
@@ -174,6 +208,21 @@ export function useWebClientPerformance(
     void runProbe();
   }
 
+  function exportTrace(): void {
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      browser: browserLabel(navigator.userAgent),
+      events: sessionTrace.snapshot(),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `webspeak-audio-trace-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
   function togglePanel(): void {
     panelOpen.value = !panelOpen.value;
   }
@@ -185,5 +234,5 @@ export function useWebClientPerformance(
 
   onUnmounted(() => { disposed = true; stop(); });
 
-  return { panelOpen, running, stats, togglePanel, refresh };
+  return { panelOpen, running, stats, traceEvents, togglePanel, refresh, exportTrace };
 }

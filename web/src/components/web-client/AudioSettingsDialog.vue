@@ -76,16 +76,14 @@
                 />
                 {{ microphoneMuted ? t("unmuteMic") : t("muteMic") }}</button
               ></div
-            ><label
-              class="noise-suppression-toggle settings-form-row"
-              ><span
-                ><strong>{{ t("noiseSuppression") }}</strong
-                ><small>{{ t("noiseSuppressionHint") }}</small></span
-              ><input
-                type="checkbox"
-                :checked="noiseSuppressionEnabled"
-                :aria-label="t('noiseSuppression')"
-                @change="onNoiseSuppressionToggle" /></label
+            ><label class="settings-form-row">
+              <span><strong>{{ t("noiseSuppression") }}</strong><small>{{ t("noiseSuppressionHint") }}</small></span>
+              <select class="noise-suppression-level" :value="noiseSuppressionLevel" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionChange">
+                <option value="off">{{ t("noiseSuppressionOff") }}</option>
+                <option value="standard">{{ t("noiseSuppressionStandard") }}</option>
+                <option value="strong">{{ t("noiseSuppressionStrong") }}</option>
+              </select>
+            </label
               ><div class="settings-form-row settings-range-form-row"
                 ><label class="settings-label">{{ t("inputVolume") }}</label
                 ><div class="settings-form-control"
@@ -265,7 +263,7 @@ type AudioSettingsState = Pick<ReturnType<typeof useVoiceWebSocket>,
   | "audioPermission"
   | "audioContextState"
   | "microphoneMuted"
-  | "noiseSuppressionEnabled"
+  | "noiseSuppressionLevel"
   | "inputVolume"
   | "outputVolume"
   | "voxThreshold"
@@ -277,7 +275,7 @@ type AudioSettingsState = Pick<ReturnType<typeof useVoiceWebSocket>,
 type AudioSettingsControls = Pick<ReturnType<typeof useWebClientAudioControls>,
   | "settingsError"
   | "onInputVolume"
-  | "onNoiseSuppressionToggle"
+  | "onNoiseSuppressionChange"
   | "onOutputVolume"
   | "onVoxThreshold"
   | "onNotificationVolume"
@@ -310,7 +308,7 @@ const {
   audioPermission,
   audioContextState,
   microphoneMuted,
-  noiseSuppressionEnabled,
+  noiseSuppressionLevel,
   inputVolume,
   outputVolume,
   voxThreshold,
@@ -322,7 +320,7 @@ const {
 const {
   settingsError: audioSettingsError,
   onInputVolume,
-  onNoiseSuppressionToggle,
+  onNoiseSuppressionChange,
   onOutputVolume,
   onVoxThreshold,
   onNotificationVolume,

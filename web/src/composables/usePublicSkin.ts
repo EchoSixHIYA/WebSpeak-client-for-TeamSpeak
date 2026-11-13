@@ -31,9 +31,9 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
   let disposed = false;
   const owns = (operation: ReturnType<typeof createSkinOperation>) => !disposed && current === operation;
   function cancel() { current?.cancel(); current = undefined; }
-  function begin() {
+  function begin(timeoutMs = options.timeoutMs) {
     cancel();
-    return current = createSkinOperation({ timeoutMs: options.timeoutMs });
+    return current = createSkinOperation({ timeoutMs });
   }
   onScopeDispose(() => { disposed = true; cancel(); });
 
@@ -41,7 +41,7 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
     operation.check();
     if (!canUseSkin(id)) id = fallbackId();
     const entry = catalogSkins.value.find(skin => skin.id === id);
-    const skin = await operation.wait(activateSkin(id, entry?.version, options.appVersion?.(), { signal: operation.signal }));
+    const skin = await operation.wait(activateSkin(id, entry?.version, options.appVersion?.(), { signal: operation.signal, timeoutMs: operation.timeoutMs }));
     if (!owns(operation)) return;
     if (!builtin(id) && !skin) throw new Error("The selected skin could not be activated.");
     activeSkin.value = skin;
@@ -89,7 +89,8 @@ export function usePublicSkin(options: PublicSkinOptions = {}) {
   }
   async function select(id: string) {
     if (disposed) return;
-    const operation = begin();
+    // A user-selected package can take longer to download on a cold cache.
+    const operation = begin(options.timeoutMs ?? (builtin(id) ? undefined : 25_000));
     try {
       try { localStorage.setItem("webspeak:skin-choice", id); } catch { /* Optional storage. */ }
       await apply(id, operation, true, true);

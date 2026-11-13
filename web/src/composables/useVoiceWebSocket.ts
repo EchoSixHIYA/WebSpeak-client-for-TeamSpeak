@@ -10,6 +10,7 @@ import { createVoiceCommands } from "../voice/commands.js";
 import { createVoiceSessionState } from "../voice/session-state.js";
 import { applySavedMemberVolumes } from "../voice/member-volume-preferences.js";
 import { createAudioDiagnostics, type AudioPermission, type VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
+import { createVoiceSessionTrace } from "../voice/session-trace.js";
 export type { AudioPermission, BrowserVoiceAudioStats, VoiceAudioStatusSample } from "../voice/audio-diagnostics.js";
 import type { SinkAudioElement } from "../voice/webrtc-playback.js";
 import { createScreenShareController } from "../voice/screen-share.js";
@@ -20,7 +21,7 @@ import type { ChatMessage } from "../../../src/shared/voice-models.js";
 import type { ClientCommandPayloads, ClientCommandType } from "../../../src/shared/client-commands.js";
 export type { ScreenShareStreamDescription as ScreenShareStream, ScreenShareViewerDescription as ScreenShareViewer, ScreenSharePeerSignal as ScreenShareSignal } from "../../../src/shared/screen-share.js";
 export type { ChannelMember, ChannelInfo, ChatMessage, ServerEvent, VoiceAudioBridgeStats } from "../../../src/shared/voice-models.js";
-import { reactive, ref, shallowRef } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, shallowRef } from "vue";
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
 export interface VoiceState {
@@ -197,6 +198,7 @@ class CancelledMediaOperation extends Error {
 }
 
 export function useVoiceWebSocket() {
+  const sessionTrace = createVoiceSessionTrace();
   const ws = shallowRef<WebSocket | null>(null);
   const serverInfo = shallowRef<VoiceServerInfo | null>(null);
   const state = reactive<VoiceState>({ connected: false, connecting: false, reconnecting: false, reconnectAttempt: 0, reconnectFailed: false, tsClientId: 0, error: "", errorCode: "", microphoneError: "", microphoneErrorCode: "", audioNotice: "", audioNoticeCode: "", channelSwitchedChannelId: "" });
@@ -215,10 +217,12 @@ export function useVoiceWebSocket() {
   const { members, channels, chatMessages, serverEvents, pokeNotifications } = sessionState;
   let chatGeneration = 0;
   const voiceConnection = createVoiceConnection({
-    onSocket: socket => { ws.value = socket; },
+    onSocket: socket => { ws.value = socket; sessionTrace.record("gateway.socket", { state: socket ? "connecting" : "closed" }); },
+    onSocketOpen: () => sessionTrace.record("gateway.socket", { state: "open" }),
     onMessage: handleMessage,
     onAudio: handleAudioFrame,
     onClose(event) {
+      sessionTrace.record("gateway.socket.closed", { code: event.code, clean: event.wasClean });
       releaseSessionResources();
       state.connected = false;
       state.connecting = false;
@@ -235,6 +239,7 @@ export function useVoiceWebSocket() {
     onFailure({ code, detail, cause }) {
       state.connecting = false;
       state.errorCode = normalizedClientErrorCode(code, "REQUEST_FAILED");
+      sessionTrace.record("gateway.connection.failed", { code: state.errorCode });
       state.error = cause instanceof Error ? cause.message : joinTicketReason(state.errorCode, detail);
     },
   });
@@ -302,9 +307,10 @@ export function useVoiceWebSocket() {
     onError: error => { setMicrophoneError(error); },
   });
   const microphoneMuted = ref(false);
-  const noiseSuppressionEnabled = ref(true);
+  const noiseSuppressionLevel = ref<"off" | "standard" | "strong">("strong");
+  const noiseSuppressionEnabled = computed(() => noiseSuppressionLevel.value !== "off");
   let noiseSuppressionTouched = false;
-  let committedNoiseSuppressionEnabled = noiseSuppressionEnabled.value;
+  let committedNoiseSuppressionLevel = noiseSuppressionLevel.value;
   const inputVolume = ref(1);
   const outputVolume = ref(1);
   const outputMuted = ref(false);
@@ -352,9 +358,14 @@ export function useVoiceWebSocket() {
       if (rms !== null && !microphoneMuted.value && track.enabled && rms >= voxThreshold.value) markSpeaking(state.tsClientId);
       else if (state.tsClientId) clearSpeaking(state.tsClientId);
     },
-    onReady: syncWebRtcMemberVolumes,
+    onReady() {
+      sessionTrace.record("webrtc.media", { state: "active" });
+      syncWebRtcMemberVolumes();
+    },
+    onConnectionState(stateName) { sessionTrace.record("webrtc.connection", { state: stateName }); },
     async onFallback(reason, isCurrent) {
       if (!isCurrent()) return;
+      sessionTrace.record("webrtc.fallback", { code: safeClientErrorCode(reason) || "WEBRTC_UNAVAILABLE" });
       setAudioNotice("WEBRTC_FALLBACK", `实时语音（WebRTC）不可用（错误代码：${safeClientErrorCode(reason) || "WEBRTC_UNAVAILABLE"}），已切换为兼容传输：延迟与音质可能下降`);
       try { await startMicrophone(); }
       catch (error) { if (isCurrent()) setMicrophoneError(error); }
@@ -403,7 +414,8 @@ export function useVoiceWebSocket() {
       preferredInputDeviceId: committedInputDeviceId,
       inputDeviceId: committedInputDeviceId,
       microphoneMuted: microphoneMuted.value,
-      noiseSuppressionEnabled: committedNoiseSuppressionEnabled,
+      noiseSuppressionEnabled: committedNoiseSuppressionLevel !== "off",
+      noiseSuppressionLevel: committedNoiseSuppressionLevel,
       voxThreshold: voxThreshold.value,
       inputGain: inputVolume.value,
       outputVolume: outputVolume.value,
@@ -426,9 +438,15 @@ export function useVoiceWebSocket() {
       committedInputDeviceId = selectedInputDeviceId.value;
     }
     if (typeof preferences.microphoneMuted === "boolean") microphoneMuted.value = preferences.microphoneMuted;
-    if (!noiseSuppressionTouched && typeof preferences.noiseSuppressionEnabled === "boolean") {
-      noiseSuppressionEnabled.value = preferences.noiseSuppressionEnabled;
-      committedNoiseSuppressionEnabled = preferences.noiseSuppressionEnabled;
+    if (!noiseSuppressionTouched) {
+      const storedLevel = preferences.noiseSuppressionLevel;
+      if (storedLevel === "off" || storedLevel === "standard" || storedLevel === "strong") {
+        noiseSuppressionLevel.value = storedLevel;
+        committedNoiseSuppressionLevel = storedLevel;
+      } else if (typeof preferences.noiseSuppressionEnabled === "boolean") {
+        noiseSuppressionLevel.value = preferences.noiseSuppressionEnabled ? "strong" : "off";
+        committedNoiseSuppressionLevel = noiseSuppressionLevel.value;
+      }
     }
     if (typeof preferences.voxThreshold === "number") voxThreshold.value = clamp(preferences.voxThreshold, 0.001, 0.08);
     if (typeof preferences.inputGain === "number") inputVolume.value = Math.max(0, Math.min(1, preferences.inputGain));
@@ -482,7 +500,10 @@ export function useVoiceWebSocket() {
       audioCtx = new AudioContext({ sampleRate: 48000 }) as SinkAudioContext;
       audioContextState.value = audioCtx.state;
       audioCtx.addEventListener("statechange", () => {
-        if (audioCtx) audioContextState.value = audioCtx.state;
+        if (audioCtx) {
+          audioContextState.value = audioCtx.state;
+          sessionTrace.record("audio.context", { state: audioCtx.state });
+        }
       });
       outputDeviceSupported.value = typeof audioCtx.setSinkId === "function"
         || typeof (HTMLMediaElement.prototype as SinkAudioElement).setSinkId === "function";
@@ -573,7 +594,7 @@ export function useVoiceWebSocket() {
       sampleRate: { ideal: 48000 },
       channelCount: { ideal: 1 },
       echoCancellation: true,
-      noiseSuppression: noiseSuppressionEnabled.value,
+      noiseSuppression: noiseSuppressionLevel.value !== "off",
       // Keep the microphone's natural dynamics. Browser AGC can make speech
       // pump in volume, especially while background noise changes.
       autoGainControl: false,
@@ -698,7 +719,7 @@ export function useVoiceWebSocket() {
       factoryOwnsStream = true;
       nextCapture = await microphoneCaptureFactory.prepare({
         context: ctx, stream: nextStream, signal: controller.signal, assertCurrent,
-        noiseSuppression: noiseSuppressionEnabled.value, volume: inputVolume.value, onSamples: handleCaptureChunk,
+        rnnoiseEnabled: noiseSuppressionLevel.value === "strong", volume: inputVolume.value, onSamples: handleCaptureChunk,
       });
       assertCurrent();
       // Commit only a complete graph. Permission and node failures leave the
@@ -706,13 +727,21 @@ export function useVoiceWebSocket() {
       stopMicrophone(false);
       micStream = nextStream;
       microphoneCapture = nextCapture;
+      const microphoneTrack = nextStream.getAudioTracks()[0];
+      if (microphoneTrack) {
+        const recordTrack = (stateName: string) => sessionTrace.record("microphone.track", { state: stateName, muted: microphoneTrack.muted });
+        recordTrack(microphoneTrack.readyState);
+        microphoneTrack.addEventListener("mute", () => recordTrack("mute"));
+        microphoneTrack.addEventListener("unmute", () => recordTrack("unmute"));
+        microphoneTrack.addEventListener("ended", () => recordTrack("ended"));
+      }
       Object.assign(microphoneProcessing, nextCapture.processing);
       nextCapture.setVolume(inputVolume.value);
       nextCapture.activate();
       // The fallback for a later failed change is this actual live graph, even
       // if device enumeration or WebRTC negotiation is still in progress.
       committedInputDeviceId = selectedInputDeviceId.value;
-      committedNoiseSuppressionEnabled = noiseSuppressionEnabled.value;
+      committedNoiseSuppressionLevel = noiseSuppressionLevel.value;
       clearMicrophoneError();
     } catch (error) {
       nextCapture?.dispose();
@@ -795,6 +824,7 @@ export function useVoiceWebSocket() {
       pendingMicrophoneCapture = null;
     }
     stopCaptureGraph();
+    if (micStream) sessionTrace.record("microphone.track", { state: "released" });
     microphoneCapture?.dispose();
     microphoneCapture = null;
     webrtc.releaseInput();
@@ -834,13 +864,13 @@ export function useVoiceWebSocket() {
       await refreshAudioDevices();
       if (!isCurrent()) return;
       committedInputDeviceId = selectedInputDeviceId.value;
-      committedNoiseSuppressionEnabled = noiseSuppressionEnabled.value;
+      committedNoiseSuppressionLevel = noiseSuppressionLevel.value;
       localStorage.setItem("webspeak:input-device", committedInputDeviceId);
       await saveAudioPreferences();
     } catch (error) {
       if (!isCurrent() || error instanceof CancelledMediaOperation) return;
       selectedInputDeviceId.value = committedInputDeviceId;
-      noiseSuppressionEnabled.value = committedNoiseSuppressionEnabled;
+      noiseSuppressionLevel.value = committedNoiseSuppressionLevel;
       localStorage.setItem("webspeak:input-device", committedInputDeviceId);
       throw error;
     }
@@ -1031,7 +1061,7 @@ export function useVoiceWebSocket() {
     deviceListGeneration++;
     selectedInputDeviceId.value = committedInputDeviceId;
     selectedOutputDeviceId.value = committedOutputDeviceId;
-    noiseSuppressionEnabled.value = committedNoiseSuppressionEnabled;
+    noiseSuppressionLevel.value = committedNoiseSuppressionLevel;
     microphoneTest.dispose();
     audioDiagnostics.reset();
     commands.clear(new Error("语音连接已关闭"));
@@ -1057,6 +1087,7 @@ export function useVoiceWebSocket() {
         };
         break;
       case "connected":
+        sessionTrace.record("teamspeak.session", { state: "connected" });
         const wasReconnecting = state.reconnecting;
         state.connected = true;
         state.connecting = false;
@@ -1106,6 +1137,7 @@ export function useVoiceWebSocket() {
         break;
       }
       case "disconnected":
+        sessionTrace.record("teamspeak.session", { state: "disconnected", recoverable: msg.recoverable !== false });
         state.connected = false;
         state.connecting = false;
         state.reconnecting = Boolean(msg.recoverable !== false);
@@ -1114,6 +1146,7 @@ export function useVoiceWebSocket() {
         releaseSessionResources();
         break;
       case "reconnecting":
+        sessionTrace.record("teamspeak.reconnect", { state: "retrying", attempt: Number(msg.attempt) || 0 });
         state.connected = false;
         state.connecting = false;
         state.reconnecting = true;
@@ -1122,10 +1155,12 @@ export function useVoiceWebSocket() {
         releaseSessionResources();
         break;
       case "reconnected":
+        sessionTrace.record("teamspeak.reconnect", { state: "restored" });
         state.reconnecting = false;
         state.reconnectFailed = false;
         break;
       case "reconnectFailed":
+        sessionTrace.record("teamspeak.reconnect", { state: "failed", code: normalizedClientErrorCode(msg.code) });
         state.connected = false;
         state.connecting = false;
         state.reconnecting = false;
@@ -1135,6 +1170,7 @@ export function useVoiceWebSocket() {
         releaseSessionResources();
         break;
       case "connectionFailed":
+        sessionTrace.record("teamspeak.session", { state: "connection-failed", code: normalizedClientErrorCode(msg.code) });
         state.connected = false;
         state.connecting = false;
         state.reconnecting = false;
@@ -1180,6 +1216,7 @@ export function useVoiceWebSocket() {
       }
       case "error":
         state.errorCode = normalizedClientErrorCode(msg.error?.code, "OPERATION_FAILED");
+        sessionTrace.record("teamspeak.session.error", { code: state.errorCode });
         state.error = protocolErrorMessage(state.errorCode, String(msg.error?.message || msg.message || "操作失败"));
         {
           const requestId = typeof msg.requestId === "string" ? msg.requestId : "";
@@ -1200,10 +1237,15 @@ export function useVoiceWebSocket() {
       return;
     }
     const clientId = (data[1] << 8) | data[2];
+    const codec = data[0];
     if (clientId === state.tsClientId) return;
+    if (codec !== 4 && codec !== 5) {
+      audioDiagnostics.count("framesDropped");
+      return;
+    }
     audioDiagnostics.count("framesReceived");
     markSpeaking(clientId);
-    remotePlayback.play(clientId, data.slice(3));
+    remotePlayback.play(clientId, codec, data.slice(3));
   }
 
   function sendCmd<K extends ClientCommandType>(type: K, payload: ClientCommandPayloads[K]): void {
@@ -1399,15 +1441,21 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
-  async function setNoiseSuppressionEnabled(enabled: boolean): Promise<void> {
-    if (noiseSuppressionEnabled.value === enabled) return;
+  async function setNoiseSuppressionLevel(level: "off" | "standard" | "strong"): Promise<void> {
+    if (noiseSuppressionLevel.value === level) return;
     noiseSuppressionTouched = true;
-    noiseSuppressionEnabled.value = enabled;
+    const previousLevel = noiseSuppressionLevel.value;
+    noiseSuppressionLevel.value = level;
     try {
       await reconfigureMicrophone();
     } catch (error) {
+      noiseSuppressionLevel.value = previousLevel;
       setMicrophoneError(error);
     }
+  }
+
+  function setNoiseSuppressionEnabled(enabled: boolean): Promise<void> {
+    return setNoiseSuppressionLevel(enabled ? (noiseSuppressionLevel.value === "off" ? "strong" : noiseSuppressionLevel.value) : "off");
   }
 
   function setOutputVolume(volume: number): void {
@@ -1431,6 +1479,8 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
+  onBeforeUnmount(() => sessionTrace.dispose());
+
   return {
     pluginSession,
     ...screenShare.api,
@@ -1446,6 +1496,7 @@ export function useVoiceWebSocket() {
     pokeNotifications,
     microphoneMuted,
     noiseSuppressionEnabled,
+    noiseSuppressionLevel,
     inputVolume,
     outputVolume,
     outputMuted,
@@ -1472,6 +1523,7 @@ export function useVoiceWebSocket() {
     accompanimentErrorCode,
     setVolume,
     setInputVolume,
+    setNoiseSuppressionLevel,
     setNoiseSuppressionEnabled,
     setOutputVolume,
     toggleOutputMute,
@@ -1504,5 +1556,6 @@ export function useVoiceWebSocket() {
     checkSupport,
     clearError,
     measureVoiceAudioStatus,
+    sessionTrace,
   };
 }

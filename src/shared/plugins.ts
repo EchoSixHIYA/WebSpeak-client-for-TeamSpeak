@@ -15,9 +15,9 @@ export interface PluginManifest {
 }
 export interface PluginFile { encoding: "utf8" | "base64"; data: string }
 export interface PluginPackage { manifest: PluginManifest; files: Record<string, PluginFile> }
-export interface PluginSettings { enabled: boolean; trusted: boolean; scope: PluginScope; targets: string[]; config: JsonValue; hasServerConfig: boolean }
+export interface PluginSettings { enabled: boolean; trusted: boolean; toolbarPinned: boolean; scope: PluginScope; targets: string[]; config: JsonValue; hasServerConfig: boolean }
 export interface PluginSettingsInput {
-  enabled: boolean; trusted: boolean; scope: PluginScope; targets: string[]; config: JsonValue;
+  enabled: boolean; trusted: boolean; toolbarPinned?: boolean; scope: PluginScope; targets: string[]; config: JsonValue;
   serverConfigAction?: "keep" | "replace" | "remove"; serverConfig?: JsonValue;
 }
 export interface PluginRuntimeStatus { state: "disabled" | "client" | "stopped" | "starting" | "running" | "failed"; error?: string }
@@ -95,8 +95,8 @@ export function parsePluginJson(v: unknown, maxBytes = 64 * 1024): JsonValue {
 export function readInstalledPlugin(v: unknown): InstalledPlugin {
   pluginAssert(pluginRecord(v) && pluginRecord(v.settings) && typeof v.revision === "string" && /^[a-f0-9]{64}$/.test(v.revision) && typeof v.installedAt === "number" && Number.isFinite(v.installedAt));
   const manifest=parsePluginManifest(v.manifest),s=v.settings;
-  pluginAssert(typeof s.enabled === "boolean" && typeof s.trusted === "boolean" && typeof s.hasServerConfig === "boolean" && manifest.scopes.includes(s.scope as PluginScope) && Array.isArray(s.targets) && s.targets.length <= 50 && s.targets.every(t=>typeof t === "string" && t.length <= 300));
-  const result: InstalledPlugin={manifest,revision:v.revision,installedAt:v.installedAt,settings:{enabled:s.enabled,trusted:s.trusted,scope:s.scope as PluginScope,targets:[...s.targets],config:parsePluginJson(s.config),hasServerConfig:s.hasServerConfig}};
+  pluginAssert(typeof s.enabled === "boolean" && typeof s.trusted === "boolean" && (s.toolbarPinned === undefined || typeof s.toolbarPinned === "boolean") && typeof s.hasServerConfig === "boolean" && manifest.scopes.includes(s.scope as PluginScope) && Array.isArray(s.targets) && s.targets.length <= 50 && s.targets.every(t=>typeof t === "string" && t.length <= 300));
+  const result: InstalledPlugin={manifest,revision:v.revision,installedAt:v.installedAt,settings:{enabled:s.enabled,trusted:s.trusted,toolbarPinned:s.toolbarPinned===true,scope:s.scope as PluginScope,targets:[...s.targets],config:parsePluginJson(s.config),hasServerConfig:s.hasServerConfig}};
   if(v.runtime!==undefined){pluginAssert(pluginRecord(v.runtime) && ["disabled","client","stopped","starting","running","failed"].includes(String(v.runtime.state)) && (v.runtime.error===undefined||typeof v.runtime.error==="string"));result.runtime={state:v.runtime.state as PluginRuntimeStatus["state"],...(v.runtime.error?{error:v.runtime.error as string}:{})};}
   return result;
 }

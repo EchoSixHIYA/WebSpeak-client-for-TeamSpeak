@@ -1,3 +1,5 @@
+import { opusPacketDurationUs } from "./opus-packet.js";
+
 interface RemotePlaybackOptions {
   getContext(): AudioContext;
   getVolume(clientId: number): number;
@@ -6,6 +8,7 @@ interface RemotePlaybackOptions {
 }
 
 interface SpeakerPlayback {
+  codec: 4 | 5;
   context: AudioContext;
   decoder: AudioDecoder | null;
   gain: GainNode;
@@ -73,9 +76,9 @@ export function createRemotePlayback(options: RemotePlaybackOptions) {
     }
   }
 
-  function create(clientId: number, context: AudioContext): SpeakerPlayback {
+  function create(clientId: number, context: AudioContext, codec: 4 | 5): SpeakerPlayback {
     const stream: SpeakerPlayback = {
-      context, decoder: null, gain: context.createGain(), sources: new Set(),
+      codec, context, decoder: null, gain: context.createGain(), sources: new Set(),
       playTime: context.currentTime, timestamp: 0,
     };
     speakers.set(clientId, stream);
@@ -89,23 +92,24 @@ export function createRemotePlayback(options: RemotePlaybackOptions) {
         clear(clientId);
       },
     });
-    stream.decoder.configure({ codec: "opus", sampleRate: 48000, numberOfChannels: 1 });
+    stream.decoder.configure({ codec: "opus", sampleRate: 48000, numberOfChannels: codec === 4 ? 1 : 2 });
     return stream;
   }
 
-  function play(clientId: number, opusData: Uint8Array): void {
-    if (opusData.length < 3) { options.onDrop(); return; }
+  function play(clientId: number, codec: 4 | 5, opusData: Uint8Array): void {
+    const duration = opusPacketDurationUs(opusData);
+    if (!duration || opusData.length < 3) { options.onDrop(); return; }
     try {
       const context = options.getContext();
       let stream = speakers.get(clientId);
-      if (stream && (stream.context !== context || stream.playTime > context.currentTime + MAX_PLAY_AHEAD_SECONDS || (stream.decoder?.decodeQueueSize ?? 0) >= MAX_DECODE_QUEUE_FRAMES)) {
+      if (stream && (stream.codec !== codec || stream.context !== context || stream.playTime > context.currentTime + MAX_PLAY_AHEAD_SECONDS || (stream.decoder?.decodeQueueSize ?? 0) >= MAX_DECODE_QUEUE_FRAMES)) {
         clear(clientId);
         stream = undefined;
       }
-      stream ??= create(clientId, context);
+      stream ??= create(clientId, context, codec);
       if (speakers.get(clientId) !== stream) return;
-      stream.decoder?.decode(new EncodedAudioChunk({ type: "key", timestamp: stream.timestamp, duration: 20_000, data: opusData }));
-      stream.timestamp += 20_000;
+      stream.decoder?.decode(new EncodedAudioChunk({ type: "key", timestamp: stream.timestamp, duration, data: opusData }));
+      stream.timestamp += duration;
     } catch {
       options.onDecodeError();
       clear(clientId);

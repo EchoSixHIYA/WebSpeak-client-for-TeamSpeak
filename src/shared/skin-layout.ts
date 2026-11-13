@@ -278,6 +278,7 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.favorite-servers.tooltip",
   "voice.header",
   "voice.header-actions",
+  "voice.plugin-toolbar",
   "voice.member",
   "voice.member-panel",
   "voice.member-panel.channels",

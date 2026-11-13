@@ -33,15 +33,21 @@
         ><div
           ><strong>{{ t("voiceStatus") }}</strong
           ><small>{{ t("voiceStatusHint") }}</small></div
-        ><button
+        ><div class="performance-panel-tools"><button
+          type="button"
+          class="performance-refresh"
+          :title="t('exportAudioTrace')"
+          :aria-label="t('exportAudioTrace')"
+          :disabled="!traceEvents.length"
+          @click="exportTrace"
+          ><Icon name="download" :size="15" /></button><button
           type="button"
           class="performance-refresh"
           :title="t('measureNow')"
+          :aria-label="t('measureNow')"
           :disabled="performanceRunning"
           @click="refreshPerformanceProbe"
-          ><Icon
-            name="refresh"
-            :size="15" /></button
+          ><Icon name="refresh" :size="15" /></button></div
       ></header>
       <div
         class="voice-status-summary"
@@ -147,6 +153,7 @@
               : t("voiceStatusWaiting")
         }}</p
       >
+      <p class="performance-status">{{ t("backgroundVoiceHint") }} · {{ t("audioTraceHint") }}</p>
       <section
         v-if="showScreenShare && screenShareWebRtcStats.peers.length"
         class="webrtc-stats"
@@ -224,7 +231,7 @@ import type { useWebClientPerformance } from "../../composables/useWebClientPerf
 import type { ScreenShareWebRtcStats } from "../../composables/useVoiceWebSocket.js";
 const props = defineProps<{ model: ReturnType<typeof useWebClientPerformance>; screenShareWebRtcStats: ScreenShareWebRtcStats; showScreenShare?: boolean; t: (key: string) => string }>();
 const showScreenShare = props.showScreenShare !== false;
-const { panelOpen: performancePanelOpen, running: performanceRunning, stats: performanceStats, togglePanel: togglePerformancePanel, refresh: refreshPerformanceProbe } = props.model;
+const { panelOpen: performancePanelOpen, running: performanceRunning, stats: performanceStats, traceEvents, togglePanel: togglePerformancePanel, refresh: refreshPerformanceProbe, exportTrace } = props.model;
 const root = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
 const t = props.t;

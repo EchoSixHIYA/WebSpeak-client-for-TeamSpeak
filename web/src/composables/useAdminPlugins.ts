@@ -6,10 +6,10 @@ import { parsePluginPackage, PLUGIN_LIMIT_BYTES, type InstalledPlugin, type Plug
 export function useAdminPlugins(api: AdminApi) {
   const installed=shallowRef<InstalledPlugin[]>([]),catalog=shallowRef<PluginCatalog|null>(null),runtime=shallowRef<PluginRuntimeSettings|null>(null);
   const origin=ref(''),busy=ref(false),error=ref(''),catalogError=ref(''),requests=createAdminRequests();
-  const drafts=reactive<Record<string,{enabled:boolean;trusted:boolean;scope:'server'|'instance';targets:string;config:string;serverConfigAction:'keep'|'replace'|'remove';serverConfig:string}>>({});
+  const drafts=reactive<Record<string,{enabled:boolean;trusted:boolean;toolbarPinned:boolean;scope:'server'|'instance';targets:string;config:string;serverConfigAction:'keep'|'replace'|'remove';serverConfig:string}>>({});
   function apply(records:InstalledPlugin[]){
     installed.value=records;
-    for(const record of records)if(!drafts[record.manifest.id])drafts[record.manifest.id]={enabled:record.settings.enabled,trusted:record.settings.trusted,scope:record.settings.scope,targets:record.settings.targets.join('\n'),config:JSON.stringify(record.settings.config,null,2),serverConfigAction:'keep',serverConfig:''};
+    for(const record of records)if(!drafts[record.manifest.id])drafts[record.manifest.id]={enabled:record.settings.enabled,trusted:record.settings.trusted,toolbarPinned:record.settings.toolbarPinned,scope:record.settings.scope,targets:record.settings.targets.join('\n'),config:JSON.stringify(record.settings.config,null,2),serverConfigAction:'keep',serverConfig:''};
     for(const id of Object.keys(drafts))if(!records.some(r=>r.manifest.id===id))delete drafts[id];
   }
   async function work(run:(signal:AbortSignal,current:()=>boolean)=>Promise<void>){
@@ -29,7 +29,7 @@ export function useAdminPlugins(api: AdminApi) {
   });}
   function save(record:InstalledPlugin){return work(async(signal,current)=>{
     const draft=drafts[record.manifest.id],captured=JSON.stringify(draft);
-    const settings:PluginSettingsInput={enabled:draft.enabled,trusted:draft.trusted,scope:draft.scope,targets:draft.targets.split(/\r?\n/).map(t=>t.trim()).filter(Boolean),config:JSON.parse(draft.config),serverConfigAction:draft.serverConfigAction,...(draft.serverConfigAction==='replace'?{serverConfig:JSON.parse(draft.serverConfig)}:{})};
+    const settings:PluginSettingsInput={enabled:draft.enabled,trusted:draft.trusted,toolbarPinned:draft.toolbarPinned,scope:draft.scope,targets:draft.targets.split(/\r?\n/).map(t=>t.trim()).filter(Boolean),config:JSON.parse(draft.config),serverConfigAction:draft.serverConfigAction,...(draft.serverConfigAction==='replace'?{serverConfig:JSON.parse(draft.serverConfig)}:{})};
     const result=await api.configurePlugin(record.manifest.id,record.revision,settings,signal);
     if(current()){if(JSON.stringify(drafts[record.manifest.id])===captured)delete drafts[record.manifest.id];apply(installed.value.map(p=>p.manifest.id===record.manifest.id?result.plugin:p));}
   });}

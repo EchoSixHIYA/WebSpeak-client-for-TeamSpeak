@@ -28,7 +28,17 @@ export class PluginRegistry {
         const manifest=parsePluginManifest(v.manifest);pluginAssert(file===`${manifest.id}.json`&&typeof v.packageDigest==='string'&&/^[a-f0-9]{64}$/.test(v.packageDigest)&&typeof v.serverConfigCiphertext==='string'&&typeof v.installedAt==='number'&&Number.isFinite(v.installedAt));
         const settings=this.settings(v.settings,manifest,!!v.serverConfigCiphertext);
         const record={schemaVersion:2 as const,manifest,settings,packageDigest:v.packageDigest,serverConfigCiphertext:v.serverConfigCiphertext,installedAt:v.installedAt,revision:''};
-        this.readSecret(record);record.revision=this.hash(record);pluginAssert(record.revision===v.revision);this.records.set(manifest.id,record);
+        this.readSecret(record);
+        if (pluginRecord(v.settings) && v.settings.toolbarPinned === undefined) {
+          const legacyHash=createHash("sha256").update(JSON.stringify({manifest,settings:v.settings,packageDigest:v.packageDigest,serverConfigCiphertext:v.serverConfigCiphertext,installedAt:v.installedAt})).digest("hex");
+          pluginAssert(legacyHash===v.revision);
+          record.revision="";
+          this.records.set(manifest.id,record);
+          try { await this.commit(record); }
+          catch { /* keep the migrated record usable in memory if disk replacement fails */ }
+        } else {
+          record.revision=this.hash(record);pluginAssert(record.revision===v.revision);this.records.set(manifest.id,record);
+        }
       } catch { /* Invalid or obsolete packages are never executed. */ }
     }
   }
@@ -41,12 +51,12 @@ export class PluginRegistry {
     return createHash('sha256').update(JSON.stringify({manifest:record.manifest,settings:record.settings,packageDigest:record.packageDigest,serverConfigCiphertext:record.serverConfigCiphertext,installedAt:record.installedAt})).digest('hex');
   }
   private settings(value: unknown, manifest: StoredPlugin['manifest'], hasServerConfig: boolean): PluginSettings {
-    pluginAssert(pluginRecord(value)&&typeof value.enabled==='boolean'&&typeof value.trusted==='boolean'&&manifest.scopes.includes(value.scope as never));
+    pluginAssert(pluginRecord(value)&&typeof value.enabled==='boolean'&&typeof value.trusted==='boolean'&&(value.toolbarPinned===undefined||typeof value.toolbarPinned==='boolean')&&manifest.scopes.includes(value.scope as never));
     pluginAssert(Array.isArray(value.targets)&&value.targets.length<=50&&value.targets.every(t=>typeof t==='string'&&t.length<=300));
     let targets:string[];try{targets=[...new Set(value.targets.map(t=>teamSpeakTargetKey(parseTeamSpeakTarget(t))))];}catch{throw new PluginError('PLUGIN_TARGET_INVALID');}
     pluginAssert(!value.enabled||value.trusted,'PLUGIN_TRUST_REQUIRED');
     pluginAssert(value.scope!=='server'||!value.enabled||targets.length>0,'PLUGIN_TARGET_REQUIRED');
-    return {enabled:value.enabled,trusted:value.trusted,scope:value.scope as PluginSettings['scope'],targets,config:parsePluginJson(value.config),hasServerConfig};
+    return {enabled:value.enabled,trusted:value.trusted,toolbarPinned:value.toolbarPinned===true,scope:value.scope as PluginSettings['scope'],targets,config:parsePluginJson(value.config),hasServerConfig};
   }
   private readSecret(record: StoredPlugin): JsonValue {
     const text=decryptSecret(record.serverConfigCiphertext,this.masterKey,`webspeak:plugin-config:v2:${record.manifest.id}`);
@@ -66,7 +76,7 @@ export class PluginRegistry {
     await mkdir(directory,{recursive:true});const file=path.join(directory,`${digest}.wplugin`);
     try{await writeFile(file,bytes,{flag:'wx',mode:0o600});}catch(error){if(!(error&&typeof error==='object'&&'code'in error&&error.code==='EEXIST'))throw error;}
     const old=previous?.settings;
-    const settings={enabled:false,trusted:false,scope:old&&pack.manifest.scopes.includes(old.scope)?old.scope:pack.manifest.scopes[0],targets:old?.targets??[],config:old?.config??{},hasServerConfig:!!previous?.serverConfigCiphertext};
+    const settings={enabled:false,trusted:false,toolbarPinned:old?.toolbarPinned??false,scope:old&&pack.manifest.scopes.includes(old.scope)?old.scope:pack.manifest.scopes[0],targets:old?.targets??[],config:old?.config??{},hasServerConfig:!!previous?.serverConfigCiphertext};
     return this.commit({schemaVersion:2,manifest:pack.manifest,settings,packageDigest:digest,serverConfigCiphertext:previous?.serverConfigCiphertext??'',installedAt:previous?.installedAt??Date.now(),revision:''});
   });}
   configure(id:string,input:unknown,revision:string):Promise<InstalledPlugin>{return this.mutate(async()=>{

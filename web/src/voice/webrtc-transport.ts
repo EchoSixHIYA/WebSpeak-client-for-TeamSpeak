@@ -2,6 +2,7 @@ import { isSessionDescription, type WebRtcClientMessage } from "../../../src/sha
 import { createWebRtcInput, type WebRtcInput } from "./webrtc-input.js";
 import { createMicrophoneMeter, type MicrophoneMeter } from "./microphone-meter.js";
 import { createWebRtcPlayback, type WebRtcPlaybackOptions } from "./webrtc-playback.js";
+import { addOpusFmtpParameters } from "../../../src/shared/opus-sdp.js";
 
 interface Microphone {
   context: AudioContext;
@@ -24,6 +25,7 @@ interface TransportOptions {
   releaseAccompaniment(): void;
   onLevel(rms: number | null, track: MediaStreamTrack): void;
   onReady(): void;
+  onConnectionState?(state: RTCPeerConnectionState): void;
   onFallback(reason: string, isCurrent: () => boolean): Promise<void>;
   playback: WebRtcPlaybackOptions;
 }
@@ -142,20 +144,22 @@ export function createWebRtcTransport(options: TransportOptions) {
       };
       record.meter = createMicrophoneMeter(context, stream, rms => options.onLevel(rms, track));
       peer.onconnectionstatechange = () => {
+        options.onConnectionState?.(peer.connectionState);
         if (isCurrent(record) && peer.connectionState === "failed") void fail(record, "WEBRTC_CONNECTION_FAILED");
       };
+      options.onConnectionState?.(peer.connectionState);
 
       record.active = true;
       const offer = await peer.createOffer();
       if (!isCurrent(record)) return;
-      await peer.setLocalDescription(offer);
+      await peer.setLocalDescription({ ...offer, sdp: addOpusFmtpParameters(offer.sdp ?? "", ["stereo=1"]) });
       if (!isCurrent(record)) return;
       await waitForIce(record, peer);
       if (!isCurrent(record)) return;
       const description = peer.localDescription;
       if (!description || description.type !== "offer") throw new Error("WebRTC offer was not created");
       connection.send({ type: "webrtcOffer", payload: {
-        sdp: { type: "offer", sdp: description.sdp },
+        sdp: { type: "offer", sdp: addOpusFmtpParameters(description.sdp, ["stereo=1"]) },
         muted: options.muted(), accompanimentActive: options.accompanimentActive(),
       } });
       record.answerTimer = window.setTimeout(() => {

@@ -1,10 +1,14 @@
 <template>
+  <Teleport to="#webspeak-plugin-toolbar">
+    <div v-if="thirdPartyAllowed && connected && sessionToken" class="ws-plugin-toolbar">
+      <button ref="launcher" class="header-action ws-plugin-toolbar-trigger" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="visible" @click="toggle">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+      </button>
+      <button v-for="entry in pinnedApps" :key="entry.manifest.id" class="header-action ws-plugin-toolbar-shortcut" type="button" :title="entry.manifest.name" :aria-label="entry.manifest.name" :disabled="busy || entry.runtime.state === 'failed'" @click="launch(entry.manifest.id)">{{ entry.manifest.name.slice(0, 1).toUpperCase() }}</button>
+    </div>
+  </Teleport>
   <Teleport to="body">
     <div v-if="thirdPartyAllowed && connected && sessionToken" class="ws-plugin-overlay" :data-plugin-theme="theme">
-      <button ref="launcher" class="ws-plugin-launcher" :style="launcherPosition" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="visible" @pointerdown="startLauncherDrag" @lostpointercapture="endDrag" @click="toggle">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
-        <span>{{ tr('title') }}</span><i v-if="current" />
-      </button>
       <section v-show="visible" ref="windowElement" class="ws-plugin-window" :class="{ 'is-maximized': maximized, 'is-dragging': dragging }" :style="position" role="dialog" :aria-label="current && appView ? current.manifest.name : tr('title')" tabindex="-1" @keydown.esc.stop="minimize">
         <header class="ws-plugin-titlebar" @pointerdown="startDrag" @lostpointercapture="endDrag" @dblclick="toggleMaximize">
           <span class="ws-plugin-mark" aria-hidden="true">◈</span>
@@ -55,14 +59,14 @@ const tr = (key: PluginTextKey) => pluginTranslations[props.language][key];
 const ui = computed(() => pluginWindowTranslations[props.language]);
 const windowElement = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), frame = ref<HTMLIFrameElement | null>(null);
 const available = shallowRef<AvailablePluginApp[]>([]), current = shallowRef<PluginAppLaunch | null>(null);
+const pinnedApps = computed(() => available.value.filter(entry => entry.toolbarPinned));
 const busy = ref(false), error = ref(''), theme = ref<'light' | 'dark'>('light');
 const visible = ref(false), maximized = ref(false), appView = ref(false), dragging = ref(false), search = ref('');
 const position = ref<Record<string, string>>({});
-const launcherPosition = ref<Record<string, string>>({});
 const filtered = computed(() => available.value.filter(entry => `${entry.manifest.name} ${entry.manifest.description}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())));
 let epoch = 0, pending: AbortController | undefined, opening: { client: PluginAppClient; key: string } | undefined, observer: MutationObserver | undefined;
-let drag: { id: number; x: number; y: number; left: number; top: number; handle: HTMLElement; kind: 'window' | 'launcher'; moved: boolean } | undefined;
-let suppressLauncherClick = false, resizeObserver: ResizeObserver | undefined;
+let drag: { id: number; x: number; y: number; left: number; top: number; handle: HTMLElement; moved: boolean } | undefined;
+let resizeObserver: ResizeObserver | undefined;
 const browserFeatures = computed(() => {
   const policy = (document as Document & { featurePolicy?: { features(): string[] } }).featurePolicy;
   const features = policy?.features() ?? ['fullscreen', 'autoplay', 'camera', 'microphone', 'display-capture', 'clipboard-read', 'clipboard-write', 'geolocation', 'screen-wake-lock'];
@@ -84,7 +88,6 @@ async function refresh() {
   finally { if (owner === epoch) { busy.value = false; pending = undefined; } }
 }
 function toggle() {
-  if (suppressLauncherClick) { suppressLauncherClick = false; return; }
   if (visible.value) { minimize(); return; }
   detectTheme(); visible.value = true;
   if (!current.value) { appView.value = false; void refresh(); }
@@ -98,6 +101,7 @@ function stop() {
 }
 async function launch(id: string) {
   if (!thirdPartyAllowed.value) return;
+  detectTheme(); visible.value = true;
   if (current.value?.manifest.id === id) { appView.value = true; return; }
   stop(); const owner = ++epoch, controller = new AbortController(), service = client(), key = crypto.randomUUID(); pending = controller; opening = { client: service, key }; busy.value = true; error.value = '';
   try {
@@ -115,10 +119,6 @@ function message(event: MessageEvent) {
 }
 function appearance() { if (current.value && opening) void opening.client.appearance(current.value.id, theme.value, props.language).catch(() => undefined); }
 function fitWindow() {
-  if (launcher.value && launcherPosition.value.left) {
-    const box = launcher.value.getBoundingClientRect();
-    launcherPosition.value = { left: `${Math.max(8, Math.min(box.left, innerWidth - box.width - 8))}px`, top: `${Math.max(8, Math.min(box.top, innerHeight - box.height - 8))}px`, right: 'auto', bottom: 'auto' };
-  }
   if (!visible.value || maximized.value || !windowElement.value) return;
   const box = windowElement.value.getBoundingClientRect();
   position.value = { left: `${Math.max(8, Math.min(box.left, innerWidth - box.width - 8))}px`, top: `${Math.max(8, Math.min(box.top, innerHeight - box.height - 8))}px`, transform: 'none' };
@@ -128,34 +128,34 @@ function startDrag(event: PointerEvent) {
   if (event.button !== 0 || maximized.value || (event.target as HTMLElement).closest('button')) return;
   const box = windowElement.value?.getBoundingClientRect(); if (!box) return;
   event.preventDefault(); const handle = event.currentTarget as HTMLElement;
-  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: box.left, top: box.top, handle, kind: 'window', moved: false }; dragging.value = true;
+  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: box.left, top: box.top, handle, moved: false }; dragging.value = true;
   handle.setPointerCapture(event.pointerId);
-}
-function startLauncherDrag(event: PointerEvent) {
-  if (event.button !== 0 || !launcher.value) return;
-  const box = launcher.value.getBoundingClientRect(); suppressLauncherClick = false;
-  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: box.left, top: box.top, handle: launcher.value, kind: 'launcher', moved: false };
-  launcher.value.setPointerCapture(event.pointerId);
 }
 function moveDrag(event: PointerEvent) {
   if (!drag || drag.id !== event.pointerId) return;
-  const target = drag.kind === 'launcher' ? launcher.value : windowElement.value; if (!target) return;
+  const target = windowElement.value; if (!target) return;
   if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 5 && !drag.moved) return;
   drag.moved = true; const box = target.getBoundingClientRect();
   const next = { left: `${Math.max(8, Math.min(drag.left + event.clientX - drag.x, innerWidth - box.width - 8))}px`, top: `${Math.max(8, Math.min(drag.top + event.clientY - drag.y, innerHeight - box.height - 8))}px`, transform: 'none' };
-  if (drag.kind === 'launcher') launcherPosition.value = { ...next, right: 'auto', bottom: 'auto' }; else position.value = next;
+  position.value = next;
 }
 function endDrag() {
   const old = drag; drag = undefined; dragging.value = false;
-  if (old?.kind === 'launcher' && old.moved) suppressLauncherClick = true;
   if (old?.handle.hasPointerCapture(old.id)) old.handle.releasePointerCapture(old.id);
 }
 watch(windowElement, element => { resizeObserver?.disconnect(); if (element) { resizeObserver = new ResizeObserver(fitWindow); resizeObserver.observe(element); } });
-watch(() => [props.sessionToken, props.gatewayUrl, props.connected] as const, close);
-watch(thirdPartyAllowed, allowed => { if (!allowed) close(); }, { flush: 'sync' });
+watch(() => [props.sessionToken, props.gatewayUrl, props.connected] as const, () => {
+  close();
+  if (props.connected && thirdPartyAllowed.value) void refresh();
+});
+watch(thirdPartyAllowed, allowed => {
+  if (!allowed) close();
+  else if (props.connected) void refresh();
+}, { flush: 'sync' });
 watch(() => props.language, appearance); watch(theme, appearance);
 onMounted(() => {
   detectTheme(); window.addEventListener('message', message); window.addEventListener('resize', fitWindow); window.addEventListener('pointermove', moveDrag); window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag); window.addEventListener('blur', endDrag);
+  if (props.connected && thirdPartyAllowed.value) void refresh();
   observer = new MutationObserver(detectTheme); observer.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-ws-skin', 'data-theme'] });
 });
 onBeforeUnmount(() => { stop(); endDrag(); observer?.disconnect(); resizeObserver?.disconnect(); window.removeEventListener('message', message); window.removeEventListener('resize', fitWindow); window.removeEventListener('pointermove', moveDrag); window.removeEventListener('pointerup', endDrag); window.removeEventListener('pointercancel', endDrag); window.removeEventListener('blur', endDrag); });

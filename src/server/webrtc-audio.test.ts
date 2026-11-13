@@ -116,6 +116,7 @@ function fixture() {
     closed: false, closePromise: null, audioTimer: null, activityTimer: undefined,
     pendingFrames: new Map([[1, []]]), memberVolumes: new Map([[1, 1]]),
     partialPcmByClient: new Map([[1, Buffer.alloc(2)]]), activeSpeakerIds: new Set([1]),
+    decoderCodecByClient: new Map([[1, 4], [2, 5]]),
     decoderByClient: new Map([
       [1, { dispose() { released.push("decoder-1"); throw new Error("Decoder failed"); } }],
       [2, { dispose() { released.push("decoder-2"); } }],

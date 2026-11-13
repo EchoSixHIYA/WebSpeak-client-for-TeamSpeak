@@ -6,6 +6,7 @@ export interface ConnectionFailure {
 
 interface ConnectionOptions {
   onSocket(socket: WebSocket | null): void;
+  onSocketOpen?(): void;
   onMessage(message: unknown): void;
   onAudio(frame: Uint8Array): void;
   onClose(event: CloseEvent): void;
@@ -72,6 +73,7 @@ export function createVoiceConnection(options: ConnectionOptions) {
     options.onSocket(socket);
     socket.onopen = () => {
       if (!isCurrent(record)) clean(() => socket.close(1000));
+      else options.onSocketOpen?.();
     };
     socket.onmessage = event => {
       if (!isCurrent(record) || record.socket !== socket || socket.readyState !== WebSocket.OPEN) return;

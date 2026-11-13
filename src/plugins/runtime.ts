@@ -105,7 +105,7 @@ export class PluginRuntime {
   async restart(id:string):Promise<void>{this.revokePlugin(id,"PLUGIN_RESTARTED");const entry=this.entries.get(id);if(entry)entry.stale=true;await this.synchronize(id);}
   directory(voiceToken:string) {
     const participant=this.options.participant(voiceToken);pluginAssert(participant,"PLUGIN_NOT_CONNECTED");
-    return this.options.registry.list().filter(policy=>{try{this.scopeKey(policy,participant);return true;}catch{return false;}}).map(policy=>({manifest:policy.manifest,scope:policy.settings.scope,runtime:this.status(policy.manifest.id)}));
+      return this.options.registry.list().filter(policy=>{try{this.scopeKey(policy,participant);return true;}catch{return false;}}).map(policy=>({manifest:policy.manifest,scope:policy.settings.scope,toolbarPinned:policy.settings.toolbarPinned,runtime:this.status(policy.manifest.id)}));
   }
   private scopeKey(policy:InstalledPlugin,participant:PluginParticipant):string{
     pluginAssert(policy.settings.enabled&&policy.settings.trusted,"PLUGIN_DISABLED");

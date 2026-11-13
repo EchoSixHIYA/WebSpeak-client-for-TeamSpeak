@@ -1,6 +1,6 @@
 import { parsePluginManifest, pluginAssert, pluginRecord, type PluginManifest, type PluginAppLaunch, type PluginScope, type PluginRuntimeStatus } from '../../../src/shared/plugins.js';
 
-export interface AvailablePluginApp { manifest: PluginManifest; scope: PluginScope; runtime: PluginRuntimeStatus }
+export interface AvailablePluginApp { manifest: PluginManifest; scope: PluginScope; toolbarPinned: boolean; runtime: PluginRuntimeStatus }
 export function createPluginAppClient(gatewayUrl:string,token:string,fetcher:typeof fetch=fetch,timeoutMs=15000){
   pluginAssert(/^[A-Za-z0-9_-]{43}$/.test(token),'PLUGIN_NOT_CONNECTED');
   const gateway=new URL(gatewayUrl);pluginAssert(['ws:','wss:','http:','https:'].includes(gateway.protocol)&&!gateway.username&&!gateway.password);
@@ -23,7 +23,7 @@ export function createPluginAppClient(gatewayUrl:string,token:string,fetcher:typ
       const value=await request('','GET',undefined,signal);pluginAssert(pluginRecord(value)&&Array.isArray(value.plugins)&&value.plugins.length<=50,'PLUGIN_INVALID_RESPONSE');
       return value.plugins.map(entry=>{
         pluginAssert(pluginRecord(entry)&&(entry.scope==='server'||entry.scope==='instance')&&pluginRecord(entry.runtime)&&['disabled','client','stopped','starting','running','failed'].includes(String(entry.runtime.state)),'PLUGIN_INVALID_RESPONSE');
-        return {manifest:parsePluginManifest(entry.manifest),scope:entry.scope,runtime:{state:entry.runtime.state as PluginRuntimeStatus['state'],...(typeof entry.runtime.error==='string'?{error:entry.runtime.error}:{})}};
+        return {manifest:parsePluginManifest(entry.manifest),scope:entry.scope,toolbarPinned:entry.toolbarPinned===true,runtime:{state:entry.runtime.state as PluginRuntimeStatus['state'],...(typeof entry.runtime.error==='string'?{error:entry.runtime.error}:{})}};
       });
     },
     async open(id:string,options:{openId:string;theme:'light'|'dark';language:string},signal?:AbortSignal):Promise<PluginAppLaunch>{

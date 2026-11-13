@@ -6113,6 +6113,12 @@
   gap: 12px;
 }
 
+:deep(.performance-panel-tools) {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
 :deep(.performance-panel header strong),
 :deep(.performance-panel header small) {
   display: block;
@@ -6746,6 +6752,29 @@
   display: block;
   color: var(--text-primary);
   font-size: 11px;
+}
+
+:deep(.noise-suppression-level) {
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px 28px 8px 10px;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+}
+
+:deep(.noise-suppression-level:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
+:deep(.dock-switch-row .noise-suppression-level) {
+  min-width: 138px;
+  max-width: 168px;
+  font-size: 10px;
 }
 
 :deep(.noise-suppression-toggle) {
