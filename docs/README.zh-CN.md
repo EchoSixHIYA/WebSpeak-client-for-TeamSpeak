@@ -78,6 +78,8 @@ WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语�
 <details>
 <summary>展开日间、夜间、ILLUSIA、KAAK 与 Discord Voice 皮肤预览</summary>
 
+以下截图拍摄于已连接的 TeamSpeak 语音房间。
+
 | 日间 | 夜间 |
 | --- | --- |
 | ![日间皮肤](./screenshots/skin-day.png) | ![夜间皮肤](./screenshots/skin-night.png) |

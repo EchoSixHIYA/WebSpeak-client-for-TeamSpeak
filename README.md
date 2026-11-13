@@ -52,6 +52,8 @@ Join voice channels, chat and share your screen from a browser. Deploy your own 
 
 - [简体中文](./docs/README.zh-CN.md#screenshots) · [English](./docs/README.en.md#screenshots) · [Deutsch](./docs/README.de.md#screenshots) · [Русский](./docs/README.ru.md#screenshots) · [日本語](./docs/README.ja.md#screenshots)
 
+以下皮肤截图拍摄于已连接的 TeamSpeak 语音房间。 / The skin screenshots below were captured in a connected TeamSpeak voice room.
+
 | 日间 · Day | 夜间 · Night |
 | --- | --- |
 | ![日间皮肤 · Day skin](./docs/screenshots/skin-day.png) | ![夜间皮肤 · Night skin](./docs/screenshots/skin-night.png) |
