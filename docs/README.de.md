@@ -13,7 +13,7 @@
 
 WebSpeak ist ein selbst gehosteter Browserclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer verwenden Sprache, Chat und Bildschirmfreigabe im Browser; Betreiber verwalten Zielserver, Zugriff und Daten über die Webkonsole.
 
-Stabile Version: [Hinweise zu v0.3.0](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Mit Plugin-API v2, schwebenden Anwendungen und gemeinsamer Instanzberechtigung.
+Stabile Version: [Hinweise zu v0.3.1](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Audiowiedergabe und Diagnose, Rauschunterdrückung, Plugin-Kurzbefehle und private Einladungen.
 
 
 
@@ -340,6 +340,14 @@ Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und opti
 ## Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
+
+- Die WebSocket-Wiedergabe berücksichtigt jetzt die Opus-Kanalzahl und die tatsächliche Paketdauer. Der WebRTC-Downlink-Mix erhält Stereo. Siehe #54.
+- Die Rauschunterdrückung bietet jetzt Aus, Standard und Stark. Stark kombiniert die Browserfunktion mit RNNoise. Siehe #53.
+- Das Sprachstatusfenster exportiert die letzten zwei Minuten der Gateway-, Sprach- und Mikrofondiagnose. Die Aufnahme im Hintergrund hängt vom Browser und Betriebssystem ab. Siehe #49 und #55.
+- Der Plugin-Einstieg befindet sich in der Werkzeugleiste des Sprachbereichs. Administratoren können Plugin-Kurzbefehle anheften. Siehe #56.
+- Private Arbeitsbereichseinladungen können ablaufen. Die KAAK-Willkommensseite wurde wiederhergestellt, das überdeckte Skin-Menü in der Demo und zu kurze Wartezeiten bei großen Downloads wurden korrigiert. Die README zeigt fünf Skins.
 
 ### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
 

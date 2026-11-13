@@ -13,7 +13,7 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors join voice, chat and screen sharing in a browser; operators manage target servers, access policy and data through the administration console.
 
-Stable release: [v0.3.0 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Includes plugin API v2, floating applications and unified instance authorization.
+Stable release: [v0.3.1 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Voice playback and diagnostics, noise suppression levels, plugin shortcuts and private invites.
 
 
 
@@ -340,6 +340,14 @@ Functional plugins are independent applications using standard browser capabilit
 ## Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
+
+- Fixed lost Opus channel information and fixed 20 ms packet durations in WebSocket playback. WebRTC downlink mixing now preserves stereo. See #54.
+- Added Off, Standard and Strong noise suppression. Strong combines browser suppression with RNNoise. See #53.
+- The voice performance panel can export two minutes of gateway, voice and microphone diagnostics for disconnects and interrupted background capture. Background capture still depends on browser and OS policies. See #49 and #55.
+- Moved the plugin launcher into the voice workspace toolbar. Administrators can pin plugin shortcuts. See #56.
+- Added expiring private workspace invites and restored the KAAK welcome page. Fixed an obscured skin menu in the demo and premature timeouts on large skin downloads. The README now shows five skins.
 
 ### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
 

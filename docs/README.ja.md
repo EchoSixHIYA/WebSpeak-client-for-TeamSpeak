@@ -13,7 +13,7 @@
 
 WebSpeak はセルフホスト型の TeamSpeak 3 / TeamSpeak 6 ブラウザークライアント兼音声ゲートウェイです。ユーザーはブラウザーで音声、チャット、画面共有に参加でき、運営者は管理コンソールで接続先、アクセス方針、データを管理できます。
 
-安定版：[v0.3.0 更新内容](#latest-release-notes) · [ダウンロード](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。API v2、フローティングアプリ、インスタンス単位の許可に対応。
+安定版：[v0.3.1 更新内容](#latest-release-notes) · [ダウンロード](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 音声再生と診断、ノイズ抑制、プラグインのショートカット、非公開招待を改善。
 
 
 
@@ -275,6 +275,14 @@ relay.example.com {
 ## 更新履歴
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
+
+- WebSocket 再生で Opus のチャンネル情報と実際のパケット長を扱うよう修正しました。WebRTC の下りミックスでもステレオを維持します。関連 #54。
+- ノイズ抑制にオフ・標準・強の3段階を追加しました。強ではブラウザーのノイズ抑制と RNNoise を併用します。関連 #53。
+- 音声パネルから直近2分間のゲートウェイ、音声、マイクの診断をエクスポートできます。バックグラウンドでの録音はブラウザーと OS の制約を受けます。関連 #49、#55。
+- プラグインの入口を音声ワークスペースのツールバーに移動し、管理者がショートカットを固定できるようにしました。関連 #56。
+- 有効期限付きの非公開招待を追加し、KAAK のウェルカム画面を復元しました。デモのスキンメニューが隠れる問題と、大きなスキンのダウンロードが早くタイムアウトする問題を修正しました。README に5種類のスキン画像を追加しました。
 
 ### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
 

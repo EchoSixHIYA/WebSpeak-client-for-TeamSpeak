@@ -13,7 +13,7 @@
 
 WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户通过浏览器加入语音、聊天和屏幕共享；部署者通过管理员控制台管理目标服务器、访问策略和数据。
 
-稳定版：[v0.3.0 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。包含功能插件 API v2、悬浮应用界面和实例统一授权。
+稳定版：[v0.3.1 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 语音播放与诊断、降噪选项、插件快捷入口和私密邀请。
 
 
 
@@ -360,15 +360,15 @@ relay.example.com {
 
 <a id="live-update-2026-11-13"></a>
 
-### 2026-11-13 · 在线演示更新
-
-- 修复 WebSocket 语音播放丢失声道信息和固定按 20 毫秒处理 Opus 包的问题，并在 WebRTC 下行混音中保留立体声。关联 #54。
-- 音频设置提供关闭、标准和强三档降噪。强档在浏览器降噪基础上使用 RNNoise。关联 #53。
-- 语音性能面板支持导出最近两分钟的连接与音频诊断。记录包括页面切换和麦克风状态，便于定位切到后台后语音中断的原因。后台采音仍受操作系统和浏览器限制。关联 #49、#55。
-- 插件入口移至语音工作区顶部工具栏。管理员可以将可用插件固定为快捷入口。关联 #56。
-- 支持有有效期的私密工作区邀请，恢复 KAAK 欢迎页，并补充五款皮肤的截图。
-
 <a id="latest-release-notes"></a>
+
+### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
+
+- 修复 WebSocket 播放丢失 Opus 声道信息、固定按 20 毫秒处理音频包的问题，并保留 WebRTC 下行混音的立体声。关联 #54。
+- 新增关闭、标准和强三档降噪。强档在浏览器降噪基础上使用 RNNoise。关联 #53。
+- 语音性能面板可导出最近两分钟的网关、语音和麦克风诊断，帮助定位掉线和后台采音中断。后台采音仍受浏览器和操作系统限制。关联 #49、#55。
+- 将插件入口移至语音工作区顶部工具栏，管理员可固定插件快捷入口。关联 #56。
+- 支持有有效期的私密工作区邀请，恢复 KAAK 欢迎页，并修复演示页皮肤菜单被遮挡及首次下载较大皮肤时容易超时的问题。README 补齐五款皮肤截图。
 
 ### [v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0) · 2026-11-03
 

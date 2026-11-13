@@ -19,9 +19,7 @@
   </p>
 </div>
 
-当前版本 / Current version: **[v0.3.0](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.0)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
-
-[在线演示更新 · 2026-11-13 / Live demo update](./docs/README.zh-CN.md#live-update-2026-11-13)
+当前版本 / Current version: **[v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
 
 ## 关于 WebSpeak · Overview
 
@@ -106,9 +104,9 @@ Data persists in the `webspeak-data` volume. The Compose file uses host networki
 | 皮肤包 · Skin packages | [皮肤索引 · Catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) |
 | 功能插件 · Functional plugins | [应用目录与开发起点 · Catalog & application starter](https://github.com/Huddle-Up-Forge/webspeak-plugin) · [开发指南 · Guide](./docs/PLUGIN_DEVELOPMENT.md) · [Agent Skill](./.agents/skills/webspeak-plugin-development/SKILL.md) |
 
-皮肤包负责界面、布局及其附属小组件；功能插件使用标准浏览器环境和可选 Node 后端，自行实现业务功能。功能插件 API v2 已包含在 v0.3.0 中，提供独立于皮肤的悬浮应用入口。
+皮肤包负责界面、布局及其附属小组件；功能插件使用标准浏览器环境和可选 Node 后端，自行实现业务功能。功能插件 API v2 已包含在 v0.3.1 中，提供独立于皮肤的工具栏入口。
 
-Skins own appearance, layout and attached widgets. Functional plugin API v2 is included in v0.3.0 with a skin-independent floating application workspace.
+Skins own appearance, layout and attached widgets. Functional plugin API v2 is included in v0.3.1 with a skin-independent toolbar entry for the application workspace.
 
 ### 开发与收录 · Develop & contribute
 

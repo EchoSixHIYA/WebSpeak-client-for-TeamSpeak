@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
-def appVersion = project.hasProperty('appVersion') ? project.property('appVersion').toString() : '0.3.0'
-def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toString().toInteger() : 300
+def appVersion = project.hasProperty('appVersion') ? project.property('appVersion').toString() : '0.3.1'
+def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toString().toInteger() : 301
 
 android {
     namespace = "io.webspeak.client"
