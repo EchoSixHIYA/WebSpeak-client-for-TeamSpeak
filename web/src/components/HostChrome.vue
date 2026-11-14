@@ -162,13 +162,16 @@ function openLibrary() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.defaultPrevented || event.repeat || !thirdPartyAllowed.value) return;
+  if (event.repeat || !thirdPartyAllowed.value) return;
+  // The recovery chord must survive a capture-phase preventDefault() from a
+  // skin or plugin, so it runs before the defaultPrevented check below.
   if (isRecoveryShortcut(event)) {
     event.preventDefault();
     shortcutOpen.value = true;
     void nextTick(() => recoveryPopover.value?.querySelector("button")?.focus());
     return;
   }
+  if (event.defaultPrevented) return;
   if (event.key === "Escape" && shortcutOpen.value) shortcutOpen.value = false;
 }
 
@@ -184,13 +187,13 @@ onMounted(() => {
   refreshLauncherReachability();
   reachabilityTimer = setInterval(refreshLauncherReachability, 1000);
   window.addEventListener("resize", refreshLauncherReachability);
-  window.addEventListener("keydown", onKeydown);
+  window.addEventListener("keydown", onKeydown, true);
   void nextTick(syncPopover);
 });
 onBeforeUnmount(() => {
   if (reachabilityTimer) clearInterval(reachabilityTimer);
   window.removeEventListener("resize", refreshLauncherReachability);
-  window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("keydown", onKeydown, true);
   layer?.dispose();
 });
 </script>

@@ -435,7 +435,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 - 皮肤激活时，宿主在 `documentElement` 上设置 `data-ws-host-skin="<皮肤 ID>"`；停用或回退到内置皮肤时立即移除。
 - 编译 `skin.css` 时，**只**命中下列宿主部件的单个选择器会被限定到 `:root[data-ws-host-skin="<皮肤 ID>"] …`，其余规则仍限定到 `.ws-skin-root[data-ws-skin="…"]`。宿主部件的选择器必须**以可主题化的 `[data-ws-part="host.…"]` 开头**，不能把 `:root`、`html`、`body` 或 `*:has(…)` 作为规则主体；`:root:has([data-ws-part="host.watermark"])` 一类写法会被拒绝。皮肤作者不能自己写 `html`、`body`、`data-ws-host-skin`、`data-ws-route`、`data-theme` 或 `data-ws-skin` 选择器，也不能在同一选择器里混用宿主部件与页面部件；宿主部件只对 schema v3/v4 开放皮肤生效。
-- 宿主外壳的布局与层级由 WebSpeak 拥有：皮肤可改颜色、边框、圆角、阴影和素材，但不能用 `position`、`inset`、`z-index`、`transform` 等把 `host.plugins.overlay` 之类控件变成全屏遮罩。
+- 宿主外壳的布局与层级：应用库外壳 `host.plugins.overlay` 仍由 WebSpeak 拥有——皮肤可改颜色、边框、圆角、阴影和素材，但不能用 `position`、`inset`、`z-index`、`transform`、尺寸等把它或其子元素变成全屏遮罩。装饰性宿主部件（`host.watermark`、`host.hint`、`host.voice-status-decoration`、`host.plugins.launcher`）可以被重定位、改变尺寸和动画化；恢复路径不依赖它们。
 - 自定义变量仍必须使用 `--skin-` 前缀（不能覆盖宿主内部令牌），`@import`、脚本、`expression()`、`javascript:` 等仍被拒绝。
 - 皮肤根作用域只在根内部向下生效。编译器会拒绝任何以 `:root` 开头、紧跟兄弟组合符（`+` / `~`）的选择器，例如 `:root ~ *`、`:root ~ [data-ws-host-layer]` 或 `:root:hover + div`；这类规则会被改写为皮肤根的兄弟选择器，从而够到 body 上的宿主层。`:root [data-ws-part="home.header"]`、`:root > [data-ws-part=…]` 这类后代/子代写法仍然可用。
 - 宿主自有层的属性 `data-ws-host-layer`、`data-ws-host-recovery`、`data-ws-host-layer-content` 与 `data-ws-recovery-action` **不是皮肤钩子**：它们不在公开部件表中，编译器会按名称拒绝引用它们的皮肤选择器（包括 `:root [data-ws-host-layer]` 这类带公开钩子的混合写法）。
@@ -461,9 +461,9 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 **显示规则**：只要当前是第三方（非内置/非官方）皮肤，恢复入口就作为小型常驻胶囊显示在左下角；它不是水印或装饰条，官方 Day、Night、ILLUSIA 与 KAAK 皮肤不会自动出现它。对内置/官方皮肤，它只在 `host.plugins.launcher` 被实例配置或 `chrome.json` 声明隐藏、或宿主在已连接状态下检测到启动器被 CSS 隐藏/移出视口/不可点击时作为兜底出现。
 
-**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。
+**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。监听器运行在捕获阶段，皮肤或插件脚本提前调用 `preventDefault()` 不会吞掉该组合键。
 
-`host.recovery` 与 `host.permission` 这两个名称仅保留为文档/布局元数据中的概念标识，**不再对应可被皮肤命中的 DOM 钩子**。皮肤加载失败的横幅使用独立部件 `app.skin-load-recovery`（「切换到内置皮肤」），与恢复胶囊不是同一个钩子。`skin.library` 是皮肤菜单里的应用库快捷入口，可作辅助路径，但**不是**兜底。
+`host.recovery` 与 `host.permission` 这两个名称仅保留为文档/布局元数据中的概念标识，**不再对应可被皮肤命中的 DOM 钩子**。皮肤加载失败的横幅保留 `app.skin-load-recovery` 部件标识（「切换到内置皮肤」），但它和恢复胶囊一样运行在闭合 Shadow DOM 宿主层中，编译后的皮肤 CSS 无法命中或改写它。`skin.library` 是皮肤菜单里的应用库快捷入口，可作辅助路径，但**不是**兜底。
 
 恢复入口的宿主层与授权对话框的宿主层各自独立；两者都不与装饰同父，因此 `[data-ws-part="host.watermark"] ~ *` 一类兄弟选择器也碰不到它们。
 
@@ -618,9 +618,11 @@ v1/v2 校验器会阻止隐藏必要操作控件和其容器。v3 可改变显�
 [data-ws-part="host.plugins.launcher"]
 ```
 
-上面必须使用单独的精确属性选择器；不能通过父容器、组合选择器或子元素间接隐藏/重置内容。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认不渲染，`chrome.json#visibleParts` 才是它们的开启开关。关键帧只有在其动画仅被这些可选部件引用时，才可使用透明度归零；若关键帧也被必要控件引用或动画名通过变量指定，则会被拒绝。`clip`、`clip-path` 和 `mask` 一律不允许，避免视觉裁切误伤真实控件。校验器是防止布局回归的边界，不是视觉质量证明；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
+上面必须使用单独的精确属性选择器；不能通过父容器、组合选择器或子元素间接隐藏/重置内容。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认不渲染，`chrome.json#visibleParts` 才是它们的开启开关。
 
-皮肤可以重画控制外观。v1/v2 不能重新布置必要操作；v3 可以，因此须人工实测加入/退出、麦克风状态、设置、菜单、屏幕共享退出、音量、全屏等操作的可达性。v3 也不能用大的负 `margin*`、`inset`/`translate` 等把受保护控件移出视口，或把 `host.plugins.overlay` 及其后代改成定位全屏、放大到覆盖视口（`zoom` 等）；这些写法会在导入时被拒绝。校验成功不代表设计质量合格；提交前要逐页实测窄屏和桌面尺寸、所有界面语言、键盘焦点与减少动效设置。
+关键帧与普通声明遵循同一套受保护控件检查：如果关键帧被受保护控件（例如 `voice.audio-dock`）引用，则其中的 `display: none`、`opacity: 0`、把控件移出视口的 `transform`/`inset`/`margin`，以及 `filter: opacity(0)` / `brightness(0)` 等视觉移除写法都会被拒绝；受保护控件上的 `animation` / `animation-name` 也不能用 `var()` / `attr()` 间接指定动画名。只被可选/装饰部件引用的关键帧仍可隐藏它们，v3 对非受保护部件的隐藏只给出警告。`clip`、`clip-path` 和 `mask` 并非一律禁止：它们仅在受保护控件主体上（以及作为 `host.plugins.overlay` 的既有锁定属性）被拒绝；官方示例皮肤（harbor、kaak）已经使用 `clip-path`。校验器是恢复路径的最后一道安全网，不是布局或视觉质量检查；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
+
+皮肤可以重画控制外观。v1/v2 不能重新布置必要操作；v3 可以，因此须人工实测加入/退出、麦克风状态、设置、菜单、屏幕共享退出、音量、全屏等操作的可达性。v3 也不能用大的负 `margin*`、`inset`/`translate` 等把受保护控件移出视口，或把 `host.plugins.overlay` 及其后代改成定位全屏、放大到覆盖视口（`zoom` 等）；这些写法会在导入时被拒绝。装饰性宿主外壳（`host.watermark`、`host.hint`、`host.voice-status-decoration`、`host.plugins.launcher`）和普通页面部件不受布局锁限制，可以自由使用 flex/grid、重定位、自定义尺寸、大背景和动画；固定定位或极端 `z-index` 只会给出提示。开放皮肤（v3/v4）的布局与视觉质量由官方库的人工审核保证，编译器不会阻止一般性的布局回归。校验成功不代表设计质量合格；提交前要逐页实测窄屏和桌面尺寸、所有界面语言、键盘焦点与减少动效设置。
 
 CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删除实例里的包会停止从服务器提供该包；已经下载过的浏览器副本会保留在本地存储，因此仍可能在该浏览器的选择器中出现。清除该站点的浏览器数据可移除本地副本。
 

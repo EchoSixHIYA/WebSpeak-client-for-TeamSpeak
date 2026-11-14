@@ -1,5 +1,5 @@
 import postcss, { type AtRule, type Declaration, type Node, type Rule } from "postcss";
-import selectorParser from "postcss-selector-parser";
+import selectorParser, { type Node as SelectorNode } from "postcss-selector-parser";
 import valueParser from "postcss-value-parser";
 import {
   DECORATIVE_PART_IDS as OPTIONAL_VISUAL_PARTS,
@@ -180,21 +180,47 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
 
   const referencedKeyframes = new Set<string>();
   const nonOptionalKeyframes = new Set<string>();
+  // Keyframes referenced by a protected control must obey the same
+  // visibility/positioning rules as a declaration on that control. Keyframe
+  // params are already namespaced at this point, so the maps use scoped names.
+  const protectedKeyframeParts = new Map<string, string>();
+  // Keyframes referenced by non-decorative host chrome (the plugin overlay
+  // shell) keep the host layout locks; decorative host parts are free to move.
+  const lockedHostKeyframeParts = new Map<string, Set<string>>();
   root.walkRules((rule: Rule) => {
     if (hasKeyframesAncestor(rule)) return;
     const optionalTarget = hideableRules.has(rule);
     rule.walkDecls((declaration: Declaration) => {
-      const property = declaration.prop.toLowerCase();
+      // Match the enforcement walk: decode the property so an escaped
+      // `anim\61 tion` cannot skip the keyframe mapping, and treat
+      // `-webkit-animation` as `animation`.
+      const property = decodeCssEscapes(declaration.prop).toLowerCase().replace(/^-(?:webkit|moz|ms|o)-/, "");
       if (property !== "animation" && property !== "animation-name") return;
-      const value = declaration.value;
-      if (/\b(?:var|attr)\s*\(|\\/i.test(value)) {
+      // Decode first so an escaped identifier (`\6b`, `ws-…-\00006b`) is
+      // matched against the original and namespaced names. `var()`/`attr()`
+      // still cannot be resolved statically; only those bail out. A bare
+      // backslash is no longer a reason to skip protected mapping.
+      const decodedValue = decodeCssEscapes(declaration.value);
+      if (/\b(?:var|attr)\s*\(/i.test(decodedValue)) {
         keyframeNames.forEach((_, name) => nonOptionalKeyframes.add(name));
         return;
       }
-      for (const name of keyframeNames.keys()) {
-        if (!referencesCssIdentifier(value, name)) continue;
+      // The value may already use the namespaced name (a pack can name its own
+      // id), so match both the original and the rewritten identifier.
+      const protectedTarget = selectorSubjectProtectedPart(rule.selector);
+      const lockedHostParts = selectorLockedHostParts(rule.selector);
+      for (const [name, scopedName] of keyframeNames) {
+        if (!referencesCssIdentifier(decodedValue, name) && !referencesCssIdentifier(decodedValue, scopedName)) continue;
         referencedKeyframes.add(name);
         if (!optionalTarget) nonOptionalKeyframes.add(name);
+        if (protectedTarget && !protectedKeyframeParts.has(scopedName)) {
+          protectedKeyframeParts.set(scopedName, protectedTarget);
+        }
+        if (lockedHostParts.length) {
+          const parts = lockedHostKeyframeParts.get(scopedName) ?? new Set<string>();
+          for (const part of lockedHostParts) parts.add(part);
+          lockedHostKeyframeParts.set(scopedName, parts);
+        }
       }
     });
   });
@@ -209,17 +235,30 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     const decodedValue = decodeCssEscapes(value);
     const owningRule = findOwningRule(declaration);
     const keyframesRule = owningRule ? findKeyframesRule(owningRule) : null;
+    const keyframeScope = keyframesRule?.params.trim() ?? null;
     const canHideTarget = owningRule
       ? hideableRules.has(owningRule) || Boolean(keyframesRule && optionalOnlyKeyframes.has(keyframesRule.params.trim()))
       : false;
     // Trusted UI and essential audio/recovery controls stay available even for
     // open skins. The host also draws authorization and recovery UI outside the
-    // skin root, so a container-level hide cannot remove them either.
-    const protectedTarget = owningRule && !keyframesRule ? selectorSubjectProtectedPart(owningRule.selector) : null;
+    // skin root, so a container-level hide cannot remove them either. A
+    // keyframe inherits the protected status of the rules that reference it.
+    const protectedTarget = owningRule
+      ? keyframesRule
+        ? (keyframeScope ? protectedKeyframeParts.get(keyframeScope) ?? null : null)
+        : selectorSubjectProtectedPart(owningRule.selector)
+      : null;
     // Every themeable host part referenced anywhere in the selector. A rule may
     // target a descendant of the overlay (for example with `*`), so the subject
     // alone is not enough to decide whether host chrome layout is at stake.
-    const hostChromeParts = owningRule && !keyframesRule ? selectorHostChromeParts(owningRule.selector) : [];
+    // Decorative host chrome (watermark, hint, status strip, plugin launcher)
+    // is free to be repositioned; only non-decorative host chrome keeps its
+    // layout locks.
+    const hostChromeParts = owningRule
+      ? keyframesRule
+        ? (keyframeScope ? [...(lockedHostKeyframeParts.get(keyframeScope) ?? [])] : [])
+        : selectorLockedHostParts(owningRule.selector)
+      : [];
     const inHostChromeScope = hostChromeParts.length > 0;
     const inOverlayScope = hostChromeParts.includes("host.plugins.overlay");
     if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)
@@ -231,10 +270,11 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     if (schemaVersion < 3 && isLayoutAffectingProperty(property)) {
       throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");
     }
-    // Host chrome lives outside the skin root and owns its own placement. A
-    // skin may repaint it (colors, borders, radius, artwork) but must not turn
-    // it — or any of its descendants — into a viewport-sized overlay above
-    // authorization/recovery UI.
+    // Non-decorative host chrome lives outside the skin root and owns its own
+    // placement. A skin may repaint it (colors, borders, radius, artwork) but
+    // must not turn it — or any of its descendants — into a viewport-sized
+    // overlay above authorization/recovery UI. Decorative host parts skip this
+    // lock so they can be repositioned and resized freely.
     if (inHostChromeScope && HOST_CHROME_LOCKED_PROPERTIES.has(unprefixedProperty)) {
       throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition or restack host controls.");
     }
@@ -252,22 +292,29 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
       }
       if (!canHideTarget && schemaVersion < 3) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
     }
-    const removesVisual = property === "all"
-      || (property === "display" && compactValue === "none")
-      || (property === "visibility" && /^(?:hidden|collapse)$/.test(compactValue))
-      || (property === "opacity" && /^0(?:\.0+)?%?$/.test(compactValue))
-      || (property === "pointer-events" && compactValue === "none")
-      || (property === "clip-path" && /inset\(\s*50%/.test(compactValue))
-      || (property === "mask" && /(?:alpha\(0\)|luminance\(0\))/.test(compactValue));
+    // An indirect animation name could resolve to a keyframe that hides or
+    // moves the subject; check it at the declaration site instead of treating
+    // every keyframe in the file as protected.
+    if (!keyframesRule && protectedTarget && (unprefixedProperty === "animation" || unprefixedProperty === "animation-name")
+      && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
+      throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
+    }
+    const removesVisual = unprefixedProperty === "all"
+      || (unprefixedProperty === "display" && compactValue === "none")
+      || (unprefixedProperty === "visibility" && /^(?:hidden|collapse)$/.test(compactValue))
+      || (unprefixedProperty === "opacity" && /^0(?:\.0+)?%?$/.test(compactValue))
+      || (unprefixedProperty === "pointer-events" && compactValue === "none")
+      || (unprefixedProperty === "clip-path" && /inset\(\s*50%/.test(compactValue))
+      || (unprefixedProperty === "mask" && /(?:alpha\(0\)|luminance\(0\))/.test(compactValue));
     if (removesVisual && protectedTarget) {
       throw declaration.error(`The required control "${protectedTarget}" must remain available; permission, recovery and essential audio paths cannot be hidden.`);
     }
     if (removesVisual && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be hidden or reset; required controls and their containers must remain available.");
     }
-    const visuallyRemoves = (property === "transform" && /scale(?:3d)?\(\s*0(?:\s*[,)]|\s*\))/i.test(decodedValue))
-      || (property === "clip-path" && /inset\(\s*50%/i.test(decodedValue))
-      || (property === "filter" && /(?:opacity|brightness)\(\s*0(?:%|\s*[,)]|\s*\))/i.test(decodedValue));
+    const visuallyRemoves = (unprefixedProperty === "transform" && /scale(?:3d)?\(\s*0(?:\s*[,)]|\s*\))/i.test(decodedValue))
+      || (unprefixedProperty === "clip-path" && /inset\(\s*50%/i.test(decodedValue))
+      || (unprefixedProperty === "filter" && /(?:opacity|brightness)\(\s*0(?:%|\s*[,)]|\s*\))/i.test(decodedValue));
     if (visuallyRemoves && protectedTarget) {
       throw declaration.error(`The required control "${protectedTarget}" must remain visible.`);
     }
@@ -279,7 +326,7 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     }
     if (schemaVersion >= 3 && removesVisual && !protectedTarget) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
     if (/\bz-index\s*:\s*(?:[1-9]\d{4,}|-\d{4,})\b/i.test(`${property}:${decodedValue}`) || (property === "position" && decodedValue === "fixed")) warnings.add("Fixed positioning or extreme stacking may cover important controls; check the preview on desktop and mobile.");
-    const withScopedNames = rewriteScopedNames(value, property, keyframeNames, fontFamilyNames);
+    const withScopedNames = rewriteScopedNames(value, unprefixedProperty, keyframeNames, fontFamilyNames);
     declaration.value = rewriteAssetUrls(withScopedNames, (assetPath) => {
       if (!hasSkinCssAsset(assets, assetPath)) throw declaration.error(`CSS references an asset not present in the package: ${assetPath}`);
       return `wskin-asset:${encodeURIComponent(assetPath)}`;
@@ -427,21 +474,46 @@ function assertHostChromeSubject(parsed: selectorParser.Root): void {
   }
 }
 
+/** Functional pseudo-classes whose arguments keep the subject role. */
+const SUBJECT_PSEUDO_CLASSES = new Set([":is", ":where", ":matches", ":-webkit-any", ":-moz-any"]);
+
+/** The nodes after the last combinator, i.e. the subject compound. */
+function lastCompound(nodes: SelectorNode[]): SelectorNode[] {
+  let start = 0;
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    if (nodes[index].type === "combinator") { start = index + 1; break; }
+  }
+  return nodes.slice(start);
+}
+
+/**
+ * Find a protected part in one compound. The subject may be wrapped in
+ * `:is()`/`:where()`, so descend into those arguments. `:not(...)` is
+ * deliberately skipped: a protected part inside `:not()` is not the subject.
+ */
+function compoundProtectedPart(nodes: SelectorNode[]): string | null {
+  for (const node of nodes) {
+    if (node.type === "attribute" && node.attribute.toLowerCase() === "data-ws-part" && node.value) {
+      const part = node.value.replace(/^['"]|['"]$/g, "");
+      if (PROTECTED_PART_IDS.has(part)) return part;
+    }
+    if (node.type === "pseudo" && node.nodes && SUBJECT_PSEUDO_CLASSES.has(node.value.toLowerCase())) {
+      for (const nested of node.nodes) {
+        const part = compoundProtectedPart(lastCompound(nested.nodes));
+        if (part) return part;
+      }
+    }
+  }
+  return null;
+}
+
 /** Find a protected part in the subject (last compound) of any selector in a rule. */
 function selectorSubjectProtectedPart(selector: string): string | null {
   try {
     const parsed = selectorParser().astSync(selector);
     for (const item of parsed.nodes) {
-      let start = 0;
-      for (let index = item.nodes.length - 1; index >= 0; index -= 1) {
-        if (item.nodes[index].type === "combinator") { start = index + 1; break; }
-      }
-      for (let index = start; index < item.nodes.length; index += 1) {
-        const node = item.nodes[index];
-        if (node.type !== "attribute" || node.attribute.toLowerCase() !== "data-ws-part" || !node.value) continue;
-        const part = node.value.replace(/^['"]|['"]$/g, "");
-        if (PROTECTED_PART_IDS.has(part)) return part;
-      }
+      const part = compoundProtectedPart(lastCompound(item.nodes));
+      if (part) return part;
     }
   } catch { /* A malformed selector is rejected elsewhere. */ }
   return null;
@@ -458,6 +530,16 @@ function selectorHostChromeParts(selector: string): string[] {
     });
   } catch { /* A malformed selector is rejected elsewhere. */ }
   return parts;
+}
+
+/**
+ * Host parts whose layout stays owned by WebSpeak. Decorative host chrome (the
+ * watermark, hint, voice-status strip and plugin launcher) is deliberately
+ * excluded: skins may reposition, resize and animate it because recovery does
+ * not depend on it.
+ */
+function selectorLockedHostParts(selector: string): string[] {
+  return selectorHostChromeParts(selector).filter((part) => !OPTIONAL_VISUAL_PARTS.has(part));
 }
 
 function isLayoutAffectingProperty(property: string): boolean {

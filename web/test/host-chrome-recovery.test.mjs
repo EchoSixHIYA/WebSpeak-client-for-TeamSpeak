@@ -42,15 +42,26 @@ const scenarios = [
     name: "pointer-events-none",
     css: compileHostile('[data-ws-part="host.plugins.launcher"], [data-ws-part="host.plugins.overlay"] { pointer-events: none !important; }'),
   },
+  {
+    // Decorative host chrome may legitimately be a fixed, viewport-sized,
+    // max-stacking decoration. Recovery lives in a closed-shadow top layer and
+    // must still win the hit test.
+    name: "decorative-watermark-overlay",
+    css: compileHostile(`
+      @keyframes drift { from { transform: translateX(0); } to { transform: translateX(12px); } }
+      [data-ws-part="host.watermark"] { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2147483647; background: #123; animation: drift 3s ease-in-out infinite alternate; }
+    `),
+  },
 ];
 
 test("host chrome renders recovery and authorization in a closed-shadow top layer", async () => {
-  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin] = await Promise.all([
+  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice] = await Promise.all([
     read("../src/components/HostChrome.vue"),
     read("../src/components/InstanceAuthorization.vue"),
     read("../src/services/host-owned-layer.ts"),
     read("../src/services/host-chrome.ts"),
     read("../src/composables/usePublicSkin.ts"),
+    read("../src/components/SkinLoadRecoveryNotice.vue"),
   ]);
 
   // Recovery: closed shadow root + manual popover + no skin hook.
@@ -59,6 +70,11 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(hostChrome, /data-ws-recovery-action="built-in"/);
   assert.match(hostChrome, /requestBuiltInSkin/);
   assert.match(hostChrome, /isThirdPartySkinActive/);
+  // The shortcut runs in the capture phase so a plugin/skin capture listener
+  // cannot swallow it with preventDefault().
+  assert.match(hostChrome, /addEventListener\("keydown", onKeydown, true\)/);
+  assert.match(hostChrome, /removeEventListener\("keydown", onKeydown, true\)/);
+  assert.doesNotMatch(hostChrome, /event\.defaultPrevented \|\| event\.repeat/);
   assert.doesNotMatch(hostChrome, /data-ws-part="host\.recovery"/);
   assert.doesNotMatch(hostChrome, /ws-host-recovery-layer/);
 
@@ -66,6 +82,12 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(authorization, /createHostOwnedLayer\('authorization'/);
   assert.match(authorization, /showModal\(\)/);
   assert.doesNotMatch(authorization, /data-ws-part="host\.permission"/);
+
+  // The load-failure banner is trusted UI too: closed shadow layer, stylesheet
+  // inside the boundary, no document-level scoped stylesheet to override.
+  assert.match(recoveryNotice, /createHostOwnedLayer\("skin-load"/);
+  assert.match(recoveryNotice, /data-ws-part="app\.skin-load-recovery"/);
+  assert.doesNotMatch(recoveryNotice, /<style scoped>/);
 
   // The layer itself: closed shadow root, no data-ws-part, fixed fallback.
   assert.match(ownedLayer, /attachShadow\(\{ mode: "closed" \}\)/);

@@ -17,7 +17,7 @@
  * without the Popover API still shows the UI above ordinary content.
  */
 
-export type HostOwnedLayerName = "recovery" | "authorization";
+export type HostOwnedLayerName = "recovery" | "authorization" | "skin-load";
 
 /**
  * The CSS 32-bit maximum stacking value. A compiled skin may legitimately use
