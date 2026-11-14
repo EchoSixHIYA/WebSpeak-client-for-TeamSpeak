@@ -4700,7 +4700,7 @@
   [data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-switcher,
   [data-ws-plugin-part="kaak-workspace.rail-skin"] .skin-trigger,
   [data-ws-plugin-part="kaak-workspace.rail-language"] .language-switcher,
-  [data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger { width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
+  [data-ws-plugin-part="kaak-workspace.rail-language"] .language-trigger { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   [data-ws-plugin-part="kaak-workspace.rail-links"] a { transition: none; }
@@ -4722,9 +4722,11 @@
   width: var(--skin-kaak-app-button-size);
   --skin-kaak-app-button-size: 58px;
 }
-[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"] > button {
-  display: grid;
-  place-items: center;
+[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"][data-presentation="drawer-side"] > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   padding: 0;
   width: var(--skin-kaak-app-button-size);
   height: var(--skin-kaak-app-button-size);
@@ -4733,10 +4735,15 @@
   color: #d1d5dc;
   background: var(--skin-kaak-rail-item-bg);
 }
-[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"] > button > span {
+[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"][data-presentation="drawer-side"] > button svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"][data-presentation="drawer-side"] > button > span {
   display: none;
 }
-[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"] > button:is(:hover, :focus-visible, [aria-expanded="true"]) {
+[data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"][data-presentation="drawer-side"] > button:is(:hover, :focus-visible, [aria-expanded="true"]) {
   border-color: #699b32;
   color: #a8ed50;
   background: #2b3524;
@@ -4754,7 +4761,7 @@
 [data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-drawer.app"]:is(:hover, :focus-visible) {
   background: #2b3524;
 }
-@media (max-height: 620px), (max-width: 500px) {
+@media (max-height: 620px) {
   [data-ws-plugin-part="kaak-workspace.plugin-launcher"] { --skin-kaak-app-button-size: 44px; }
-  [data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"] > button { border-radius: 14px; }
+  [data-ws-plugin-part="kaak-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"][data-presentation="drawer-side"] > button { border-radius: 14px; }
 }
