@@ -13,7 +13,7 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors join voice, chat and screen sharing in a browser; operators manage target servers, access policy and data through the administration console.
 
-Stable release: [v0.3.1 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Voice playback and diagnostics, noise suppression levels, plugin shortcuts and private invites.
+Stable release: [v0.3.2 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Skin recovery, app library layouts, and plugin settings forms.
 
 
 
@@ -340,6 +340,14 @@ Functional plugins are independent applications using standard browser capabilit
 ## Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
+
+- Third-party skins can style host decorations. The host manages recovery and authorization so users can switch back to a built-in skin. Thanks to ph1gros for the TS3 detection and compatibility work (#46), and OddTurtleHead for host theming and skin recovery (#57).
+- Day, Night and ILLUSIA open the app library from the top toolbar. KAAK 3.1.134 puts it in the leftmost icon rail and aligns its button with neighboring controls. Pinned apps appear first.
+- The plugin console adds a field editor, forms for P2P File Transfer, Watch Together and TSMusicBot, and links to plugin repositories.
+- Skin and plugin stores accept differences in display metadata while checking SHA-256, package format, and fields required for installation or execution.
+- Updated the skin and plugin development guides and Agent Skills for launcher layouts, configuration fields, and the separate HTTPS origin required for public plugin hosting.
 
 ### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
 

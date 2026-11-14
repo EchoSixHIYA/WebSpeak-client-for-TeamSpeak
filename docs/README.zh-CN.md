@@ -13,7 +13,7 @@
 
 WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户通过浏览器加入语音、聊天和屏幕共享；部署者通过管理员控制台管理目标服务器、访问策略和数据。
 
-稳定版：[v0.3.1 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 语音播放与诊断、降噪选项、插件快捷入口和私密邀请。
+稳定版：[v0.3.2 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · 皮肤恢复入口、应用库布局和插件配置表单。
 
 
 
@@ -363,6 +363,14 @@ relay.example.com {
 <a id="live-update-2026-11-13"></a>
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
+
+- 第三方皮肤可以为宿主装饰添加样式。恢复入口和授权弹窗由宿主管理，应用皮肤后仍能切回内置皮肤。感谢 ph1gros 对 TS3 版本识别及兼容性文档的贡献（#46），以及 OddTurtleHead 对宿主装饰和皮肤恢复的贡献（#57）。
+- 日间、夜间和 ILLUSIA 的应用库在顶部工具栏展开。KAAK 3.1.134 将应用库放入最左侧图标栏，按钮与相邻控件对齐。固定应用排在列表前面。
+- 插件后台提供字段编辑器，以及 P2P 文件传输、视频同看和 TSMusicBot 的配置表单。插件页面可以打开对应仓库。
+- 皮肤和插件商店允许目录与包内的展示信息有所不同，继续校验 SHA-256、包格式和影响安装或运行的字段。
+- 更新皮肤及插件开发指南和 Agent Skill，说明入口布局、配置字段和公网插件所需的独立 HTTPS 地址。
 
 ### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
 

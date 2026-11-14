@@ -13,7 +13,7 @@
 
 WebSpeak はセルフホスト型の TeamSpeak 3 / TeamSpeak 6 ブラウザークライアント兼音声ゲートウェイです。ユーザーはブラウザーで音声、チャット、画面共有に参加でき、運営者は管理コンソールで接続先、アクセス方針、データを管理できます。
 
-安定版：[v0.3.1 更新内容](#latest-release-notes) · [ダウンロード](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 音声再生と診断、ノイズ抑制、プラグインのショートカット、非公開招待を改善。
+安定版：[v0.3.2 更新内容](#latest-release-notes) · [ダウンロード](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · スキンの復元、アプリライブラリの配置、プラグイン設定フォーム。
 
 
 
@@ -275,6 +275,14 @@ relay.example.com {
 ## 更新履歴
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
+
+- サードパーティースキンでホストの装飾を変更できます。復元と許可の操作は WebSpeak が管理し、組み込みスキンに戻せます。TS3 判定と互換性情報の ph1gros（#46）、ホスト装飾と復元機能の OddTurtleHead（#57）に感謝します。
+- 日間、夜間、ILLUSIA では上部バーからアプリライブラリを開けます。KAAK 3.1.134 では左端のアイコン列に移動し、隣のボタンとサイズを揃えました。固定したアプリは先頭に表示されます。
+- 管理画面にフィールドエディター、P2P ファイル転送・動画の同時視聴・TSMusicBot の設定フォーム、各リポジトリへのリンクを追加しました。
+- ストアでは表示情報の差異を許容し、SHA-256、パッケージ形式、インストールや実行に必要な項目を検証します。
+- 開発ガイドと Agent Skill に、アプリ入口の配置、設定項目、公開プラグインに必要な独立した HTTPS オリジンを記載しました。
 
 ### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
 

@@ -13,7 +13,7 @@
 
 WebSpeak ist ein selbst gehosteter Browserclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer verwenden Sprache, Chat und Bildschirmfreigabe im Browser; Betreiber verwalten Zielserver, Zugriff und Daten über die Webkonsole.
 
-Stabile Version: [Hinweise zu v0.3.1](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Audiowiedergabe und Diagnose, Rauschunterdrückung, Plugin-Kurzbefehle und private Einladungen.
+Stabile Version: [Hinweise zu v0.3.2](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Skin-Wiederherstellung, App-Bibliothek und Plugin-Formulare.
 
 
 
@@ -340,6 +340,14 @@ Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und opti
 ## Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
+
+- Drittanbieter-Skins können Host-Dekorationen gestalten. Der Host verwaltet Wiederherstellung und Freigabe, damit Nutzer zu einem integrierten Skin zurückkehren können. Danke an ph1gros für die TS3-Erkennung und Kompatibilitätshinweise (#46) und an OddTurtleHead für Host-Design und Skin-Wiederherstellung (#57).
+- Tag, Nacht und ILLUSIA öffnen die App-Bibliothek über die obere Leiste. KAAK 3.1.134 platziert den Button in der linken Symbolleiste und gleicht ihn den Nachbarbuttons an. Angeheftete Apps stehen oben.
+- Die Plugin-Verwaltung bietet einen Feldeditor, Formulare für P2P-Dateitransfer, gemeinsames Ansehen und TSMusicBot sowie Links zu den Repositories.
+- Die Stores tolerieren Unterschiede bei Anzeigedaten und prüfen SHA-256, Paketformat und für Installation oder Ausführung nötige Felder.
+- Die Entwicklungsleitfäden und Agent Skills erklären die Platzierung des App-Buttons, die Konfigurationsfelder und den separaten HTTPS-Ursprung für öffentliche Plugins.
 
 ### [v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1) · 2026-11-13
 

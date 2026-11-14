@@ -19,7 +19,7 @@
   </p>
 </div>
 
-当前版本 / Current version: **[v0.3.1](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.1)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
+当前版本 / Current version: **[v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
 
 ## 关于 WebSpeak · Overview
 
@@ -106,9 +106,9 @@ Data persists in the `webspeak-data` volume. The Compose file uses host networki
 | 皮肤包 · Skin packages | [皮肤索引 · Catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) |
 | 功能插件 · Functional plugins | [应用目录与开发起点 · Catalog & application starter](https://github.com/Huddle-Up-Forge/webspeak-plugin) · [开发指南 · Guide](./docs/PLUGIN_DEVELOPMENT.md) · [Agent Skill](./.agents/skills/webspeak-plugin-development/SKILL.md) |
 
-皮肤包负责界面、布局及其附属小组件；功能插件使用标准浏览器环境和可选 Node 后端，自行实现业务功能。功能插件 API v2 已包含在 v0.3.1 中，提供独立于皮肤的工具栏入口。
+皮肤包负责界面、布局及其附属小组件；功能插件使用标准浏览器环境和可选 Node 后端，自行实现业务功能。功能插件 API v2 已包含在 v0.3.1 中，从语音工作区的应用库启动，支持工具栏和皮肤侧栏入口。
 
-Skins own appearance, layout and attached widgets. Functional plugin API v2 is included in v0.3.1 with a skin-independent toolbar entry for the application workspace.
+Skins own appearance, layout and attached widgets. Functional plugin API v2 is included in v0.3.1 and opens applications from the voice workspace library, available in the toolbar or a skin sidebar.
 
 ### 开发与收录 · Develop & contribute
 
@@ -144,7 +144,7 @@ The skills complete the contribution workflow automatically: publish validated s
 <summary>查看贡献说明 · View contribution credits</summary>
 
 - [HoneyBBQ](https://github.com/HoneyBBQ) — 上游 [teamspeak-js（`@honeybbq/teamspeak`）](https://github.com/HoneyBBQ/teamspeak-js) SDK 的作者，为 WebSpeak 提供底层 TeamSpeak 协议客户端能力。
-- [ph1gros](https://github.com/ph1gros) — 在 [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) 中报告并提供公开目标 IPv6 校验、管理员认证与会话、代理限流和 PCM 上行边界的安全审查、补丁及回归测试；相关问题由项目在 `dev` 分支重新实现并修复。Security findings, proposed fixes and regression tests; reimplemented on `dev`.
+- [ph1gros](https://github.com/ph1gros) — 在 [PR #48](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/48) 中报告并提供公开目标 IPv6 校验、管理员认证与会话、代理限流和 PCM 上行边界的安全审查、补丁及回归测试；相关问题由项目在 `dev` 分支重新实现并修复。[PR #46](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/46) 提供 TS3 版本识别修复及兼容性文档建议。Security findings, proposed fixes and regression tests; reimplemented on `dev`.
 - [LainHE](https://github.com/LainHE) — [已合并 PR #2、#8、#28、#31–#35、#37、#38、#40](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ALainHE)，涉及浏览器报错翻译、缩放与首页布局、屏幕共享码率与观看者头像、中继目标校验与异常重连、可信代理校验、连接失败传递、音频故障报告及 WebRTC 失败时的资源清理。
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) 支持 TeamSpeak 注册昵称连接并保留昵称目标；[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) 改进 KAAK 首次连接后的工作区保留与重连；[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) 和 [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) 提供 Discord 皮肤的原始设计与实现（提交署名 **yumi**），后由 WebSpeak 项目移植为[独立分发的 `.wskin` 皮肤](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)。
