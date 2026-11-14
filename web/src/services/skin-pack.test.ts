@@ -490,7 +490,7 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.132");
+  assert.equal(skin.version, "3.1.133");
   assert.equal(skin.workspace, undefined);
   assert.equal(skin.minAppVersion, "0.3.2");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);

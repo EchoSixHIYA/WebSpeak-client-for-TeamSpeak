@@ -52,3 +52,5 @@ Member cards are rendered by WebSpeak's trusted `voice.member-cards` widget. It 
 - Shared format and safety rules: [SKIN_DEVELOPMENT.md](../SKIN_DEVELOPMENT.md)
 
 KAAK is included in the public skin selector and its `.wskin` archive is also available as a standalone package. After changing the source, run `npm run skin:kaak:build` to rebuild both copies, then run the package tests and verify the connection page, approval, denial, revoke, desktop, and narrow-screen paths in the local browser. The connected voice surface can be verified when a TeamSpeak session is available.
+
+KAAK 3.1.133 places the application library icon in the server rail, alongside the skin and language controls. It opens the drawer beside the rail.
