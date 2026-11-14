@@ -259,15 +259,16 @@
         data-ws-part="home.footer"
       >
         <div class="ws-skin-mount-slot" data-ws-skin-mount="home.footer.before"></div>
-        <span>WebSpeak</span><span class="footer-separator">·</span
-        ><span>{{ t("teamSpeakClient") }}</span
+        <span data-ws-part="home.footer.decoration">WebSpeak</span><span class="footer-separator" data-ws-part="home.footer.decoration">·</span
+        ><span data-ws-part="home.footer.decoration">{{ t("teamSpeakClient") }}</span
         ><span class="footer-spacer"></span
         ><button
           type="button"
           class="clear-local-button"
+          data-ws-part="home.footer.clear"
           @click="clearBrowserData"
           >{{ t("clearLocalData") }}</button
-        ><span class="footer-separator">·</span><span>{{ t("browserSupport") }}</span>
+        ><span class="footer-separator" data-ws-part="home.footer.decoration">·</span><span data-ws-part="home.footer.decoration">{{ t("browserSupport") }}</span>
       </footer>
 
       <!-- QQ community modal -->
@@ -469,7 +470,7 @@
               :screen-share-web-rtc-stats="screenShareWebRtcStats"
               :t="t"
             />
-            <div id="webspeak-plugin-toolbar" class="webspeak-plugin-toolbar-host" data-ws-part="voice.plugin-toolbar"></div>
+            <div id="webspeak-plugin-toolbar" ref="pluginToolbarTarget" class="webspeak-plugin-toolbar-host" data-ws-part="voice.plugin-toolbar"></div>
             <button
               class="header-action"
               :title="t('copyInvite')"
@@ -515,9 +516,10 @@
               class="workspace-skin-switcher"
               :menu-label="t('skinSelector')"
               :options="skinOptions"
+              :plugin-library-available="voiceState.connected && Boolean(pluginSession)"
               @change="onSkinChange"
             />
-            <LanguageSwitcher
+            <LanguageSwitcher skin-icon
               v-model="language"
               class="workspace-language"
               :menu-label="t('languageMenu')"
@@ -797,13 +799,14 @@
           class="mobile-skin-switcher"
           :menu-label="t('skinSelector')"
           :options="skinOptions"
+          :plugin-library-available="voiceState.connected && Boolean(pluginSession)"
           @change="onSkinChange"
         />
         <div class="language-menu-row"
           ><Icon
             name="globe"
             :size="18" /><span>{{ t("languageMenu") }}</span
-          ><LanguageSwitcher
+          ><LanguageSwitcher skin-icon
             v-model="language"
             :menu-label="t('languageMenu')"
             @change="persistLanguage"
@@ -871,7 +874,8 @@
       <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
 
-    <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" />
+    <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" :toolbar-target="pluginToolbarTarget" />
+    <HostChrome :language="language" :connected="voiceState.connected" :plugin-library-available="voiceState.connected && Boolean(pluginSession)" />
     <IdentityImportDialog
       v-if="identityImportOpen"
       v-model="identityImportText"
@@ -1007,6 +1011,7 @@ import { useWebClientChannels, type TreeChannel } from "../composables/useWebCli
 import { useWebClientConnection } from "../composables/useWebClientConnection.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import PluginPanel from "../components/PluginPanel.vue";
+import HostChrome from "../components/HostChrome.vue";
 import InstanceAuthorization from '../components/InstanceAuthorization.vue';
 import WorkspaceInviteDialog from "../components/web-client/WorkspaceInviteDialog.vue";
 import { useVoiceWebSocket, type ChannelMember, type ChatMessage } from "../composables/useVoiceWebSocket.js";
@@ -1170,6 +1175,7 @@ const skinPluginDocument = computed<SkinPluginDocument>(() => {
   if (!skin) return emptySkinPluginDocument;
   return loadSkinPluginAuthoringDocument(skin.id, skin.version) ?? skin.pluginData ?? emptySkinPluginDocument;
 });
+const pluginToolbarTarget = ref<HTMLElement | null>(null);
 const skinPluginSurfaceActive = ref(false);
 const skinRuntimePluginSurfaceActive = ref(false);
 watch(activeSkin, () => {
@@ -1918,6 +1924,7 @@ const skinPluginWidgets = {
     onChange: onSkinChange,
   }),
   "app.language-switcher": () => h(LanguageSwitcher, {
+    skinIcon: true,
     modelValue: language.value,
     "onUpdate:modelValue": (value: Language) => { language.value = value; },
     menuLabel: t("languageMenu"),

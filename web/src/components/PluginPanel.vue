@@ -1,15 +1,15 @@
 <template>
-  <Teleport to="#webspeak-plugin-toolbar">
+  <Teleport v-if="toolbarTarget" :to="toolbarTarget">
     <div v-if="thirdPartyAllowed && connected && sessionToken" class="ws-plugin-toolbar">
-      <button ref="launcher" class="header-action ws-plugin-toolbar-trigger" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="visible" @click="toggle">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+      <button v-if="!isHostPartHidden('host.plugins.launcher')" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="visible" @click="toggle">
+        <svg viewBox="0 0 24 24" data-ws-icon-slot="host.plugins.launcher" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
       </button>
       <button v-for="entry in pinnedApps" :key="entry.manifest.id" class="header-action ws-plugin-toolbar-shortcut" type="button" :title="entry.manifest.name" :aria-label="entry.manifest.name" :disabled="busy || entry.runtime.state === 'failed'" @click="launch(entry.manifest.id)">{{ entry.manifest.name.slice(0, 1).toUpperCase() }}</button>
     </div>
   </Teleport>
   <Teleport to="body">
     <div v-if="thirdPartyAllowed && connected && sessionToken" class="ws-plugin-overlay" :data-plugin-theme="theme">
-      <section v-show="visible" ref="windowElement" class="ws-plugin-window" :class="{ 'is-maximized': maximized, 'is-dragging': dragging }" :style="position" role="dialog" :aria-label="current && appView ? current.manifest.name : tr('title')" tabindex="-1" @keydown.esc.stop="minimize">
+      <section v-show="visible" ref="windowElement" class="ws-plugin-window" data-ws-part="host.plugins.overlay" :class="{ 'is-maximized': maximized, 'is-dragging': dragging }" :style="position" role="dialog" :aria-label="current && appView ? current.manifest.name : tr('title')" tabindex="-1" @keydown.esc.stop="minimize">
         <header class="ws-plugin-titlebar" @pointerdown="startDrag" @lostpointercapture="endDrag" @dblclick="toggleMaximize">
           <span class="ws-plugin-mark" aria-hidden="true">◈</span>
           <div class="ws-plugin-window-title"><strong>{{ current && appView ? current.manifest.name : tr('title') }}</strong><small>WebSpeak</small></div>
@@ -54,7 +54,8 @@ import { pluginTranslations, type PluginTextKey } from '../i18n/plugins.js';
 import { pluginWindowTranslations } from '../i18n/plugin-window.js';
 import type { SiteLanguage } from '../../../src/site-copy.js';
 import { thirdPartyAllowed } from '../services/instance-authorization.js';
-const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage }>();
+import { isHostPartHidden, pluginLibraryRequests } from '../services/host-chrome.js';
+const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage; toolbarTarget: HTMLElement | null }>();
 const tr = (key: PluginTextKey) => pluginTranslations[props.language][key];
 const ui = computed(() => pluginWindowTranslations[props.language]);
 const windowElement = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), frame = ref<HTMLIFrameElement | null>(null);
@@ -153,10 +154,20 @@ watch(thirdPartyAllowed, allowed => {
   else if (props.connected) void refresh();
 }, { flush: 'sync' });
 watch(() => props.language, appearance); watch(theme, appearance);
+// Trusted recovery entry (host chrome / skin menu) keeps the application
+// library reachable when a skin hides the toolbar launcher.
+watch(pluginLibraryRequests, () => {
+  if (!thirdPartyAllowed.value || !props.connected || !props.sessionToken) return;
+  detectTheme();
+  visible.value = true;
+  appView.value = false;
+  if (!current.value) void refresh();
+  void nextTick(() => { fitWindow(); windowElement.value?.focus(); });
+});
 onMounted(() => {
   detectTheme(); window.addEventListener('message', message); window.addEventListener('resize', fitWindow); window.addEventListener('pointermove', moveDrag); window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag); window.addEventListener('blur', endDrag);
   if (props.connected && thirdPartyAllowed.value) void refresh();
-  observer = new MutationObserver(detectTheme); observer.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-ws-skin', 'data-theme'] });
+  observer = new MutationObserver(detectTheme); observer.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-ws-skin', 'data-ws-host-skin', 'data-theme'] });
 });
 onBeforeUnmount(() => { stop(); endDrag(); observer?.disconnect(); resizeObserver?.disconnect(); window.removeEventListener('message', message); window.removeEventListener('resize', fitWindow); window.removeEventListener('pointermove', moveDrag); window.removeEventListener('pointerup', endDrag); window.removeEventListener('pointercancel', endDrag); window.removeEventListener('blur', endDrag); });
 </script>

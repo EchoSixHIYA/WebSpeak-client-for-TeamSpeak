@@ -7,6 +7,7 @@ import { getBundledSkinPackageUrl, isPublicSkinEnabled } from "./skin-catalog.js
 import { createSkinOperation, type SkinLoadOptions } from "./skin-operation.js";
 import { setSkinLayoutPackage } from "./skin-layout-runtime.js";
 import { canUseSkin } from './instance-authorization.js';
+import { HOST_SKIN_ATTRIBUTE } from '../../../src/shared/skin-visual-parts.js';
 
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
@@ -112,6 +113,10 @@ async function prepareAndActivate(id: string, expectedVersion: string | undefine
     document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
       clientRoot.dataset.wsSkin = skin!.id;
     });
+    // Host chrome lives outside `.ws-skin-root` (Teleport to body). A
+    // document-level marker lets compiled host rules reach it, but only while
+    // this exact skin is active; removing the skin removes the marker.
+    document.documentElement.setAttribute(HOST_SKIN_ATTRIBUTE, skin!.id);
     markCoreControls();
 
     let style = document.getElementById(CUSTOM_STYLE_ID) as HTMLStyleElement | null;
@@ -155,6 +160,7 @@ export function clearCustomSkinStyle(): void {
 function removeCustomSkinStyle(): void {
   document.getElementById(CUSTOM_STYLE_ID)?.remove();
   document.getElementById(CUSTOM_BASE_STYLE_ID)?.remove();
+  document.documentElement.removeAttribute(HOST_SKIN_ATTRIBUTE);
   activeAssetUrls.forEach((url) => URL.revokeObjectURL(url));
   activeAssetUrls = [];
 }

@@ -22,7 +22,11 @@ const skin = id => ({ id, name: id, version: "1.0.0", minAppVersion: "0.2.6",
   css: `[data-ws-skin="${id}"] { --skin-test: blue; }`, assets: {}, installedAt: 1 });
 const json = body => new Response(JSON.stringify(body));
 class Element {
-  dataset = {}; textContent = ""; id = "";
+  dataset = {}; textContent = ""; id = ""; attributes = new Map();
+  setAttribute(name, value) { this.attributes.set(String(name), String(value)); }
+  getAttribute(name) { return this.attributes.get(String(name)) ?? null; }
+  hasAttribute(name) { return this.attributes.has(String(name)); }
+  removeAttribute(name) { this.attributes.delete(String(name)); }
   append(el) { elements.set(el.id, el); }
   remove() { elements.delete(this.id); }
   matches() { return false; }

@@ -96,6 +96,8 @@ assets/preview.jpg            # 可选：管理后台显示的预览图，也可
 assets/background.webp        # 可选：页面艺术素材
 assets/brand.woff2            # 可选：自带字体
 components.json               # v3 可选：声明式组件或完整页面 surface
+chrome.json                   # v3/v4 可选：宿主装饰隐藏与图标位图覆盖（见「chrome.json」章节）
+assets/icons/language.png     # v3/v4 可选：工具栏图标位图覆盖素材
 plugins.json                  # v4 必需：插件入口、页面、模式、权限与包内文件
 plugins/<plugin-id>/index.js  # v4 插件代码，目前只校验和缓存
 plugins/<plugin-id>/index.wasm # v4 有界 Wasm 插件入口
@@ -130,6 +132,7 @@ plugins/<plugin-id>/assets/   # v4 插件专属的本地图片或字体素材
 | `version`、`minAppVersion` | 必需，使用语义化版本号，例如 `1.2.0`。 |
 | `entry` | 必需，包内 CSS 文件路径，最多 120 个字符。 |
 | `content` | 可选，包内 JSON 文件路径，最多 120 个字符。 |
+| `chrome` | v3/v4 可选，包内 `chrome.json` 路径，最多 120 个字符；v1/v2 声明该字段会被拒绝。 |
 | `preview` | 可选，包内 PNG、JPG/JPEG、WebP、AVIF 或 GIF 图片路径，最多 120 个字符。 |
 | `description` | 可选，最多 400 个字符。 |
 
@@ -394,6 +397,8 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 | 聊天与菜单 | `voice.chat`、`voice.chat.tabs`、`voice.chat.tab`、`voice.chat.heading`、`voice.chat.messages`、`voice.chat.event`、`voice.chat.message`、`voice.chat.message-avatar`、`voice.chat.message-body`、`voice.chat.message-bubble`、`voice.chat.empty`、`voice.chat.composer`、`voice.chat.status`、`voice.context-menu-backdrop`、`voice.context-menu`、`voice.context-menu.header`、`voice.context-menu.move-submenu` |
 | 屏幕共享 | `voice.screen-share-settings`、`voice.screen-share-settings.heading`、`voice.screen-share-settings.fields`、`voice.screen-share-settings.note`、`voice.screen-share-settings.actions`、`voice.screen-player`、`voice.screen-player.stage`、`voice.screen-player.video`、`voice.screen-player.placeholder`、`voice.screen-player.exit`、`voice.screen-player.viewers`、`voice.screen-player.viewer-avatar`、`voice.screen-player.live`、`voice.screen-player.source`、`voice.screen-player.controls`、`voice.screen-player.volume`、`voice.screen-player.fullscreen` |
 | `/demo` 演示页 | `demo.header`、`demo.brand`、`demo.header-tools`、`demo.badge`、`demo.skin-switcher`、`demo.language-switcher`、`demo.home-link`、`demo.reconnect`、`demo.reconnect.restore`、`demo.layout`、`demo.channels`、`demo.channels.heading`、`demo.channel`、`demo.channel.select`、`demo.channel.members`、`demo.main`、`demo.hero`、`demo.live`、`demo.hero.title`、`demo.hero.description`、`demo.hero.online`、`demo.wave`、`demo.voice-heading`、`demo.voice-grid`、`demo.voice-card`、`demo.avatar`、`demo.member-name`、`demo.member-status`、`demo.chat.heading`、`demo.chat.tabs`、`demo.chat.tab`、`demo.chat.messages`、`demo.chat.message`、`demo.chat.empty`、`demo.chat.composer`、`demo.chat.input`、`demo.chat.send`、`demo.actions`、`demo.actions.heading`、`demo.action.speaking`、`demo.action.poke`、`demo.action.reconnect`、`demo.note`、`demo.user`、`demo.poke-notification`、`demo.poke.dismiss` |
+| 宿主外壳（皮肤根之外 / 宿主固定绘制） | `host.plugins.launcher`、`host.plugins.overlay`、`host.watermark`、`host.hint`、`host.voice-status-decoration`、`app.skin-load-recovery`、`skin.library`；`host.recovery` / `host.permission` 仅为概念标识（闭合 Shadow DOM + 顶层，无 CSS 钩子，见下文） |
+| 首页页脚拆分 | `home.footer`（容器，不可隐藏）、`home.footer.decoration`（装饰文案，可隐藏）、`home.footer.clear`（必要链接，受保护） |
 
 `voice.member.avatar` 是语音活动区头像；`voice.member.mic-status` 在成员麦克风静音时显示，状态值为 `muted`；`voice.member.action-trigger` 是打开宿主成员操作菜单的按钮，由成员卡片小组件的 `options.memberActions` 控制；`voice.member-row.avatar` 是右侧成员树头像。语音成员列表的动态项提供 `.ws-voice-member-enter-active`、`.ws-voice-member-leave-active`、`.ws-voice-member-enter-from`、`.ws-voice-member-leave-to` 和 `.ws-voice-member-move` 动效钩子，可分别设置加入、离开和排序变化的过渡。状态属性还会使用 `current`、`drag-over`、`dragging`、`self`、`events-empty` 和 `messages-empty`。当前根节点以及屏幕共享播放器、弹窗、菜单都属于同一皮肤作用域。
 
@@ -414,6 +419,100 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
   background-image: linear-gradient(110deg, #efffff, #c8f3f2);
 }
 ```
+
+### 宿主外壳主题化（v3 / v4 开放皮肤）
+
+应用库窗口、水印、非关键提示与空状态装饰绘制在皮肤根之外；插件入口保留在语音工作区顶部工具栏。宿主提供第二个文档级作用域来主题化这些部件：
+
+- 皮肤激活时，宿主在 `documentElement` 上设置 `data-ws-host-skin="<皮肤 ID>"`；停用或回退到内置皮肤时立即移除。
+- 编译 `skin.css` 时，**只**命中下列宿主部件的单个选择器会被限定到 `:root[data-ws-host-skin="<皮肤 ID>"] …`，其余规则仍限定到 `.ws-skin-root[data-ws-skin="…"]`。宿主部件的选择器必须**以可主题化的 `[data-ws-part="host.…"]` 开头**，不能把 `:root`、`html`、`body` 或 `*:has(…)` 作为规则主体；`:root:has([data-ws-part="host.watermark"])` 一类写法会被拒绝。皮肤作者不能自己写 `html`、`body`、`data-ws-host-skin`、`data-ws-route`、`data-theme` 或 `data-ws-skin` 选择器，也不能在同一选择器里混用宿主部件与页面部件；宿主部件只对 schema v3/v4 开放皮肤生效。
+- 宿主外壳的布局与层级由 WebSpeak 拥有：皮肤可改颜色、边框、圆角、阴影和素材，但不能用 `position`、`inset`、`z-index`、`transform` 等把 `host.plugins.overlay` 之类控件变成全屏遮罩。
+- 自定义变量仍必须使用 `--skin-` 前缀（不能覆盖宿主内部令牌），`@import`、脚本、`expression()`、`javascript:` 等仍被拒绝。
+- 皮肤根作用域只在根内部向下生效。编译器会拒绝任何以 `:root` 开头、紧跟兄弟组合符（`+` / `~`）的选择器，例如 `:root ~ *`、`:root ~ [data-ws-host-layer]` 或 `:root:hover + div`；这类规则会被改写为皮肤根的兄弟选择器，从而够到 body 上的宿主层。`:root [data-ws-part="home.header"]`、`:root > [data-ws-part=…]` 这类后代/子代写法仍然可用。
+- 宿主自有层的属性 `data-ws-host-layer`、`data-ws-host-recovery`、`data-ws-host-layer-content` 与 `data-ws-recovery-action` **不是皮肤钩子**：它们不在公开部件表中，编译器会按名称拒绝引用它们的皮肤选择器（包括 `:root [data-ws-host-layer]` 这类带公开钩子的混合写法）。
+- 无 Popover API 或顶层提升被拒绝时，恢复胶囊会退回固定宿主层并使用 32 位最大 `z-index: 2147483647`。宿主层在 `#app` 之后追加到 `document.body`；与树内皮肤层同为最大层级时，后绘制的宿主层仍在上面。顶层（top layer）路径的 `showPopover()` / `showModal()` 仍高于两者。
+
+可主题化的宿主部件：
+
+| 部件 | 内容 |
+| --- | --- |
+| `host.plugins.launcher` | 语音工作区顶部的插件按钮（颜色、尺寸、圆角、背景图均可改；也可声明式隐藏） |
+| `host.plugins.overlay` | 应用库浮层窗口外壳；**不含**权限对话框里的批准/拒绝（`host.permission`） |
+| `host.watermark` | 页面大淡 WebSpeak 品牌水印 |
+| `host.hint` | 非关键提示文案（「音频控制始终保留…」一类） |
+| `host.voice-status-decoration` | 右栏空的 Voice status 装饰条；与必要状态 `voice.connection-status`、`voice.audio-status` 完全分开 |
+
+### 恢复入口与授权对话框：结构上不可被皮肤触及
+
+`host.recovery`（恢复入口）与 `host.permission`（授权对话框）是可信宿主控件。它们**不是**可供皮肤选择或主题化的 CSS 钩子：当前客户端把两者渲染在 `Teleport` 到 `body` 的宿主层里，该层满足下面三条，编译后的皮肤 CSS 无法命中、遮挡或禁用它们：
+
+1. **闭合 Shadow DOM**：内容位于 `attachShadow({ mode: "closed" })` 的根内。作者 CSS（无论影子根开或闭）不能跨越 shadow 边界；宿主层元素本身也不带任何 `data-ws-part`，因此连文档级宿主作用域（`:root[data-ws-host-skin="…"] [data-ws-part="host.…"]`）也匹配不到。
+2. **顶层（top layer）**：恢复入口是 `popover="manual"`，授权对话框是 `<dialog>` + `showModal()`。顶层绘制高于所有普通层叠上下文，包括皮肤把某个公开部件写成 `position: fixed; inset: 0; z-index: 2147483647` 的全屏层。
+3. **不依赖可主题化浮层**：恢复面板的「使用内置皮肤」直接重置到内置 Day/Night 皮肤，不经过 `host.plugins.overlay`；即使皮肤把该浮层写成 `display: none !important` 或 `pointer-events: none`，重置仍然生效。「应用库」按钮只是一条便利路径，会走常规应用库浮层，因此不是兜底路径。
+
+**显示规则**：只要当前是第三方（非内置/非官方）皮肤，恢复入口就作为小型常驻胶囊显示在左下角；它不是水印或装饰条，官方 Day、Night、ILLUSIA 与 KAAK 皮肤不会自动出现它。对内置/官方皮肤，它只在 `host.plugins.launcher` 被实例配置或 `chrome.json` 声明隐藏、或宿主在已连接状态下检测到启动器被 CSS 隐藏/移出视口/不可点击时作为兜底出现。
+
+**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。
+
+`host.recovery` 与 `host.permission` 这两个名称仅保留为文档/布局元数据中的概念标识，**不再对应可被皮肤命中的 DOM 钩子**。皮肤加载失败的横幅使用独立部件 `app.skin-load-recovery`（「切换到内置皮肤」），与恢复胶囊不是同一个钩子。`skin.library` 是皮肤菜单里的应用库快捷入口，可作辅助路径，但**不是**兜底。
+
+恢复入口的宿主层与授权对话框的宿主层各自独立；两者都不与装饰同父，因此 `[data-ws-part="host.watermark"] ~ *` 一类兄弟选择器也碰不到它们。
+
+`host.watermark`、`host.hint` 与 `host.voice-status-decoration` 属于默认隐藏的装饰：官方/内置皮肤（Day、Night、ILLUSIA、KAAK）不会渲染它们，外观与生产版一致。主题化宿主外壳的皮肤需在 `chrome.json` 中用 `visibleParts` 明确开启；`chrome.json` 的 `hiddenParts` 仍然优先。
+
+示例（v3 `skin.css`）：
+
+```css
+/* 只命中宿主部件，编译后进入文档级宿主作用域 */
+[data-ws-part="host.plugins.launcher"] {
+  background: #1d4f9c;
+  color: #fff;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+[data-ws-part="host.watermark"] { color: #dbe8f7; opacity: .08; }
+[data-ws-part="host.hint"] { display: none; }
+```
+
+宿主图标槽用 `data-ws-icon-slot` 标记，槽名即部件名，可在 CSS 中直接换背景位图；也可用下面的 `chrome.json` 声明式覆盖。可用槽名：
+
+| 槽名 | 位置 |
+| --- | --- |
+| `host.plugins.launcher` | 顶部工具栏插件按钮图标 |
+| `language.trigger` | 语言下拉触发器图标 |
+| `skin.trigger` | 皮肤下拉触发器图标 |
+| `home.toolbar.settings` | 首页工具栏设置图标 |
+| `voice.performance` | 语音页 Voice status / 性能触发器图标 |
+
+### `chrome.json`：声明式显示 / 隐藏与图标位图覆盖
+
+v3/v4 清单可增加可选字段 `"chrome": "chrome.json"`，文件位于包根目录，最多 32 KiB：
+
+```json
+{
+  "schemaVersion": 1,
+  "visibleParts": ["host.watermark", "host.hint", "host.voice-status-decoration"],
+  "hiddenParts": ["home.footer.decoration"],
+  "icons": {
+    "language.trigger": "assets/icons/language.png",
+    "skin.trigger": "assets/icons/skin.png",
+    "host.plugins.launcher": "assets/icons/apps.png"
+  }
+}
+```
+
+| 字段 | 规则 |
+| --- | --- |
+| `visibleParts` | 可选，最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的宿主装饰名。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认隐藏；皮肤需在这里明确列出才会渲染。省略该字段时装饰保持隐藏，即使包内已有 `hiddenParts` 或 `icons`（宿主不再根据生成的 CSS 猜测旧包意图）。内置皮肤没有 `chrome.json`，因此始终不显示这些装饰。实例级 `hiddenParts` 与皮肤 `hiddenParts` 仍然优先。 |
+| `hiddenParts` | 最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的名字；编译成 `display:none` 并写入皮肤 CSS。可信控件、恢复入口与必要音频路径（如 `voice.audio-dock`、`voice.connection-status`、`home.footer.clear`）永不允许出现，皮肤 CSS 直接隐藏它们也会被拒绝。 |
+| `icons` | 最多 16 项；键必须是上表的图标槽名；值必须是包内 `assets/icons/<文件名>` 的位图相对路径。 |
+
+图标文件约定：仅 PNG / JPG / WebP / AVIF / GIF（**不接受 SVG**），路径必须位于 `assets/icons/` 下且只有一层文件名（不允许 `..`、绝对路径、`\`、`%`、空格或外部 URL）。导入端与服务端登记时都会校验路径、文件是否存在、MIME 是否为位图、单张不超过 64 KiB、总量不超过 512 KiB。宿主把位图编译进皮肤 CSS 的 `background-image`，并隐藏槽内的矢量图形；`url()` 仍走包内资源解析，无法引用外部地址。
+
+实例级默认值：启动网关时设置环境变量 `WEBSPEAK_HOST_CHROME_HIDDEN_PARTS`（逗号或空格分隔，例如 `host.watermark,host.hint`）。`/api/public-config` 会返回校验后的 `hiddenHostParts`，宿主据此默认折叠这些非关键装饰；未知或受保护的名字会被忽略。宿主的三个装饰部件默认就是隐藏的；皮肤通过 `chrome.json` 的 `visibleParts` 开启，实例默认值与皮肤 `hiddenParts` 取并集并优先于 `visibleParts`。
+
+`home.footer` 是容器，包含必要的「清除本地数据」链接 `home.footer.clear`，因此**不在**可隐藏列表；纯装饰文案被拆分为 `home.footer.decoration`，只隐藏它不会破坏恢复路径。
 
 ### 令牌、字体、动效和图片
 
@@ -477,28 +576,42 @@ v1/v2 外观可以因窄屏而更换图片裁切或装饰，但 @media 规则也
 
 v1/v2 校验器会阻止隐藏必要操作控件和其容器。v3 可改变显示状态，因此皮肤开发者必须保留语音操作路径；授权界面、皮肤选择和恢复入口由宿主在皮肤作用域之外提供。以下选择器是旧格式对可选装饰部件的透明度白名单：
 
+下面这份清单是**唯一**的可隐藏装饰部件白名单，由 `src/shared/skin-visual-parts.ts` 的 `DECORATIVE_PART_IDS` 定义；CSS 校验器（`OPTIONAL_VISUAL_PARTS`）、布局编辑器（`DECORATIVE_PART_IDS`）与 `chrome.json` 的 `hiddenParts` 共用它，三者永远一致：
+
 ```css
+[data-ws-part="demo.avatar"]
+[data-ws-part="demo.badge"]
+[data-ws-part="demo.note"]
+[data-ws-part="demo.poke-notification"]
+[data-ws-part="demo.wave"]
+[data-ws-part="demo.member-status"]
+[data-ws-part="home.feature"]
+[data-ws-part="home.features"]
+[data-ws-part="home.footer.decoration"]
 [data-ws-part="home.hero.eyebrow"]
 [data-ws-part="home.gateway-status"]
-[data-ws-part="home.features"]
-[data-ws-part="home.feature"]
+[data-ws-part="home.join-card.sonar"]
+[data-ws-part="home.join-card.waveform"]
 [data-ws-part="home.visitors"]
+[data-ws-part="voice.activity.artwork"]
 [data-ws-part="voice.activity-heading"]
 [data-ws-part="voice.member.avatar"]
+[data-ws-part="voice.member.avatar-wrap"]
 [data-ws-part="voice.member.live-indicator"]
 [data-ws-part="voice.member-row.avatar"]
+[data-ws-part="voice.performance.metrics"]
+[data-ws-part="voice.performance.webrtc-stats"]
 [data-ws-part="voice.screen-player.viewer-avatar"]
 [data-ws-part="voice.screen-player.live"]
-[data-ws-part="demo.badge"]
-[data-ws-part="demo.wave"]
-[data-ws-part="demo.avatar"]
-[data-ws-part="demo.member-status"]
-[data-ws-part="demo.note"]
+[data-ws-part="host.watermark"]
+[data-ws-part="host.hint"]
+[data-ws-part="host.voice-status-decoration"]
+[data-ws-part="host.plugins.launcher"]
 ```
 
-上面必须使用单独的精确属性选择器；不能通过父容器、组合选择器或子元素间接隐藏/重置内容。关键帧只有在其动画仅被这些可选部件引用时，才可使用透明度归零；若关键帧也被必要控件引用或动画名通过变量指定，则会被拒绝。`clip`、`clip-path` 和 `mask` 一律不允许，避免视觉裁切误伤真实控件。校验器是防止布局回归的边界，不是视觉质量证明；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
+上面必须使用单独的精确属性选择器；不能通过父容器、组合选择器或子元素间接隐藏/重置内容。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认不渲染，`chrome.json#visibleParts` 才是它们的开启开关。关键帧只有在其动画仅被这些可选部件引用时，才可使用透明度归零；若关键帧也被必要控件引用或动画名通过变量指定，则会被拒绝。`clip`、`clip-path` 和 `mask` 一律不允许，避免视觉裁切误伤真实控件。校验器是防止布局回归的边界，不是视觉质量证明；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
 
-皮肤可以重画控制外观。v1/v2 不能重新布置必要操作；v3 可以，因此须人工实测加入/退出、麦克风状态、设置、菜单、屏幕共享退出、音量、全屏等操作的可达性。校验成功不代表设计质量合格；提交前要逐页实测窄屏和桌面尺寸、所有界面语言、键盘焦点与减少动效设置。
+皮肤可以重画控制外观。v1/v2 不能重新布置必要操作；v3 可以，因此须人工实测加入/退出、麦克风状态、设置、菜单、屏幕共享退出、音量、全屏等操作的可达性。v3 也不能用大的负 `margin*`、`inset`/`translate` 等把受保护控件移出视口，或把 `host.plugins.overlay` 及其后代改成定位全屏、放大到覆盖视口（`zoom` 等）；这些写法会在导入时被拒绝。校验成功不代表设计质量合格；提交前要逐页实测窄屏和桌面尺寸、所有界面语言、键盘焦点与减少动效设置。
 
 CSS 被限定在 `.ws-skin-root` 内，管理员页面不会继承皮肤。删除实例里的包会停止从服务器提供该包；已经下载过的浏览器副本会保留在本地存储，因此仍可能在该浏览器的选择器中出现。清除该站点的浏览器数据可移除本地副本。
 

@@ -1,3 +1,13 @@
+import {
+  AUTH_PASSWORD_PART_IDS,
+  DECORATIVE_PART_IDS,
+  HOST_PART_IDS,
+  PROTECTED_PART_IDS,
+  TRUSTED_PART_IDS,
+} from "./skin-visual-parts.js";
+
+export { AUTH_PASSWORD_PART_IDS, DECORATIVE_PART_IDS, TRUSTED_PART_IDS, PROTECTED_PART_IDS, HOST_PART_IDS };
+
 export type SkinLayoutPage = "home" | "voice" | "demo";
 export type SkinLayoutProfile = "desktop" | "tablet" | "mobile";
 
@@ -46,24 +56,10 @@ export interface SkinLayoutComponent {
   editable: boolean;
 }
 
-const AUTH_PASSWORD_PART_IDS = [
-  "auth.password.backdrop",
-  "auth.password.dialog",
-  "auth.password.decoration",
-  "auth.password.eyebrow",
-  "auth.password.title",
-  "auth.password.lead",
-  "auth.password.form",
-  "auth.password.label",
-  "auth.password.field",
-  "auth.password.field-icon",
-  "auth.password.error",
-  "auth.password.actions",
-] as const;
-
 const PUBLIC_PART_IDS = new Set<string>([
   "app",
   "app.toast",
+  "app.skin-load-recovery",
   ...AUTH_PASSWORD_PART_IDS,
   "control",
   "demo.action.poke",
@@ -336,25 +332,16 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.shell",
   "voice.whisper-strip",
   "voice.workspace",
+  // Host chrome is rendered outside the skin root. It stays in the public
+  // part registry so contract tests and the layout catalogue describe it,
+  // even though the layout editor only moves elements inside the root.
+  ...HOST_PART_IDS,
+  "home.footer.decoration",
+  "home.footer.clear",
+  "skin.library",
 ]);
 
 const CONTROL_KINDS = ["button", "link", "input", "checkbox", "range", "select", "textarea", "menuitem", "draggable"] as const;
-const TRUSTED_PART_IDS = new Set([
-  ...AUTH_PASSWORD_PART_IDS,
-  "app",
-  "app.toast",
-  "home.security-note",
-  "home.identity-import.security",
-  "voice.connection-status",
-  "voice.screen-share-error",
-]);
-const DECORATIVE_PART_IDS = new Set([
-  "demo.avatar", "demo.badge", "demo.note", "demo.poke-notification", "demo.wave",
-  "home.feature", "home.features", "home.footer", "home.hero.eyebrow", "home.join-card.sonar",
-  "home.join-card.waveform", "home.visitors", "voice.activity.artwork", "voice.member.avatar-wrap",
-  "voice.member.live-indicator", "voice.performance.metrics", "voice.performance.webrtc-stats",
-  "voice.screen-player.viewer-avatar",
-]);
 const SHELL_PART_IDS = new Set([
   "app", "home", "home.content", "home.form", "home.header", "voice.shell", "voice.workspace",
   "voice.content", "demo.layout", "demo.main",
@@ -379,6 +366,7 @@ const ACTION_PART_IDS = new Set([
   "voice.favorite-servers.strip.server", "demo.voice-card", "home.identity-import.drop-zone",
   "voice.channel-group", "voice.member-row", "voice.server-switcher.trigger", "voice.server-switcher.item",
   "voice.channel-tree.expander", "voice.channel-tree.row", "demo.skin-switcher", "demo.language-switcher",
+  "skin.library", "home.footer.clear", "host.plugins.launcher",
 ]);
 const INTERACTIVE_PART_IDS = new Set([
   "voice.invite.create", "voice.invite.copy",
@@ -399,6 +387,7 @@ const INTERACTIVE_PART_IDS = new Set([
   "voice.screen-player.exit", "voice.screen-player.fullscreen", "demo.voice-card",
   "home.identity-import.drop-zone", "voice.channel-group", "voice.member-row", "demo.skin-switcher",
   "demo.language-switcher",
+  "skin.library", "home.footer.clear", "host.plugins.launcher",
 ]);
 const IDENTITY_PART_IDS = new Set([
   "home.identity", "home.identity-actions", "home.identity-export.button", "home.identity-import-dialog",
@@ -409,8 +398,9 @@ const IDENTITY_PART_IDS = new Set([
 ]);
 const COMMON_PART_IDS = new Set([
   ...AUTH_PASSWORD_PART_IDS,
-  "app", "app.toast", "control", "skin.trigger", "skin.menu", "skin.option",
-  "language.trigger", "language.menu", "language.option",
+  ...HOST_PART_IDS,
+  "app", "app.toast", "app.skin-load-recovery", "control", "skin.trigger", "skin.menu", "skin.option",
+  "skin.library", "language.trigger", "language.menu", "language.option",
 ]);
 
 function pageOfPart(id: string): SkinLayoutPage | "common" | null {
@@ -451,6 +441,9 @@ const COMPONENT_NAME_PARTS: Record<string, string> = {
   user: "User", video: "Video", viewer: "Viewer", viewers: "Viewers", visitors: "Visitors", voice: "Voice",
   volume: "Volume", wave: "Wave", waveform: "Waveform", webrtc: "WebRTC", whisper: "Whisper", workspace: "Workspace",
   wrap: "Wrapper", zone: "Drop zone",
+  host: "Host", plugins: "Plugins", launcher: "Launcher", overlay: "Overlay", watermark: "Watermark",
+  decoration: "Decoration", recovery: "Recovery", permission: "Permission", library: "Library",
+  clear: "Clear",
 };
 
 function componentName(id: string): string {
