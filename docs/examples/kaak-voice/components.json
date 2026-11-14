@@ -584,7 +584,8 @@
               },
               {
                 "widget": "home.social-links",
-                "part": "rail-links"
+                "part": "rail-links",
+                "options": { "communityLinks": false }
               }
             ]
           },
@@ -864,6 +865,7 @@
                 "widget": "voice.server-header",
                 "part": "server-summary"
               },
+              {"widget":"voice.plugin-launcher","part":"plugin-launcher","options":{"pluginPresentation":"drawer-side"}},
               {
                 "widget": "voice.server-banner",
                 "part": "server-banner"

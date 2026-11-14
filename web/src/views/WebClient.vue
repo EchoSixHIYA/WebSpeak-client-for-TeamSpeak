@@ -874,7 +874,7 @@
       <div class="ws-skin-mount-slot" data-ws-skin-mount="voice.workspace.overlay"></div>
     </div>
 
-    <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" :toolbar-target="pluginToolbarTarget" />
+    <PluginPanel :session-token="pluginSession" :gateway-url="pluginVoiceSocket?.url ?? ''" :connected="voiceState.connected" :language="language" :toolbar-target="skinPluginToolbar?.element ?? pluginToolbarTarget" :presentation="skinPluginToolbar?.presentation ?? (OFFICIAL_SKIN_IDS.has(activeSkinId) ? 'drawer-below' : 'dialog')" />
     <HostChrome :language="language" :connected="voiceState.connected" :plugin-library-available="voiceState.connected && Boolean(pluginSession)" />
     <IdentityImportDialog
       v-if="identityImportOpen"
@@ -970,7 +970,7 @@
 
 <script setup lang="ts">
 import { observeMobileViewport } from "../services/mobile-viewport.js";
-import { computed, h, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
+import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import VoiceConnectionStatus from "../components/web-client/VoiceConnectionStatus.vue";
 import { useVoiceWorkspace } from "../composables/useVoiceWorkspace.js";
@@ -1011,6 +1011,7 @@ import { useWebClientChannels, type TreeChannel } from "../composables/useWebCli
 import { useWebClientConnection } from "../composables/useWebClientConnection.js";
 import { useWebClientMembers } from "../composables/useWebClientMembers.js";
 import PluginPanel from "../components/PluginPanel.vue";
+import { OFFICIAL_SKIN_IDS } from "../services/instance-authorization.js";
 import HostChrome from "../components/HostChrome.vue";
 import InstanceAuthorization from '../components/InstanceAuthorization.vue';
 import WorkspaceInviteDialog from "../components/web-client/WorkspaceInviteDialog.vue";
@@ -1176,6 +1177,7 @@ const skinPluginDocument = computed<SkinPluginDocument>(() => {
   return loadSkinPluginAuthoringDocument(skin.id, skin.version) ?? skin.pluginData ?? emptySkinPluginDocument;
 });
 const pluginToolbarTarget = ref<HTMLElement | null>(null);
+const skinPluginToolbar = shallowRef<{ element: HTMLElement; presentation: NonNullable<SkinPluginWidgetOptions["pluginPresentation"]> } | null>(null);
 const skinPluginSurfaceActive = ref(false);
 const skinRuntimePluginSurfaceActive = ref(false);
 watch(activeSkin, () => {
@@ -1832,11 +1834,11 @@ const skinPluginWidgets = {
     h("h2", { "data-ws-part": "home.server-announcement.title" }, t("serverAnnouncement")),
     h("p", { "data-ws-part": "home.server-announcement.body" }, localizedWelcomeText.value),
   ]),
-  "home.social-links": () => h("nav", {
+  "home.social-links": (options?: SkinPluginWidgetOptions) => h("nav", {
     "data-ws-part": "home.social-links",
     "aria-label": t("communityLinks"),
   }, [
-    h("a", {
+    ...(options?.communityLinks === false ? [] : [h("a", {
       href: githubRepositoryUrl,
       target: "_blank",
       rel: "noreferrer",
@@ -1849,7 +1851,7 @@ const skinPluginWidgets = {
       rel: "noreferrer",
       title: t("qqGroup"),
       "aria-label": t("qqGroup"),
-    }, [h(Icon, { name: "qq", size: 20 })]),
+    }, [h(Icon, { name: "qq", size: 20 })])]),
     h("a", {
       href: "/admin",
       title: t("adminConsole"),
@@ -1929,6 +1931,24 @@ const skinPluginWidgets = {
     "onUpdate:modelValue": (value: Language) => { language.value = value; },
     menuLabel: t("languageMenu"),
     onChange: persistLanguage,
+  }),
+  "voice.plugin-launcher": (options?: SkinPluginWidgetOptions) => h("div", {
+    ref: (element) => {
+      if (element instanceof HTMLElement) {
+        const presentation = options?.pluginPresentation ?? "dialog";
+        if (skinPluginToolbar.value?.element !== element || skinPluginToolbar.value.presentation !== presentation) {
+          skinPluginToolbar.value = { element, presentation };
+        }
+      } else if (skinPluginToolbar.value && !skinPluginToolbar.value.element.isConnected) {
+        skinPluginToolbar.value = null;
+      } else if (skinPluginToolbar.value) {
+        const previous = skinPluginToolbar.value.element;
+        void nextTick(() => {
+          if (skinPluginToolbar.value?.element === previous && !previous.isConnected) skinPluginToolbar.value = null;
+        });
+      }
+    },
+    class: "webspeak-plugin-toolbar-skin-slot",
   }),
   "voice.channel-panel": () => h(ChannelMemberPanel, {
     query: memberQuery.value,

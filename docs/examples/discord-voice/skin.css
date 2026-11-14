@@ -2149,3 +2149,20 @@
     scroll-behavior: auto !important;
   }
 }
+
+[data-ws-plugin-part="discord-workspace.plugin-launcher"] {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  --skin-plugin-app-accent: #c9cdfc;
+}
+[data-ws-plugin-part="discord-workspace.plugin-launcher"] [data-ws-part="voice.plugin-launcher"] > button {
+  color: var(--skin-plugin-app-accent);
+}
+[data-ws-plugin-part="discord-workspace.plugin-launcher"] [data-ws-part="voice.plugin-drawer"] {
+  background: #242529;
+  color: #e8e9ed;
+  border-color: #3f4148;
+}
+[data-ws-plugin-part="discord-workspace.plugin-launcher"] [data-ws-part="voice.plugin-drawer.app"]:hover {
+  background: #383a44;
+}

@@ -72,21 +72,50 @@
               </div>
             </template>
             <template v-else>
-            <div class="plugin-config-group" role="group" :aria-label="tr('config')">
+            <div v-if="plugin.manifest.id === fileTransferId" class="plugin-config-group">
+              <label>{{ tr('maxFileSize') }}
+                <input v-model="model.drafts[plugin.manifest.id].publicFields.maxFileMiB" type="number" min="1" max="2048" placeholder="256" />
+              </label>
+              <p>{{ tr('fileTransferIceHelp') }}</p>
+            </div>
+            <div v-else-if="plugin.manifest.id === watchTogetherId" class="plugin-config-group">
+              <label>{{ tr('playbackControl') }}
+                <select v-model="model.drafts[plugin.manifest.id].publicFields.control">
+                  <option value="">{{ tr('configDefault') }} · {{ tr('controlEveryone') }}</option>
+                  <option value="everyone">{{ tr('controlEveryone') }}</option>
+                  <option value="host">{{ tr('controlHost') }}</option>
+                </select>
+              </label>
+              <p>{{ tr('watchTogetherConfigHelp') }}</p>
+            </div>
+            <div v-else class="plugin-config-group" role="group" :aria-label="tr('config')">
               <p>{{ tr('config') }}</p>
               <PluginConfigValue :labels="valueLabels" :model-value="model.configValue(plugin.manifest.id, 'config')" @update:model-value="model.setConfigValue(plugin.manifest.id, 'config', $event)" />
             </div>
-            <template v-if="plugin.manifest.server">
-              <p class="plugin-config-help">
+            <template v-if="plugin.manifest.server && plugin.manifest.id !== watchTogetherId">
+              <p v-if="plugin.manifest.id !== fileTransferId" class="plugin-config-help">
                 {{ tr('privateConfigHelp') }}
               </p>
               <label>{{ tr('privateConfig') }}
                 <small>{{ tr(plugin.settings.hasServerConfig?'secretSaved':'secretEmpty') }}</small>
+                <small v-if="plugin.manifest.id === fileTransferId">{{ tr('replaceIceHelp') }}</small>
                 <select v-model="model.drafts[plugin.manifest.id].serverConfigAction">
                   <option value="keep">{{ tr('keep') }}</option><option value="replace">{{ tr('replace') }}</option><option value="remove">{{ tr('erase') }}</option>
                 </select>
               </label>
-              <div v-if="model.drafts[plugin.manifest.id].serverConfigAction==='replace'" class="plugin-config-group" role="group" :aria-label="tr('privateConfig')">
+              <div v-if="model.drafts[plugin.manifest.id].serverConfigAction==='replace' && plugin.manifest.id === fileTransferId" class="plugin-config-group">
+                <label class="plugin-trust"><input v-model="model.drafts[plugin.manifest.id].defaultIce" type="checkbox" />{{ tr('defaultIce') }}</label>
+                <template v-if="!model.drafts[plugin.manifest.id].defaultIce">
+                  <div v-for="(server, index) in model.drafts[plugin.manifest.id].iceServers" :key="index" class="plugin-config-grid">
+                    <label>{{ tr('iceUrls') }}<input v-model="server.urls" type="text" placeholder="turn:turn.example.com:3478" /></label>
+                    <label>{{ tr('iceUsername') }}<input v-model="server.username" type="text" autocomplete="off" /></label>
+                    <label>{{ tr('iceCredential') }}<input v-model="server.credential" type="password" autocomplete="new-password" /></label>
+                    <button type="button" class="plugin-button" @click="model.drafts[plugin.manifest.id].iceServers.splice(index, 1)">{{ tr('remove') }}</button>
+                  </div>
+                  <button type="button" class="plugin-button" @click="model.drafts[plugin.manifest.id].iceServers.push({urls:'',username:'',credential:''})">{{ tr('addIce') }}</button>
+                </template>
+              </div>
+              <div v-else-if="model.drafts[plugin.manifest.id].serverConfigAction==='replace'" class="plugin-config-group" role="group" :aria-label="tr('privateConfig')">
                 <PluginConfigValue secret :labels="valueLabels" :model-value="model.configValue(plugin.manifest.id, 'serverConfig')" @update:model-value="model.setConfigValue(plugin.manifest.id, 'serverConfig', $event)" />
               </div>
             </template>
@@ -106,7 +135,7 @@ import Icon from '../Icon.vue';
 import PluginConfigValue from './PluginConfigValue.vue';
 import type { SiteLanguage } from '../../../../src/site-copy.js';
 import { PLUGIN_STORE_REPOSITORY, type InstalledPlugin, type PluginStoreEntry, type PluginManifest } from '../../../../src/shared/plugins.js';
-import { musicBotId, musicBotPrivateFields, musicBotPublicFields, musicBotRepository, type useAdminPlugins } from '../../composables/useAdminPlugins.js';
+import { fileTransferId, watchTogetherId, musicBotId, musicBotPrivateFields, musicBotPublicFields, musicBotRepository, type useAdminPlugins } from '../../composables/useAdminPlugins.js';
 import { pluginTranslations, type PluginTextKey } from '../../i18n/plugins.js';
 import { pluginStoreTranslations, type PluginStoreTextKey } from '../../i18n/plugin-store.js';
 const props=defineProps<{model:ReturnType<typeof useAdminPlugins>;language:SiteLanguage}>();
@@ -114,6 +143,8 @@ const tr=(key:PluginTextKey)=>pluginTranslations[props.language][key],text=(key:
 const valueLabels=computed(()=>({type:tr('valueType'),key:tr('fieldKey'),value:tr('fieldValue'),add:tr('addField'),remove:tr('remove')}));
 function describeError(code:string) {
   if(code==='TSMB_API_KEY_REQUIRED')return tr('musicBotConfigHelp');
+  if(code==='PLUGIN_FILE_LIMIT_INVALID')return tr('maxFileSize');
+  if(code==='PLUGIN_ICE_URL_INVALID')return tr('iceInvalid');
   if(code==='PLUGIN_CHECKSUM')return tr('storeChecksum');
   if(code==='PLUGIN_PACKAGE_MISMATCH')return tr('storeMismatch');
   return `${tr('error')} (${code})`;
@@ -139,7 +170,7 @@ function onToggle(event:Event,id:string){if((event.target as HTMLDetailsElement)
 .plugin-setup-link,.plugin-installed-meta a{color:var(--admin-accent);display:inline-flex;align-items:center;gap:5px}
 .plugin-setup-link{margin-bottom:12px;font-size:12px}
 .plugin-config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));column-gap:16px}
-.plugin-config-grid input{box-sizing:border-box;width:100%;min-width:0;padding:10px 12px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-field);color:var(--admin-text);font-size:12px}
+.plugin-config-grid input,.plugin-config-group input{box-sizing:border-box;width:100%;min-width:0;padding:10px 12px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-field);color:var(--admin-text);font-size:12px}
 .plugin-config-field,.plugin-config-group{font-size:12px;color:var(--admin-muted);min-width:0}
 .plugin-config-field [role=group],.plugin-config-group{display:grid;gap:8px;margin-bottom:12px}
 section.page-content.plugin-admin{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;align-content:start;gap:24px;color:var(--admin-text);min-width:0}

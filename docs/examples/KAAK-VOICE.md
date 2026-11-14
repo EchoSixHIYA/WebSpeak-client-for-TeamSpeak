@@ -30,7 +30,7 @@ The owner authorized inspection of the first two voice rooms in the KOOK server.
 
 ## Returning to the workspace
 
-KAAK 3.1.131 uses the normal connection home on every visit. It no longer opts into persistent workspace entry. The connection-status and explicit reconnect controls remain available inside the voice workspace.
+KAAK 3.1.132 uses the normal connection home on every visit. It no longer opts into persistent workspace entry. The connection-status and explicit reconnect controls remain available inside the voice workspace.
 
 The permission-gated `voice.connection-status` host widget provides the connection state, nickname and explicit reconnect button beside server navigation at desktop and narrow widths. Open-mode server switching and adding servers reuse the host connection flow, including saved-password lookup and trusted password prompts; fixed mode retains its restrictions. All KAAK layout and styling remain in the package.
 

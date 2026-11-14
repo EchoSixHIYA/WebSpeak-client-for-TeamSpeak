@@ -275,6 +275,9 @@ const PUBLIC_PART_IDS = new Set<string>([
   "voice.header",
   "voice.header-actions",
   "voice.plugin-toolbar",
+  "voice.plugin-launcher",
+  "voice.plugin-drawer",
+  "voice.plugin-drawer.app",
   "voice.member",
   "voice.member-panel",
   "voice.member-panel.channels",
@@ -366,7 +369,7 @@ const ACTION_PART_IDS = new Set([
   "voice.favorite-servers.strip.server", "demo.voice-card", "home.identity-import.drop-zone",
   "voice.channel-group", "voice.member-row", "voice.server-switcher.trigger", "voice.server-switcher.item",
   "voice.channel-tree.expander", "voice.channel-tree.row", "demo.skin-switcher", "demo.language-switcher",
-  "skin.library", "home.footer.clear", "host.plugins.launcher",
+  "skin.library", "home.footer.clear", "host.plugins.launcher", "voice.plugin-drawer.app",
 ]);
 const INTERACTIVE_PART_IDS = new Set([
   "voice.invite.create", "voice.invite.copy",

@@ -1,10 +1,24 @@
 <template>
-  <Teleport v-if="toolbarTarget" :to="toolbarTarget">
-    <div v-if="thirdPartyAllowed && connected && sessionToken" class="ws-plugin-toolbar">
-      <button v-if="!isHostPartHidden('host.plugins.launcher')" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="visible" @click="toggle">
+  <Teleport :to="toolbarTarget ?? 'body'">
+    <div v-if="thirdPartyAllowed && connected && sessionToken" ref="toolbar" class="ws-plugin-toolbar" :class="{ 'ws-plugin-toolbar-fallback': !toolbarTarget }" data-ws-part="voice.plugin-launcher" :data-presentation="presentation" :data-theme="theme" @keydown.esc="dismissDrawer">
+      <button v-if="!isHostPartHidden('host.plugins.launcher')" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="presentation === 'dialog' ? visible : drawerOpen" :aria-controls="drawerOpen ? drawerId : undefined" @click="toggle">
         <svg viewBox="0 0 24 24" data-ws-icon-slot="host.plugins.launcher" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+        <span v-if="presentation === 'drawer-side'">{{ tr('title') }}</span>
       </button>
-      <button v-for="entry in pinnedApps" :key="entry.manifest.id" class="header-action ws-plugin-toolbar-shortcut" type="button" :title="entry.manifest.name" :aria-label="entry.manifest.name" :disabled="busy || entry.runtime.state === 'failed'" @click="launch(entry.manifest.id)">{{ entry.manifest.name.slice(0, 1).toUpperCase() }}</button>
+      <section v-if="drawerOpen" :id="drawerId" ref="drawer" class="ws-plugin-drawer" data-ws-part="voice.plugin-drawer" :aria-label="tr('title')">
+        <input ref="drawerSearch" v-model="search" class="ws-plugin-drawer-search" type="search" :placeholder="ui.search" :aria-label="ui.search" />
+        <p v-if="error" role="alert">{{ error }}</p>
+        <p v-else-if="busy && !available.length" role="status">{{ tr('loading') }}</p>
+        <p v-else-if="!filtered.length">{{ available.length ? ui.noResults : tr('empty') }}</p>
+        <ul v-if="filtered.length">
+          <li v-for="entry in filtered" :key="entry.manifest.id">
+            <button type="button" class="ws-plugin-drawer-app" data-ws-part="voice.plugin-drawer.app" :disabled="busy || entry.runtime.state === 'failed'" :title="entry.runtime.error || entry.manifest.name" @click="launch(entry.manifest.id)">
+              <span class="ws-plugin-drawer-mark" aria-hidden="true">{{ entry.manifest.name.slice(0, 1).toUpperCase() }}</span>
+              <span>{{ entry.manifest.name }}</span><span v-if="entry.toolbarPinned" aria-hidden="true">★</span>
+            </button>
+          </li>
+        </ul>
+      </section>
     </div>
   </Teleport>
   <Teleport to="body">
@@ -19,13 +33,13 @@
             <button class="ws-plugin-close" type="button" :title="tr('close')" :aria-label="tr('close')" @click="close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
           </div>
         </header>
-        <nav class="ws-plugin-navigation" :aria-label="tr('title')">
+        <nav v-if="dialogLibrary" class="ws-plugin-navigation" :aria-label="tr('title')">
           <button type="button" :class="{ active: !appView }" @click="appView = false">{{ ui.workspace }}</button>
           <button v-if="current" type="button" :class="{ active: appView }" @click="appView = true">{{ current.manifest.name }}</button>
           <span v-if="current && appView" class="ws-plugin-version">v{{ current.manifest.version }}</span>
         </nav>
         <p v-if="error" role="alert" class="ws-plugin-error">{{ error }}</p>
-        <div v-show="!appView" class="ws-plugin-library">
+        <div v-if="dialogLibrary" v-show="!appView" class="ws-plugin-library">
           <div class="ws-plugin-library-heading"><div><h2>{{ tr('title') }}</h2><span>{{ available.length }} {{ ui.count }}</span></div><button type="button" :disabled="busy" @click="refresh">{{ busy ? tr('loading') : tr('refresh') }}</button></div>
           <input v-model="search" class="ws-plugin-search" type="search" :placeholder="ui.search" :aria-label="ui.search" />
           <p v-if="!busy && !filtered.length" class="ws-plugin-empty">{{ available.length ? ui.noResults : tr('empty') }}</p>
@@ -47,24 +61,32 @@
   </Teleport>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch } from 'vue';
 import { createPluginAppClient, type AvailablePluginApp, type PluginAppClient } from '../services/plugin-app-client.js';
 import { type PluginAppLaunch, pluginRecord } from '../../../src/shared/plugins.js';
 import { pluginTranslations, type PluginTextKey } from '../i18n/plugins.js';
 import { pluginWindowTranslations } from '../i18n/plugin-window.js';
 import type { SiteLanguage } from '../../../src/site-copy.js';
 import { thirdPartyAllowed } from '../services/instance-authorization.js';
-import { isHostPartHidden, pluginLibraryRequests } from '../services/host-chrome.js';
-const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage; toolbarTarget: HTMLElement | null }>();
+import { isHostPartHidden, isHostPartVisuallyReachable, pluginLibraryRequests } from '../services/host-chrome.js';
+import type { SkinPluginWidgetOptions } from '../../../src/shared/skin-plugin.js';
+const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage; toolbarTarget: HTMLElement | null; presentation: NonNullable<SkinPluginWidgetOptions['pluginPresentation']> }>();
 const tr = (key: PluginTextKey) => pluginTranslations[props.language][key];
 const ui = computed(() => pluginWindowTranslations[props.language]);
 const windowElement = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), frame = ref<HTMLIFrameElement | null>(null);
 const available = shallowRef<AvailablePluginApp[]>([]), current = shallowRef<PluginAppLaunch | null>(null);
-const pinnedApps = computed(() => available.value.filter(entry => entry.toolbarPinned));
+const toolbar = ref<HTMLElement | null>(null);
+const drawerOpen = ref(false);
+const drawer = ref<HTMLElement | null>(null);
+const drawerSearch = ref<HTMLInputElement | null>(null);
+const drawerId = useId();
+const dialogLibrary = ref(false);
 const busy = ref(false), error = ref(''), theme = ref<'light' | 'dark'>('light');
 const visible = ref(false), maximized = ref(false), appView = ref(false), dragging = ref(false), search = ref('');
 const position = ref<Record<string, string>>({});
-const filtered = computed(() => available.value.filter(entry => `${entry.manifest.name} ${entry.manifest.description}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())));
+const filtered = computed(() => available.value
+  .filter(entry => `${entry.manifest.name} ${entry.manifest.description}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()))
+  .sort((a, b) => Number(b.toolbarPinned) - Number(a.toolbarPinned)));
 let epoch = 0, pending: AbortController | undefined, opening: { client: PluginAppClient; key: string } | undefined, observer: MutationObserver | undefined;
 let drag: { id: number; x: number; y: number; left: number; top: number; handle: HTMLElement; moved: boolean } | undefined;
 let resizeObserver: ResizeObserver | undefined;
@@ -89,31 +111,75 @@ async function refresh() {
   finally { if (owner === epoch) { busy.value = false; pending = undefined; } }
 }
 function toggle() {
-  if (visible.value) { minimize(); return; }
-  detectTheme(); visible.value = true;
-  if (!current.value) { appView.value = false; void refresh(); }
+  if (props.presentation === 'dialog') {
+    if (visible.value && dialogLibrary.value) { minimize(); return; }
+    openLibraryDialog();
+    return;
+  }
+  if (drawerOpen.value) { drawerOpen.value = false; return; }
+  openDrawer();
+}
+function openDrawer() {
+  drawerOpen.value = true;
+  detectTheme();
+  visible.value = false;
+  search.value = '';
+  if (!busy.value) void refresh();
+  void nextTick(() => { fitDrawer(); drawerSearch.value?.focus({ preventScroll: true }); });
+}
+function openLibraryDialog() {
+  drawerOpen.value = false;
+  detectTheme();
+  dialogLibrary.value = true;
+  visible.value = true;
+  appView.value = false;
+  if (!busy.value) void refresh();
   void nextTick(() => { fitWindow(); windowElement.value?.focus(); });
 }
+function dismissDrawer(event: KeyboardEvent) {
+  if (!drawerOpen.value) return;
+  event.stopPropagation();
+  drawerOpen.value = false;
+  launcher.value?.focus();
+}
+function closeDrawerOutside(event: PointerEvent) {
+  if (drawerOpen.value && toolbar.value && !event.composedPath().includes(toolbar.value)) drawerOpen.value = false;
+}
+function fitDrawer() {
+  const element = drawer.value;
+  if (!element || props.presentation !== 'drawer-below') return;
+  element.style.translate = '';
+  const box = element.getBoundingClientRect();
+  const delta = Math.max(8 - box.left, Math.min(0, document.documentElement.clientWidth - 8 - box.right));
+  if (delta) element.style.translate = `${delta}px 0`;
+}
 function minimize() { endDrag(); visible.value = false; launcher.value?.focus(); }
-function close() { stop(); error.value = ''; available.value = []; search.value = ''; minimize(); }
+function close() { drawerOpen.value = false; stop(); error.value = ''; available.value = []; search.value = ''; minimize(); }
 function stop() {
   ++epoch; pending?.abort(); pending = undefined; const old = opening; opening = undefined; current.value = null; appView.value = false; busy.value = false;
   if (old) void old.client.cancelOpen(old.key).catch(() => undefined);
 }
 async function launch(id: string) {
-  if (!thirdPartyAllowed.value) return;
+  if (!thirdPartyAllowed.value || !props.connected || !props.sessionToken || busy.value) return;
+  if (drawerOpen.value) dialogLibrary.value = false;
+  drawerOpen.value = false;
   detectTheme(); visible.value = true;
-  if (current.value?.manifest.id === id) { appView.value = true; return; }
+  if (current.value?.manifest.id === id) { appView.value = true; focusAppWindow(); return; }
   stop(); const owner = ++epoch, controller = new AbortController(), service = client(), key = crypto.randomUUID(); pending = controller; opening = { client: service, key }; busy.value = true; error.value = '';
   try {
     const app = await service.open(id, { openId: key, theme: theme.value, language: props.language }, controller.signal);
     if (owner !== epoch) return;
     if (new URL(app.url).origin === location.origin) throw new Error('PLUGIN_SEPARATE_ORIGIN_REQUIRED');
     current.value = app; appView.value = true;
+    focusAppWindow();
   } catch (e) {
     if (owner === epoch) { const old = opening; opening = undefined; if (old) void old.client.cancelOpen(old.key).catch(() => undefined); if (!controller.signal.aborted) error.value = `${tr('error')}: ${e instanceof Error ? e.message : ''}`; }
   } finally { if (owner === epoch) { busy.value = false; pending = undefined; } }
 }
+function focusAppWindow() {
+  void nextTick(() => { fitWindow(); windowElement.value?.focus(); });
+}
+watch([() => props.toolbarTarget, () => props.presentation], () => { drawerOpen.value = false; });
 function message(event: MessageEvent) {
   if (!current.value || event.source !== frame.value?.contentWindow || event.origin !== new URL(current.value.url).origin || !pluginRecord(event.data)) return;
   if (event.data.type === 'webspeak-app-closed' && event.data.id === current.value.id) { stop(); error.value = tr('context'); }
@@ -158,16 +224,19 @@ watch(() => props.language, appearance); watch(theme, appearance);
 // library reachable when a skin hides the toolbar launcher.
 watch(pluginLibraryRequests, () => {
   if (!thirdPartyAllowed.value || !props.connected || !props.sessionToken) return;
-  detectTheme();
-  visible.value = true;
-  appView.value = false;
-  if (!current.value) void refresh();
-  void nextTick(() => { fitWindow(); windowElement.value?.focus(); });
+  if (props.presentation !== 'dialog' && isHostPartVisuallyReachable('host.plugins.launcher')) openDrawer();
+  else openLibraryDialog();
 });
 onMounted(() => {
+  document.addEventListener('pointerdown', closeDrawerOutside, true);
+  window.addEventListener('resize', fitDrawer);
   detectTheme(); window.addEventListener('message', message); window.addEventListener('resize', fitWindow); window.addEventListener('pointermove', moveDrag); window.addEventListener('pointerup', endDrag); window.addEventListener('pointercancel', endDrag); window.addEventListener('blur', endDrag);
   if (props.connected && thirdPartyAllowed.value) void refresh();
   observer = new MutationObserver(detectTheme); observer.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-ws-skin', 'data-ws-host-skin', 'data-theme'] });
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeDrawerOutside, true);
+  window.removeEventListener('resize', fitDrawer);
 });
 onBeforeUnmount(() => { stop(); endDrag(); observer?.disconnect(); resizeObserver?.disconnect(); window.removeEventListener('message', message); window.removeEventListener('resize', fitWindow); window.removeEventListener('pointermove', moveDrag); window.removeEventListener('pointerup', endDrag); window.removeEventListener('pointercancel', endDrag); window.removeEventListener('blur', endDrag); });
 </script>

@@ -41,6 +41,14 @@ export const musicBotPublicFields: readonly ConfigField[] = [
   {key:'locale',type:'text',placeholder:'auto'},
 ];
 
+export const fileTransferId = 'community.p2p-file-transfer';
+export const watchTogetherId = 'community.watch-together';
+
+const exampleFields: Readonly<Record<string, readonly ConfigField[]>> = {
+  [fileTransferId]: [{key:'maxFileMiB',type:'number',placeholder:'256'}],
+  [watchTogetherId]: [{key:'control',type:'select',choices:['everyone','host'],placeholder:'everyone'}],
+};
+
 function makeConfigDraft(fields: readonly ConfigField[], config?: JsonValue): Record<string, string> {
   return Object.fromEntries(fields.map(({key,type}) => {
     const value = pluginRecord(config) ? config[key] : undefined;
@@ -71,12 +79,12 @@ function readConfigFields(fields: readonly ConfigField[], draft: Record<string, 
 export function useAdminPlugins(api: AdminApi) {
   const installed=shallowRef<InstalledPlugin[]>([]),catalog=shallowRef<PluginCatalog|null>(null),runtime=shallowRef<PluginRuntimeSettings|null>(null);
   const origin=ref(''),busy=ref(false),error=ref(''),catalogError=ref(''),requests=createAdminRequests();
-  const drafts=reactive<Record<string,{enabled:boolean;trusted:boolean;toolbarPinned:boolean;scope:'server'|'instance';targets:string;config:string;serverConfigAction:'keep'|'replace'|'remove';serverConfig:string;publicFields:Record<string,string>;privateFields:Record<string,string>}>>({});
+  const drafts=reactive<Record<string,{enabled:boolean;trusted:boolean;toolbarPinned:boolean;scope:'server'|'instance';targets:string;config:string;serverConfigAction:'keep'|'replace'|'remove';serverConfig:string;publicFields:Record<string,string>;privateFields:Record<string,string>;iceServers:{urls:string;username:string;credential:string}[];defaultIce:boolean}>>({});
   function apply(records:InstalledPlugin[]){
     installed.value=records;
     for(const record of records)if(!drafts[record.manifest.id]){
       const musicBot = record.manifest.id === musicBotId;
-      drafts[record.manifest.id]={enabled:record.settings.enabled,trusted:record.settings.trusted,toolbarPinned:record.settings.toolbarPinned,scope:record.settings.scope,targets:record.settings.targets.join('\n'),config:JSON.stringify(record.settings.config,null,2),serverConfigAction:'keep',serverConfig:'',publicFields:musicBot?makeConfigDraft(musicBotPublicFields,record.settings.config):{},privateFields:musicBot?makeConfigDraft(musicBotPrivateFields):{}};
+      drafts[record.manifest.id]={enabled:record.settings.enabled,trusted:record.settings.trusted,toolbarPinned:record.settings.toolbarPinned,scope:record.settings.scope,targets:record.settings.targets.join('\n'),config:JSON.stringify(record.settings.config,null,2),serverConfigAction:'keep',serverConfig:'',publicFields:makeConfigDraft(musicBot?musicBotPublicFields:exampleFields[record.manifest.id]??[],record.settings.config),privateFields:musicBot?makeConfigDraft(musicBotPrivateFields):{},iceServers:[],defaultIce:true};
     }
     for(const id of Object.keys(drafts))if(!records.some(r=>r.manifest.id===id))delete drafts[id];
   }
@@ -111,9 +119,19 @@ export function useAdminPlugins(api: AdminApi) {
   function save(record:InstalledPlugin){return work(async(signal,current)=>{
     const draft=drafts[record.manifest.id],captured=JSON.stringify(draft);
     const musicBot=record.manifest.id===musicBotId;
-    const settings:PluginSettingsInput={enabled:draft.enabled,trusted:draft.trusted,toolbarPinned:draft.toolbarPinned,scope:draft.scope,targets:draft.targets.split(/\r?\n/).map(t=>t.trim()).filter(Boolean),config:musicBot?readConfigFields(musicBotPublicFields,draft.publicFields,record.settings.config):JSON.parse(draft.config),serverConfigAction:draft.serverConfigAction};
+    const fields=musicBot?musicBotPublicFields:exampleFields[record.manifest.id];
+    const settings:PluginSettingsInput={enabled:draft.enabled,trusted:draft.trusted,toolbarPinned:draft.toolbarPinned,scope:draft.scope,targets:draft.targets.split(/\r?\n/).map(t=>t.trim()).filter(Boolean),config:fields?readConfigFields(fields,draft.publicFields,record.settings.config):JSON.parse(draft.config),serverConfigAction:draft.serverConfigAction};
+    if(record.manifest.id===fileTransferId && pluginRecord(settings.config) && typeof settings.config.maxFileMiB==='number'
+      && (settings.config.maxFileMiB<1 || settings.config.maxFileMiB>2048)) throw new Error('PLUGIN_FILE_LIMIT_INVALID');
     if(draft.serverConfigAction==='replace'){
-      settings.serverConfig=musicBot?readConfigFields(musicBotPrivateFields,draft.privateFields):JSON.parse(draft.serverConfig);
+      if(record.manifest.id===fileTransferId){
+        settings.serverConfig=draft.defaultIce?{}:{iceServers:draft.iceServers.map(({urls,username,credential})=>({
+          urls:urls.split(/\s+/).filter(Boolean),...(username.trim()?{username:username.trim()}:{}),...(credential?{credential}:{}),
+        }))};
+        if(!draft.defaultIce && draft.iceServers.some(server=>!server.urls.trim() || server.urls.trim().split(/\s+/).some(url=>!/^(stun|stuns|turn|turns):\S+$/i.test(url)))) throw new Error('PLUGIN_ICE_URL_INVALID');
+      }else{
+        settings.serverConfig=musicBot?readConfigFields(musicBotPrivateFields,draft.privateFields):JSON.parse(draft.serverConfig || '{}');
+      }
       if(musicBot && pluginRecord(settings.serverConfig) && (typeof settings.serverConfig.apiKey !== 'string' || !/^tsmb_[A-Za-z0-9_-]{20,}$/.test(settings.serverConfig.apiKey))) throw new Error('TSMB_API_KEY_REQUIRED');
     }
     if(musicBot && draft.enabled && (draft.serverConfigAction==='remove' || (draft.serverConfigAction==='keep' && !record.settings.hasServerConfig))) throw new Error('TSMB_API_KEY_REQUIRED');
@@ -128,7 +146,7 @@ export function useAdminPlugins(api: AdminApi) {
     const result=await api.uploadPlugin(pack,installed.value.find(p=>p.manifest.id===pack.manifest.id)?.revision??null,signal);
     if(current()){delete drafts[pack.manifest.id];apply([...installed.value.filter(p=>p.manifest.id!==pack.manifest.id),result.plugin]);}
   });}
-  function cancelRequests(){requests.reset();busy.value=false;for(const draft of Object.values(drafts)){draft.serverConfig='';draft.serverConfigAction='keep';for(const key of Object.keys(draft.privateFields))draft.privateFields[key]='';}}
+  function cancelRequests(){requests.reset();busy.value=false;for(const draft of Object.values(drafts)){draft.serverConfig='';draft.serverConfigAction='keep';draft.iceServers=[];draft.defaultIce=true;for(const key of Object.keys(draft.privateFields))draft.privateFields[key]='';}}
   function reset(){cancelRequests();installed.value=[];catalog.value=null;runtime.value=null;origin.value='';error.value='';catalogError.value='';for(const id of Object.keys(drafts))delete drafts[id];}
   return {installed,catalog,runtime,origin,busy,error,catalogError,drafts,load,install,save,restart,saveRuntime,remove,upload,cancelRequests,reset,configValue,setConfigValue,musicBotCollection,setMusicBotCollection};
 }

@@ -490,9 +490,9 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const file = new File([archive], "kaak-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.kaak-voice");
-  assert.equal(skin.version, "3.1.131");
+  assert.equal(skin.version, "3.1.132");
   assert.equal(skin.workspace, undefined);
-  assert.equal(skin.minAppVersion, "0.2.8");
+  assert.equal(skin.minAppVersion, "0.3.2");
   assert.equal(BUILTIN_SKIN_CATALOG.find((entry) => entry.id === skin.id)?.version, skin.version);
   assert.equal(skin.schemaVersion, 3);
   const baseMessages = skin.contentData?.locales["zh-CN"]?.messages ?? {};
@@ -507,6 +507,8 @@ test("the distributable KAAK package provides full home and voice surfaces", asy
   const voice = skin.pluginData?.components.find((component) => component.page === "voice");
   assert.ok(voice?.permissions.includes("voice.connect"));
   assert.match(JSON.stringify(voice?.root), /"widget":"voice.connection-status"/);
+  assert.match(JSON.stringify(voice?.root), /"widget":"voice.plugin-launcher".*?"pluginPresentation":"drawer-side"/);
+  assert.match(JSON.stringify(voice?.root), /"widget":"home.social-links".*?"communityLinks":false/);
   assert.deepEqual(skin.pluginData?.components.map((component) => [component.id, component.mode]), [
     ["kaak-home", "surface"],
     ["kaak-workspace", "surface"],
@@ -949,6 +951,7 @@ test("the Discord Voice package imports portable home and voice surfaces", async
   const file = new File([archive], "discord-voice.wskin", { type: "application/octet-stream" });
   const skin = await importSkinPack(file);
   assert.equal(skin.id, "community.discord-voice");
+  assert.equal(skin.minAppVersion, "0.3.2");
   assert.equal(skin.packageType, "open-skin");
   assert.equal(skin.schemaVersion, 3);
   assert.deepEqual(skin.pluginData?.components.map(({ id, page, mode }) => [id, page, mode]), [
@@ -963,6 +966,7 @@ test("the Discord Voice package imports portable home and voice surfaces", async
   assert.ok(voice?.permissions.includes("audio.microphone.control"));
   assert.ok(voice?.permissions.includes("voice.screenShare.control"));
   assert.equal(voice?.actions["copy-invite-link"]?.type, "session.copyInviteLink");
+  assert.match(JSON.stringify(voice?.root), /"widget":"voice.plugin-launcher".*?"pluginPresentation":"drawer-side"/);
   assert.equal(skin.runtimePlugins?.plugins.length ?? 0, 0, "the open skin contains no executable plugin code");
   const baseMessageKeys = Object.keys(skin.contentData?.locales.en?.messages ?? {}).sort();
   for (const locale of ["zh-CN", "de", "ru", "ja"]) {
