@@ -135,7 +135,9 @@ export default async function activate({ dataDir, config, publicConfig, events, 
 
 ## 分发与验证
 
-[分发仓库](https://github.com/Huddle-Up-Forge/webspeak-plugin) 目录为 `{"schemaVersion":2,"plugins":[{"id":"community.my-app","repository":"https://github.com/OWNER/REPO","metadataPath":"plugin.json"}]}`。插件仓库 `plugin.json` 包含同一 `manifest` 和 `package:{ref,path,sha256}`。`ref` 使用固定提交/不可变标签，`path` 指向已提交包，SHA-256 为包原始字节哈希。宿主限制 GitHub 内容来源、核验哈希与 manifest；目录或安装修订改变会拒绝覆盖，需重新加载。空目录不默认安装插件。
+[分发仓库](https://github.com/Huddle-Up-Forge/webspeak-plugin) 目录为 `{"schemaVersion":2,"plugins":[{"id":"community.my-app","repository":"https://github.com/OWNER/REPO","metadataPath":"plugin.json"}]}`。插件仓库 `plugin.json` 包含 `manifest` 和 `package:{ref,path,sha256}`。`ref` 使用固定提交/不可变标签，`path` 指向已提交包，SHA-256 为包原始字节哈希。实例安装时校验包哈希、API 版本、插件 ID、版本、作用域集合与前后端入口。商店展示 `plugin.json` 里的名称、描述、作者和许可证，实例安装后展示包内清单里的值。目录或安装修订改变时需重新加载。空目录不默认安装插件。
+
+需要后台配置的插件应在仓库 README 写明公开与私密字段的用途、必填项、凭据获取方式，并提供用占位符的 JSON 示例。管理员可从已安装插件的高级配置打开仓库说明。
 
 验证实际构建包的导入、审核、启用、自定义 HTTP/WS、依赖加载、持久化和关闭/断线/禁用/更新撤销；检查明暗、语言、窄屏。协作另测两位真实参与者及并发/离开/重连。区分模拟身份、真实 TS、浏览器交互与跨网络证据。宿主回归：`npm run verify`。
 

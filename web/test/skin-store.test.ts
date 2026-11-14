@@ -49,11 +49,18 @@ async function registry(t: test.TestContext) {
 }
 test("store installs exact verified packages and preserves enabled/default state on update", async t => {
   const f = fixture(), store = new SkinStore("0.2.8", f.fetcher), skins = await registry(t);
+  f.overrides.set(`${raw}/HEAD/skin.json`, () => Response.json({
+    ...f.metadata(), name: "Catalog display name", author: "Catalog author", license: "MIT (code)",
+  }));
   const entry = (await store.list()).entries[0];
   assert.equal(entry.compatible, true);
   const input = { id: entry.id, revision: entry.revision, installedVersion: null };
   await store.install(skins, input);
   assert.deepEqual(await skins.readArchive(entry.id), f.archive());
+  const [installed] = await skins.list();
+  assert.equal(installed.name, manifest.name);
+  assert.equal(installed.author, manifest.author);
+  assert.equal(installed.license, manifest.license);
   await skins.setDefaultSkin(entry.id);
   f.setVersion("1.1.0");
   const updated = (await store.list(true)).entries[0];
@@ -104,9 +111,11 @@ test("store bounds downloads and validates checksum, package identity and metada
   f.overrides.set(packageUrl, () => new Response("x", { headers: { "content-length": String(21 * 1024 * 1024) } }));
   await assert.rejects(store.install(skins, input), errorCode("SKIN_STORE_TOO_LARGE"));
   f.overrides.delete(packageUrl);
-  f.overrides.set(`${raw}/HEAD/skin.json`, () => Response.json({ ...f.metadata(), name: "Different display name" }));
-  const mismatch = (await store.list(true)).entries[0];
-  await assert.rejects(store.install(skins, { ...input, revision: mismatch.revision }), errorCode("SKIN_STORE_PACKAGE_MISMATCH"));
+  for (const fields of [{ version: "1.1.0" }, { minAppVersion: "0.2.7" }]) {
+    f.overrides.set(`${raw}/HEAD/skin.json`, () => Response.json({ ...f.metadata(), ...fields }));
+    const mismatch = (await store.list(true)).entries[0];
+    await assert.rejects(store.install(skins, { ...input, revision: mismatch.revision }), errorCode("SKIN_STORE_PACKAGE_MISMATCH"));
+  }
   f.overrides.set(`${raw}/HEAD/skin.json`, () => Response.json({ ...f.metadata(), package: { ...f.metadata().package, path: "../private.wskin" } }));
   assert.equal((await store.list(true)).entries[0].error, "SKIN_STORE_INVALID");
   assert.deepEqual(await skins.list(), []);

@@ -118,9 +118,10 @@ test('v2 admin HTTP requires authentication, origin, CSRF and renewed trust; sec
  const service=new AdminService(database,Buffer.alloc(32,7),logger,path.join(env.directory,'absent.json'),undefined,'test');await service.initialize();await service.changePassword('runtime-test-password');
  const pack=await application(true),bytes=JSON.stringify(pack),digest=createHash('sha256').update(bytes).digest('hex');
  let packageBytes=bytes;
+ let listedManifest={...pack.manifest,name:'Catalog name',author:'Catalog author',license:'Catalog license',description:'Catalog description',scopes:[...pack.manifest.scopes].reverse()};
  const store=new PluginStore(async(url)=>{
   const address=String(url);if(address.endsWith('/index.json'))return Response.json({schemaVersion:2,plugins:[{id:pack.manifest.id,repository:'https://github.com/example/app'}]});
-  if(address.endsWith('/plugin.json'))return Response.json({manifest:pack.manifest,package:{ref:'fixed-commit',path:'packages/app.wplugin',sha256:digest}});
+  if(address.endsWith('/plugin.json'))return Response.json({manifest:listedManifest,package:{ref:'fixed-commit',path:'packages/app.wplugin',sha256:digest}});
   return new Response(packageBytes);
  });
  const app=express();app.use((req,res,next)=>req.path.startsWith('/api/admin/plugins')?next():express.json()(req,res,next));
@@ -135,7 +136,15 @@ test('v2 admin HTTP requires authentication, origin, CSRF and renewed trust; sec
  assert.equal((await write({origin})).status,403);assert.equal((await write({origin:'https://other.example','x-csrf-token':csrf})).status,403);
  const catalog=await api.pluginStore();assert.equal(catalog.entries[0].manifest?.apiVersion,2);
  packageBytes='tampered';await assert.rejects(api.installPlugin({id:pack.manifest.id,revision:catalog.entries[0].revision,installedRevision:null}),/PLUGIN_CHECKSUM/);packageBytes=bytes;
+ const original=listedManifest;
+ for (const change of [{version:'9.0.0'},{server:undefined},{scopes:['instance'] as const}]) {
+  listedManifest={...original,...change,...(change.scopes?{scopes:[...change.scopes]}:{})};
+  const {entries:[entry]}=await api.pluginStore();
+  await assert.rejects(api.installPlugin({id:pack.manifest.id,revision:entry.revision,installedRevision:null}),/PLUGIN_PACKAGE_MISMATCH/);
+ }
+ listedManifest=original;
  const installed=(await api.installPlugin({id:pack.manifest.id,revision:catalog.entries[0].revision,installedRevision:null})).plugin;assert.equal(installed.settings.trusted,false);
+ assert.deepEqual(installed.manifest,pack.manifest);
  await assert.rejects(api.configurePlugin(pack.manifest.id,installed.revision,{...installed.settings,enabled:true}),/PLUGIN_TRUST_REQUIRED/);
  const enabled=(await api.configurePlugin(pack.manifest.id,installed.revision,{...installed.settings,enabled:true,trusted:true,scope:'instance',serverConfigAction:'replace',serverConfig:{secret:'private-test-value'}})).plugin;
  assert.equal(enabled.runtime?.state,'running');assert.equal((await api.restartPlugin(pack.manifest.id,enabled.revision)).plugin.runtime?.state,'running');
