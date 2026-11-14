@@ -137,13 +137,13 @@ export default async function activate({ dataDir, config, publicConfig, events, 
 
 [分发仓库](https://github.com/Huddle-Up-Forge/webspeak-plugin) 目录为 `{"schemaVersion":2,"plugins":[{"id":"community.my-app","repository":"https://github.com/OWNER/REPO","metadataPath":"plugin.json"}]}`。插件仓库 `plugin.json` 包含 `manifest` 和 `package:{ref,path,sha256}`。`ref` 使用固定提交/不可变标签，`path` 指向已提交包，SHA-256 为包原始字节哈希。实例安装时校验包哈希、API 版本、插件 ID、版本、作用域集合与前后端入口。商店展示 `plugin.json` 里的名称、描述、作者和许可证，实例安装后展示包内清单里的值。目录或安装修订改变时需重新加载。空目录不默认安装插件。
 
-需要后台配置的插件应在仓库 README 写明公开与私密字段的用途、必填项、凭据获取方式，并提供用占位符的 JSON 示例。管理员可从已安装插件的高级配置打开仓库说明。
+需要后台配置的插件应在仓库 README 写明公开与私密字段的用途、必填项、默认值、取值范围和凭据获取方式，并提供含占位符的 `config.example.json`。管理员可从已安装插件打开仓库，并使用后台的通用字段编辑器。P2P 文件传输、视频同看和 TSMusicBot 有专用表单，由管理前端提供。仓库示例文件供管理员参考，当前运行时没有自动注册表单的接口。
 
 验证实际构建包的导入、审核、启用、自定义 HTTP/WS、依赖加载、持久化和关闭/断线/禁用/更新撤销；检查明暗、语言、窄屏。协作另测两位真实参与者及并发/离开/重连。区分模拟身份、真实 TS、浏览器交互与跨网络证据。宿主回归：`npm run verify`。
 
-## 悬浮应用窗口 / Floating application workspace
+## 插件入口与应用窗口 / Plugin launcher and application window
 
-功能插件入口由宿主的独立悬浮层提供，不属于默认主题或任何皮肤插槽。入口可拖动，避免遮挡工作台控件。应用库和应用内容使用非模态窗口：打开后仍可操作工作台；标题栏可拖动，支持最小化、最大化、还原和关闭，小屏幕自动限制在可视区域内。宿主窗口优先读取标准 `color-scheme` 来选择日间/夜间配色，不继承皮肤组件样式。
+插件入口由宿主管理。WebSpeak 0.3.2 起，完整语音皮肤可以把 `voice.plugin-launcher` 放到工具栏或侧栏，并选择抽屉或对话框。布局缺少可用插槽时会显示宿主的应用库入口。应用库和应用内容使用非模态窗口：打开后仍可操作工作台；标题栏可拖动，支持最小化、最大化、还原和关闭，小屏幕自动限制在可视区域内。宿主窗口优先读取标准 `color-scheme` 来选择日间/夜间配色，不继承皮肤组件样式。
 
 最小化、切换到应用库、再返回当前应用均保留同一个 iframe 与会话，传输、播放等任务不会因收起窗口而重置。关闭窗口、切换至另一个应用或语音会话撤销时，宿主结束当前应用会话。当前同时承载一个前端应用；不要把窗口最小化当成退出事件。
 
