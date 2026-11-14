@@ -35,6 +35,8 @@ export function useAdminSkins(options: Options) {
     const code = error instanceof AdminApiError ? error.code : "";
     if (["SKIN_STORE_CHANGED", "SKIN_STORE_INSTALLED_CHANGED", "SKIN_STORE_NOT_NEWER"].includes(code)) return options.tr("skinStoreChanged");
     if (code === "SKIN_STORE_INCOMPATIBLE") return options.tr("skinStoreIncompatible");
+    if (code === "SKIN_STORE_CHECKSUM") return options.tr("skinStoreChecksum");
+    if (code === "SKIN_STORE_PACKAGE_MISMATCH") return options.tr("skinStoreMismatch");
     if (code.startsWith("SKIN_") && code !== "SKIN_STORE_UNAVAILABLE" && code !== "SKIN_STORAGE_UNAVAILABLE") return options.tr("skinStoreInvalid");
     return options.tr("skinStoreUnavailable");
   }

@@ -134,8 +134,8 @@ export class SkinStore {
     const bytes = await this.download(`${source.repository.replace("https://github.com/", "https://raw.githubusercontent.com/")}/${metadata.package.ref}/${metadata.package.path}`, MAX_PACK_BYTES);
     if (createHash("sha256").update(bytes).digest("hex") !== metadata.package.sha256) return fail("SKIN_STORE_CHECKSUM");
     const { manifest } = validateSkinArchive(bytes, input.id);
-    for (const key of ["id", "name", "version", "author", "license", "minAppVersion"] as const) {
-      if (manifest[key] !== metadata[key]) return fail("SKIN_STORE_PACKAGE_MISMATCH");
+    if (manifest.version !== metadata.version || manifest.minAppVersion !== metadata.minAppVersion) {
+      return fail("SKIN_STORE_PACKAGE_MISMATCH");
     }
     return registry.save(bytes, input.id);
   }

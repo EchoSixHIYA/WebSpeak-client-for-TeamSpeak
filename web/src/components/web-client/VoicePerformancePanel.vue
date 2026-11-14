@@ -14,7 +14,8 @@
       @click.stop="togglePerformancePanel"
       ><Icon
         name="activity"
-        :size="16" /><span class="performance-trigger-label">{{ t("voiceStatus") }}</span
+        :size="16"
+        data-ws-icon-slot="voice.performance" /><span class="performance-trigger-label">{{ t("voiceStatus") }}</span
       ><small v-if="performanceStats.ready">{{ voiceTransportLabel }}</small
       ><Icon
         name="chevron-down"

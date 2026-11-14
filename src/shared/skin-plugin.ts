@@ -67,6 +67,7 @@ export const SKIN_PLUGIN_HOST_WIDGETS = Object.freeze([
   "voice.connection-status",
   "voice.connection-controls",
   "voice.disconnect-control",
+  "voice.plugin-launcher",
 ] as const);
 export type SkinPluginHostWidget = typeof SKIN_PLUGIN_HOST_WIDGETS[number];
 export interface SkinPluginWidgetOptions {
@@ -78,6 +79,8 @@ export interface SkinPluginWidgetOptions {
   memberDragDrop?: boolean;
   /** Select a supported host presentation for a channel tree. */
   layout?: "default" | "server-sidebar";
+  pluginPresentation?: "dialog" | "drawer-below" | "drawer-side";
+  communityLinks?: boolean;
   /** Provider identity used by the generic, UI-only home sign-in entry. */
   identityProviderId?: string;
   /** Provider display name used by the generic, UI-only home sign-in entry. */
@@ -479,6 +482,7 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
         if (typeof rawNode.widget !== "string" || !HOST_WIDGETS.has(rawNode.widget)) fail("SKIN_PLUGIN_WIDGET_INVALID", "The component requests an unsupported host widget.");
         if (page === "demo") fail("SKIN_PLUGIN_WIDGET_INVALID", "Host widgets are available only on the home and voice client pages.");
         if (rawNode.widget === "home.visitor-count" && page !== "home") fail("SKIN_PLUGIN_WIDGET_INVALID", "The visitor count widget is available only on the home page.");
+        if (rawNode.widget === "voice.plugin-launcher" && page !== "voice") fail("SKIN_PLUGIN_WIDGET_INVALID", "The plugin launcher is available only on the voice page.");
         if (rawNode.options !== undefined && inputSchemaVersion < 3) fail("SKIN_PLUGIN_SCHEMA_UNSUPPORTED", "Host widget options require components schema version 3.");
         // Preserve existing schema v2 packages; newly authored v3 widgets must declare every
         // permission needed by the trusted host UI they embed. Screen-share start was already gated.
@@ -494,12 +498,21 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
                 ? new Set(["layout"])
               : rawNode.widget === "home.identity-provider"
                 ? new Set(["identityProviderId", "identityProviderLabel"])
-              : new Set<string>();
+              : rawNode.widget === "voice.plugin-launcher"
+                ? new Set(["pluginPresentation"])
+              : rawNode.widget === "home.social-links"
+                ? new Set(["communityLinks"])
+                : new Set<string>();
           if (!isRecord(rawNode.options)
             || Object.keys(rawNode.options).some((key) => !supportedOptions.has(key))
             || (rawNode.options.screenShare !== undefined && typeof rawNode.options.screenShare !== "boolean")
             || (rawNode.options.memberActions !== undefined && typeof rawNode.options.memberActions !== "boolean")
             || (rawNode.options.memberDragDrop !== undefined && typeof rawNode.options.memberDragDrop !== "boolean")
+            || (rawNode.options.communityLinks !== undefined && typeof rawNode.options.communityLinks !== "boolean")
+            || (rawNode.options.pluginPresentation !== undefined
+              && rawNode.options.pluginPresentation !== "dialog"
+              && rawNode.options.pluginPresentation !== "drawer-below"
+              && rawNode.options.pluginPresentation !== "drawer-side")
             || (rawNode.options.layout !== undefined
               && rawNode.options.layout !== "default"
               && !(rawNode.widget === "voice.channel-tree" && rawNode.options.layout === "server-sidebar"))
@@ -517,6 +530,8 @@ export function parseSkinPluginDocument(input: unknown): SkinPluginDocument {
             ...(rawNode.options.memberActions !== undefined ? { memberActions: rawNode.options.memberActions } : {}),
             ...(rawNode.options.memberDragDrop !== undefined ? { memberDragDrop: rawNode.options.memberDragDrop } : {}),
             ...(rawNode.options.layout !== undefined ? { layout: rawNode.options.layout } : {}),
+            ...(rawNode.options.pluginPresentation !== undefined ? { pluginPresentation: rawNode.options.pluginPresentation } : {}),
+            ...(rawNode.options.communityLinks !== undefined ? { communityLinks: rawNode.options.communityLinks } : {}),
             ...(rawNode.options.identityProviderId !== undefined ? { identityProviderId: rawNode.options.identityProviderId } : {}),
             ...(rawNode.options.identityProviderLabel !== undefined ? { identityProviderLabel: rawNode.options.identityProviderLabel } : {}),
           };

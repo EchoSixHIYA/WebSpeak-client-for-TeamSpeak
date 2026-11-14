@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <section v-if="error" class="skin-load-recovery" role="alert">
+    <section v-if="error" class="skin-load-recovery" data-ws-part="app.skin-load-recovery" role="alert">
       <p>{{ labels.skinLoadError(error.skinId) }}</p>
       <button type="button" @click="$emit('use-built-in')">{{ labels.skinUseBuiltIn }}</button>
     </section>

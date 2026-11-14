@@ -92,6 +92,7 @@
         <Icon
           name="settings"
           :size="15"
+          data-ws-icon-slot="home.toolbar.settings"
         /><span>{{ t("adminConsole") }}</span>
       </a>
       <SkinSwitcher
@@ -101,7 +102,7 @@
         :options="skinOptions"
         @change="emit('skinChange', $event)"
       />
-      <LanguageSwitcher
+      <LanguageSwitcher skin-icon
         v-model="language"
         class="join-language-switcher"
         :menu-label="t('languageMenu')"

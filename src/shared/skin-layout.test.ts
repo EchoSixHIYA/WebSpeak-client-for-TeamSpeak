@@ -8,7 +8,11 @@ import {
   SKIN_LAYOUT_COMPONENTS,
   validateSkinLayout,
   canEditSkinLayoutComponent,
+  DECORATIVE_PART_IDS,
+  HOST_PART_IDS,
 } from "./skin-layout.js";
+import { HOST_TRUSTED_PART_IDS } from "./skin-visual-parts.js";
+import { OPTIONAL_VISUAL_PARTS } from "./skin-css.js";
 
 async function vueSources(directory: URL): Promise<string[]> {
   const files = (await readdir(directory, { recursive: true })).filter((file) => file.endsWith(".vue"));
@@ -16,16 +20,20 @@ async function vueSources(directory: URL): Promise<string[]> {
 }
 
 test("the stable layout registry covers public skin hooks and excludes the admin console", async () => {
-  const [webClient, demo, sharedComponents, skinSwitcher, languageSwitcher, admin, adminComponents] = await Promise.all([
+  const [webClient, demo, sharedComponents, skinSwitcher, languageSwitcher, hostChrome, pluginPanel, authorization, recoveryNotice, admin, adminComponents] = await Promise.all([
     readFile(new URL("../../web/src/views/WebClient.vue", import.meta.url), "utf8"),
     readFile(new URL("../../web/src/views/DemoView.vue", import.meta.url), "utf8"),
     vueSources(new URL("../../web/src/components/web-client/", import.meta.url)),
     readFile(new URL("../../web/src/components/SkinSwitcher.vue", import.meta.url), "utf8"),
     readFile(new URL("../../web/src/components/LanguageSwitcher.vue", import.meta.url), "utf8"),
+    readFile(new URL("../../web/src/components/HostChrome.vue", import.meta.url), "utf8"),
+    readFile(new URL("../../web/src/components/PluginPanel.vue", import.meta.url), "utf8"),
+    readFile(new URL("../../web/src/components/InstanceAuthorization.vue", import.meta.url), "utf8"),
+    readFile(new URL("../../web/src/components/SkinLoadRecoveryNotice.vue", import.meta.url), "utf8"),
     readFile(new URL("../../web/src/views/AdminView.vue", import.meta.url), "utf8"),
     vueSources(new URL("../../web/src/components/admin/", import.meta.url)),
   ]);
-  const publicSource = [webClient, demo, ...sharedComponents, skinSwitcher, languageSwitcher].join("\n");
+  const publicSource = [webClient, demo, ...sharedComponents, skinSwitcher, languageSwitcher, hostChrome, pluginPanel, authorization, recoveryNotice].join("\n");
   const publicParts = new Set([...publicSource.matchAll(/data-ws-part="([^"]+)"/g)].map((match) => match[1]));
   const interactiveParts = new Set<string>();
   for (const match of publicSource.matchAll(/<[A-Za-z][\w.-]*\b[^>]*>/gs)) {
@@ -40,6 +48,14 @@ test("the stable layout registry covers public skin hooks and excludes the admin
   }
   const registered = new Set(SKIN_LAYOUT_COMPONENTS.map((component) => component.selectorPart));
   for (const part of publicParts) assert.ok(registered.has(part), "Unregistered public layout hook: " + part);
+  for (const part of HOST_PART_IDS) assert.ok(registered.has(part), "Unregistered host chrome hook: " + part);
+  // The layout registry and the CSS hiding whitelist must never drift apart.
+  assert.deepEqual([...DECORATIVE_PART_IDS].sort(), [...OPTIONAL_VISUAL_PARTS].sort());
+  for (const part of HOST_TRUSTED_PART_IDS) {
+    const component = getSkinLayoutComponent(part, "voice");
+    assert.equal(component?.category, "trusted-chrome", "Trusted host entry must not be layout-editable: " + part);
+    assert.equal(component?.editable, false);
+  }
   const micStatus = getSkinLayoutComponent("voice.member.mic-status", "voice");
   assert.equal(micStatus?.category, "core");
   assert.equal(micStatus?.editable, true);

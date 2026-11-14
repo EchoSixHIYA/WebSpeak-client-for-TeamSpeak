@@ -72,7 +72,12 @@ export class PluginStore {
     pluginAssert(createHash("sha256").update(bytes).digest("hex") === metadata.descriptor.sha256, "PLUGIN_CHECKSUM");
     let value: unknown;
     try { value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { throw new PluginError("PLUGIN_INVALID"); }
-    const pack = parsePluginPackage(value); pluginAssert(JSON.stringify(pack.manifest) === JSON.stringify(metadata.manifest), "PLUGIN_PACKAGE_MISMATCH");
+    const pack = parsePluginPackage(value);
+    const actual = pack.manifest, listed = metadata.manifest;
+    pluginAssert(actual.id === listed.id && actual.version === listed.version
+      && actual.client.entry === listed.client.entry && actual.server?.entry === listed.server?.entry
+      && actual.scopes.length === listed.scopes.length && actual.scopes.every(scope => listed.scopes.includes(scope)),
+      "PLUGIN_PACKAGE_MISMATCH");
     return registry.install(pack, input.installedRevision as string | null);
   }
 }

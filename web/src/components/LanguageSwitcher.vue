@@ -11,7 +11,7 @@
       :aria-controls="menuId"
       @click.stop="toggle"
     >
-      <Icon class="language-current-icon" name="translate" :size="24" />
+      <Icon class="language-current-icon" name="translate" :size="24" :data-ws-icon-slot="skinIcon ? 'language.trigger' : undefined" />
       <span class="language-current-flag" aria-hidden="true">{{ currentLanguage.flag }}</span>
       <span class="language-current-code">{{ currentLanguage.code }}</span>
       <Icon name="chevron-down" :size="13" />
@@ -50,6 +50,7 @@ import Icon from "./Icon.vue";
 type Language = "zh" | "en" | "de" | "ru" | "ja";
 
 const props = withDefaults(defineProps<{
+  skinIcon?: boolean;
   modelValue: Language;
   menuLabel?: string;
 }>(), {

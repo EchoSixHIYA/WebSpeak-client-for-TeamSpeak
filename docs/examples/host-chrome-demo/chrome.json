@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "hiddenParts": ["host.plugins.launcher"],
+  "visibleParts": ["host.watermark", "host.hint", "host.voice-status-decoration"],
+  "icons": {
+    "language.trigger": "assets/icons/language.png",
+    "skin.trigger": "assets/icons/skin.png",
+    "host.plugins.launcher": "assets/icons/apps.png",
+    "home.toolbar.settings": "assets/icons/settings.png",
+    "voice.performance": "assets/icons/status.png"
+  }
+}

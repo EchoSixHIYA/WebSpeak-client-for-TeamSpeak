@@ -3007,7 +3007,7 @@
   :deep(.section-counter) {
     display: none;
   }
-  .workspace-actions .header-action:first-child {
+  .workspace-actions > .header-action:first-child {
     display: none;
   }
   .dock-icon {

@@ -263,6 +263,7 @@
                   }
                 ]
               },
+              {"widget":"voice.plugin-launcher","part":"plugin-launcher","options":{"pluginPresentation":"drawer-side"}},
               {
                 "tag": "div",
                 "className": "dc-sidebar-scroll",

@@ -13,7 +13,7 @@
       :aria-controls="menuId"
       @click.stop="toggle"
     >
-      <Icon :name="selectedOption.icon || 'compass'" :size="15" />
+      <Icon :name="selectedOption.icon || 'compass'" :size="15" data-ws-icon-slot="skin.trigger" />
       <span>{{ menuLabel }}</span>
       <Icon name="chevron-down" :size="12" />
     </button>
@@ -38,6 +38,9 @@
       <button type="button" class="skin-option skin-authorization" role="option" :aria-selected="false" @click="authorization">
         <Icon name="shield" :size="16" /><span>{{ authorizationCopy.menu }}</span><small>{{ thirdPartyAllowed ? authorizationCopy.enabled : authorizationCopy.disabled }}</small>
       </button>
+      <button v-if="thirdPartyAllowed && pluginLibraryAvailable" type="button" class="skin-option skin-library" data-ws-part="skin.library" role="option" :aria-selected="false" @click="openLibrary">
+        <Icon name="grid" :size="16" /><span>{{ libraryLabel }}</span>
+      </button>
     </div>
   </div>
 </template>
@@ -47,6 +50,8 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import Icon from "./Icon.vue";
 import { authorizationLanguage, canUseSkin, openInstanceAuthorization, thirdPartyAllowed } from '../services/instance-authorization.js';
 import { instanceAuthorizationCopy } from '../i18n/instance-authorization.js';
+import { hostChromeCopy } from '../i18n/host-chrome.js';
+import { openPluginLibrary } from '../services/host-chrome.js';
 
 export interface SkinOption {
   value: string;
@@ -58,6 +63,7 @@ const props = defineProps<{
   modelValue: string;
   menuLabel: string;
   options: SkinOption[];
+  pluginLibraryAvailable?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -67,7 +73,9 @@ const emit = defineEmits<{
 
 const options = computed(() => props.options.filter(option => canUseSkin(option.value)));
 const authorizationCopy = computed(() => instanceAuthorizationCopy[authorizationLanguage.value]);
+const libraryLabel = computed(() => hostChromeCopy[authorizationLanguage.value]?.library ?? hostChromeCopy.en.library);
 function authorization() { close(); openInstanceAuthorization(); }
+function openLibrary() { close(); openPluginLibrary(); }
 const selectedOption = computed(() => options.value.find((option) => option.value === props.modelValue) ?? options.value[0] ?? {
   value: props.modelValue,
   label: props.menuLabel,
@@ -101,6 +109,7 @@ onUnmounted(() => document.removeEventListener("pointerdown", onDocumentPointerD
 }
 .skin-authorization{margin-top:6px;border-top:1px solid #8bdad8!important}
 .skin-authorization small{margin-left:auto;font-size:10px;opacity:.75}
+.skin-library{opacity:.9}
 
 .skin-trigger {
   display: inline-flex;

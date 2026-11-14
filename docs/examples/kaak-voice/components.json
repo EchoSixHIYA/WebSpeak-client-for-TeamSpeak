@@ -582,9 +582,11 @@
                 "widget": "app.language-switcher",
                 "part": "rail-language"
               },
+              {"widget":"voice.plugin-launcher","part":"plugin-launcher","options":{"pluginPresentation":"drawer-side"}},
               {
                 "widget": "home.social-links",
-                "part": "rail-links"
+                "part": "rail-links",
+                "options": { "communityLinks": false }
               }
             ]
           },

@@ -149,6 +149,9 @@ The skills complete the contribution workflow automatically: publish validated s
 - [TimmySheep](https://github.com/TimmySheep) — [已合并 PR #13、#15–#24](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pulls?q=is%3Apr+is%3Amerged+author%3ATimmySheep)，涉及 TS6 既有屏幕共享发现、屏幕比例、移动端语音/常亮/皮肤菜单、身份频道选项、PWA/主题、聊天历史、成员音频状态和麦克风权限等改进。
 - [yichen11818](https://github.com/yichen11818) — [PR #25](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/25) 支持 TeamSpeak 注册昵称连接并保留昵称目标；[PR #51](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/51) 改进 KAAK 首次连接后的工作区保留与重连；[PR #27](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/27) 和 [PR #52](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/52) 提供 Discord 皮肤的原始设计与实现（提交署名 **yumi**），后由 WebSpeak 项目移植为[独立分发的 `.wskin` 皮肤](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)。
 
+- [Jh_Harry](https://github.com/JhHarry) — [Persona 3](https://github.com/JhHarry/webspeak-skin-persona3)、[Persona 4](https://github.com/JhHarry/webspeak-skin-persona4) 和 [Persona 5](https://github.com/JhHarry/webspeak-skin-persona5) 的皮肤样式、构建脚本与打包。Theme styles, build scripts, and packaging for the three Persona skins.
+- [OddTurtleHead](https://github.com/OddTurtleHead) — [PR #57](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/pull/57) 为皮肤开放宿主装饰的定制接口，完善独立皮肤恢复入口，并提供两套示例皮肤。Host chrome theming, a protected skin recovery control, and two example skins.
+
 </details>
 
 ## 许可证 · License

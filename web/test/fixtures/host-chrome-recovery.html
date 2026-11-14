@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="voice" data-ws-host-skin="community.hostile-fixture">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host chrome recovery fixture</title>
+<script>
+  // Authorize third-party skins before instance-authorization.ts is evaluated.
+  try { localStorage.setItem("webspeak:instance-authorization:v1", JSON.stringify({ schemaVersion: 1, allowed: true })); } catch {}
+</script>
+<style>
+  html, body { margin: 0; min-height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { min-height: 100vh; }
+  #dock { display: flex; gap: 8px; padding: 12px; background: #eef4f2; }
+  #overlay { width: 320px; height: 180px; margin: 12px; background: #fff; border: 1px solid #ccd; }
+  #app { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<!-- A minimal public-skin surface so compiled hostile rules have real targets. -->
+<div class="ws-skin-root" data-ws-skin="community.hostile-fixture" data-ws-page="voice" data-ws-part="app">
+  <div id="dock" data-ws-part="voice.audio-dock">
+    <button type="button" data-ws-part="voice.audio-dock.microphone">Mic</button>
+    <button type="button" data-ws-part="voice.audio-dock.output">Output</button>
+  </div>
+  <div id="overlay" data-ws-part="host.plugins.overlay">Application library</div>
+  <button type="button" id="launcher" data-ws-part="host.plugins.launcher">Plugins</button>
+</div>
+<div id="app"></div>
+<div id="auth-app"></div>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script type="module">
+import { createApp, h } from "vue";
+import HostChrome from "/src/components/HostChrome.vue";
+import InstanceAuthorization from "/src/components/InstanceAuthorization.vue";
+import { hostBuiltInSkinRequests, setHostChromeActiveSkin } from "/src/services/host-chrome.ts";
+import { hostOwnedLayers, syncRecoveryPopover } from "/src/services/host-owned-layer.ts";
+
+const output = document.getElementById("result");
+const scenarios = JSON.parse(decodeURIComponent(location.hash.slice(1) || "[]"));
+const style = document.createElement("style");
+style.id = "hostile-skin";
+document.head.append(style);
+
+setHostChromeActiveSkin("community.hostile-fixture");
+createApp({ render: () => h(HostChrome, { language: "en", connected: true }) }).mount("#app");
+createApp({ render: () => h(InstanceAuthorization, { language: "en" }) }).mount("#auth-app");
+
+const layer = hostOwnedLayers().find((entry) => entry.name === "recovery");
+const results = [];
+
+if (!layer) {
+  output.textContent = JSON.stringify({ error: "recovery layer was not created" });
+} else {
+  const popover = layer.container.querySelector("[data-ws-host-recovery]");
+  // The component promotes the popover on the next microtask; do it here so
+  // the whole fixture runs synchronously and the result is ready before load.
+  if (!popover.matches(":popover-open")) popover.showPopover();
+  for (const scenario of scenarios) {
+    style.textContent = scenario.css;
+    const button = layer.container.querySelector('[data-ws-recovery-action="built-in"]');
+    // Reading geometry forces a synchronous style/layout pass, so the hostile
+    // stylesheet is fully applied before the hit test.
+    const rect = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const computed = getComputedStyle(button);
+    const dock = document.getElementById("dock");
+    const before = hostBuiltInSkinRequests.value;
+    if (hit === button || button.contains(hit)) {
+      hit.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
+    } else {
+      button.click();
+    }
+    results.push({
+      name: scenario.name,
+      popoverOpen: popover.matches(":popover-open"),
+      // elementFromPoint retargets nodes inside a closed shadow root to its
+      // host, so either the inner button or the host proves the top layer won.
+      topLayerHit: hit === layer.host || hit === button || layer.container.contains(hit),
+      hostileCovered: hit === dock,
+      visible: computed.display !== "none" && computed.visibility !== "hidden"
+        && Number(computed.opacity) > 0.01 && computed.pointerEvents !== "none",
+      clicked: hostBuiltInSkinRequests.value === before + 1,
+      layerOutsideSkinRoot: layer.host.closest(".ws-skin-root") === null,
+      buttonRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    });
+  }
+  // Authorization: the real dialog is teleported into its own closed shadow
+  // root. showModal() must place it above the same hostile fullscreen layer.
+  style.textContent = scenarios[0]?.css ?? "";
+  const authLayer = hostOwnedLayers().find((entry) => entry.name === "authorization");
+  const authDialog = authLayer?.container.querySelector("dialog");
+  let authorization = null;
+  if (authLayer && authDialog) {
+    authDialog.showModal();
+    const rect = authDialog.getBoundingClientRect();
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    authorization = {
+      modalOpen: authDialog.matches(":modal"),
+      topLayerHit: hit === authLayer.host || authDialog === hit || authLayer.container.contains(hit),
+      hostileCovered: hit === document.getElementById("dock"),
+      layerOutsideSkinRoot: authLayer.host.closest(".ws-skin-root") === null,
+      sized: rect.width > 0 && rect.height > 0,
+    };
+    authDialog.close();
+  }
+  // Verify the rejected-promotion fallback really lays the capsule out. A
+  // closed [popover] is `display:none !important` until the attribute is gone.
+  const fallback = document.createElement("div");
+  fallback.setAttribute("popover", "manual");
+  fallback.textContent = "fallback";
+  fallback.style.cssText = "position:fixed;left:0;top:0;width:80px;height:24px;";
+  Object.defineProperty(fallback, "showPopover", {
+    configurable: true,
+    value: () => { throw new Error("top-layer promotion rejected"); },
+  });
+  document.body.append(fallback);
+  syncRecoveryPopover(fallback, true);
+  const fallbackStyle = getComputedStyle(fallback);
+  const fallbackRect = fallback.getBoundingClientRect();
+  const popoverFallback = {
+    display: fallbackStyle.display,
+    popoverAttribute: fallback.hasAttribute("popover"),
+    visible: fallbackStyle.display !== "none" && fallbackRect.width > 0 && fallbackRect.height > 0,
+  };
+  fallback.remove();
+  output.textContent = JSON.stringify({ results, authorization, popoverFallback });
+}
+</script>
+</body>
+</html>
