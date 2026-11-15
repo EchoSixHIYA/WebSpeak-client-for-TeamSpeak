@@ -8,5 +8,8 @@
     "host.plugins.launcher": "assets/icons/apps.png",
     "home.toolbar.settings": "assets/icons/settings.png",
     "voice.performance": "assets/icons/status.png"
+  },
+  "slots": {
+    "host.recovery": { "anchor": "voice.audio-dock", "align": "end", "compact": true }
   }
 }

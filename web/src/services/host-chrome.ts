@@ -1,6 +1,6 @@
 import { computed, readonly, ref, shallowRef } from "vue";
-import { DECORATIVE_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
-import { resolveHiddenHostParts, type SkinChromeDocument } from "../../../src/shared/skin-chrome.js";
+import { DECORATIVE_PART_IDS, HOST_SLOTTABLE_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
+import { resolveHiddenHostParts, type SkinChromeDocument, type SkinChromeSlot } from "../../../src/shared/skin-chrome.js";
 import { isHostPartReachable } from "./host-chrome-visibility.js";
 
 /**
@@ -30,6 +30,9 @@ export function setHostChromeActiveSkin(id: string | undefined): void {
   activeSkin.value = id;
 }
 
+/** Read-only view for host chrome that reacts to skin activations. */
+export const hostChromeActiveSkinId = readonly(activeSkin);
+
 export function isBundledSkin(id: string | undefined): boolean {
   return !id || id.startsWith("builtin.") || BUNDLED_SKIN_IDS.has(id);
 }
@@ -58,6 +61,16 @@ export function setSkinHostChromeParts(document: SkinChromeDocument | undefined)
 
 export function isHostPartHidden(part: string): boolean {
   return hiddenParts.value.has(part);
+}
+
+/**
+ * Slot declarations are honoured only for an active third-party skin. Bundled
+ * skins, and any skin without a matching `chrome.json#slots` entry, keep the
+ * default floating placement.
+ */
+export function activeHostSlot(part: string): SkinChromeSlot | undefined {
+  if (!HOST_SLOTTABLE_PART_IDS.has(part) || !isThirdPartySkinActive()) return undefined;
+  return skinChrome.value?.slots?.[part];
 }
 
 /**

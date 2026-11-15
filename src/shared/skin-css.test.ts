@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileSkinCss, OPTIONAL_VISUAL_PARTS } from "./skin-css.js";
 import { DECORATIVE_PART_IDS as LAYOUT_DECORATIVE, PROTECTED_PART_IDS } from "./skin-layout.js";
-import { DECORATIVE_PART_IDS } from "./skin-visual-parts.js";
+import { DECORATIVE_PART_IDS, HOST_SLOTTABLE_PART_IDS } from "./skin-visual-parts.js";
 import {
   compileSkinChromeCss,
   DEFAULT_HIDDEN_HOST_PARTS,
@@ -194,6 +194,62 @@ test("chrome.json declares hidden parts and icon bitmaps, with path and size val
   assert.throws(() => validateSkinChromeAssets(valid, () => undefined), /missing from the package/);
   assert.throws(() => validateSkinChromeAssets(valid, () => ({ bytes: SKIN_ICON_MAX_BYTES + 1, mime: "image/png" })), /exceeds/);
   assert.throws(() => validateSkinChromeAssets(valid, () => ({ bytes: 10, mime: "text/plain" })), /raster image/);
+});
+
+test("chrome.json slots accept skin-owned anchors and reject trusted host UI", () => {
+  assert.deepEqual([...HOST_SLOTTABLE_PART_IDS], ["host.recovery"]);
+
+  const explicit = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true },
+    },
+  }));
+  assert.deepEqual(explicit.slots?.["host.recovery"], {
+    anchor: "voice.audio-dock",
+    align: "start",
+    compact: true,
+  });
+
+  // Defaults: align "end", compact off. Component and runtime-plugin parts are
+  // ordinary anchors; only host/trusted parts are off limits.
+  const defaults = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": { anchor: "skin.voice.harbor-dock.part-anchor" },
+    },
+  }));
+  assert.deepEqual(defaults.slots?.["host.recovery"], {
+    anchor: "skin.voice.harbor-dock.part-anchor",
+    align: "end",
+    compact: false,
+  });
+  assert.doesNotThrow(() => parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: { "host.recovery": { anchor: "skin.voice.runtime_plugin_voice-surface__dock.part-anchor" } },
+  })));
+
+  // Slot declarations are runtime input, not compiled CSS: the generated host
+  // stylesheet must stay exactly as empty as before.
+  assert.equal(compileSkinChromeCss(explicit, "demo-skin"), "");
+
+  const invalidDocuments: Array<[unknown, RegExp]> = [
+    [{ schemaVersion: 1, slots: [] }, /must be an object/],
+    [{ schemaVersion: 1, slots: { "host.permission": { anchor: "voice.audio-dock" } } }, /Unknown slottable host part/],
+    [{ schemaVersion: 1, slots: { "host.recovery": "voice.audio-dock" } }, /must be an object/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "host.plugins.launcher" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.connection-status" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "app" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", align: "left" } } }, /invalid align/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", compact: "yes" } } }, /compact must be a boolean/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", extra: true } } }, /unsupported field/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "../escape" } } }, /not a valid part name/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "Voice Audio Dock" } } }, /not a valid part name/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "" } } }, /at most 240 characters/],
+  ];
+  for (const [value, message] of invalidDocuments) {
+    assert.throws(() => parseSkinChromeDocument(JSON.stringify(value)), message, JSON.stringify(value));
+  }
 });
 
 test("instance-level hidden parts ignore unknown and protected names", () => {

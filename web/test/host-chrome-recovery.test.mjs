@@ -55,13 +55,14 @@ const scenarios = [
 ];
 
 test("host chrome renders recovery and authorization in a closed-shadow top layer", async () => {
-  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice] = await Promise.all([
+  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice, slotPlacement] = await Promise.all([
     read("../src/components/HostChrome.vue"),
     read("../src/components/InstanceAuthorization.vue"),
     read("../src/services/host-owned-layer.ts"),
     read("../src/services/host-chrome.ts"),
     read("../src/composables/usePublicSkin.ts"),
     read("../src/components/SkinLoadRecoveryNotice.vue"),
+    read("../src/services/host-slot-placement.ts"),
   ]);
 
   // Recovery: closed shadow root + manual popover + no skin hook.
@@ -79,6 +80,17 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.doesNotMatch(hostChrome, /event\.defaultPrevented \|\| event\.repeat/);
   assert.doesNotMatch(hostChrome, /data-ws-part="host\.recovery"/);
   assert.doesNotMatch(hostChrome, /ws-host-recovery-layer/);
+  // Slots are a declarative anchor, not a skin hook: the host still binds the
+  // capsule itself and switches back to the fixed position at runtime.
+  assert.match(hostChrome, /activeHostSlot\("host\.recovery"\)/);
+  assert.match(hostChrome, /bindHostSlot\(/);
+  assert.match(hostChrome, /onModeChange/);
+  assert.match(slotPlacement, /querySelectorAll\("\.ws-skin-root"\)/);
+  assert.match(slotPlacement, /isHostPartReachable\(/);
+  assert.match(slotPlacement, /evaluateSlottedControl/);
+  assert.match(hostChromeService, /export function activeHostSlot/);
+  assert.match(hostChromeService, /HOST_SLOTTABLE_PART_IDS\.has\(part\)/);
+  assert.match(hostChromeService, /isThirdPartySkinActive\(\)/);
 
   // Authorization: showModal() inside the same host-owned mechanism.
   assert.match(authorization, /createHostOwnedLayer\('authorization'/);
@@ -218,6 +230,7 @@ test("recovery stays visible and clickable under hostile compiled skins", { skip
   for (const result of payload.results) {
     assert.equal(result.popoverOpen, true, `${result.name}: recovery popover is not in the top layer`);
     assert.equal(result.topLayerHit, true, `${result.name}: recovery is covered by the hostile layer`);
+    assert.equal(result.hitIsLayerHost, true, `${result.name}: elementFromPoint did not retarget the closed shadow root to the layer host`);
     assert.equal(result.hostileCovered, false, `${result.name}: the hostile layer received the hit test`);
     assert.equal(result.visible, true, `${result.name}: recovery is visually hidden or non-interactive`);
     assert.equal(result.clicked, true, `${result.name}: clicking "use built-in skin" did not reach the handler`);

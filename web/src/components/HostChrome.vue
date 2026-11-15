@@ -35,6 +35,8 @@
       popover="manual"
       @keydown.escape="shortcutOpen = false"
       class="ws-host-recovery"
+      :class="{ 'ws-host-recovery-compact': compact }"
+      :tabindex="compact ? 0 : undefined"
       data-ws-host-recovery
       role="region"
       :aria-label="copy.recovery"
@@ -42,12 +44,14 @@
       <span class="ws-host-recovery-mark" aria-hidden="true">◈</span>
       <button
         type="button"
+        class="ws-host-recovery-action"
         data-ws-recovery-action="built-in"
         :title="copy.shortcut"
         @click="useBuiltInSkin"
       >{{ copy.useBuiltIn }}</button>
       <button
         type="button"
+        class="ws-host-recovery-action"
         v-if="pluginLibraryAvailable"
         data-ws-recovery-action="library"
         :title="copy.library"
@@ -62,6 +66,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import type { SiteLanguage } from "../../../src/site-copy.js";
 import { hostChromeCopy } from "../i18n/host-chrome.js";
 import {
+  activeHostSlot,
+  hostChromeActiveSkinId,
   isHostPartHidden,
   isHostPartVisuallyReachable,
   isRecoveryShortcut,
@@ -74,6 +80,7 @@ import {
   syncRecoveryPopover,
   type HostOwnedLayer,
 } from "../services/host-owned-layer.js";
+import { bindHostSlot, type HostSlotBinding } from "../services/host-slot-placement.js";
 import { shouldShowRecovery } from "../services/host-chrome-visibility.js";
 import { thirdPartyAllowed } from "../services/instance-authorization.js";
 
@@ -94,35 +101,52 @@ const RECOVERY_LAYER_CSS = `
   max-width: calc(100vw - 24px);
   padding: 4px 5px 4px 9px;
   border: 1px solid #9db6b2;
-  border-radius: 999px;
-  background: color-mix(in srgb, #ffffff 92%, transparent);
-  color: #31524f;
+  border-radius: var(--ws-recovery-radius, 999px);
+  background: var(--ws-recovery-background, color-mix(in srgb, #ffffff 92%, transparent));
+  color: var(--ws-recovery-foreground, #31524f);
+  font-family: var(--ws-recovery-font, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--ws-recovery-font-size, 11px);
   box-shadow: 0 6px 18px #0f2a2626;
   pointer-events: auto;
 }
 .ws-host-recovery:popover-open { display: flex; }
-.ws-host-recovery-mark { font-size: 12px; line-height: 1; }
+.ws-host-recovery-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
 .ws-host-recovery button {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: var(--ws-recovery-hit, 28px);
   padding: 4px 9px;
   border: 1px solid #9db6b2;
-  border-radius: 999px;
-  background: #fff;
-  color: #31524f;
+  border-radius: var(--ws-recovery-radius, 999px);
+  background: var(--ws-recovery-background, #fff);
+  color: var(--ws-recovery-foreground, #31524f);
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
 }
 .ws-host-recovery button[data-ws-recovery-action="built-in"] {
-  border-color: #b45309;
+  border-color: var(--ws-recovery-accent, #b45309);
   background: #fff7ed;
   color: #7c2d12;
 }
 .ws-host-recovery button:hover { filter: brightness(.96); }
 .ws-host-recovery button:focus-visible { outline: 2px solid #4c8f88; outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .ws-host-recovery button { transition: none; } }
+.ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) { gap: 0; padding: 4px; }
+.ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) .ws-host-recovery-action { display: none; }
+.ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) .ws-host-recovery-mark {
+  min-width: var(--ws-recovery-hit, 28px);
+  min-height: var(--ws-recovery-hit, 28px);
+}
+.ws-host-recovery.ws-host-recovery-compact:focus-visible { outline: 2px solid var(--ws-recovery-accent, #4c8f88); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .ws-host-recovery, .ws-host-recovery button { transition: none !important; }
+}
 `;
 
 const layer: HostOwnedLayer | null = createHostOwnedLayer("recovery", RECOVERY_LAYER_CSS);
@@ -148,6 +172,49 @@ const shortcutOpen = ref(false);
 const recoveryPopover = ref<HTMLElement | null>(null);
 const recoveryVisible = computed(() => showRecovery.value || (shortcutOpen.value && thirdPartyAllowed.value));
 
+/**
+ * Optional anchor from the active skin's chrome.json. Only third-party skins
+ * can declare it; the host still owns the capsule and the module falls back to
+ * the default corner whenever the anchor stops being usable.
+ */
+const slotConfig = computed(() => activeHostSlot("host.recovery"));
+const slotMode = ref<"floating" | "slotted">("floating");
+const compactHold = ref(true);
+let compactHoldTimer: ReturnType<typeof setTimeout> | undefined;
+
+watch(hostChromeActiveSkinId, () => {
+  // Keep the full capsule visible for a moment after a skin is activated, so
+  // the entry stays discoverable before it folds into the skin's layout.
+  compactHold.value = true;
+  if (compactHoldTimer) clearTimeout(compactHoldTimer);
+  compactHoldTimer = setTimeout(() => { compactHold.value = false; }, 5000);
+}, { immediate: true });
+
+const compact = computed(() => Boolean(slotConfig.value?.compact)
+  && slotMode.value === "slotted"
+  && !compactHold.value
+  && !shortcutOpen.value);
+
+let slotBinding: HostSlotBinding | undefined;
+function syncSlotBinding() {
+  slotBinding?.dispose();
+  slotBinding = undefined;
+  const control = recoveryPopover.value;
+  const config = slotConfig.value;
+  if (!control || !config || !layer) {
+    slotMode.value = "floating";
+    return;
+  }
+  slotBinding = bindHostSlot({
+    layer,
+    control,
+    anchor: config.anchor,
+    skinId: hostChromeActiveSkinId.value,
+    align: config.align,
+    onModeChange: change => { slotMode.value = change.mode; },
+  });
+}
+
 function syncPopover() {
   syncRecoveryPopover(recoveryPopover.value, recoveryVisible.value);
 }
@@ -169,7 +236,11 @@ function onKeydown(event: KeyboardEvent) {
   if (isRecoveryShortcut(event)) {
     event.preventDefault();
     shortcutOpen.value = true;
-    void nextTick(() => { syncPopover(); recoveryPopover.value?.querySelector("button")?.focus(); });
+    void nextTick(() => {
+      syncPopover();
+      slotBinding?.revalidate();
+      recoveryPopover.value?.querySelector("button")?.focus();
+    });
   }
 }
 
@@ -178,7 +249,18 @@ function refreshLauncherReachability() {
   launcherReachable.value = isHostPartVisuallyReachable("host.plugins.launcher");
 }
 
-watch([recoveryVisible, recoveryPopover], () => { void nextTick(syncPopover); }, { flush: "post" });
+watch([recoveryVisible, recoveryPopover], () => {
+  void nextTick(() => {
+    syncPopover();
+    slotBinding?.revalidate();
+  });
+}, { flush: "post" });
+watch([slotConfig, hostChromeActiveSkinId], () => {
+  void nextTick(() => {
+    syncPopover();
+    syncSlotBinding();
+  });
+}, { flush: "post" });
 watch(thirdPartyAllowed, allowed => { if (!allowed) shortcutOpen.value = false; });
 
 onMounted(() => {
@@ -186,10 +268,15 @@ onMounted(() => {
   reachabilityTimer = setInterval(refreshLauncherReachability, 1000);
   window.addEventListener("resize", refreshLauncherReachability);
   window.addEventListener("keydown", onKeydown, true);
-  void nextTick(syncPopover);
+  void nextTick(() => {
+    syncPopover();
+    syncSlotBinding();
+  });
 });
 onBeforeUnmount(() => {
   if (reachabilityTimer) clearInterval(reachabilityTimer);
+  if (compactHoldTimer) clearTimeout(compactHoldTimer);
+  slotBinding?.dispose();
   window.removeEventListener("resize", refreshLauncherReachability);
   window.removeEventListener("keydown", onKeydown, true);
   layer?.dispose();

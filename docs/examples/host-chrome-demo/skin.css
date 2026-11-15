@@ -25,6 +25,13 @@
 [data-ws-part="voice.audio-dock"] {
   border-top: 1px solid var(--skin-border);
   background: #f7f9fb;
+  /* Fold the trusted recovery capsule into the audio dock (chrome.json#slots). */
+  --skin-recovery-accent: #1d4f9c;
+  --skin-recovery-background: #ffffff;
+  --skin-recovery-foreground: #141414;
+  --skin-recovery-radius: 999px;
+  --skin-recovery-font: Tahoma, "Segoe UI", sans-serif;
+  --skin-recovery-size: small;
 }
 
 /* --- Host chrome (outside .ws-skin-root) --- */

@@ -1,15 +1,25 @@
-import { DECORATIVE_PART_IDS, HOST_SKIN_ATTRIBUTE, SKIN_ICON_SLOT_IDS } from "./skin-visual-parts.js";
+import {
+  DECORATIVE_PART_IDS,
+  HOST_SKIN_ATTRIBUTE,
+  HOST_SLOTTABLE_PART_IDS,
+  SKIN_ICON_SLOT_IDS,
+  TRUSTED_PART_IDS,
+  isHostPart,
+} from "./skin-visual-parts.js";
 
 /**
  * `chrome.json` is an optional, declarative companion to an open skin.
  *
- * It describes two host-chrome capabilities that CSS alone cannot express
- * safely:
+ * It describes host-chrome capabilities that CSS alone cannot express safely:
  *  - `visibleParts`: decorations the skin asks the host to render. This is the
  *    only opt-in; official and built-in skins stay clean.
  *  - `hiddenParts`: non-critical decorations the skin wants collapsed by
  *    default. Only explicitly optional parts are accepted.
  *  - `icons`: bitmap overrides for stable icon slots, keyed by part name.
+ *  - `slots`: declarative anchors for trusted host controls. A skin never
+ *    receives the control; it only names a part it already renders so the
+ *    host can position its own top-layer capsule there and fall back to the
+ *    default corner when the anchor stops being usable.
  *
  * Both the browser importer and the server-side registry parse the exact same
  * document, so a package accepted by one is accepted by the other.
@@ -18,9 +28,20 @@ import { DECORATIVE_PART_IDS, HOST_SKIN_ATTRIBUTE, SKIN_ICON_SLOT_IDS } from "./
 export const SKIN_CHROME_MAX_BYTES = 32 * 1024;
 export const SKIN_CHROME_MAX_HIDDEN_PARTS = 32;
 export const SKIN_CHROME_MAX_ICONS = 16;
+export const SKIN_CHROME_MAX_SLOTS = 8;
 export const SKIN_ICON_MAX_BYTES = 64 * 1024;
 export const SKIN_ICONS_MAX_TOTAL_BYTES = 512 * 1024;
 export const SKIN_ICON_DIRECTORY = "assets/icons/";
+
+/**
+ * Anchor names are `data-ws-part` values, including host-rendered v3 component
+ * parts (`skin.<page>.<component>.part-<name>`) and v4 runtime plugin parts
+ * (`skin.<page>.runtime_plugin_<plugin>__<component>.part-<name>`). Each
+ * dot-separated segment follows the same identifier grammar as other part
+ * names; the generous overall limit covers a namespaced runtime plugin.
+ */
+export const SKIN_SLOT_ANCHOR_MAX_LENGTH = 240;
+const PART_NAME_SEGMENT = /^[-_a-z][-_a-z0-9]*$/i;
 
 const SUPPORTED_ICON_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "avif", "gif"]);
 
@@ -45,6 +66,19 @@ export interface SkinChromeDocument {
    */
   visibleParts?: string[];
   icons: Record<string, string>;
+  /** Protected host controls folded into skin-owned layout anchors. */
+  slots?: Partial<Record<string, SkinChromeSlot>>;
+}
+
+export type SkinChromeSlotAlign = "start" | "center" | "end";
+
+export interface SkinChromeSlot {
+  /** Existing `data-ws-part` inside `.ws-skin-root` used as the anchor box. */
+  anchor: string;
+  /** Horizontal alignment inside the anchor; the control is vertically centred. */
+  align: SkinChromeSlotAlign;
+  /** Collapse to the mark only until hovered or focused. */
+  compact: boolean;
 }
 
 export interface SkinChromeAssetInfo {
@@ -94,6 +128,29 @@ export function normalizeSkinIconPath(raw: unknown): string {
   return path;
 }
 
+/**
+ * A slot anchor is an existing part name, never host-owned UI: a skin must not
+ * be able to park a protected control on the launcher, the authorization
+ * dialog or another trusted element it could then cover or remove.
+ */
+function normalizeSlotAnchor(raw: unknown): string {
+  if (typeof raw !== "string" || !raw || raw.length > SKIN_SLOT_ANCHOR_MAX_LENGTH) {
+    return reject(`A slot anchor must be a part name of at most ${SKIN_SLOT_ANCHOR_MAX_LENGTH} characters.`, "SKIN_CHROME_SLOT_INVALID");
+  }
+  const segments = raw.split(".");
+  if (segments.some((segment) => !PART_NAME_SEGMENT.test(segment))) {
+    return reject(`A slot anchor is not a valid part name: ${raw}.`, "SKIN_CHROME_SLOT_INVALID");
+  }
+  if (isHostPart(raw) || TRUSTED_PART_IDS.has(raw)) {
+    return reject(`A slot anchor cannot point at trusted host UI: ${raw}.`, "SKIN_CHROME_SLOT_INVALID");
+  }
+  return raw;
+}
+
+function isSlotAlign(value: unknown): value is SkinChromeSlotAlign {
+  return value === "start" || value === "center" || value === "end";
+}
+
 export function parseSkinChromeDocument(source: string): SkinChromeDocument {
   const bytes = new TextEncoder().encode(source).byteLength;
   if (!bytes || bytes > SKIN_CHROME_MAX_BYTES) {
@@ -104,7 +161,7 @@ export function parseSkinChromeDocument(source: string): SkinChromeDocument {
   catch { return reject("chrome.json is not valid JSON.", "SKIN_CHROME_INVALID"); }
   if (!isRecord(raw)) return reject("chrome.json must be an object.", "SKIN_CHROME_INVALID");
   for (const key of Object.keys(raw)) {
-    if (key !== "schemaVersion" && key !== "hiddenParts" && key !== "visibleParts" && key !== "icons") {
+    if (key !== "schemaVersion" && key !== "hiddenParts" && key !== "visibleParts" && key !== "icons" && key !== "slots") {
       return reject(`chrome.json contains an unsupported field: ${key}.`, "SKIN_CHROME_INVALID");
     }
   }
@@ -151,7 +208,48 @@ export function parseSkinChromeDocument(source: string): SkinChromeDocument {
       icons[slot] = normalizeSkinIconPath(path);
     }
   }
-  return { schemaVersion: 1, hiddenParts, ...(visibleParts ? { visibleParts } : {}), icons };
+  let slots: Partial<Record<string, SkinChromeSlot>> | undefined;
+  if (raw.slots !== undefined) {
+    if (!isRecord(raw.slots)) {
+      return reject("slots must be an object mapping protected part names to anchors.", "SKIN_CHROME_SLOT_INVALID");
+    }
+    const entries = Object.entries(raw.slots);
+    if (entries.length > SKIN_CHROME_MAX_SLOTS) {
+      return reject(`A skin may declare at most ${SKIN_CHROME_MAX_SLOTS} slots.`, "SKIN_CHROME_SLOT_INVALID");
+    }
+    slots = Object.create(null) as Partial<Record<string, SkinChromeSlot>>;
+    for (const [part, value] of entries) {
+      if (!HOST_SLOTTABLE_PART_IDS.has(part)) {
+        return reject(`Unknown slottable host part: ${part}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      if (!isRecord(value)) {
+        return reject(`Slot ${part} must be an object.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      for (const key of Object.keys(value)) {
+        if (key !== "anchor" && key !== "align" && key !== "compact") {
+          return reject(`Slot ${part} contains an unsupported field: ${key}.`, "SKIN_CHROME_SLOT_INVALID");
+        }
+      }
+      const anchor = normalizeSlotAnchor(value.anchor);
+      const align = value.align === undefined ? "end" : value.align;
+      if (!isSlotAlign(align)) {
+        return reject(`Slot ${part} has an invalid align value: ${String(align)}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      const compact = value.compact === undefined ? false : value.compact;
+      if (typeof compact !== "boolean") {
+        return reject(`Slot ${part} compact must be a boolean.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      slots[part] = { anchor, align, compact };
+    }
+  }
+
+  return {
+    schemaVersion: 1,
+    hiddenParts,
+    ...(visibleParts ? { visibleParts } : {}),
+    icons,
+    ...(slots ? { slots } : {}),
+  };
 }
 
 /**

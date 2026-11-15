@@ -78,7 +78,9 @@ if (!layer) {
       popoverOpen: popover.matches(":popover-open"),
       // elementFromPoint retargets nodes inside a closed shadow root to its
       // host, so either the inner button or the host proves the top layer won.
+      // Slot placement compares strictly against the host; record that too.
       topLayerHit: hit === layer.host || hit === button || layer.container.contains(hit),
+      hitIsLayerHost: hit === layer.host,
       hostileCovered: hit === dock,
       visible: computed.display !== "none" && computed.visibility !== "hidden"
         && Number(computed.opacity) > 0.01 && computed.pointerEvents !== "none",
