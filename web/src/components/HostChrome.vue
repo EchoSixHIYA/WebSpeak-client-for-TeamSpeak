@@ -33,6 +33,7 @@
     <div
       ref="recoveryPopover"
       popover="manual"
+      @keydown.escape="shortcutOpen = false"
       class="ws-host-recovery"
       data-ws-host-recovery
       role="region"
@@ -164,15 +165,12 @@ function openLibrary() {
 function onKeydown(event: KeyboardEvent) {
   if (event.repeat || !thirdPartyAllowed.value) return;
   // The recovery chord must survive a capture-phase preventDefault() from a
-  // skin or plugin, so it runs before the defaultPrevented check below.
+  // skin or plugin, so it is handled before anything else.
   if (isRecoveryShortcut(event)) {
     event.preventDefault();
     shortcutOpen.value = true;
-    void nextTick(() => recoveryPopover.value?.querySelector("button")?.focus());
-    return;
+    void nextTick(() => { syncPopover(); recoveryPopover.value?.querySelector("button")?.focus(); });
   }
-  if (event.defaultPrevented) return;
-  if (event.key === "Escape" && shortcutOpen.value) shortcutOpen.value = false;
 }
 
 let reachabilityTimer: ReturnType<typeof setInterval> | undefined;

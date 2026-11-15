@@ -74,6 +74,8 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   // cannot swallow it with preventDefault().
   assert.match(hostChrome, /addEventListener\("keydown", onKeydown, true\)/);
   assert.match(hostChrome, /removeEventListener\("keydown", onKeydown, true\)/);
+  // Escape closes the popover from inside its closed shadow root.
+  assert.match(hostChrome, /@keydown\.escape="shortcutOpen = false"/);
   assert.doesNotMatch(hostChrome, /event\.defaultPrevented \|\| event\.repeat/);
   assert.doesNotMatch(hostChrome, /data-ws-part="host\.recovery"/);
   assert.doesNotMatch(hostChrome, /ws-host-recovery-layer/);

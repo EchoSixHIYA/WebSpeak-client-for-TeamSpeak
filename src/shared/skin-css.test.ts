@@ -247,10 +247,12 @@ test("protected controls cannot be hidden through variables or moved off-screen"
     '[data-ws-part="voice.audio-dock"] { margin-left: -9999px; }',
     '[data-ws-part="voice.audio-dock"] { margin-inline: -9999px; }',
     '[data-ws-part="voice.audio-dock"] { margin-block-start: -1200px; }',
-    '[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -999px; }',
+    '[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -1000px; }',
     '[data-ws-part="voice.audio-dock"] { margin-left: -100vw; }',
-    '[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 500px); }',
+    '[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 5000px); }',
     '[data-ws-part="voice.audio-dock"] { transform: matrix(1, 0, 0, 1, -4000, 0); }',
+    '[data-ws-part="voice.audio-dock"] { margin-left: -1e4px; }',
+    '[data-ws-part="voice.audio-dock"] { transform: translateX(calc(2px*-1000)); }',
   ]) {
     assert.throws(() => compile(css), /must remain on screen/, css);
   }
@@ -263,8 +265,18 @@ test("protected controls cannot be hidden through variables or moved off-screen"
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { background: var(--skin-panel); }'));
   assert.doesNotThrow(() => compile(':root { --skin-hide: none; } [data-ws-part="host.watermark"] { display: var(--skin-hide); }'));
   // A small margin on a protected control and a decorative dock child are still
-  // legitimate v3 theming.
+  // legitimate v3 theming. Ordinary placement is no longer mistaken for a
+  // yeet: only values clearly beyond a viewport are rejected.
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: -6px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -999px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 500px); }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { position: fixed; top: 140px; left: 260px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin-top: 120px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: 0 auto 120px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { top: 100%; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { scale: 100%; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { rotate: 4deg; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { transform: rotate(8deg); }'));
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] > div:first-child { display: none; }'));
   // The off-screen guard only protects the subject, not decorative or
   // non-protected parts.
@@ -316,6 +328,10 @@ test("host chrome cannot be restyled into a viewport-sized overlay", () => {
   assert.match(themed.css, /data-ws-part="host\.plugins\.overlay"/);
   assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] * { color: #fff; border-color: #1d4f9c; border-radius: 6px; }'));
   assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.launcher"] { background: #1d4f9c; width: 120px; }'));
+  // Overlay contents may use normal sizing and margins; only a viewport-sized
+  // box would turn the library contents into a fullscreen mask.
+  assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] button { min-width: 44px; min-height: 44px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] * { margin: 0; }'));
 });
 
 test("keyframes follow the same protected-control rules as regular declarations", () => {
@@ -324,8 +340,8 @@ test("keyframes follow the same protected-control rules as regular declarations"
     ['@keyframes k { to { visibility: hidden; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
     ['@keyframes k { to { transform: translateX(-9999px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
     ['@keyframes k { to { inset: 0 0 0 -120vw; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
-    ['@keyframes k { to { filter: opacity(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain visible/],
-    ['@keyframes k { to { filter: brightness(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain visible/],
+    ['@keyframes k { to { filter: opacity(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain available/],
+    ['@keyframes k { to { filter: brightness(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain available/],
     // A variable animation name must not hide the name from the walk.
     [':root { --skin-anim: k; } @keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: var(--skin-anim) 1s forwards; }', /cannot use indirect values/],
     ['@keyframes k { to { opacity: 0; } } [data-ws-part="home.title"] { --skin-anim: k; } [data-ws-part="voice.audio-dock"] { animation-name: var(--skin-anim); }', /cannot use indirect values/],
@@ -354,6 +370,160 @@ test("keyframes follow the same protected-control rules as regular declarations"
   }
 });
 
+test("keyframes hide protected parts only when the animation can rest there", () => {
+  // Entrances and pulses that merely pass through a hidden/intermediate state
+  // are legitimate: only `to`/`100%` (and a genuinely resting `from`) count.
+  for (const css of [
+    '@keyframes in { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="app"] { animation: in .3s; }',
+    '@keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } [data-ws-part="app.toast"] { animation: toastIn .3s; }',
+    '@keyframes fade { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="voice.connection-status"] { animation: fade .4s; }',
+    '@keyframes slide { from { transform: translateX(-100%); } to { transform: none; } } [data-ws-part="voice.mobile-nav"] { animation: slide .25s; }',
+    '@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } } [data-ws-part="app.toast"] { animation: pop .2s; }',
+    '@keyframes pulse { 50% { opacity: 0; } 100% { opacity: 1; } } [data-ws-part="voice.connection-status"] { animation: pulse 2s infinite; }',
+    '@keyframes in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } } [data-ws-part="host.plugins.overlay"] { animation: in .2s; }',
+    '@keyframes pop { from { scale: 0; } to { scale: 1; } } [data-ws-part="host.plugins.overlay"] { animation: pop .2s; }',
+    '@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } } [data-ws-part="host.plugins.overlay"] { animation: pop .2s; }',
+    '@keyframes slide { from { transform: translateY(8px); } to { transform: translateY(0); } } [data-ws-part="host.plugins.overlay"] { animation: slide .2s; }',
+    // A keyframe without a `to` frame ends on the element's own style.
+    '@keyframes tint { 50% { opacity: 0; } } [data-ws-part="voice.connection-status"] { animation: tint 2s; }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+
+  const rejected: Array<[string, RegExp]> = [
+    ['@keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { 100% { display: none; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { to { transform: translateX(-5000px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    // Reverse/alternate/fill-backwards animations can end (or hold) on `from`.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    ['@keyframes k { from { display: none; } } [data-ws-part="voice.audio-dock"] { animation: k 1s alternate; }', /must remain available/],
+    ['@keyframes k { from { visibility: hidden; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; animation-direction: alternate-reverse; }', /must remain available/],
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; animation-fill-mode: both; }', /must remain available/],
+    ['@keyframes k { 0% { filter: brightness(0); } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    // Declaration order cannot hide a reverse direction behind a longhand.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-direction: normal; animation: k 1s reverse; }', /must remain available/],
+    // A variable fill mode is unknowable, so the start frame is treated as resting.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-name: k; animation-fill-mode: var(--skin-fill); }', /must remain available/],
+    // A paused animation renders its start frame from the first paint.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s paused; }', /must remain available/],
+    ['@keyframes k { from { display: none; } } [data-ws-part="voice.audio-dock"] { animation-name: k; animation-play-state: paused; }', /must remain available/],
+    // Escaped `to`/`from` and `1e2%` must still be recognised as resting steps.
+    ['@keyframes k { \\74 o { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { t\\6f { transform: translateX(-5000px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    ['@keyframes k { \\66 rom { opacity: 0; } to { opacity: 1; } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    ['@keyframes k { 1e2% { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    // Direction/fill longhands in a sibling rule on the same subject still rest on `from`.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; } [data-ws-part="voice.audio-dock"] { animation-direction: reverse; animation-fill-mode: both; }', /must remain available/],
+  ];
+  for (const [css, message] of rejected) {
+    assert.throws(() => compile(css), (error: unknown) => error instanceof Error && message.test(error.message), css);
+  }
+});
+
+test("escaped animation names are matched and rewritten", () => {
+  const escaped = compile('@keyframes pulse { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { animation-name: p\\75 lse; }');
+  assert.match(escaped.css, /animation-name: ws-demo-skin-pulse/);
+  assert.doesNotMatch(escaped.css, /p\\75 lse/);
+
+  const shorthand = compile('@keyframes pulse { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { animation: p\\75 lse .3s ease; }');
+  assert.match(shorthand.css, /animation: ws-demo-skin-pulse \.3s ease/);
+
+  // Only the name slot is rewritten: a keyframe named like a timing keyword
+  // must not turn the timing function into a keyframe reference.
+  const timing = compile('@keyframes linear { from { opacity: 1; } to { opacity: 1; } } [data-ws-part="home.title"] { animation: linear 1s linear; }');
+  assert.match(timing.css, /animation: linear 1s ws-demo-skin-linear/);
+});
+
+test("keyword-shaped animation tokens do not become keyframe references", () => {
+  const named = compile('@keyframes alternate { from { opacity: 1; } to { opacity: 1; } } @keyframes bob { from { transform: translateY(0); } to { transform: translateY(4px); } } [data-ws-part="voice.audio-dock"] { animation: bob 2s alternate; }');
+  assert.match(named.css, /@keyframes ws-demo-skin-alternate/);
+  assert.match(named.css, /animation: ws-demo-skin-bob 2s alternate/);
+  assert.doesNotMatch(named.css, /animation: bob 2s ws-demo-skin-alternate/);
+});
+
+test("normalised hidden values cannot hide protected parts", () => {
+  const hidden: Array<[string, string]> = [
+    ["display", "none"],
+    ["visibility", "hidden"],
+    ["visibility", "collapse"],
+    ["opacity", ".0"],
+    ["opacity", "+0"],
+    ["opacity", "-1"],
+    ["opacity", "0%"],
+    ["opacity", "0.5%"],
+    ["opacity", "0.001"],
+    ["opacity", "calc(0)"],
+    ["filter", "opacity(0.0)"],
+    ["filter", "brightness(0)"],
+    ["-webkit-filter", "opacity(0)"],
+    ["pointer-events", "none"],
+    ["transform", "scale(0)"],
+    ["transform", "scaleX(0)"],
+    ["transform", "scaleY(0)"],
+    ["transform", "scale3d(0, 1, 1)"],
+    ["transform", "scale(0 0)"],
+    ["scale", "0"],
+    ["scale", "0%"],
+    ["scale", "0 0"],
+    ["content-visibility", "hidden"],
+    ["clip-path", "inset(50%)"],
+    ["clip-path", "inset(60% 0)"],
+    ["clip-path", "inset(0 60%)"],
+    ["clip-path", "circle(0)"],
+    ["clip-path", "ellipse(0 10px)"],
+    ["clip", "rect(0,0,0,0)"],
+    ["clip", "rect(0 0 0 0)"],
+    ["mask", "alpha(0)"],
+    ["mask-image", "luminance(0)"],
+    ["mask-image", "linear-gradient(transparent, transparent)"],
+    ["mask-image", "linear-gradient(#0000, #0000)"],
+    ["mask-image", "linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / 0))"],
+    ["mask-image", "conic-gradient(from 0deg, transparent, transparent)"],
+    ["opacity", "0e0"],
+    ["opacity", "1e-3"],
+    ["filter", "opacity(1e-2)"],
+    ["transform", "scale(0e0)"],
+    ["scale", "1e-9"],
+  ];
+  for (const [property, value] of hidden) {
+    const direct = `[data-ws-part="voice.audio-dock"] { ${property}: ${value}; }`;
+    assert.throws(() => compile(direct), /must remain available/, direct);
+    const frame = `@keyframes k { to { ${property}: ${value}; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; }`;
+    assert.throws(() => compile(frame), /must remain available/, frame);
+  }
+  // Partial effects and artwork clipping remain legitimate.
+  for (const css of [
+    '[data-ws-part="voice.audio-dock"] { opacity: .5; }',
+    '[data-ws-part="voice.audio-dock"] { filter: opacity(.4); }',
+    '[data-ws-part="voice.audio-dock"] { transform: scale(.5); }',
+    '[data-ws-part="voice.audio-dock"] { scale: .8; }',
+    '[data-ws-part="voice.audio-dock"] { clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%); }',
+    '[data-ws-part="voice.audio-dock"] { clip-path: inset(20%); }',
+    '[data-ws-part="voice.audio-dock"] { mask-image: linear-gradient(transparent, red); }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+});
+
+test("selector variants cannot disguise a protected subject", () => {
+  for (const css of [
+    '[data-ws-part="VOICE.AUDIO-DOCK" i] { display: none; }',
+    '[data-ws-part="voice.audio-dock" I] { opacity: 0; }',
+    ':not(:not([data-ws-part="voice.audio-dock"])) { display: none; }',
+    ':not(:not([data-ws-part="voice.audio-dock"]):hover) { visibility: hidden; }',
+    ':nth-child(2n of [data-ws-part="voice.audio-dock"]) { display: none; }',
+    ':nth-last-child(odd of .member, [data-ws-part="voice.audio-dock"]) { pointer-events: none; }',
+    ':not(:not([data-ws-part="voice.audio-dock"]), [data-ws-part="home.title"]) { display: none; }',
+    ':not(:is(:not([data-ws-part="voice.audio-dock"]))) { display: none; }',
+  ]) {
+    assert.throws(() => compile(css), /must remain available/, css);
+  }
+  // The `s` flag keeps matching case-sensitive, so this selects nothing.
+  assert.doesNotThrow(() => compile('[data-ws-part="VOICE.AUDIO-DOCK" s] { display: none; }'));
+  // A single :not() still means "every other element".
+  assert.doesNotThrow(() => compile(':not([data-ws-part="voice.audio-dock"]) { display: none; }'));
+});
+
 test("escaped, namespaced and :is()/:where() animation names cannot bypass the protected-control locks", () => {
   const rejected: Array<[string, RegExp]> = [
     // Escaped property name used to skip the keyframe mapping walk.
@@ -374,8 +544,8 @@ test("escaped, namespaced and :is()/:where() animation names cannot bypass the p
     ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { animation: ws-demo-skin-\\00006b  1s forwards; }', /must remain available/],
     ['@keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-name: \\6b; }', /must remain available/],
     // Prefixed visual-removal properties must use the same checks as the unprefixed form.
-    ['[data-ws-part="voice.audio-dock"] { -webkit-filter: opacity(0); }', /must remain visible/],
-    ['[data-ws-part="voice.audio-dock"] { -webkit-transform: scale(0); }', /must remain visible/],
+    ['[data-ws-part="voice.audio-dock"] { -webkit-filter: opacity(0); }', /must remain available/],
+    ['[data-ws-part="voice.audio-dock"] { -webkit-transform: scale(0); }', /must remain available/],
   ];
   for (const [css, message] of rejected) {
     assert.throws(() => compile(css), (error: unknown) => error instanceof Error && message.test(error.message), css);
@@ -397,6 +567,9 @@ test("keyframes cannot turn the plugin overlay into a fullscreen layer", () => {
     '@keyframes k { to { width: 100vw; height: 100vh; } } [data-ws-part="host.plugins.overlay"] * { animation: k 1s forwards; }',
     '@keyframes k { to { zoom: 10; } } [data-ws-part="host.plugins.overlay"] { animation: k 1s forwards; }',
     '@keyframes k { to { transform: scale(10); } } [data-ws-part="host.plugins.overlay"] { animation-name: k; }',
+    '@keyframes k { to { position: fixed; inset: 0; z-index: 2147483647; } } [data-ws-part="host.plugins.overlay"] { --skin-a: ws-demo-skin-k; animation: var(--skin-a) 1s forwards; }',
+    '[data-ws-part="host.plugins.overlay"] * { width: calc(50vw * 2); }',
+    '[data-ws-part="host.plugins.overlay"] * { width: calc(99vw + 1vw); }',
   ]) {
     assert.throws(() => compile(css), /layout is owned by WebSpeak|fullscreen overlay/, css);
   }
@@ -409,6 +582,11 @@ test("large layout restyles of non-protected parts and decorative host chrome co
     '[data-ws-part="home.header"] { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; position: relative; width: 80vw; height: 50vh; }',
     '[data-ws-part="home.header"] { display: flex; flex-direction: column; align-items: stretch; translate: 24px 0; }',
     '[data-ws-part="voice.audio-dock"] > div:first-child { position: absolute; width: 100vw; height: 100vh; }',
+    // Whole-page and protected-part layout rewrites are the owner's explicit
+    // use case; placement is no longer mistaken for a yeet.
+    '[data-ws-part="app"] { display: grid; grid-template-areas: "rail main"; grid-template-columns: 72px 1fr; position: relative; }',
+    '[data-ws-part="voice.audio-dock"] { position: fixed; top: 140px; left: 260px; display: flex; flex-direction: column; gap: 10px; }',
+    '[data-ws-part="home"] { display: flex; flex-direction: column; align-items: stretch; min-height: 100vh; }',
     // Official example skins (harbor, kaak) clip their own artwork.
     '[data-ws-part="home.header"] { clip-path: polygon(0 0, 100% 0, 100% 82%, 0 100%); }',
     '[data-ws-part="host.watermark"] { position: fixed; inset: 0; width: 100vw; height: 100vh; transform: rotate(-8deg); }',

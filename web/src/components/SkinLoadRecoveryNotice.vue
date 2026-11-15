@@ -35,6 +35,7 @@ const SKIN_LOAD_LAYER_CSS = `
   justify-content: center;
   gap: 12px;
   width: min(720px, calc(100vw - 24px));
+  box-sizing: border-box;
   padding: 10px 12px;
   transform: translateX(-50%);
   border: 1px solid #f59e0b;

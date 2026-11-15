@@ -1,6 +1,6 @@
 import postcss, { type AtRule, type Declaration, type Node, type Rule } from "postcss";
-import selectorParser, { type Node as SelectorNode } from "postcss-selector-parser";
-import valueParser from "postcss-value-parser";
+import selectorParser, { type Node as SelectorNode, type Pseudo as SelectorPseudo } from "postcss-selector-parser";
+import valueParser, { type Node as ValueNode } from "postcss-value-parser";
 import {
   DECORATIVE_PART_IDS as OPTIONAL_VISUAL_PARTS,
   HOST_CHROME_PART_IDS,
@@ -94,6 +94,19 @@ const FORBIDDEN_SCOPE_ATTRIBUTES = new Set([
   "data-ws-host-layer-content",
   "data-ws-recovery-action",
 ]);
+/** CSS-wide keywords never name a keyframe and reset an animatable slot. */
+const CSS_WIDE_KEYWORDS = new Set(["initial", "inherit", "unset", "revert", "revert-layer"]);
+/** Shorthand keyword slots; a repeated category frees the word to be the name. */
+const ANIMATION_KEYWORD_CATEGORIES = new Map<string, string>([
+  ["linear", "timing"], ["ease", "timing"], ["ease-in", "timing"], ["ease-out", "timing"],
+  ["ease-in-out", "timing"], ["step-start", "timing"], ["step-end", "timing"],
+  ["normal", "direction"], ["reverse", "direction"], ["alternate", "direction"], ["alternate-reverse", "direction"],
+  ["none", "fill"], ["forwards", "fill"], ["backwards", "fill"], ["both", "fill"],
+  ["running", "play"], ["paused", "play"], ["infinite", "iteration"],
+]);
+/** Words that let an animation hold its `from`/`0%` frame. */
+const RESTING_START_KEYWORDS = new Set(["reverse", "alternate", "alternate-reverse", "backwards", "both", "paused"]);
+
 export function compileSkinCss(source: string, id: string, assets: SkinCssAssets, schemaVersion: SkinCssSchemaVersion, pluginId?: string): { css: string; warnings: string[] } {
   const size = new TextEncoder().encode(source).byteLength;
   if (!size || size > MAX_CSS_BYTES) throw new SkinCssValidationError("The CSS entry must be between 1 byte and 512 KiB.", "SKIN_CSS_SIZE");
@@ -105,10 +118,8 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
   const scope = pluginId
     ? `${skinScope} .ws-plugin-component[data-ws-runtime-plugin="${pluginId}"]`
     : skinScope;
-  // Host chrome is Teleported outside `.ws-skin-root`. Rules that target only
-  // registered host parts use a second, document-level scope anchored to an
-  // attribute the host sets while this exact skin is active. Author CSS never
-  // names html/body: the host generates the scope itself.
+  // Host chrome is Teleported outside `.ws-skin-root`; these rules get their own
+  // document-level scope, which the host anchors to the active skin attribute.
   const hostSkinScope = `:root[${HOST_SKIN_ATTRIBUTE}="${id}"]`;
   const hostScopeNodes = selectorParser().astSync(hostSkinScope).first!.nodes.map((node) => node.clone());
   const namespace = `ws-${id.replace(/[^a-z0-9_-]/gi, "-")}${pluginId ? `-${pluginId}` : ""}`;
@@ -180,80 +191,91 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
 
   const referencedKeyframes = new Set<string>();
   const nonOptionalKeyframes = new Set<string>();
-  // Keyframes referenced by a protected control must obey the same
-  // visibility/positioning rules as a declaration on that control. Keyframe
-  // params are already namespaced at this point, so the maps use scoped names.
+  // Keyframes inherit the protected/locked status of their referencing rules;
+  // params are namespaced here, and `from`/`0%` only rests for some rules.
   const protectedKeyframeParts = new Map<string, string>();
-  // Keyframes referenced by non-decorative host chrome (the plugin overlay
-  // shell) keep the host layout locks; decorative host parts are free to move.
   const lockedHostKeyframeParts = new Map<string, Set<string>>();
+  const restingFromKeyframes = new Set<string>();
+  // Direction/fill/play-state longhands may sit in a sibling rule on the same
+  // subject; collect names per subject, then mark resting-from afterwards.
+  const subjectKeyframes = new Map<string, Set<string>>();
+  const restingSubjects = new Set<string>();
   root.walkRules((rule: Rule) => {
     if (hasKeyframesAncestor(rule)) return;
     const optionalTarget = hideableRules.has(rule);
+    const protectedTarget = selectorSubjectProtectedPart(rule.selector);
+    const lockedHostParts = selectorLockedHostParts(rule.selector);
+    const subjects = [
+      ...selectorSubjectParts(rule.selector, PROTECTED_PART_IDS),
+      ...selectorSubjectParts(rule.selector, HOST_CHROME_PART_IDS).filter((part) => !OPTIONAL_VISUAL_PARTS.has(part)),
+    ];
+    const restsAtStart = subjects.length > 0 && ruleCanRestAtStart(rule);
+    if (restsAtStart) for (const subject of subjects) restingSubjects.add(subject);
     rule.walkDecls((declaration: Declaration) => {
-      // Match the enforcement walk: decode the property so an escaped
-      // `anim\61 tion` cannot skip the keyframe mapping, and treat
-      // `-webkit-animation` as `animation`.
-      const property = decodeCssEscapes(declaration.prop).toLowerCase().replace(/^-(?:webkit|moz|ms|o)-/, "");
+      // Decode the property like the enforcement walk (`anim\61 tion`), and the
+      // value so escaped identifiers match their declared names.
+      const property = unprefixed(decodeCssEscapes(declaration.prop).toLowerCase());
       if (property !== "animation" && property !== "animation-name") return;
-      // Decode first so an escaped identifier (`\6b`, `ws-…-\00006b`) is
-      // matched against the original and namespaced names. `var()`/`attr()`
-      // still cannot be resolved statically; only those bail out. A bare
-      // backslash is no longer a reason to skip protected mapping.
       const decodedValue = decodeCssEscapes(declaration.value);
       if (/\b(?:var|attr)\s*\(/i.test(decodedValue)) {
         keyframeNames.forEach((_, name) => nonOptionalKeyframes.add(name));
         return;
       }
-      // The value may already use the namespaced name (a pack can name its own
-      // id), so match both the original and the rewritten identifier.
-      const protectedTarget = selectorSubjectProtectedPart(rule.selector);
-      const lockedHostParts = selectorLockedHostParts(rule.selector);
-      for (const [name, scopedName] of keyframeNames) {
-        if (!referencesCssIdentifier(decodedValue, name) && !referencesCssIdentifier(decodedValue, scopedName)) continue;
-        referencedKeyframes.add(name);
-        if (!optionalTarget) nonOptionalKeyframes.add(name);
-        if (protectedTarget && !protectedKeyframeParts.has(scopedName)) {
-          protectedKeyframeParts.set(scopedName, protectedTarget);
-        }
-        if (lockedHostParts.length) {
-          const parts = lockedHostKeyframeParts.get(scopedName) ?? new Set<string>();
-          for (const part of lockedHostParts) parts.add(part);
-          lockedHostKeyframeParts.set(scopedName, parts);
+      const { names } = parseAnimationLayers(decodedValue, property);
+      for (const nameNode of names) {
+        if (!nameNode) continue;
+        const name = nameNode.value;
+        for (const [original, scopedName] of keyframeNames) {
+          if (name !== original && name !== scopedName) continue;
+          referencedKeyframes.add(original);
+          if (!optionalTarget) nonOptionalKeyframes.add(original);
+          if (protectedTarget && !protectedKeyframeParts.has(scopedName)) {
+            protectedKeyframeParts.set(scopedName, protectedTarget);
+          }
+          if (lockedHostParts.length) {
+            const parts = lockedHostKeyframeParts.get(scopedName) ?? new Set<string>();
+            for (const part of lockedHostParts) parts.add(part);
+            lockedHostKeyframeParts.set(scopedName, parts);
+          }
+          if (restsAtStart) restingFromKeyframes.add(scopedName);
+          for (const subject of subjects) {
+            const names = subjectKeyframes.get(subject) ?? new Set<string>();
+            names.add(scopedName);
+            subjectKeyframes.set(subject, names);
+          }
         }
       }
     });
   });
+  for (const subject of restingSubjects) {
+    for (const name of subjectKeyframes.get(subject) ?? []) restingFromKeyframes.add(name);
+  }
   const optionalOnlyKeyframes = new Set([...referencedKeyframes]
     .filter((name) => !nonOptionalKeyframes.has(name))
     .map((name) => keyframeNames.get(name)!));
 
   root.walkDecls((declaration: Declaration) => {
     const property = decodeCssEscapes(declaration.prop).toLowerCase();
-    const unprefixedProperty = property.replace(/^-(?:webkit|moz|ms|o)-/, "");
+    const unprefixedProperty = unprefixed(property);
     const value = declaration.value.trim();
     const decodedValue = decodeCssEscapes(value);
     const owningRule = findOwningRule(declaration);
     const keyframesRule = owningRule ? findKeyframesRule(owningRule) : null;
     const keyframeScope = keyframesRule?.params.trim() ?? null;
+    // `to`/`100%` always rest, and `from`/`0%` when the rule can rest at start.
+    const restingFrame = !keyframesRule
+      || (keyframeScope !== null && keyframeStepCanRest(owningRule!.selector, restingFromKeyframes.has(keyframeScope)));
     const canHideTarget = owningRule
       ? hideableRules.has(owningRule) || Boolean(keyframesRule && optionalOnlyKeyframes.has(keyframesRule.params.trim()))
       : false;
-    // Trusted UI and essential audio/recovery controls stay available even for
-    // open skins. The host also draws authorization and recovery UI outside the
-    // skin root, so a container-level hide cannot remove them either. A
-    // keyframe inherits the protected status of the rules that reference it.
+    // A keyframe inherits the protected status of its referencing rules.
     const protectedTarget = owningRule
       ? keyframesRule
         ? (keyframeScope ? protectedKeyframeParts.get(keyframeScope) ?? null : null)
         : selectorSubjectProtectedPart(owningRule.selector)
       : null;
-    // Every themeable host part referenced anywhere in the selector. A rule may
-    // target a descendant of the overlay (for example with `*`), so the subject
-    // alone is not enough to decide whether host chrome layout is at stake.
-    // Decorative host chrome (watermark, hint, status strip, plugin launcher)
-    // is free to be repositioned; only non-decorative host chrome keeps its
-    // layout locks.
+    // Every locked host part in the selector, not just the subject: `*` under
+    // the overlay is still host chrome. Decorative parts are excluded.
     const hostChromeParts = owningRule
       ? keyframesRule
         ? (keyframeScope ? [...(lockedHostKeyframeParts.get(keyframeScope) ?? [])] : [])
@@ -261,6 +283,8 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
       : [];
     const inHostChromeScope = hostChromeParts.length > 0;
     const inOverlayScope = hostChromeParts.includes("host.plugins.overlay");
+    const overlaySubject = Boolean(!keyframesRule && owningRule
+      && selectorSubjectPart(owningRule.selector, HOST_CHROME_PART_IDS) === "host.plugins.overlay");
     if (property.startsWith("--") && !/^--skin-[a-z0-9_-]+$/i.test(property)
       && !(pluginId && property.startsWith(`--plugin-${pluginId}-`))) {
       throw declaration.error(pluginId
@@ -270,61 +294,56 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     if (schemaVersion < 3 && isLayoutAffectingProperty(property)) {
       throw declaration.error("Skin CSS may change component artwork and appearance, but must not change layout, positioning, sizing, text flow, or interaction geometry.");
     }
-    // Non-decorative host chrome lives outside the skin root and owns its own
-    // placement. A skin may repaint it (colors, borders, radius, artwork) but
-    // must not turn it — or any of its descendants — into a viewport-sized
-    // overlay above authorization/recovery UI. Decorative host parts skip this
-    // lock so they can be repositioned and resized freely.
-    if (inHostChromeScope && HOST_CHROME_LOCKED_PROPERTIES.has(unprefixedProperty)) {
-      throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition or restack host controls.");
-    }
-    if (inOverlayScope && HOST_OVERLAY_LOCKED_PROPERTIES.has(unprefixedProperty)) {
-      throw declaration.error("The application library shell cannot be resized into a fullscreen overlay; theme its colors, borders, radius and artwork instead.");
+    // Host chrome keeps its placement and footprint; decorative host parts skip
+    // this lock. Overlay contents may size themselves unless viewport-sized.
+    if (inHostChromeScope && !keyframesRule) {
+      if (HOST_CHROME_LOCKED_PROPERTIES.has(unprefixedProperty)) {
+        throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition or restack host controls.");
+      }
+      if (overlaySubject && HOST_OVERLAY_LOCKED_PROPERTIES.has(unprefixedProperty)) {
+        throw declaration.error("The application library shell cannot be resized into a fullscreen overlay; theme its colors, borders, radius and artwork instead.");
+      }
+      // Overlay contents may size themselves, but not to the viewport.
+      if (inOverlayScope && !overlaySubject && OVERLAY_SIZE_PROPERTIES.has(unprefixedProperty) && valueIsViewportSized(decodedValue)) {
+        throw declaration.error("The application library shell cannot be resized into a fullscreen overlay; theme its colors, borders, radius and artwork instead.");
+      }
+    } else if (inHostChromeScope && restingFrame && keyframeEscapesHostLock(unprefixedProperty, decodedValue)) {
+      throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition, restack or resize host controls into a fullscreen layer.");
     }
     if (property === "font-family") warnings.add("Custom fonts can change localized text wrapping; verify every WebSpeak language before publishing.");
     if (["behavior", "-moz-binding"].includes(property) || /expression\s*\(|javascript\s*:|vbscript\s*:/i.test(decodedValue)) {
       throw declaration.error("Executable CSS values are not allowed.");
     }
-    const compactValue = decodeCssEscapes(valueParser(value).nodes.filter((node) => node.type !== "space" && node.type !== "comment").map((node) => node.value ?? "").join("")).toLowerCase();
-    if (INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
+    if (INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) && restingFrame && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
       if (protectedTarget) {
         throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
       }
       if (!canHideTarget && schemaVersion < 3) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
     }
-    // An indirect animation name could resolve to a keyframe that hides or
-    // moves the subject; check it at the declaration site instead of treating
-    // every keyframe in the file as protected.
-    if (!keyframesRule && protectedTarget && (unprefixedProperty === "animation" || unprefixedProperty === "animation-name")
+    // An indirect animation name is checked at the declaration site. Locked
+    // host chrome (the plugin overlay) uses the same rule, otherwise a
+    // variable could point at a fullscreen keyframe.
+    if (!keyframesRule && (unprefixedProperty === "animation" || unprefixedProperty === "animation-name")
       && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
-      throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
+      if (protectedTarget) {
+        throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
+      }
+      if (inHostChromeScope) {
+        throw declaration.error("Host chrome layout is owned by WebSpeak; skins may theme colors, borders, radius and artwork but must not reposition or restack host controls through an indirect animation name.");
+      }
     }
-    const removesVisual = unprefixedProperty === "all"
-      || (unprefixedProperty === "display" && compactValue === "none")
-      || (unprefixedProperty === "visibility" && /^(?:hidden|collapse)$/.test(compactValue))
-      || (unprefixedProperty === "opacity" && /^0(?:\.0+)?%?$/.test(compactValue))
-      || (unprefixedProperty === "pointer-events" && compactValue === "none")
-      || (unprefixedProperty === "clip-path" && /inset\(\s*50%/.test(compactValue))
-      || (unprefixedProperty === "mask" && /(?:alpha\(0\)|luminance\(0\))/.test(compactValue));
-    if (removesVisual && protectedTarget) {
+    // One predicate for every way a declaration can hide or disable a part.
+    const hidesVisual = restingFrame && hidesVisually(unprefixedProperty, decodedValue);
+    if (hidesVisual && protectedTarget) {
       throw declaration.error(`The required control "${protectedTarget}" must remain available; permission, recovery and essential audio paths cannot be hidden.`);
     }
-    if (removesVisual && !canHideTarget && schemaVersion < 3) {
+    if (hidesVisual && !canHideTarget && schemaVersion < 3) {
       throw declaration.error("Only explicitly optional visual parts may be hidden or reset; required controls and their containers must remain available.");
     }
-    const visuallyRemoves = (unprefixedProperty === "transform" && /scale(?:3d)?\(\s*0(?:\s*[,)]|\s*\))/i.test(decodedValue))
-      || (unprefixedProperty === "clip-path" && /inset\(\s*50%/i.test(decodedValue))
-      || (unprefixedProperty === "filter" && /(?:opacity|brightness)\(\s*0(?:%|\s*[,)]|\s*\))/i.test(decodedValue));
-    if (visuallyRemoves && protectedTarget) {
-      throw declaration.error(`The required control "${protectedTarget}" must remain visible.`);
-    }
-    if (visuallyRemoves && !canHideTarget && schemaVersion < 3) {
-      throw declaration.error("Only explicitly optional visual parts may be visually removed.");
-    }
-    if (protectedTarget && valueMovesOffscreen(unprefixedProperty, decodedValue)) {
+    if (restingFrame && protectedTarget && valueMovesOffscreen(unprefixedProperty, decodedValue)) {
       throw declaration.error(`The required control "${protectedTarget}" must remain on screen and reachable.`);
     }
-    if (schemaVersion >= 3 && removesVisual && !protectedTarget) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
+    if (schemaVersion >= 3 && hidesVisual && !protectedTarget) warnings.add("This open skin hides an interface part; keep a usable path to essential voice and recovery controls.");
     if (/\bz-index\s*:\s*(?:[1-9]\d{4,}|-\d{4,})\b/i.test(`${property}:${decodedValue}`) || (property === "position" && decodedValue === "fixed")) warnings.add("Fixed positioning or extreme stacking may cover important controls; check the preview on desktop and mobile.");
     const withScopedNames = rewriteScopedNames(value, unprefixedProperty, keyframeNames, fontFamilyNames);
     declaration.value = rewriteAssetUrls(withScopedNames, (assetPath) => {
@@ -486,37 +505,75 @@ function lastCompound(nodes: SelectorNode[]): SelectorNode[] {
   return nodes.slice(start);
 }
 
-/**
- * Find a protected part in one compound. The subject may be wrapped in
- * `:is()`/`:where()`, so descend into those arguments. `:not(...)` is
- * deliberately skipped: a protected part inside `:not()` is not the subject.
- */
-function compoundProtectedPart(nodes: SelectorNode[]): string | null {
+/** Find a part in a compound; `:is()`/`:where()`/`:nth-child(… of S)` and
+ * `:not(:not(X))` keep the subject role, a single `:not()` does not. */
+function compoundPart(nodes: SelectorNode[], parts: ReadonlySet<string>): string | null {
   for (const node of nodes) {
     if (node.type === "attribute" && node.attribute.toLowerCase() === "data-ws-part" && node.value) {
-      const part = node.value.replace(/^['"]|['"]$/g, "");
-      if (PROTECTED_PART_IDS.has(part)) return part;
+      const value = node.value.replace(/^['"]|['"]$/g, "");
+      if (node.insensitive) {
+        const lower = value.toLowerCase();
+        for (const part of parts) if (part.toLowerCase() === lower) return part;
+      } else if (parts.has(value)) {
+        return value;
+      }
     }
-    if (node.type === "pseudo" && node.nodes && SUBJECT_PSEUDO_CLASSES.has(node.value.toLowerCase())) {
+    if (node.type !== "pseudo" || !node.nodes) continue;
+    const pseudo = node.value.toLowerCase();
+    if (SUBJECT_PSEUDO_CLASSES.has(pseudo) || pseudo === ":nth-child" || pseudo === ":nth-last-child") {
       for (const nested of node.nodes) {
-        const part = compoundProtectedPart(lastCompound(nested.nodes));
+        const part = compoundPart(lastCompound(nested.nodes), parts);
         if (part) return part;
+      }
+    } else if (pseudo === ":not") {
+      // `:not(:not(X))` and `:not(:not(X), Y)` are `X`; wrappers like
+      // `:not(:is(:not(X)))` unwrap the same way. A single `:not(X)` is skipped.
+      for (const argument of node.nodes) {
+        const inner = nestedNegation(lastCompound(argument.nodes));
+        if (!inner) continue;
+        for (const nested of inner.nodes) {
+          const part = compoundPart(lastCompound(nested.nodes), parts);
+          if (part) return part;
+        }
       }
     }
   }
   return null;
 }
 
-/** Find a protected part in the subject (last compound) of any selector in a rule. */
-function selectorSubjectProtectedPart(selector: string): string | null {
+/** A `:not(...)` argument that is itself a `:not`, possibly wrapped in `:is()`. */
+function nestedNegation(nodes: SelectorNode[]): SelectorPseudo | null {
+  const direct = nodes.find((node): node is SelectorPseudo => node.type === "pseudo" && node.value.toLowerCase() === ":not");
+  if (direct) return direct;
+  for (const node of nodes) {
+    if (node.type !== "pseudo" || !node.nodes || !SUBJECT_PSEUDO_CLASSES.has(node.value.toLowerCase())) continue;
+    for (const nested of node.nodes) {
+      const found = nestedNegation(lastCompound(nested.nodes));
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** Every matching part in the subject of any selector in a rule. */
+function selectorSubjectParts(selector: string, parts: ReadonlySet<string>): string[] {
+  const found: string[] = [];
   try {
     const parsed = selectorParser().astSync(selector);
     for (const item of parsed.nodes) {
-      const part = compoundProtectedPart(lastCompound(item.nodes));
-      if (part) return part;
+      const part = compoundPart(lastCompound(item.nodes), parts);
+      if (part && !found.includes(part)) found.push(part);
     }
   } catch { /* A malformed selector is rejected elsewhere. */ }
-  return null;
+  return found;
+}
+
+function selectorSubjectPart(selector: string, parts: ReadonlySet<string>): string | null {
+  return selectorSubjectParts(selector, parts)[0] ?? null;
+}
+
+function selectorSubjectProtectedPart(selector: string): string | null {
+  return selectorSubjectPart(selector, PROTECTED_PART_IDS);
 }
 
 /** Find every themeable host part referenced by a selector, in any compound. */
@@ -532,79 +589,394 @@ function selectorHostChromeParts(selector: string): string[] {
   return parts;
 }
 
-/**
- * Host parts whose layout stays owned by WebSpeak. Decorative host chrome (the
- * watermark, hint, voice-status strip and plugin launcher) is deliberately
- * excluded: skins may reposition, resize and animate it because recovery does
- * not depend on it.
- */
+/** Host parts whose layout stays locked; decorative chrome is excluded. */
 function selectorLockedHostParts(selector: string): string[] {
   return selectorHostChromeParts(selector).filter((part) => !OPTIONAL_VISUAL_PARTS.has(part));
 }
 
+function unprefixed(property: string): string {
+  return property.replace(/^-(?:webkit|moz|ms|o)-/, "");
+}
+
 function isLayoutAffectingProperty(property: string): boolean {
-  const unprefixed = property.replace(/^-(?:webkit|moz|ms|o)-/, "");
-  if (LAYOUT_AFFECTING_PROPERTIES.has(unprefixed)) return true;
-  if (/^(?:margin|padding)(?:-|$)/.test(unprefixed)) return true;
-  if (/^border(?:-|$)/.test(unprefixed) && !/^border-(?:color(?:-|$)|radius(?:-|$))/.test(unprefixed)) return true;
-  if (/^(?:grid|flex|align-(?:content|items|self)|justify-(?:content|items|self)|place-(?:content|items|self)|offset|transform|overscroll|overflow|column)(?:-|$)/.test(unprefixed)) return true;
-  return /^font-(?!family$|weight$|style$|synthesis$|palette$)/.test(unprefixed);
+  const local = unprefixed(property);
+  if (LAYOUT_AFFECTING_PROPERTIES.has(local)) return true;
+  if (/^(?:margin|padding)(?:-|$)/.test(local)) return true;
+  if (/^border(?:-|$)/.test(local) && !/^border-(?:color(?:-|$)|radius(?:-|$))/.test(local)) return true;
+  if (/^(?:grid|flex|align-(?:content|items|self)|justify-(?:content|items|self)|place-(?:content|items|self)|offset|transform|overscroll|overflow|column)(?:-|$)/.test(local)) return true;
+  return /^font-(?!family$|weight$|style$|synthesis$|palette$)/.test(local);
 }
 
 /**
  * True when a positioning/margin/transform value can push a protected control
- * off-screen. Thresholds are deliberately low: a protected control has a
- * minimum 44 px hit target, so an offset of a hundred pixels is already enough
- * to make it unreachable. Percentages and viewport units are compared against a
- * full viewport/containing block.
+ * clearly off-screen: -1000 px / -100 % or +2000 px / +200 %. Ordinary layout
+ * moves are legitimate, so only viewport-ejecting values are rejected.
  */
-const OFFSET_PROPERTY_PATTERN = /^(?:margin|inset|left|right|top|bottom|translate|transform|scale|rotate)(?:-|$)/;
-const ABSOLUTE_OFFSET_LIMIT_PX = 100;
-const RELATIVE_OFFSET_LIMIT = 100;
+const OFFSET_PROPERTY_PATTERN = /^(?:margin|inset|left|right|top|bottom|translate|transform)(?:-|$)/;
+const OFFSET_LIMITS = { negativePx: 1000, positivePx: 2000, negativePercent: 100, positivePercent: 200 };
 
-function absoluteLengthToPixels(magnitude: number, unit: string): number | null {
-  switch (unit) {
-    case "px": return magnitude;
-    case "rem": case "em": return magnitude * 16;
-    case "ex": case "rex": case "ch": return magnitude * 8;
-    case "cm": return magnitude * 37.8;
-    case "mm": return magnitude * 3.78;
-    case "q": return magnitude * 0.945;
-    case "in": return magnitude * 96;
-    case "pt": return magnitude * 1.333;
-    case "pc": return magnitude * 16;
-    default: return null;
+type Dimension = { value: number; unit: string };
+
+const ABSOLUTE_UNIT_PIXELS: Record<string, number> = { px: 1, rem: 16, em: 16, ex: 8, rex: 8, ch: 8, cm: 37.8, mm: 3.78, q: 0.945, in: 96, pt: 1.333, pc: 16 };
+function absoluteLengthToPixels(value: number, unit: string): number | null {
+  const factor = ABSOLUTE_UNIT_PIXELS[unit];
+  return factor ? value * factor : null;
+}
+
+type OffsetMeasurement = { kind: "pixels" | "percent"; value: number };
+
+const VIEWPORT_UNIT_PATTERN = /^(?:s|l|d)?v(?:w|h|i|min|max)$|^cq(?:w|h|min|max|i|b)$/;
+
+/** CSS `<number>` including a scientific-notation exponent. */
+const CSS_NUMBER_PATTERN = "[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?";
+
+/** One CSS number, percentage or length, including a flat `calc()`. */
+function parseDimension(text: string): Dimension | null {
+  const compact = text.trim().toLowerCase();
+  const calc = /^calc\(([\s\S]*)\)$/.exec(compact);
+  if (calc) return evaluateCalc(calc[1]);
+  const match = new RegExp(`^(${CSS_NUMBER_PATTERN})([a-z%]*)$`).exec(compact);
+  return match ? { value: Number(match[1]), unit: match[2] } : null;
+}
+
+/** Flat `calc()`: sums of products over numbers and one unit; nested or mixed
+ * input is unknown (`null` → allowed). A sign after `*`/`/` is a factor,
+ * so `calc(2px*-1000)` is -2000px, not 2px + -1000. */
+function evaluateCalc(text: string): Dimension | null {
+  const compact = text.replace(/\s+/g, "");
+  const tokens = compact.match(new RegExp(`[*/]|${CSS_NUMBER_PATTERN}(?:[a-z%]+)?`, "g"));
+  if (!tokens || tokens.join("") !== compact) return null;
+  const total: Dimension = { value: 0, unit: "" };
+  let term: Dimension | null = null;
+  let pending: "*" | "/" | null = null;
+  const addTerm = (): boolean => {
+    if (!term || (total.unit && term.unit && total.unit !== term.unit)) return false;
+    total.value += term.value;
+    total.unit ||= term.unit;
+    return true;
+  };
+  for (const token of tokens) {
+    if (token === "*" || token === "/") { pending = token; continue; }
+    const factor = parseDimension(token);
+    if (!factor) return null;
+    if (pending && term) {
+      if (factor.unit && (term.unit || pending === "/")) return null;
+      term = { value: pending === "/" ? term.value / factor.value : term.value * factor.value, unit: term.unit || factor.unit };
+      pending = null;
+      continue;
+    }
+    if (term && !addTerm()) return null;
+    term = factor;
+    pending = null;
   }
+  return !pending && addTerm() ? total : null;
+}
+
+/** Normalise one length for comparison; a bare number is not a length. */
+function lengthMeasurement(value: string): OffsetMeasurement | null {
+  const dimension = parseDimension(value);
+  if (!dimension?.unit) return null;
+  if (dimension.unit === "%" || VIEWPORT_UNIT_PATTERN.test(dimension.unit)) return { kind: "percent", value: dimension.value };
+  const pixels = absoluteLengthToPixels(dimension.value, dimension.unit);
+  return pixels === null ? null : { kind: "pixels", value: pixels };
+}
+
+function exceedsOffset(measurement: OffsetMeasurement | null): boolean {
+  if (!measurement) return false;
+  const [negative, positive] = measurement.kind === "percent"
+    ? [OFFSET_LIMITS.negativePercent, OFFSET_LIMITS.positivePercent]
+    : [OFFSET_LIMITS.negativePx, OFFSET_LIMITS.positivePx];
+  return measurement.value <= -negative || measurement.value >= positive;
 }
 
 function valueMovesOffscreen(property: string, value: string): boolean {
   if (!OFFSET_PROPERTY_PATTERN.test(property)) return false;
   let offscreen = false;
   valueParser(value).walk((node) => {
-    if (node.type !== "word") return;
-    const match = /^(-?(?:\d+|\d*\.\d+))(px|rem|em|r?ex|ch|%|cm|mm|q|in|pt|pc|(?:s|l|d)?v(?:w|h|min|max)|cq(?:w|h|min|max|i|b))$/i.exec(node.value);
-    if (!match) return;
-    const magnitude = Math.abs(Number(match[1]));
-    const unit = match[2].toLowerCase();
-    if (unit === "%" || /^(?:s|l|d)?v(?:w|h|min|max)$/.test(unit) || /^cq(?:w|h|min|max|i|b)$/.test(unit)) {
-      if (magnitude >= RELATIVE_OFFSET_LIMIT) offscreen = true;
-      return;
+    const name = node.type === "function" ? node.value.toLowerCase() : "";
+    if (node.type === "word") offscreen ||= exceedsOffset(lengthMeasurement(node.value));
+    else if (name === "calc") {
+      offscreen ||= exceedsOffset(lengthMeasurement(valueParser.stringify(node)));
+      return false;
+    } else if (node.type === "function" && (name === "matrix" || name === "matrix3d")) {
+      // A matrix can smuggle a large translation in unitless numbers.
+      const items = valueParser.stringify(node.nodes).split(",").map((item) => Number(item.trim()));
+      offscreen ||= (name === "matrix" ? [items[4], items[5]] : [items[12], items[13]])
+        .some((item) => item <= -OFFSET_LIMITS.negativePx || item >= OFFSET_LIMITS.positivePx);
+      return false;
     }
-    const pixels = absoluteLengthToPixels(magnitude, unit);
-    if (pixels !== null && pixels >= ABSOLUTE_OFFSET_LIMIT_PX) offscreen = true;
+    return undefined;
   });
-  // A matrix transform can smuggle a large translation in unitless numbers.
-  if (property === "transform") {
-    valueParser(value).walk((node) => {
-      if (node.type !== "function") return;
-      const name = node.value.toLowerCase();
-      if (name !== "matrix" && name !== "matrix3d") return;
-      const numbers = valueParser.stringify(node.nodes).split(",").map((item) => Number(item.trim()));
-      const translations = name === "matrix" ? [numbers[4], numbers[5]] : [numbers[12], numbers[13]];
-      if (translations.some((translation) => Number.isFinite(translation) && Math.abs(translation) >= ABSOLUTE_OFFSET_LIMIT_PX)) offscreen = true;
-    });
-  }
   return offscreen;
+}
+
+/** This declaration removes the element from view; partial effects stay allowed. */
+function hidesVisually(property: string, value: string): boolean {
+  if (property === "all") return true;
+  const text = decodeCssEscapes(value).trim().toLowerCase();
+  if ((property === "display" && text === "none") || (property === "visibility" && /^(?:hidden|collapse)$/.test(text))
+    || (property === "pointer-events" && text === "none") || (property === "content-visibility" && text === "hidden")) return true;
+  if (property === "opacity") return (numericValue(text) ?? 1) <= 0.01;
+  if (property === "filter") return filterHides(text);
+  if (property === "transform") return transformHides(text);
+  if (property === "scale") return scalePropertyHides(text);
+  if (property === "clip-path") return clipPathHides(text);
+  if (property === "clip") return clipHides(text);
+  return property === "mask" || property === "mask-image" ? maskHides(text) : false;
+}
+
+/** Visit every function node; `test` gets the lower-cased name and its arguments. */
+function anyFunction(value: string, test: (name: string, args: string) => boolean): boolean {
+  let hit = false;
+  valueParser(value).walk((node) => {
+    if (node.type === "function" && test(node.value.toLowerCase(), valueParser.stringify(node.nodes))) hit = true;
+  });
+  return hit;
+}
+
+/** A number, a percentage as 0–1, or a flat `calc()` of numbers. */
+function numericValue(value: string): number | null {
+  const dimension = parseDimension(value);
+  if (!dimension) return null;
+  return dimension.unit === "%" ? dimension.value / 100 : dimension.unit === "" ? dimension.value : null;
+}
+
+function filterHides(value: string): boolean {
+  return anyFunction(value, (name, args) => {
+    const amount = numericValue(args);
+    return amount !== null && (name === "opacity" ? amount <= 0.01 : name === "brightness" && amount <= 0);
+  });
+}
+
+function numbers(text: string): number[] {
+  return text.split(/[\s,]+/).map(numericValue).filter((item): item is number => item !== null);
+}
+
+function isZeroFactor(value: number): boolean {
+  return Math.abs(value) <= 0.001;
+}
+
+function transformHides(value: string): boolean {
+  return anyFunction(value, (name, args) => {
+    const factors = numbers(args);
+    if (name === "scale" || name === "scale3d") return factors.slice(0, 2).some(isZeroFactor);
+    return (name === "scalex" || name === "scaley") && isZeroFactor(factors[0] ?? 1);
+  });
+}
+
+function scalePropertyHides(value: string): boolean {
+  const factors = numbers(value);
+  return factors.length > 0 && (isZeroFactor(factors[0]) || (factors.length > 1 && isZeroFactor(factors[1])));
+}
+
+function zeroLength(value: string | undefined): boolean {
+  const dimension = value ? parseDimension(value) : null;
+  return dimension !== null && isZeroFactor(dimension.value);
+}
+
+function insetHides(args: string): boolean {
+  const sides = args.split(/\bround\b/i)[0].trim().split(/\s+/).map(parseDimension);
+  if (sides.some((side) => !side || (side.unit !== "" && side.unit !== "%"))) return false;
+  const values = sides.map((side) => side!.value);
+  const [top, right = top, bottom = top, left = right] = values;
+  return top + bottom >= 100 || left + right >= 100;
+}
+
+function clipPathHides(value: string): boolean {
+  return anyFunction(value, (name, args) => {
+    const shape = args.split(/\bat\b/i)[0].trim();
+    if (name === "inset") return insetHides(args);
+    if (name === "circle") return zeroLength(shape.split(/\s+/)[0]);
+    return name === "ellipse" && shape.split(/\s+/).filter(Boolean).slice(0, 2).some(zeroLength);
+  });
+}
+
+function clipHides(value: string): boolean {
+  const match = /^rect\(([\s\S]*)\)$/i.exec(value.trim());
+  if (!match) return false;
+  const sides = match[1].split(/[\s,]+/).filter(Boolean);
+  return sides.length === 4 && sides.every(zeroLength);
+}
+
+const GRADIENT_PRELUDE_KEYWORDS = new Set([
+  "from", "to", "left", "right", "top", "bottom", "center", "at", "circle", "ellipse",
+  "closest-side", "closest-corner", "farthest-side", "farthest-corner", "in",
+]);
+
+/** `#rgb0` / `#rrggbb00`, `transparent`, or a colour function with alpha ≤ 0.01. */
+function colorIsTransparent(text: string): boolean {
+  const value = text.trim().toLowerCase();
+  if (value === "transparent" || /^#(?:[\da-f]{3}0|[\da-f]{6}00)$/.test(value)) return true;
+  return anyFunction(value, (name, args) => {
+    if (!/^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)$/.test(name)) return false;
+    const slash = args.split("/");
+    if (slash.length > 1) return (numericValue(slash[slash.length - 1].trim()) ?? 1) <= 0.01;
+    const channels = numbers(args);
+    return (name === "rgba" || name === "hsla") && channels.length >= 4 && channels[3] <= 0.01;
+  });
+}
+
+/** A gradient is a full mask only when every colour stop is fully transparent. */
+function gradientIsAllTransparent(args: string): boolean {
+  let transparent = false;
+  for (const segment of args.split(/,(?![^(]*\))/)) {
+    const text = segment.trim().toLowerCase();
+    if (!text) continue;
+    const first = valueParser(text).nodes.find((node) => node.type !== "space" && node.type !== "comment");
+    if (!first) continue;
+    if (first.type === "function" ? colorIsTransparent(valueParser.stringify([first])) : colorIsTransparent(first.value)) {
+      transparent = true;
+      continue;
+    }
+    if (first.type === "word" && (GRADIENT_PRELUDE_KEYWORDS.has(first.value.toLowerCase()) || parseDimension(first.value)?.unit)) continue;
+    return false;
+  }
+  return transparent;
+}
+
+function maskHides(value: string): boolean {
+  return anyFunction(value, (name, args) =>
+    name === "alpha" || name === "luminance"
+      ? (numericValue(args) ?? 1) <= 0
+      : name.endsWith("gradient") && gradientIsAllTransparent(args));
+}
+
+/**
+ * Name token per layer. In the shorthand a keyword fills the first slot of its
+ * category; a repeated category (or any other word) is the name, so
+ * `bob 2s alternate` references `bob`. Times, numbers and functions are skipped.
+ */
+function parseAnimationLayers(value: string, property: string): { parsed: ReturnType<typeof valueParser>; names: Array<ValueNode | null> } {
+  const parsed = valueParser(value);
+  const groups: ValueNode[][] = [[]];
+  for (const node of parsed.nodes) {
+    if (node.type === "div" && node.value === ",") groups.push([]);
+    else if (node.type !== "space" && node.type !== "comment") groups[groups.length - 1].push(node);
+  }
+  const names = groups.map((nodes) => {
+    const words = nodes.filter((node) => node.type === "word" || node.type === "string");
+    if (property === "animation-name") {
+      const name = words[0] ? decodeCssEscapes(words[0].value).toLowerCase() : "";
+      return words[0] && name !== "none" && !CSS_WIDE_KEYWORDS.has(name) ? words[0] : null;
+    }
+    const used = new Set<string>();
+    for (const node of words) {
+      const token = decodeCssEscapes(node.value).toLowerCase();
+      const dimension = parseDimension(token);
+      if (dimension && ["", "s", "ms"].includes(dimension.unit)) continue;
+      const category = ANIMATION_KEYWORD_CATEGORIES.get(token);
+      if (category && used.has(category)) return node;
+      if (category) used.add(category);
+      else if (node.type === "word" && CSS_WIDE_KEYWORDS.has(token)) continue;
+      else return node;
+    }
+    return null;
+  });
+  return { parsed, names };
+}
+
+/** Any restart/alternate/fill keyword or indirect value can hold the start frame.
+ * Multi-layer rules are judged as a whole, which errs towards checking `from`. */
+function ruleCanRestAtStart(rule: Rule): boolean {
+  let resting = false;
+  rule.walkDecls((declaration: Declaration) => {
+    const property = unprefixed(decodeCssEscapes(declaration.prop).toLowerCase());
+    if (!["animation", "animation-direction", "animation-fill-mode", "animation-play-state"].includes(property)) return;
+    const value = decodeCssEscapes(declaration.value).toLowerCase();
+    resting ||= /\b(?:var|attr)\s*\(/.test(value)
+      || valueParser(value).nodes.some((node) => node.type === "word" && RESTING_START_KEYWORDS.has(node.value));
+  });
+  return resting;
+}
+
+/** `to`/`100%` always rest; `from`/`0%` rest for reverse/alternate, a
+ * backwards/both fill, or a paused start. A long animation or a pause mid-way
+ * (negative delay) can linger on an unchecked intermediate frame — accepted,
+ * because recovery lives in a closed-shadow top-layer capsule. */
+function keyframeStepCanRest(selector: string, restsAtStart: boolean): boolean {
+  return selector.split(",").some((step) => {
+    const value = decodeCssEscapes(step).trim().toLowerCase();
+    if (value === "to") return true;
+    if (value === "from") return restsAtStart;
+    const position = parseDimension(value);
+    return position?.unit === "%" && (position.value >= 100 || (restsAtStart && position.value <= 0));
+  });
+}
+
+const OVERLAY_SIZE_PROPERTIES = new Set([
+  "width", "height", "min-width", "min-height", "max-width", "max-height",
+  "inline-size", "block-size", "min-inline-size", "min-block-size", "max-inline-size", "max-block-size", "aspect-ratio",
+]);
+
+function isViewportSizedDimension(dimension: Dimension | null): boolean {
+  return Boolean(dimension && VIEWPORT_UNIT_PATTERN.test(dimension.unit) && Math.abs(dimension.value) >= 100);
+}
+
+function valueIsViewportSized(value: string): boolean {
+  let sized = false;
+  valueParser(value).walk((node) => {
+    if (node.type === "word") sized ||= isViewportSizedDimension(parseDimension(node.value));
+    else if (node.type === "function" && node.value.toLowerCase() === "calc") {
+      sized ||= isViewportSizedDimension(parseDimension(valueParser.stringify(node)));
+      return false;
+    }
+    return undefined;
+  });
+  return sized;
+}
+
+function isIdentityNumber(value: number): boolean {
+  return Math.abs(value - 1) <= 0.001;
+}
+
+function isZeroAngleOrLength(value: string): boolean {
+  return zeroLength(value);
+}
+
+/** Identity transforms (`none`, `scale(1)`, `translate(0)`, `rotate(0deg)`). */
+function transformIsIdentity(value: string): boolean {
+  const compact = value.trim().toLowerCase();
+  if (compact === "none") return true;
+  let seen = false;
+  let identity = true;
+  valueParser(compact).walk((node) => {
+    if (node.type !== "function") return;
+    seen = true;
+    const name = node.value.toLowerCase();
+    const args = valueParser.stringify(node.nodes);
+    const factors = numbers(args);
+    if (name === "scale" || name === "scale3d") identity &&= factors.length > 0 && factors.every(isIdentityNumber);
+    else if (name === "scalex" || name === "scaley" || name === "scalez") identity &&= factors.length > 0 && isIdentityNumber(factors[0]);
+    else if (/^translate(?:3d|[xyz])?$/.test(name)) identity &&= args.split(/[,\s]+/).filter(Boolean).every(isZeroAngleOrLength);
+    else if (/^rotate(?:3d|[xyz])?$/.test(name) || name === "skew" || name === "skewx" || name === "skewy") {
+      identity &&= args.split(/[,\s]+/).filter(Boolean).every(isZeroAngleOrLength);
+    } else identity = false;
+  });
+  return seen && identity;
+}
+
+function isNeutralLockValue(property: string, value: string): boolean {
+  const compact = value.trim().toLowerCase();
+  if (["none", "auto", "static"].includes(compact) || CSS_WIDE_KEYWORDS.has(compact)) return true;
+  if (property === "scale" || property === "zoom") {
+    const factors = numbers(compact);
+    return factors.length > 0 && factors.every(isIdentityNumber);
+  }
+  if (property === "rotate") return isZeroAngleOrLength(compact);
+  if (property === "transform") return transformIsIdentity(compact);
+  if (property === "translate" || property.startsWith("inset") || /^(?:top|right|bottom|left)$/.test(property)) {
+    return compact.split(/\s+/).every((token) => token === "auto" || isZeroAngleOrLength(token));
+  }
+  return compact === "0" || isZeroAngleOrLength(compact);
+}
+
+/** Resting host-chrome keyframes reuse the direct lock per property: locked
+ * properties only accept identity/neutral values; sizes only reject viewport sizes. */
+function keyframeEscapesHostLock(property: string, value: string): boolean {
+  const compact = decodeCssEscapes(value).trim().toLowerCase();
+  if (isNeutralLockValue(property, compact)) return false;
+  if (OVERLAY_SIZE_PROPERTIES.has(property)) return valueIsViewportSized(value);
+  return HOST_CHROME_LOCKED_PROPERTIES.has(property);
 }
 
 function findOwningRule(node: Node): Rule | null {
@@ -623,11 +995,6 @@ function findKeyframesRule(rule: Rule): AtRule | null {
     parent = parent.parent;
   }
   return null;
-}
-
-function referencesCssIdentifier(value: string, identifier: string): boolean {
-  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^-_a-z0-9])${escaped}(?=$|[^-_a-z0-9])`, "i").test(value);
 }
 
 export function rewriteAssetUrls(value: string, resolve: (path: string) => string): string {
@@ -687,16 +1054,24 @@ function parseSingleFontFamily(value: string): string {
 }
 
 function rewriteScopedNames(value: string, property: string, keyframes: Map<string, string>, fontFamilies: Map<string, string>): string {
-  const parsed = valueParser(value);
-  if (["animation", "animation-name", "font", "font-family"].includes(property)) {
-    parsed.walk((node) => {
-      if (node.type !== "word" && node.type !== "string") return;
-      const keyframe = keyframes.get(node.value);
-      if (keyframe) node.value = keyframe;
-      const family = fontFamilies.get(node.value.toLowerCase());
-      if (family) node.value = family;
-    });
+  if (!["animation", "animation-name", "font", "font-family"].includes(property)) return value;
+  // Rewrite against the decoded value: `p\75 lse` must become the scoped name
+  // of `@keyframes pulse`, exactly like the matching walk above.
+  const decoded = decodeCssEscapes(value);
+  if (property === "animation" || property === "animation-name") {
+    const { parsed, names } = parseAnimationLayers(decoded, property);
+    for (const node of names) {
+      const scoped = node ? keyframes.get(node.value) : undefined;
+      if (node && scoped) node.value = scoped;
+    }
+    return parsed.toString();
   }
+  const parsed = valueParser(decoded);
+  parsed.walk((node) => {
+    if (node.type !== "word" && node.type !== "string") return;
+    const family = fontFamilies.get(node.value.toLowerCase());
+    if (family) node.value = family;
+  });
   return parsed.toString();
 }
 
