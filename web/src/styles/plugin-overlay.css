@@ -53,6 +53,11 @@
 
 .ws-plugin-toolbar{position:relative;display:flex;align-items:center;min-width:0}
 .ws-plugin-toolbar-fallback{position:fixed;z-index:1001;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));padding:4px;border-radius:12px;background:var(--ws-panel,#fff);box-shadow:0 4px 20px #0003;color:#233049}
+/* Runtime collision avoidance (host-floating-placement.ts) moves the fallback toolbar off skin controls. */
+.ws-plugin-toolbar-fallback[data-ws-float$="left"]{right:auto;left:16px}
+.ws-plugin-toolbar-fallback[data-ws-float^="top"]{bottom:auto;top:calc(16px + env(safe-area-inset-top))}
+.ws-plugin-toolbar-fallback[data-ws-float^="middle"]{bottom:auto;top:50%;translate:0 -50%}
+.ws-plugin-toolbar-fallback[data-ws-float$="center"]{right:auto;left:50%;translate:-50% 0}
 .ws-plugin-toolbar[data-presentation="drawer-side"]{display:grid;width:100%;gap:4px;color:inherit}
 .ws-plugin-toolbar[data-presentation="drawer-side"] .ws-plugin-toolbar-trigger{justify-content:flex-start;width:100%;gap:8px;padding:7px 10px;color:inherit;background:transparent;border:1px solid transparent;font:inherit}
 .ws-plugin-drawer{position:absolute;top:calc(100% + 8px);right:0;z-index:60;width:min(280px,calc(100vw - 32px));max-height:min(380px,60dvh);overflow:auto;overscroll-behavior:contain;padding:8px;color:var(--plugin-drawer-text,#233049);background:var(--plugin-drawer-bg,#fff);border:1px solid var(--plugin-drawer-border,#dae1ef);border-radius:12px;box-shadow:0 12px 32px #17223430;text-align:left;font:13px/1.4 system-ui,sans-serif}

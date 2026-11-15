@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host floating placement fixture</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  /* Skin audio dock in the bottom-left corner, where the capsule floats by default. */
+  #mic { position: fixed; left: 20px; bottom: 40px; width: 120px; height: 34px; }
+  /* Skin "Send" button (disabled until the user types) in the bottom-right corner. */
+  #send { position: fixed; right: 20px; bottom: 20px; width: 60px; height: 34px; }
+  /* A right-hand side sheet whose buttons sit where the capsule moved to. */
+  #sheet { position: fixed; inset: 0 0 0 auto; width: 320px; background: #eee; }
+  #sheet button { position: absolute; right: 8px; width: 280px; height: 40px; }
+  #cancel { top: 8px; } #enter { bottom: 30px; }
+  #backdrop { position: fixed; inset: 0; background: #0006; }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-skin="community.float-fixture" data-ws-part="app">
+  <div data-ws-part="voice.audio-dock.microphone"><button type="button" id="mic">Mic</button></div>
+  <button type="button" id="send" disabled>Send</button>
+  <button type="button" id="top-left" style="position:fixed;left:8px;top:8px;width:220px;height:44px">Server strip</button>
+</div>
+<pre id="result">pending</pre>
+<script type="module">
+import { createHostOwnedLayer } from "/src/services/host-owned-layer.ts";
+import { bindFloatingAvoidance } from "/src/services/host-floating-placement.ts";
+
+const output = document.getElementById("result");
+const CSS = `
+.cap { position: fixed; inset: auto auto 38px 12px; margin: 0; display: flex; gap: 4px; padding: 4px; border: 0; width: 200px; height: 30px; pointer-events: auto; }
+.cap[data-ws-float$="right"] { left: auto; right: 12px; }
+.cap[data-ws-float^="top"] { bottom: auto; top: 12px; }
+.cap[data-ws-float^="middle"] { bottom: auto; top: 50%; translate: 0 -50%; }
+.cap[data-ws-float$="center"] { left: 50%; translate: -50% 0; }
+.cap.compact { width: 30px; }
+`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+try {
+  const layer = createHostOwnedLayer("recovery", CSS);
+  const control = document.createElement("div");
+  control.className = "cap";
+  control.setAttribute("popover", "manual");
+  control.innerHTML = '<button type="button">Use built-in skin</button>';
+  layer.container.append(control);
+  control.showPopover();
+  const host = layer.host;
+  let compact = false;
+  const binding = bindFloatingAvoidance({
+    element: control,
+    isSelf: (node) => node === host || host.contains(node),
+    margins: { top: 12, right: 12, bottom: 38, left: 12 },
+    apply: (position) => control.setAttribute("data-ws-float", position),
+    compactSize: () => ({ width: 30, height: 38 }),
+    onCompactChange: (next) => { compact = next; control.classList.toggle("compact", next); },
+  });
+  const covered = () => ["mic", "send", "top-left", "cancel", "enter"].filter((id) => {
+    const element = document.getElementById(id);
+    if (!element) return false;
+    const r = element.getBoundingClientRect();
+    if (!(r.width > 0)) return false;
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  });
+  const snap = (name) => ({ name, position: binding.position, compact, covered: covered(), capsuleHit: (() => {
+    const r = control.getBoundingClientRect();
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  })() });
+  const results = [];
+  binding.revalidate();
+  results.push(snap("dock-and-send"));
+
+  // A bottom sheet opens behind a backdrop: only its buttons count now.
+  document.body.insertAdjacentHTML("beforeend", '<div id="backdrop"></div><div id="sheet" role="dialog" aria-modal="true"><button type="button" id="cancel">Cancel</button><button type="button" id="enter">Enter channel</button></div>');
+  document.getElementById("cancel").click();
+  await sleep(400);
+  results.push({ ...snap("after-click-sheet"), before: results[0].position });
+
+  // Everything is covered: the capsule folds to its mark at the least harmful spot.
+  document.getElementById("sheet").remove();
+  document.getElementById("backdrop").remove();
+  document.body.insertAdjacentHTML("beforeend", '<div id="wall" style="position:fixed;inset:0;display:grid;grid-template-columns:repeat(20,1fr)">' + '<button type="button"></button>'.repeat(400) + "</div>");
+  binding.revalidate();
+  results.push(snap("wall"));
+
+  document.getElementById("wall").remove();
+  binding.revalidate();
+  results.push(snap("wall-removed"));
+
+  binding.dispose();
+  results.push({ ...snap("disposed") });
+  output.textContent = JSON.stringify({ results });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error && error.stack || error) });
+}
+</script>
+</body>
+</html>

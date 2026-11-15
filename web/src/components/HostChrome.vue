@@ -38,6 +38,7 @@
       @focusout="onRecoveryFocusOut"
       class="ws-host-recovery"
       :class="{ 'ws-host-recovery-compact': compact }"
+      :data-ws-float="slotMode === 'slotted' ? undefined : floatPosition"
       :tabindex="compact || compactPinned ? 0 : undefined"
       data-ws-host-recovery
       role="region"
@@ -83,6 +84,11 @@ import {
   type HostOwnedLayer,
 } from "../services/host-owned-layer.js";
 import { bindHostSlot, type HostSlotBinding } from "../services/host-slot-placement.js";
+import {
+  bindFloatingAvoidance,
+  type FloatingAvoidance,
+  type FloatingPosition,
+} from "../services/host-floating-placement.js";
 import { shouldShowRecovery } from "../services/host-chrome-visibility.js";
 import { thirdPartyAllowed } from "../services/instance-authorization.js";
 import {
@@ -117,6 +123,13 @@ const RECOVERY_LAYER_CSS = `
   pointer-events: auto;
 }
 .ws-host-recovery:popover-open { display: flex; }
+/* Runtime collision avoidance (host-floating-placement.ts): when the default
+   corner would cover a skin control, the floating capsule moves. A docked
+   (slotted) capsule carries no data-ws-float and uses inline placement. */
+.ws-host-recovery[data-ws-float$="right"] { left: auto; right: max(12px, env(safe-area-inset-right)); }
+.ws-host-recovery[data-ws-float^="top"] { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
+.ws-host-recovery[data-ws-float^="middle"] { bottom: auto; top: 50%; translate: 0 -50%; }
+.ws-host-recovery[data-ws-float$="center"] { left: 50%; translate: -50% 0; }
 .ws-host-recovery-mark {
   display: inline-flex;
   align-items: center;
@@ -231,11 +244,19 @@ const shortcutExpanded = ref(false);
 /** A tap/click on the compact mark keeps it expanded (no hover on touch). */
 const compactPinned = ref(false);
 
-const compact = computed(() => Boolean(slotConfig.value?.compact)
-  && slotMode.value === "slotted"
-  && !compactHold.value
-  && !shortcutExpanded.value
-  && !compactPinned.value);
+/**
+ * Floating (not docked) capsule: corner chosen at runtime so it does not cover
+ * skin controls, and folded to its mark when every corner collides.
+ */
+const floatPosition = ref<FloatingPosition>("bottom-left");
+const floatCompact = ref(false);
+let floatingAvoidance: FloatingAvoidance | undefined;
+
+const compact = computed(() => !shortcutExpanded.value
+  && !compactPinned.value
+  && (slotMode.value === "slotted"
+    ? Boolean(slotConfig.value?.compact) && !compactHold.value
+    : floatCompact.value));
 
 function onRecoveryEscape() {
   shortcutOpen.value = false;
@@ -279,6 +300,33 @@ function syncSlotBinding() {
   });
 }
 
+function bindFloating() {
+  floatingAvoidance?.dispose();
+  floatingAvoidance = undefined;
+  const control = recoveryPopover.value;
+  if (!control || !layer) return;
+  const host = layer.host;
+  floatingAvoidance = bindFloatingAvoidance({
+    element: control,
+    isSelf: node => node === host || host.contains(node),
+    margins: { top: 12, right: 12, bottom: 38, left: 12 },
+    defaultPosition: "bottom-left",
+    apply: next => { floatPosition.value = next; },
+    compactSize: () => {
+      const hit = Number.parseFloat(getComputedStyle(control).getPropertyValue("--ws-control-hit")) || 28;
+      return { width: hit + 10, height: hit + 10 };
+    },
+    onCompactChange: next => { floatCompact.value = next; },
+    // Never move the capsule under the user's pointer or focus, and leave a
+    // docked capsule to the slot binding.
+    paused: () => slotMode.value === "slotted"
+      || shortcutExpanded.value
+      || compactPinned.value
+      || control.matches(":hover")
+      || Boolean(layer.shadow.activeElement),
+  });
+}
+
 function syncPopover() {
   syncRecoveryPopover(recoveryPopover.value, recoveryVisible.value);
 }
@@ -318,6 +366,7 @@ watch([recoveryVisible, recoveryPopover], () => {
   void nextTick(() => {
     syncPopover();
     slotBinding?.revalidate();
+    floatingAvoidance?.revalidate();
   });
 }, { flush: "post" });
 watch([recoveryPopover, hostChromeActiveSkinId], () => {
@@ -340,12 +389,14 @@ onMounted(() => {
   void nextTick(() => {
     syncPopover();
     syncSlotBinding();
+    bindFloating();
   });
 });
 onBeforeUnmount(() => {
   if (reachabilityTimer) clearInterval(reachabilityTimer);
   if (compactHoldTimer) clearTimeout(compactHoldTimer);
   slotBinding?.dispose();
+  floatingAvoidance?.dispose();
   recoveryTheme?.dispose();
   window.removeEventListener("resize", refreshLauncherReachability);
   window.removeEventListener("keydown", onKeydown, true);

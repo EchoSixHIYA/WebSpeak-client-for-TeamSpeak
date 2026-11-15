@@ -303,6 +303,49 @@ test("a declared slot docks the capsule and falls back at runtime", { skip: !CHR
   assert.equal(byName.disposed.leftoverAccent, "");
 });
 
+test("floating host controls move off skin controls at runtime", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-floating-placement.html`, ["--virtual-time-budget=10000", "--window-size=1280,800"]);
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  const byName = Object.fromEntries(payload.results.map((result) => [result.name, result]));
+
+  // Default corner covers the microphone, bottom-right covers the (disabled)
+  // Send button and top-left a server strip: the capsule takes a free spot.
+  const first = byName["dock-and-send"];
+  assert.deepEqual(first.covered, [], JSON.stringify(payload));
+  assert.notEqual(first.position, "bottom-left");
+  assert.notEqual(first.position, "bottom-right");
+  assert.equal(first.capsuleHit, true, "the moved capsule is not clickable");
+  assert.equal(first.compact, false);
+
+  // A modal sheet opened by a click: its buttons are freed within one re-check.
+  // Controls under the modal backdrop are not reachable anyway and do not count.
+  assert.deepEqual(byName["after-click-sheet"].covered.filter((id) => id === "cancel" || id === "enter"), [], JSON.stringify(byName["after-click-sheet"]));
+  assert.equal(byName["after-click-sheet"].capsuleHit, true);
+  assert.notEqual(byName["after-click-sheet"].position, byName["after-click-sheet"].before, "the capsule did not move off the sheet");
+
+  // Nowhere is free: the capsule folds to its mark but stays clickable.
+  assert.equal(byName.wall.compact, true, JSON.stringify(byName.wall));
+  assert.equal(byName.wall.capsuleHit, true);
+
+  assert.equal(byName["wall-removed"].compact, false);
+  assert.equal(byName.disposed.compact, false);
+});
+
 test("host control tokens follow late skin CSS, resolve modern colours and refuse skin fonts", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
   const server = await createServer({
     root: webRoot,

@@ -1,6 +1,6 @@
 <template>
   <Teleport :to="toolbarTarget ?? 'body'">
-    <div v-if="thirdPartyAllowed && connected && sessionToken" ref="toolbar" class="ws-plugin-toolbar" :class="{ 'ws-plugin-toolbar-fallback': !toolbarTarget }" data-ws-part="voice.plugin-launcher" :data-presentation="presentation" :data-theme="theme" @keydown.esc="dismissDrawer">
+    <div v-if="thirdPartyAllowed && connected && sessionToken" ref="toolbar" class="ws-plugin-toolbar" :class="{ 'ws-plugin-toolbar-fallback': !toolbarTarget }" :data-ws-float="toolbarTarget ? undefined : fallbackPosition" data-ws-part="voice.plugin-launcher" :data-presentation="presentation" :data-theme="theme" @keydown.esc="dismissDrawer">
       <button v-if="!isHostPartHidden('host.plugins.launcher')" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="presentation === 'dialog' ? visible : drawerOpen" :aria-controls="drawerOpen ? drawerId : undefined" @click="toggle">
         <svg viewBox="0 0 24 24" data-ws-icon-slot="host.plugins.launcher" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
         <span v-if="presentation === 'drawer-side'">{{ tr('title') }}</span>
@@ -70,12 +70,17 @@ import type { SiteLanguage } from '../../../src/site-copy.js';
 import { thirdPartyAllowed } from '../services/instance-authorization.js';
 import { isHostPartHidden, isHostPartVisuallyReachable, pluginLibraryRequests } from '../services/host-chrome.js';
 import type { SkinPluginWidgetOptions } from '../../../src/shared/skin-plugin.js';
+import { bindFloatingAvoidance, type FloatingAvoidance, type FloatingPosition } from '../services/host-floating-placement.js';
 const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage; toolbarTarget: HTMLElement | null; presentation: NonNullable<SkinPluginWidgetOptions['pluginPresentation']> }>();
 const tr = (key: PluginTextKey) => pluginTranslations[props.language][key];
 const ui = computed(() => pluginWindowTranslations[props.language]);
 const windowElement = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), frame = ref<HTMLIFrameElement | null>(null);
 const available = shallowRef<AvailablePluginApp[]>([]), current = shallowRef<PluginAppLaunch | null>(null);
 const toolbar = ref<HTMLElement | null>(null);
+// The fallback toolbar floats in a viewport corner the skin knows nothing
+// about; move it off any skin control it would cover (runtime only).
+const fallbackPosition = ref<FloatingPosition>('bottom-right');
+let fallbackAvoidance: FloatingAvoidance | undefined;
 const drawerOpen = ref(false);
 const drawer = ref<HTMLElement | null>(null);
 const drawerSearch = ref<HTMLInputElement | null>(null);
@@ -227,6 +232,21 @@ watch(pluginLibraryRequests, () => {
   if (props.presentation !== 'dialog' && isHostPartVisuallyReachable('host.plugins.launcher')) openDrawer();
   else openLibraryDialog();
 });
+watch([toolbar, () => props.toolbarTarget], ([element, target]) => {
+  fallbackAvoidance?.dispose();
+  fallbackAvoidance = undefined;
+  fallbackPosition.value = 'bottom-right';
+  if (!element || target) return;
+  fallbackAvoidance = bindFloatingAvoidance({
+    element,
+    isSelf: node => element.contains(node),
+    margins: { top: 16, right: 16, bottom: 16, left: 16 },
+    defaultPosition: 'bottom-right',
+    apply: next => { fallbackPosition.value = next; },
+    paused: () => drawerOpen.value || element.matches(':hover') || element.contains(document.activeElement),
+  });
+}, { flush: 'post' });
+onBeforeUnmount(() => { fallbackAvoidance?.dispose(); fallbackAvoidance = undefined; });
 onMounted(() => {
   document.addEventListener('pointerdown', closeDrawerOutside, true);
   window.addEventListener('resize', fitDrawer);
