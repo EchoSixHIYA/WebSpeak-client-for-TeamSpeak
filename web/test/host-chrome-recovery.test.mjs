@@ -76,7 +76,8 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(hostChrome, /addEventListener\("keydown", onKeydown, true\)/);
   assert.match(hostChrome, /removeEventListener\("keydown", onKeydown, true\)/);
   // Escape closes the popover from inside its closed shadow root.
-  assert.match(hostChrome, /@keydown\.escape="shortcutOpen = false"/);
+  assert.match(hostChrome, /@keydown\.escape="onRecoveryEscape"/);
+  assert.match(hostChrome, /function onRecoveryEscape\(\) \{\s*shortcutOpen\.value = false;/);
   assert.doesNotMatch(hostChrome, /event\.defaultPrevented \|\| event\.repeat/);
   assert.doesNotMatch(hostChrome, /data-ws-part="host\.recovery"/);
   assert.doesNotMatch(hostChrome, /ws-host-recovery-layer/);
@@ -236,4 +237,60 @@ test("recovery stays visible and clickable under hostile compiled skins", { skip
     assert.equal(result.clicked, true, `${result.name}: clicking "use built-in skin" did not reach the handler`);
     assert.equal(result.layerOutsideSkinRoot, true, `${result.name}: recovery was rendered inside .ws-skin-root`);
   }
+});
+
+test("a declared slot docks the capsule and falls back at runtime", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-slot-placement.html`);
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  const byName = Object.fromEntries(payload.results.map((result) => [result.name, result]));
+
+  const initial = byName.initial;
+  assert.equal(initial.mode, "slotted", JSON.stringify(payload));
+  assert.equal(initial.insideAnchor, true, "the capsule is not placed over the anchor");
+  assert.equal(initial.hitIsLayerHost, true, "the docked capsule is not the hit-test target");
+  assert.equal(initial.background, "rgb(16, 32, 48)", "skin background token was not applied");
+  assert.equal(initial.color, "rgb(255, 255, 255)", "skin foreground token was not applied");
+  assert.ok(initial.buttonHeight >= 36, "the large size tier minimum was not enforced");
+
+  assert.equal(byName["anchor-hidden"].mode, "floating");
+  assert.equal(byName["anchor-hidden"].reason, "anchor-missing");
+  assert.equal(byName["anchor-hidden"].inlineLeft, "");
+  assert.equal(byName["anchor-hidden"].atDefaultCorner, true);
+
+  // Anti-flap: one good check after a fallback is not enough to re-dock.
+  assert.equal(byName["restored-once"].mode, "floating");
+  assert.equal(byName["restored-twice"].mode, "slotted");
+  assert.equal(byName["restored-twice"].insideAnchor, true);
+
+  assert.equal(byName["covers-mic"].mode, "floating");
+  assert.equal(byName["covers-mic"].reason, "covers-protected");
+  assert.equal(byName["covers-mic"].atDefaultCorner, true);
+
+  assert.equal(byName["anchor-offscreen"].mode, "floating");
+  // An invisible/off-screen element is never resolved as the anchor at all.
+  assert.equal(byName["anchor-offscreen"].reason, "anchor-missing");
+  assert.equal(byName["anchor-offscreen"].atDefaultCorner, true);
+
+  // Foreground equal to background: the whole colour group reverts.
+  assert.equal(byName["unreadable-tokens"].background, "rgb(255, 255, 255)");
+  assert.equal(byName["unreadable-tokens"].color, "rgb(49, 82, 79)");
+
+  assert.equal(byName.disposed.inlineLeft, "");
+  assert.equal(byName.disposed.atDefaultCorner, true);
+  assert.equal(byName.disposed.leftoverAccent, "");
 });

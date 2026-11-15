@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   INITIAL_SLOT_MODE_STATE,
+  RECOVERY_BUILT_IN_BUTTON_BACKGROUND,
   RECOVERY_MIN_ACCENT_CONTRAST,
   RECOVERY_MIN_FONT_SIZE,
   RECOVERY_MIN_FOREGROUND_CONTRAST,
@@ -12,6 +13,7 @@ import {
   evaluateSlottedControl,
   nextSlotModeState,
   parseCssColor,
+  rectsOverlap,
   relativeLuminance,
   resolveRecoveryTokens,
   type SlotAnchorSnapshot,
@@ -157,6 +159,7 @@ test("skin tokens default to the host palette", () => {
   const tokens = resolveRecoveryTokens();
   assert.deepEqual(tokens, {
     accent: "rgb(180, 83, 9)",
+    builtInBorder: "rgb(180, 83, 9)",
     background: "rgb(255, 255, 255)",
     foreground: "rgb(49, 82, 79)",
     radius: 999,
@@ -240,4 +243,30 @@ test("the mode gate does not flap between the anchor and the fallback", () => {
   state = nextSlotModeState(state, true);
   assert.equal(state.slotted, true);
   assert.equal(state.hasSlotted, true);
+});
+
+test("a slotted capsule that would cover a protected control falls back", () => {
+  assert.deepEqual(
+    evaluateSlottedControl({ ...baseEvaluation, coversProtected: true }),
+    { ok: false, reason: "covers-protected" },
+  );
+  assert.deepEqual(evaluateSlottedControl({ ...baseEvaluation, coversProtected: false }), { ok: true });
+});
+
+test("rect overlap ignores edge contact and sub-pixel slivers", () => {
+  assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(50, 10, 100, 40)), true);
+  assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(100, 0, 50, 40)), false);
+  assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(99.5, 0, 50, 40)), false);
+  assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(0, 60, 100, 40)), false);
+});
+
+test("the built-in button border only uses an accent visible on its fixed light background", () => {
+  // Passes against the dark skin background, but vanishes on #fff7ed.
+  const pale = resolveRecoveryTokens({ background: "#141414", foreground: "#ffffff", accent: "#fff7ec" });
+  assert.equal(pale.accent, "rgb(255, 247, 236)");
+  assert.equal(pale.builtInBorder, "rgb(180, 83, 9)");
+  assert.ok(contrastRatio(parseCssColor(pale.builtInBorder)!, RECOVERY_BUILT_IN_BUTTON_BACKGROUND) >= RECOVERY_MIN_ACCENT_CONTRAST);
+
+  const strong = resolveRecoveryTokens({ background: "#ffffff", foreground: "#111111", accent: "#1d4ed8" });
+  assert.equal(strong.builtInBorder, "rgb(29, 78, 216)");
 });

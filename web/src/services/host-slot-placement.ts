@@ -16,6 +16,7 @@
 import type { SkinChromeSlotAlign } from "../../../src/shared/skin-chrome.js";
 import type { HostOwnedLayer } from "./host-owned-layer.js";
 import { isHostPartReachable, type HostPartRect } from "./host-chrome-visibility.js";
+import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
 
 export interface SlotViewport {
   width: number;
@@ -70,6 +71,7 @@ export type SlotFailureReason =
   | "control-hidden"
   | "control-too-small"
   | "control-offscreen"
+  | "covers-protected"
   | "hit-test";
 
 export interface SlotAnchorSnapshot {
@@ -89,6 +91,13 @@ export interface SlotEvaluationInput {
   minHitTarget: number;
   /** `document.elementFromPoint` at the control centre is the host layer. */
   hitTestOk: boolean;
+  /**
+   * The capsule's footprint (at its largest observed size, so a compact
+   * capsule that expands on hover is included) overlaps a visible protected
+   * control such as the microphone, output or "clear local data" link. The
+   * capsule is top layer, so it would block those controls for the pointer.
+   */
+  coversProtected?: boolean;
 }
 
 export type SlotEvaluation = { ok: true } | { ok: false; reason: SlotFailureReason };
@@ -143,6 +152,7 @@ export function evaluateSlottedControl(input: SlotEvaluationInput): SlotEvaluati
     return { ok: false, reason: "control-too-small" };
   }
   if (!fullyInsideViewport(controlRect, viewport)) return { ok: false, reason: "control-offscreen" };
+  if (input.coversProtected) return { ok: false, reason: "covers-protected" };
   if (!hitTestOk) return { ok: false, reason: "hit-test" };
   return { ok: true };
 }
@@ -217,6 +227,12 @@ export interface RecoveryRawTokens {
 
 export interface RecoveryTokens {
   accent: string;
+  /**
+   * Border of the built-in-skin button, which keeps its own fixed light
+   * background (`#fff7ed`). The skin accent is used only when it stays visible
+   * against that background; otherwise the host default accent is used there.
+   */
+  builtInBorder: string;
   background: string;
   foreground: string;
   radius: number;
@@ -245,6 +261,7 @@ export const RECOVERY_SKIN_TOKEN_PROPERTIES = {
 /** Host-owned variables set inside the closed shadow root. */
 export const RECOVERY_APPLIED_VARIABLES = {
   accent: "--ws-recovery-accent",
+  builtInBorder: "--ws-recovery-builtin-border",
   background: "--ws-recovery-background",
   foreground: "--ws-recovery-foreground",
   radius: "--ws-recovery-radius",
@@ -254,6 +271,8 @@ export const RECOVERY_APPLIED_VARIABLES = {
 } as const;
 
 const DEFAULT_ACCENT: RgbColor = { r: 180, g: 83, b: 9 };
+/** Fixed background of the built-in-skin button (`#fff7ed`). */
+export const RECOVERY_BUILT_IN_BUTTON_BACKGROUND: RgbColor = { r: 255, g: 247, b: 237 };
 const DEFAULT_BACKGROUND: RgbColor = { r: 255, g: 255, b: 255 };
 const DEFAULT_FOREGROUND: RgbColor = { r: 49, g: 82, b: 79 };
 const DEFAULT_RADIUS = 999;
@@ -361,8 +380,12 @@ export function resolveRecoveryTokens(raw: RecoveryRawTokens = {}): RecoveryToke
   const sizeValue = raw.size?.trim();
   const size = isRecoverySizeTier(sizeValue) ? sizeValue : "small";
   const metrics = RECOVERY_SIZE_METRICS[size];
+  const builtInBorder = contrastRatio(palette.accent, RECOVERY_BUILT_IN_BUTTON_BACKGROUND) >= RECOVERY_MIN_ACCENT_CONTRAST
+    ? palette.accent
+    : DEFAULT_ACCENT;
   return {
     accent: formatRgb(palette.accent),
+    builtInBorder: formatRgb(builtInBorder),
     background: formatRgb(palette.background),
     foreground: formatRgb(palette.foreground),
     radius: sanitizeRadius(raw.radius),
@@ -381,6 +404,7 @@ export function applyRecoveryTokens(control: HTMLElement, tokens: RecoveryTokens
     return;
   }
   style.setProperty(RECOVERY_APPLIED_VARIABLES.accent, tokens.accent);
+  style.setProperty(RECOVERY_APPLIED_VARIABLES.builtInBorder, tokens.builtInBorder);
   style.setProperty(RECOVERY_APPLIED_VARIABLES.background, tokens.background);
   style.setProperty(RECOVERY_APPLIED_VARIABLES.foreground, tokens.foreground);
   style.setProperty(RECOVERY_APPLIED_VARIABLES.radius, `${tokens.radius}px`);
@@ -402,6 +426,46 @@ function rectOf(rect: DOMRect | HostPartRect): HostPartRect {
     right: rect.right,
     bottom: rect.bottom,
   };
+}
+
+/** Overlap of two rects in CSS pixels on both axes (more than 1px each). */
+export function rectsOverlap(first: HostPartRect, second: HostPartRect): boolean {
+  const width = Math.min(first.right, second.right) - Math.max(first.left, second.left);
+  const height = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top);
+  return width > 1 && height > 1;
+}
+
+const INTERACTIVE_SELECTOR = "a[href],button,input,select,textarea,[role='button'],[tabindex],[contenteditable='true']";
+
+/**
+ * Protected controls (`PROTECTED_PART_IDS`) that the capsule must not sit on.
+ * Ancestors of the anchor (for example `app` or `voice.audio-dock` around a
+ * dedicated anchor node) are containers, not click targets, and are skipped;
+ * the anchor itself only counts when it is or contains an interactive control.
+ */
+export function protectedPartsCovered(
+  footprint: HostPartRect,
+  anchorElement: Element,
+  doc: Document = anchorElement.ownerDocument,
+): boolean {
+  const view = doc.defaultView;
+  for (const element of doc.querySelectorAll<HTMLElement>("[data-ws-part]")) {
+    const part = element.getAttribute("data-ws-part") ?? "";
+    if (!PROTECTED_PART_IDS.has(part)) continue;
+    if (element === anchorElement) {
+      if (!element.matches(INTERACTIVE_SELECTOR) && !element.querySelector(INTERACTIVE_SELECTOR)) continue;
+    } else if (element.contains(anchorElement)) {
+      continue;
+    }
+    const rect = element.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) continue;
+    if (view) {
+      const style = view.getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") continue;
+    }
+    if (rectsOverlap(footprint, rectOf(rect))) return true;
+  }
+  return false;
 }
 
 function isVisibleAnchor(element: HTMLElement): boolean {
@@ -500,6 +564,8 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   let frame: number | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
+  /** Largest capsule size seen; covers a compact capsule's expanded footprint. */
+  let maxSize = { width: 0, height: 0 };
 
   const requestFrame = (callback: FrameRequestCallback): number => win.requestAnimationFrame(callback);
   const cancelFrame = (handle: number): void => win.cancelAnimationFrame(handle);
@@ -518,10 +584,17 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     if (!raw) return undefined;
     const element = ensureProbe();
     if (!element) return undefined;
-    element.style.color = "rgb(1, 2, 3)";
-    element.style.color = raw;
-    const computed = win.getComputedStyle(element).color;
-    return computed === "rgb(1, 2, 3)" ? undefined : computed;
+    // An invalid value leaves the previous colour in place. Probe against two
+    // different sentinels so a real token equal to one of them still resolves.
+    const resolveWith = (sentinel: string): string => {
+      element.style.color = sentinel;
+      element.style.color = raw;
+      return win.getComputedStyle(element).color;
+    };
+    const first = resolveWith("rgb(1, 2, 3)");
+    if (first !== "rgb(1, 2, 3)") return first;
+    const second = resolveWith("rgb(4, 5, 6)");
+    return second === "rgb(4, 5, 6)" ? undefined : second;
   }
 
   function readTokens(source: Element | null): RecoveryTokens {
@@ -586,6 +659,10 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     applyRecoveryTokens(control, tokenSource ? tokens : null);
 
     const controlBox = control.getBoundingClientRect();
+    maxSize = {
+      width: Math.max(maxSize.width, controlBox.width),
+      height: Math.max(maxSize.height, controlBox.height),
+    };
     const viewport: SlotViewport = { width: win.innerWidth, height: win.innerHeight };
     let anchorSnapshot: SlotAnchorSnapshot | null = null;
     if (anchorElement) {
@@ -617,12 +694,25 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     // Move first, then hit-test: the capsule has to actually occupy the
     // intended point before `elementFromPoint` can see it. The move and a
     // failed revert happen in one task, so nothing paints in between.
+    let coversProtected = false;
+    if (anchorElement && anchorSnapshot && placement) {
+      const footprintPlacement = computeSlotPlacement(anchorSnapshot.rect, maxSize, viewport, align);
+      coversProtected = protectedPartsCovered({
+        width: maxSize.width,
+        height: maxSize.height,
+        left: footprintPlacement.left,
+        top: footprintPlacement.top,
+        right: footprintPlacement.left + maxSize.width,
+        bottom: footprintPlacement.top + maxSize.height,
+      }, anchorElement, doc);
+    }
     if (placement) applyPlacement(placement.left, placement.top);
     const evaluation = evaluateSlottedControl({
       anchor: anchorSnapshot,
       controlRect: intendedRect,
       viewport,
-      minHitTarget: tokens?.hitTarget ?? RECOVERY_SIZE_METRICS.small.hitTarget,
+      minHitTarget: tokens.hitTarget,
+      coversProtected,
       hitTestOk: placement
         ? hitTestAt(placement.left, placement.top, { width: controlBox.width, height: controlBox.height })
         : false,
@@ -642,11 +732,23 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     }
   }
 
+  /** Any unexpected error returns the capsule to the default corner. */
+  function failSafe(): void {
+    const wasSlotted = state.slotted;
+    state = nextSlotModeState(state, false);
+    clearPlacement();
+    if (wasSlotted) onModeChange?.({ mode: "floating" });
+  }
+
   function schedule(): void {
     if (disposed || frame !== undefined) return;
     frame = requestFrame(() => {
       frame = undefined;
-      evaluate();
+      try {
+        evaluate();
+      } catch {
+        failSafe();
+      }
     });
   }
 
@@ -654,8 +756,14 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     if (disposed) return;
     timer = setTimeout(() => {
       if (disposed) return;
-      evaluate();
-      scheduleTick();
+      // The periodic check is the safety net; one failing pass must not stop it.
+      try {
+        evaluate();
+      } catch {
+        failSafe();
+      } finally {
+        scheduleTick();
+      }
     }, state.slotted ? HOST_SLOT_SLOTTED_INTERVAL_MS : HOST_SLOT_IDLE_INTERVAL_MS);
   }
 

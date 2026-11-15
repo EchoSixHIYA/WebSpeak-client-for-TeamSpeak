@@ -10,6 +10,6 @@
     "voice.performance": "assets/icons/status.png"
   },
   "slots": {
-    "host.recovery": { "anchor": "voice.audio-dock", "align": "end", "compact": true }
+    "host.recovery": { "anchor": "voice.audio-dock", "align": "start", "compact": true }
   }
 }

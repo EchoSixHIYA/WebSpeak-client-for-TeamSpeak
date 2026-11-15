@@ -33,10 +33,12 @@
     <div
       ref="recoveryPopover"
       popover="manual"
-      @keydown.escape="shortcutOpen = false"
+      @keydown.escape="onRecoveryEscape"
+      @click="compactPinned = compact || compactPinned"
+      @focusout="onRecoveryFocusOut"
       class="ws-host-recovery"
       :class="{ 'ws-host-recovery-compact': compact }"
-      :tabindex="compact ? 0 : undefined"
+      :tabindex="compact || compactPinned ? 0 : undefined"
       data-ws-host-recovery
       role="region"
       :aria-label="copy.recovery"
@@ -131,7 +133,7 @@ const RECOVERY_LAYER_CSS = `
   white-space: nowrap;
 }
 .ws-host-recovery button[data-ws-recovery-action="built-in"] {
-  border-color: var(--ws-recovery-accent, #b45309);
+  border-color: var(--ws-recovery-builtin-border, #b45309);
   background: #fff7ed;
   color: #7c2d12;
 }
@@ -182,29 +184,65 @@ const slotMode = ref<"floating" | "slotted">("floating");
 const compactHold = ref(true);
 let compactHoldTimer: ReturnType<typeof setTimeout> | undefined;
 
+// Keep the full capsule visible for a moment after it first docks into a
+// newly activated skin, so the entry stays discoverable before it folds into
+// the skin's layout. The skin id is known from localStorage before the skin
+// (and its anchor) has loaded, so the 5 s window starts on the first
+// floating -> slotted transition for that skin, not on the id change.
+let compactHoldStarted = false;
 watch(hostChromeActiveSkinId, () => {
-  // Keep the full capsule visible for a moment after a skin is activated, so
-  // the entry stays discoverable before it folds into the skin's layout.
   compactHold.value = true;
+  compactHoldStarted = false;
   if (compactHoldTimer) clearTimeout(compactHoldTimer);
-  compactHoldTimer = setTimeout(() => { compactHold.value = false; }, 5000);
+  compactHoldTimer = undefined;
 }, { immediate: true });
+watch(slotMode, (mode) => {
+  if (mode !== "slotted" || compactHoldStarted) return;
+  compactHoldStarted = true;
+  compactHoldTimer = setTimeout(() => { compactHold.value = false; }, 5000);
+});
+
+/** Set by the shortcut; cleared once focus leaves the capsule. */
+const shortcutExpanded = ref(false);
+/** A tap/click on the compact mark keeps it expanded (no hover on touch). */
+const compactPinned = ref(false);
 
 const compact = computed(() => Boolean(slotConfig.value?.compact)
   && slotMode.value === "slotted"
   && !compactHold.value
-  && !shortcutOpen.value);
+  && !shortcutExpanded.value
+  && !compactPinned.value);
+
+function onRecoveryEscape() {
+  shortcutOpen.value = false;
+  shortcutExpanded.value = false;
+  compactPinned.value = false;
+}
+
+/** Unpin when the pointer goes down anywhere outside the host layer. */
+function onDocumentPointerDown(event: PointerEvent) {
+  if (!compactPinned.value || !layer) return;
+  // Events from inside the closed shadow root are retargeted to its host.
+  if (event.composedPath().includes(layer.host)) return;
+  compactPinned.value = false;
+}
+
+function onRecoveryFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget;
+  if (next instanceof Node && recoveryPopover.value?.contains(next)) return;
+  shortcutExpanded.value = false;
+  compactPinned.value = false;
+}
 
 let slotBinding: HostSlotBinding | undefined;
 function syncSlotBinding() {
   slotBinding?.dispose();
   slotBinding = undefined;
+  // A fresh binding starts floating and reports its first successful dock.
+  slotMode.value = "floating";
   const control = recoveryPopover.value;
   const config = slotConfig.value;
-  if (!control || !config || !layer) {
-    slotMode.value = "floating";
-    return;
-  }
+  if (!control || !config || !layer) return;
   slotBinding = bindHostSlot({
     layer,
     control,
@@ -236,6 +274,7 @@ function onKeydown(event: KeyboardEvent) {
   if (isRecoveryShortcut(event)) {
     event.preventDefault();
     shortcutOpen.value = true;
+    shortcutExpanded.value = true;
     void nextTick(() => {
       syncPopover();
       slotBinding?.revalidate();
@@ -268,6 +307,7 @@ onMounted(() => {
   reachabilityTimer = setInterval(refreshLauncherReachability, 1000);
   window.addEventListener("resize", refreshLauncherReachability);
   window.addEventListener("keydown", onKeydown, true);
+  window.addEventListener("pointerdown", onDocumentPointerDown, true);
   void nextTick(() => {
     syncPopover();
     syncSlotBinding();
@@ -279,6 +319,7 @@ onBeforeUnmount(() => {
   slotBinding?.dispose();
   window.removeEventListener("resize", refreshLauncherReachability);
   window.removeEventListener("keydown", onKeydown, true);
+  window.removeEventListener("pointerdown", onDocumentPointerDown, true);
   layer?.dispose();
 });
 </script>

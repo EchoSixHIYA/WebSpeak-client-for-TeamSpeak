@@ -92,20 +92,23 @@ test("slot declarations are honoured for third-party skins only", () => {
   }));
   setSkinHostChromeParts(document);
   setHostChromeActiveSkin("community.demo");
-  assert.deepEqual(activeHostSlot("host.recovery"), {
-    anchor: "voice.audio-dock",
-    align: "end",
-    compact: false,
-  });
-  // A part that is not slottable cannot be selected through chrome.json.
-  assert.equal(activeHostSlot("host.permission"), undefined);
+  try {
+    assert.deepEqual(activeHostSlot("host.recovery"), {
+      anchor: "voice.audio-dock",
+      align: "end",
+      compact: false,
+    });
+    // A part that is not slottable cannot be selected through chrome.json.
+    assert.equal(activeHostSlot("host.permission"), undefined);
 
-  // Bundled/official skins keep the default floating placement.
-  for (const id of [undefined, "builtin.light", "builtin.dark", "community.illusia-voice", "community.kaak-voice"]) {
-    setHostChromeActiveSkin(id);
-    assert.equal(activeHostSlot("host.recovery"), undefined, String(id));
+    // Bundled/official skins keep the default floating placement.
+    for (const id of [undefined, "builtin.light", "builtin.dark", "community.illusia-voice", "community.kaak-voice"]) {
+      setHostChromeActiveSkin(id);
+      assert.equal(activeHostSlot("host.recovery"), undefined, String(id));
+    }
+  } finally {
+    // Module-global state: never leak it into sibling tests.
+    setSkinHostChromeParts(undefined);
+    setHostChromeActiveSkin(undefined);
   }
-
-  setSkinHostChromeParts(undefined);
-  setHostChromeActiveSkin(undefined);
 });

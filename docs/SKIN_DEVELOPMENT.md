@@ -473,7 +473,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 ```json
 "slots": {
-  "host.recovery": { "anchor": "voice.audio-dock", "align": "end", "compact": true }
+  "host.recovery": { "anchor": "voice.audio-dock", "align": "start", "compact": true }
 }
 ```
 
@@ -490,13 +490,13 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 - v3 组件中带 `part` 的节点：`skin.<page>.<componentId>.part-<part>`；按钮、链接、输入、`role="button"` 或绑定了用户事件的可交互节点会渲染为 `skin.<page>.<componentId>.control-part-<part>`。推荐在 surface 里放一个专门的非交互空节点并设置稳定的 `part`（例如 `skin.voice.harbor-dock.part-anchor`），避免名称随交互语义变化。
 - v4 运行时插件生成的节点：`skin.<page>.runtime_plugin_<pluginId>__<componentId>.part-<part>`（同样有 `control-` 变体）。插件 UI 与 `data-ws-skin-mount` 挂载点都位于 `.ws-skin-root` 内，因此也能作为锚点。
 
-**这不是编译期限制。** `skin.css` 校验器不会因为是否声明 `slots` 而改变，也不会生成额外的隐藏或定位规则；停靠完全由宿主运行时完成。锚点一旦不可用，胶囊立即回到默认左下角（仍在闭合 Shadow DOM 和顶层，皮肤无法遮挡或隐藏）。为避免闪烁，回退后需要连续 2 次检查都通过才会重新停靠；停靠期间约每 400 ms 复查一次，浮动态保持原来的 1 s 节奏。窗口缩放、滚动和锚点/胶囊尺寸变化都会触发复查。
+**这不是编译期限制。** `skin.css` 校验器不会因为是否声明 `slots` 而改变，也不会生成额外的隐藏或定位规则；停靠完全由宿主运行时完成。胶囊位于顶层，会挡住它下面的一切，因此宿主还会检查胶囊的占位（按观察到的最大尺寸计算，紧凑模式展开后的宽度也算在内）是否压到了可见的受保护控件（`PROTECTED_PART_IDS`，例如 `voice.audio-dock.microphone`、`voice.audio-dock.output`、`home.footer.clear`、`voice.connection-status.reconnect`）；锚点的祖先容器（如包住专用锚点的 `voice.audio-dock`）不算，锚点自身只有在它是或包含可交互控件时才算。压到时同样回退。示例 `host-chrome-demo` 因此把胶囊靠 `start` 对齐在音频栏左侧的说明文字上，避开右侧的麦克风/输出按钮。锚点一旦不可用，胶囊立即回到默认左下角（仍在闭合 Shadow DOM 和顶层，皮肤无法遮挡或隐藏）。为避免闪烁，回退后需要连续 2 次检查都通过才会重新停靠；停靠期间约每 400 ms 复查一次，浮动态保持原来的 1 s 节奏。窗口缩放、滚动和锚点/胶囊尺寸变化都会触发复查。
 
-**样式令牌**：皮肤可在锚点或它的祖先上设置下列普通 `--skin-*` 变量；宿主从锚点的计算样式读取、校验，再写入闭合 Shadow DOM 内部的宿主变量。锚点仍在 DOM 中时，停靠态和浮动态都会继续使用这些令牌；锚点被移除或隐藏时，宿主读取皮肤根上可继承的值，否则使用默认值。只有颜色对比度不达标时整组颜色才回退到宿主默认值。
+**样式令牌**：皮肤可在锚点或它的祖先上设置下列普通 `--skin-*` 变量；宿主从锚点的计算样式读取、校验，再写入闭合 Shadow DOM 内部的宿主变量。令牌只对声明了 `slots` 的皮肤生效（没有插槽的皮肤里写了也不会读取，胶囊保持默认外观）。锚点仍在 DOM 中时，停靠态和浮动态都会继续使用这些令牌；锚点被移除或隐藏时，宿主读取皮肤根上可继承的值，否则使用默认值。只有颜色对比度不达标时整组颜色才回退到宿主默认值。声明了插槽但没写颜色令牌时，胶囊使用不透明的宿主默认色（白底），而不是无插槽时的半透明底。
 
 | 令牌 | 规则 |
 | --- | --- |
-| `--skin-recovery-accent` | 强调色，用于「使用内置皮肤」按钮的边框/重点。与背景的对比度必须 ≥ 3，否则整组颜色回退。 |
+| `--skin-recovery-accent` | 强调色，用于紧凑模式焦点框和「使用内置皮肤」按钮的边框。与背景的对比度必须 ≥ 3，否则整组颜色回退。该按钮自身固定为浅色底 `#fff7ed`，如果强调色在这块浅底上对比度不足 3，只有这个按钮的边框改用宿主默认 `#b45309`，其余位置仍用皮肤强调色。 |
 | `--skin-recovery-background` | 胶囊背景。宿主强制不透明（alpha 视为 1）。 |
 | `--skin-recovery-foreground` | 文字色。与背景的对比度必须 ≥ 4.5。 |
 | `--skin-recovery-radius` | 圆角，只接受 px 长度并限制在 0–999；其他值使用宿主默认 999px。 |
@@ -505,9 +505,9 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 颜色建议使用 `#rgb`、`#rrggbb`、`rgb()` 或 `rgba()`；宿主通过影子根内的探针元素让浏览器解析颜色，再按 WCAG 相对亮度检查对比度。无效、缺失或无法解析的值使用宿主默认颜色（强调色 `#b45309`、背景 `#ffffff`、文字 `#31524f`）。
 
-**紧凑模式**：`compact: true` 且成功停靠时，胶囊只显示 ◈ 标记；标记本身达到当前尺寸档位的最小命中区域，区域保留可访问名称，鼠标悬停或键盘聚焦时展开为完整按钮。新皮肤激活后的约 5 秒内始终显示完整胶囊，避免用户找不到恢复入口；用快捷键召唤时也始终完整显示。展开/收起不使用动画，`prefers-reduced-motion` 下同样没有过渡。
+**紧凑模式**：`compact: true` 且成功停靠时，胶囊只显示 ◈ 标记；标记本身达到当前尺寸档位的最小命中区域，区域保留可访问名称，鼠标悬停、键盘聚焦或点按/轻触 ◈ 时展开为完整按钮；点按展开会保持到焦点离开胶囊、在胶囊外按下指针或按 Escape。新皮肤激活后、胶囊首次成功停靠起的约 5 秒内始终显示完整胶囊（从停靠时刻开始计时，皮肤加载慢也不会提前收起），避免用户找不到恢复入口；用快捷键召唤时也始终完整显示。展开/收起不使用动画，`prefers-reduced-motion` 下同样没有过渡。
 
-**键盘快捷键**：`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）在停靠、浮动态和紧凑模式下行为一致：显示完整胶囊并聚焦第一个按钮；它仍在捕获阶段处理，皮肤或插件的 `preventDefault()` 无法吞掉。
+**键盘快捷键**：`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）在停靠、浮动态和紧凑模式下行为一致：显示完整胶囊并聚焦第一个按钮，焦点离开胶囊后紧凑模式重新生效；它仍在捕获阶段处理，皮肤或插件的 `preventDefault()` 无法吞掉。
 
 `host.watermark`、`host.hint` 与 `host.voice-status-decoration` 属于默认隐藏的装饰：官方/内置皮肤（Day、Night、ILLUSIA、KAAK）不会渲染它们，外观与生产版一致。主题化宿主外壳的皮肤需在 `chrome.json` 中用 `visibleParts` 明确开启；`chrome.json` 的 `hiddenParts` 仍然优先。
 
@@ -551,7 +551,7 @@ v3/v4 清单可增加可选字段 `"chrome": "chrome.json"`，文件位于包根
     "host.plugins.launcher": "assets/icons/apps.png"
   },
   "slots": {
-    "host.recovery": { "anchor": "voice.audio-dock", "align": "end", "compact": true }
+    "host.recovery": { "anchor": "voice.audio-dock", "align": "start", "compact": true }
   }
 }
 ```
