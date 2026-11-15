@@ -386,9 +386,23 @@ test("protected controls accept every purely visual property", () => {
     '[data-ws-part="voice.audio-dock.microphone"] { clip-path: inset(100%); }',
     '[data-ws-part="voice.audio-dock.microphone"] { transform: translateY(-9999px); }',
     ':root { --skin-pull: -9999px; } [data-ws-part="voice.audio-dock.microphone"] { margin-left: var(--skin-pull); }',
+    // Literal filter/clip/content-visibility hiding is rejected, so a variable
+    // must not smuggle the same value past the check.
+    ':root { --skin-x: opacity(0); } [data-ws-part="voice.audio-dock.microphone"] { filter: var(--skin-x); }',
+    ':root { --skin-x: opacity(0); } [data-ws-part="voice.audio-dock.microphone"] { -webkit-filter: var(--skin-x); }',
+    ':root { --skin-x: rect(0, 0, 0, 0); } [data-ws-part="voice.audio-dock.microphone"] { clip: var(--skin-x); }',
+    ':root { --skin-x: hidden; } [data-ws-part="voice.audio-dock.microphone"] { content-visibility: var(--skin-x); }',
   ]) {
     assert.throws(() => compile(css), /must remain available|must remain on screen|cannot use indirect values/, css);
   }
+});
+
+test("indirect filter values stay free outside protected controls", () => {
+  for (const version of [2, 3] as const) {
+    assert.doesNotThrow(() => compileSkinCss(':root { --skin-glow: drop-shadow(0 0 4px #0ff); } [data-ws-part="voice.header"] { filter: var(--skin-glow); }', "demo-skin", new Set(), version));
+  }
+  // Literal visual filters remain allowed on protected controls.
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock.microphone"] { filter: drop-shadow(0 0 4px #0ff) saturate(1.2); }'));
 });
 
 test("host chrome cannot be restyled into a viewport-sized overlay", () => {

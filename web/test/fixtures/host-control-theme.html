@@ -61,6 +61,22 @@ const addSkinStyle = (css) => {
   await frames();
   results.push(snap("system-font"));
 
+  // A compiled skin face behind a non-matching @media is absent from
+  // document.fonts; its scoped `ws-` name must still be refused.
+  addSkinStyle(`@media (max-width: 1px) { @font-face { font-family: "ws-community-theme-fixture-blank"; src: url(data:font/woff2;base64,AAAA); } }
+    .ws-skin-root { --skin-host-font: "ws-community-theme-fixture-blank", sans-serif; }`);
+  await frames();
+  results.push(snap("media-gated-skin-font"));
+
+  // Tokens declared inside @media follow the viewport without a DOM change.
+  const viewportStyle = addSkinStyle(`@media (min-width: 1px) { .ws-skin-root { --skin-host-background: #102030; } }`);
+  await frames();
+  const beforeResize = control.style.getPropertyValue("--ws-control-background");
+  viewportStyle.sheet.cssRules[0].media.mediaText = "(max-width: 1px)";
+  window.dispatchEvent(new Event("resize"));
+  await frames();
+  results.push({ ...snap("media-token-resize"), beforeResize });
+
   theme.dispose();
   addSkinStyle(`.ws-skin-root { --skin-host-background: #ffffff; --skin-host-foreground: #111111; }`);
   await frames();

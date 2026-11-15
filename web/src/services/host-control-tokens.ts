@@ -147,6 +147,14 @@ const ON_ACCENT_DARK: RgbColor = { r: 17, g: 24, b: 39 };
 const MAX_RADIUS = 999;
 const MAX_FONT_LENGTH = 120;
 const FONT_FAMILY_PATTERN = /^[A-Za-z0-9 ,'"-]{1,120}$/;
+/**
+ * The skin compiler renames every skin/plugin `@font-face` family to
+ * `ws-<skin id>[-<plugin id>]-<name>` (see `compileSkinCss` in
+ * src/shared/skin-css.ts), so that prefix identifies a skin font even when the
+ * face is not in `document.fonts` yet (for example behind a non-matching
+ * `@media` that activates after the token was accepted).
+ */
+const SCOPED_SKIN_FONT_PREFIX = "ws-";
 
 /** Defaults for the recovery capsule: white surface, teal text, amber accent. */
 export const RECOVERY_CONTROL_DEFAULTS: HostControlDefaults = {
@@ -281,7 +289,7 @@ function sanitizeFont(value: string | undefined, fallback: string, isWebFont: We
   }
   // A skin-supplied @font-face can ship glyph-less outlines and blank the
   // control's label, so host-owned controls only accept installed/generic fonts.
-  if (fontFamilyNames(font).some(isWebFont)) return fallback;
+  if (fontFamilyNames(font).some((name) => name.startsWith(SCOPED_SKIN_FONT_PREFIX) || isWebFont(name))) return fallback;
   return font;
 }
 
@@ -334,7 +342,10 @@ function resolvePalette(
 
 function paletteReadable(palette: { accent: RgbColor; background: RgbColor; foreground: RgbColor }): boolean {
   return contrastRatio(palette.foreground, palette.background) >= HOST_CONTROL_MIN_FOREGROUND_CONTRAST
-    && contrastRatio(palette.accent, palette.background) >= HOST_CONTROL_MIN_ACCENT_CONTRAST;
+    && contrastRatio(palette.accent, palette.background) >= HOST_CONTROL_MIN_ACCENT_CONTRAST
+    // Primary actions put host-chosen text on the accent; mid-tone accents
+    // where neither black nor white reaches the text floor are rejected.
+    && contrastRatio(readableOnAccent(palette.accent), palette.accent) >= HOST_CONTROL_MIN_FOREGROUND_CONTRAST;
 }
 
 function resolveBorder(
@@ -373,7 +384,8 @@ export function hasHostControlTokens(
  * unreadable, the resolver retries the global layer and finally the built-in
  * palette, so a skin can never make a protected control unreadable. The
  * border is optional and must stay visible against the resolved background.
- * Fonts registered by the document (skin `@font-face`) are ignored.
+ * Fonts registered by the document (skin `@font-face`) and names carrying the
+ * compiler's scoped skin-font prefix (`ws-`) are ignored.
  */
 export function resolveHostControlTokens(
   style: Pick<CSSStyleDeclaration, "getPropertyValue"> | null,
@@ -463,7 +475,8 @@ export interface HostControlThemeBinding {
  * side. Callers re-apply it when the active skin or the control changes; the
  * binding also re-applies itself when stylesheets in `<head>` or the document
  * root attributes change, because a stored skin id is known before its CSS
- * (and therefore its tokens) has been injected.
+ * (and therefore its tokens) has been injected, and on viewport resize, because
+ * tokens may be declared inside `@media`.
  */
 export function bindHostControlTheme(options: HostControlThemeBindingOptions): HostControlThemeBinding {
   let probe: HostControlProbe | null = null;
@@ -478,6 +491,9 @@ export function bindHostControlTheme(options: HostControlThemeBindingOptions): H
     observer.observe(doc.head, { childList: true, subtree: true, characterData: true });
     observer.observe(doc.documentElement, { attributes: true });
   }
+  // Tokens declared inside `@media` change with the viewport, not the DOM.
+  const onResize = (): void => binding.apply();
+  win?.addEventListener("resize", onResize, { passive: true });
 
   const binding: HostControlThemeBinding = {
     apply() {
@@ -505,6 +521,7 @@ export function bindHostControlTheme(options: HostControlThemeBindingOptions): H
     dispose() {
       observer?.disconnect();
       observer = null;
+      win?.removeEventListener("resize", onResize);
       probe?.dispose();
       probe = null;
     },

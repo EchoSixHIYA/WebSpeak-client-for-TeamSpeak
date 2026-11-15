@@ -331,5 +331,9 @@ test("host control tokens follow late skin CSS, resolve modern colours and refus
   assert.equal(late.background, late.inlineBackground);
   assert.equal(late.inlineFont, "ui-sans-serif, system-ui, sans-serif", "a skin @font-face reached a host-owned control");
   assert.equal(byName["system-font"].inlineFont, 'Tahoma, "Segoe UI", sans-serif');
+  assert.equal(byName["media-gated-skin-font"].inlineFont, "ui-sans-serif, system-ui, sans-serif", "a media-gated skin @font-face reached a host-owned control");
+  const resized = byName["media-token-resize"];
+  assert.equal(resized.beforeResize, "rgb(16, 32, 48)", "an @media token was not applied");
+  assert.notEqual(resized.inlineBackground, resized.beforeResize, "a viewport change did not refresh @media tokens");
   assert.equal(byName["after-dispose"].inlineBackground, late.inlineBackground, "a disposed binding kept observing the document");
 });

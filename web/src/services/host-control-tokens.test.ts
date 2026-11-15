@@ -15,6 +15,7 @@ import {
   applyHostControlTokens,
   contrastRatio,
   fontFamilyNames,
+  formatRgb,
   hasHostControlTokens,
   hostControlTokenKey,
   hostControlTokenProperty,
@@ -194,6 +195,17 @@ test("global tokens theme the banner and the authorization dialog", () => {
   assert.ok(contrastRatio(parseCssColor(dialog.onAccent)!, parseCssColor(dialog.accent)!) >= 4.5);
   assert.equal(dialog.hitTarget, 46);
 
+  // A mid-grey accent passes 3:1 on white, but neither black nor white text
+  // reaches 4.5:1 on it (best is ~4.23), so the palette falls back as a group.
+  const midTone = resolveHostControlTokens(
+    style(prefixed("host", { background: "#ffffff", foreground: "#000000", accent: "#7b7b7b" })),
+    "host.permission",
+    raw => raw,
+    PERMISSION_CONTROL_DEFAULTS,
+  );
+  assert.equal(midTone.accent, formatRgb(PERMISSION_CONTROL_DEFAULTS.accent));
+  assert.ok(contrastRatio(parseCssColor(midTone.onAccent)!, parseCssColor(midTone.accent)!) >= 4.5);
+
   const override = resolveHostControlTokens(
     style({ ...prefixed("host", { background: "#102030", foreground: "#ffffff", accent: "#47dcc4" }), ...prefixed("load-recovery", { background: "#ffffff", foreground: "#111111", accent: "#1d4ed8" }) }),
     "app.skin-load-recovery",
@@ -264,4 +276,8 @@ test("host controls ignore fonts registered by a skin @font-face", () => {
   assert.equal(resolve('"Blank Glyphs", sans-serif'), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
   assert.equal(resolve("Tahoma, 'blank glyphs'"), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
   assert.equal(resolve('Tahoma, "Segoe UI", sans-serif'), 'Tahoma, "Segoe UI", sans-serif');
+  // Compiled skin faces are always `ws-<skin id>-<name>`; a face gated behind a
+  // non-matching @media is not in document.fonts yet but must still be refused.
+  assert.equal(resolve('"ws-community-evil-blank", sans-serif'), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
+  assert.equal(resolve("Tahoma, ws-community-evil-blank"), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
 });

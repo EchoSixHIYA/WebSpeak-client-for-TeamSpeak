@@ -84,6 +84,14 @@ const INDIRECT_VALUE_PROPERTIES = new Set([
   "margin-block", "margin-block-start", "margin-block-end",
   "margin-inline", "margin-inline-start", "margin-inline-end",
 ]);
+/**
+ * Visual properties whose literal hiding values (`filter: opacity(0)`,
+ * `clip: rect(0 0 0 0)`, `content-visibility: hidden`) are rejected on
+ * protected controls. They stay free on every other part, but a protected
+ * control may not take them from `var()`/`attr()`, which would hide the
+ * same value from the static check.
+ */
+const PROTECTED_INDIRECT_HIDE_PROPERTIES = new Set(["filter", "clip", "content-visibility"]);
 /** Attributes a skin author must never use to reach outside the public hooks. */
 const FORBIDDEN_SCOPE_ATTRIBUTES = new Set([
   HOST_SKIN_ATTRIBUTE,
@@ -319,11 +327,13 @@ export function compileSkinCss(source: string, id: string, assets: SkinCssAssets
     if (["behavior", "-moz-binding"].includes(property) || /expression\s*\(|javascript\s*:|vbscript\s*:/i.test(decodedValue)) {
       throw declaration.error("Executable CSS values are not allowed.");
     }
-    if (INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) && restingFrame && /\b(?:var|attr)\s*\(/i.test(decodedValue)) {
-      if (protectedTarget) {
-        throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
-      }
-      if (!canHideTarget && schemaVersion < 3) throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
+    const indirectValue = restingFrame && /\b(?:var|attr)\s*\(/i.test(decodedValue);
+    if (indirectValue && protectedTarget
+      && (INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) || PROTECTED_INDIRECT_HIDE_PROPERTIES.has(unprefixedProperty))) {
+      throw declaration.error(`The required control "${protectedTarget}" cannot use indirect values for visibility or positioning.`);
+    }
+    if (indirectValue && !protectedTarget && INDIRECT_VALUE_PROPERTIES.has(unprefixedProperty) && !canHideTarget && schemaVersion < 3) {
+      throw declaration.error("Visibility and interaction styles can only use indirect values on explicitly optional visual parts.");
     }
     // An indirect animation name is checked at the declaration site. Locked
     // host chrome (the plugin overlay) uses the same rule, otherwise a

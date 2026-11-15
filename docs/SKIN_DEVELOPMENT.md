@@ -514,7 +514,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 28 个受保护部件里，`host.recovery`、`app.skin-load-recovery` 和授权对话框由宿主在闭合 Shadow DOM 中绘制，`host.permission` 目前没有渲染点；其余 25 个都渲染在 `.ws-skin-root` 内（服务器/频道密码弹窗也在根内，不是 `Teleport`）。开放皮肤（schemaVersion 3/4）可以直接用 `skin.css` 给它们换肤；宿主只保留「不能隐藏 / 不能移出视口 / 不能禁用 / 使用内置皮肤的路径不能被切断」四条底线。
 
-**应用 DOM 内的受保护控件。** 颜色、`var()` 颜色、纯色/渐变/包内位图背景、边框、圆角、`font-family`/`font-size`、内边距、宽高、`box-shadow`、`text-shadow`、`filter`、`outline` 等纯视觉属性都可以写：
+**应用 DOM 内的受保护控件。** 颜色、`var()` 颜色、纯色/渐变/包内位图背景、边框、圆角、`font-family`/`font-size`、内边距、宽高、`box-shadow`、`text-shadow`、`filter`（字面值）、`outline` 等纯视觉属性都可以写：
 
 ```css
 [data-ws-part="voice.audio-dock.microphone"],
@@ -541,7 +541,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 | 控件 | 每部件前缀 | 说明 |
 | --- | --- | --- |
 | `host.recovery` | `--skin-recovery-*` | 兼容原有令牌；写到锚点、锚点祖先或皮肤根上都有效 |
-| `app.skin-load-recovery` | `--skin-load-recovery-*` | 皮肤加载失败时出现的顶部横幅；只换肤，不参与停靠 |
+| `app.skin-load-recovery` | `--skin-load-recovery-*` | 皮肤加载失败时出现的顶部横幅；只换肤，不参与停靠。令牌取自横幅出现时的**活动**皮肤：加载失败后宿主会退回内置皮肤（内置皮肤不声明令牌），所以失败皮肤自己的值通常不会作用在自己的横幅上，横幅保持默认琥珀色 |
 | 授权对话框（`host.permission` 概念） | `--skin-permission-*` | `host.permission` 没有 DOM 渲染点；令牌作用于宿主自己的授权对话框 |
 
 每个每部件令牌都有全局回退：`--skin-host-accent`、`--skin-host-background`、`--skin-host-foreground`、`--skin-host-border`、`--skin-host-radius`、`--skin-host-font`、`--skin-host-size`。每部件值优先于全局值。例如：
@@ -561,15 +561,15 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 }
 ```
 
-宿主从计算样式读取这些变量，通过影子根内的探针解析颜色（`oklch()`、`color-mix()` 等现代写法会先换算成 sRGB 再检查对比度），再写入控件自己的 `--ws-control-*` 变量；皮肤样式晚于皮肤 ID 加载、运行时插件追加样式时，宿主会自动重新读取，不需要刷新页面。皮肤不能写入 Shadow DOM 内部，也不能替换结构令牌。安全底线与其他受保护控件一致：
+宿主从计算样式读取这些变量，通过影子根内的探针解析颜色（`oklch()`、`color-mix()` 等现代写法会先换算成 sRGB 再检查对比度），再写入控件自己的 `--ws-control-*` 变量；皮肤样式晚于皮肤 ID 加载、运行时插件追加样式、窗口尺寸变化让 `@media` 里的令牌生效时，宿主会自动重新读取，不需要刷新页面。皮肤不能写入 Shadow DOM 内部，也不能替换结构令牌。安全底线与其他受保护控件一致：
 
 - 背景强制不透明（alpha 视为 1）。
 - 文字与背景对比度必须 ≥ 4.5，强调色与背景 ≥ 3；任一不达标时整组颜色回退到宿主默认，而不是只改一项。
 - 边框与背景对比度 ≥ 3，否则使用宿主默认边框。
 - 圆角只接受 px 并限制上限（恢复胶囊 999px，横幅和授权对话框 64px）。
-- 字体族只允许字母、数字、空格、逗号、引号和连字符，最长 120 字符；只认系统已安装字体和通用族名（`sans-serif` 等）。列表里只要有一个族名来自文档里的 `@font-face`（也就是皮肤自带字体），整项令牌就被忽略，因为自带字体可以把字形做成空白，让宿主控件的文字消失。应用 DOM 内的受保护控件不受此限制，照常可以在 `skin.css` 里用皮肤字体。
+- 字体族只允许字母、数字、空格、逗号、引号和连字符，最长 120 字符；只认系统已安装字体和通用族名（`sans-serif` 等）。列表里只要有一个族名来自文档里的 `@font-face`，或带有编译器给皮肤字体加的 `ws-` 作用域前缀（包括放在暂未生效的 `@media` 里的字体），整项令牌就被忽略，因为自带字体可以把字形做成空白，让宿主控件的文字消失。应用 DOM 内的受保护控件不受此限制，照常可以在 `skin.css` 里用皮肤字体。
 - `size` 只接受 `small`、`medium`、`large`，并且只能把命中区域/字号调大；恢复胶囊为 28/32/36px 命中区域、11/12/13px 字号，横幅和授权对话框以自身更大的内置尺寸为下限。
-- 授权对话框的主按钮文字色由宿主根据强调色自动选择黑/白，保证可读。
+- 授权对话框的主按钮文字色由宿主根据强调色自动选择黑/白；如果黑白两种文字在强调色上都达不到 4.5，这组颜色同样整体回退到宿主默认。
 - 恢复胶囊停靠后如果锚点消失、被遮挡或压到其他受保护控件，仍会回退到默认位置；横幅固定在顶部，授权对话框始终是顶层模态框，二者不参与停靠，因此不会因为皮肤布局而找不到。
 
 `Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）和「使用内置皮肤」的重置路径完全不受令牌影响。旧皮肤继续写 `--skin-recovery-*` 也能工作；新皮肤建议优先使用全局 `--skin-host-*`，只在需要区分具体控件时写每部件覆盖。
@@ -731,7 +731,7 @@ v1/v2 校验器会阻止隐藏必要操作控件和其容器。v3 可改变显�
 
 上面必须使用单独的精确属性选择器；不能通过父容器、组合选择器或子元素间接隐藏/重置内容。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认不渲染，`chrome.json#visibleParts` 才是它们的开启开关。
 
-关键帧与普通声明遵循同一套受保护控件检查，但只检查动画能够**停留**的帧：`to` / `100%` 始终检查；`from` / `0%` 仅在引用它的声明（含同一主体上另一条规则的方向 / 填充 / 播放状态长属性）使用 `reverse`、`alternate`、`alternate-reverse` 方向、`backwards` / `both` 填充模式或 `paused` 播放状态时检查；转义的 `to` / `from` 与 `1e2%` 这类写法按停留帧识别；`50%` 等中间帧不会因为过渡状态被拒绝，缺少 `to` / `100%` 时结束状态回到元素自身样式（`paused` 配合负延迟、或超长动画停在中间帧属于已知残留，由闭合 Shadow DOM 的恢复胶囊兜底）。受保护控件上被拒绝的写法包括 `display: none`、`visibility: hidden|collapse`、`opacity` ≤ 0.01（含 `0`、`0%`、`0e0`、`calc(0)` 等）、`pointer-events: none`、`filter` / `-webkit-filter` 的 `opacity(≤0.01)` / `brightness(0)`、`transform` / `scale` 的零缩放、`content-visibility: hidden`、`clip-path` 的 `inset(...)`（任一边对合计 ≥ 100%）、`circle(0)` / `ellipse(0 …)`、`clip: rect(0,0,0,0)`，以及 `mask` / `mask-image` 的 `alpha(0)` / `luminance(0)` 或全透明渐变色标；`polygon()` 等装饰性裁切不受限制。受保护主体的判定会展开 `:is()` / `:where()` 参数、双重否定 `:not(:not(X))` 与 `:nth-child(An+B of S)` / `:nth-last-child(...)` 的 `S`，`[data-ws-part="…" i]` 按不区分大小写匹配。把控件移出视口只在明显越界时拒绝：负向 ≤ -1000px 或 ≤ -100%，正向 ≥ 2000px 或 ≥ 200%（`margin` / `inset` / `left` / `right` / `top` / `bottom` / `translate` / `transform`，含简单 `calc()` 与 `matrix()` 平移）；`scale`、`rotate` 和小幅平移不受影响。`host.plugins.overlay` 的布局锁在关键帧中复用普通声明的属性锁：停留帧里的定位、变换等锁定属性只能取中性或单位变换（`none`、`auto`、`static`、`0`、`scale(1)`、`translateY(0)`、`rotate(0deg)` 或 CSS 全局关键字），尺寸属性仅在达到视口尺寸时拒绝（含 `calc(50vw * 2)`）；入场动画停在这些值时通过。受保护控件和 `host.plugins.overlay` 上的 `animation` / `animation-name` 也不能用 `var()` / `attr()` 间接指定动画名。只被可选/装饰部件引用的关键帧仍可隐藏它们，v3 对非受保护部件的隐藏只给出警告。校验器是恢复路径的最后一道安全网，不是布局或视觉质量检查；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
+关键帧与普通声明遵循同一套受保护控件检查，但只检查动画能够**停留**的帧：`to` / `100%` 始终检查；`from` / `0%` 仅在引用它的声明（含同一主体上另一条规则的方向 / 填充 / 播放状态长属性）使用 `reverse`、`alternate`、`alternate-reverse` 方向、`backwards` / `both` 填充模式或 `paused` 播放状态时检查；转义的 `to` / `from` 与 `1e2%` 这类写法按停留帧识别；`50%` 等中间帧不会因为过渡状态被拒绝，缺少 `to` / `100%` 时结束状态回到元素自身样式（`paused` 配合负延迟、或超长动画停在中间帧属于已知残留，由闭合 Shadow DOM 的恢复胶囊兜底）。受保护控件上被拒绝的写法包括 `display: none`、`visibility: hidden|collapse`、`opacity` ≤ 0.01（含 `0`、`0%`、`0e0`、`calc(0)` 等）、`pointer-events: none`、`filter` / `-webkit-filter` 的 `opacity(≤0.01)` / `brightness(0)`、`transform` / `scale` 的零缩放、`content-visibility: hidden`、`clip-path` 的 `inset(...)`（任一边对合计 ≥ 100%）、`circle(0)` / `ellipse(0 …)`、`clip: rect(0,0,0,0)`，以及 `mask` / `mask-image` 的 `alpha(0)` / `luminance(0)` 或全透明渐变色标；`polygon()` 等装饰性裁切不受限制。受保护主体的判定会展开 `:is()` / `:where()` 参数、双重否定 `:not(:not(X))` 与 `:nth-child(An+B of S)` / `:nth-last-child(...)` 的 `S`，`[data-ws-part="…" i]` 按不区分大小写匹配。把控件移出视口只在明显越界时拒绝：负向 ≤ -1000px 或 ≤ -100%，正向 ≥ 2000px 或 ≥ 200%（`margin` / `inset` / `left` / `right` / `top` / `bottom` / `translate` / `transform`，含简单 `calc()` 与 `matrix()` 平移）；`scale`、`rotate` 和小幅平移不受影响。`host.plugins.overlay` 的布局锁在关键帧中复用普通声明的属性锁：停留帧里的定位、变换等锁定属性只能取中性或单位变换（`none`、`auto`、`static`、`0`、`scale(1)`、`translateY(0)`、`rotate(0deg)` 或 CSS 全局关键字），尺寸属性仅在达到视口尺寸时拒绝（含 `calc(50vw * 2)`）；入场动画停在这些值时通过。受保护控件和 `host.plugins.overlay` 上的 `animation` / `animation-name` 也不能用 `var()` / `attr()` 间接指定动画名；受保护控件上的 `filter` / `-webkit-filter`、`clip` 与 `content-visibility` 同样只接受字面值，不能用 `var()` / `attr()`（否则变量可以绕过上面的隐藏检查），其他部件不受影响。只被可选/装饰部件引用的关键帧仍可隐藏它们，v3 对非受保护部件的隐藏只给出警告。校验器是恢复路径的最后一道安全网，不是布局或视觉质量检查；自定义字体、复杂背景和高对比特效仍需人工检查文字可读性与控件辨识度。
 
 皮肤可以重画控制外观。v1/v2 不能重新布置必要操作；v3 可以，因此须人工实测加入/退出、麦克风状态、设置、菜单、屏幕共享退出、音量、全屏等操作的可达性。v3 也不能用大的负 `margin*`、`inset`/`translate` 等把受保护控件移出视口，或把 `host.plugins.overlay` 及其后代改成定位全屏、放大到覆盖视口（`zoom` 等）；这些写法会在导入时被拒绝。装饰性宿主外壳（`host.watermark`、`host.hint`、`host.voice-status-decoration`、`host.plugins.launcher`）和普通页面部件不受布局锁限制，可以自由使用 flex/grid、重定位、自定义尺寸、大背景和动画；固定定位或极端 `z-index` 只会给出提示。开放皮肤（v3/v4）的布局与视觉质量由官方库的人工审核保证，编译器不会阻止一般性的布局回归。校验成功不代表设计质量合格；提交前要逐页实测窄屏和桌面尺寸、所有界面语言、键盘焦点与减少动效设置。
 
