@@ -178,11 +178,13 @@ const showRecovery = computed(() => shouldShowRecovery({
 const shortcutOpen = ref(false);
 const recoveryPopover = ref<HTMLElement | null>(null);
 
+let slotBinding: HostSlotBinding | undefined;
+
 /**
- * Theme the capsule even when the skin does not declare a slot. `bindHostSlot`
- * still reads the anchor first when a slot exists; this root-level pass covers
- * the floating capsule and is overwritten by the anchor values on the next
- * revalidation.
+ * Theme the capsule even when the skin does not declare a slot. While a slot
+ * binding exists it reads the anchor first and owns the tokens; this
+ * root-level pass covers the slot-less capsule and refreshes itself when the
+ * skin stylesheet arrives after the stored skin id.
  */
 const recoveryTheme = layer ? bindHostControlTheme({
   layer,
@@ -190,6 +192,8 @@ const recoveryTheme = layer ? bindHostControlTheme({
   part: "host.recovery",
   defaults: RECOVERY_CONTROL_DEFAULTS,
   source: () => findSkinRoot(hostChromeActiveSkinId.value),
+  // While a slot binding exists it owns the capsule tokens (anchor first).
+  active: () => !slotBinding,
 }) : null;
 
 const recoveryVisible = computed(() => showRecovery.value || (shortcutOpen.value && thirdPartyAllowed.value));
@@ -254,7 +258,6 @@ function onRecoveryFocusOut(event: FocusEvent) {
   compactPinned.value = false;
 }
 
-let slotBinding: HostSlotBinding | undefined;
 function syncSlotBinding() {
   slotBinding?.dispose();
   slotBinding = undefined;

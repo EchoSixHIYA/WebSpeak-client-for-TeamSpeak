@@ -268,12 +268,20 @@ function sanitizeRadius(value: string | undefined, fallback: number, maxRadius: 
   return Number.isFinite(radius) ? Math.min(maxRadius, Math.max(0, radius)) : fallback;
 }
 
-function sanitizeFont(value: string | undefined, fallback: string): string {
+/** Lower-cased family names from a `font-family` list, quotes removed. */
+export function fontFamilyNames(value: string): string[] {
+  return value.split(",").map((name) => name.trim().replace(/^["']|["']$/g, "").trim().toLowerCase()).filter(Boolean);
+}
+
+function sanitizeFont(value: string | undefined, fallback: string, isWebFont: WebFontCheck): string {
   if (!value) return fallback;
   const font = value.trim().replace(/\s+/g, " ");
   if (!font || font.length > MAX_FONT_LENGTH || !FONT_FAMILY_PATTERN.test(font) || !/[A-Za-z0-9]/.test(font)) {
     return fallback;
   }
+  // A skin-supplied @font-face can ship glyph-less outlines and blank the
+  // control's label, so host-owned controls only accept installed/generic fonts.
+  if (fontFamilyNames(font).some(isWebFont)) return fallback;
   return font;
 }
 
@@ -308,6 +316,9 @@ function mergeRawTokens(...layers: readonly HostControlRawTokens[]): HostControl
 }
 
 type ColorProbe = (raw: string | undefined) => string | undefined;
+/** True when a (lower-cased, unquoted) family is provided by a document @font-face. */
+type WebFontCheck = (family: string) => boolean;
+const NO_WEB_FONTS: WebFontCheck = () => false;
 
 function resolvePalette(
   raw: HostControlRawTokens,
@@ -362,12 +373,14 @@ export function hasHostControlTokens(
  * unreadable, the resolver retries the global layer and finally the built-in
  * palette, so a skin can never make a protected control unreadable. The
  * border is optional and must stay visible against the resolved background.
+ * Fonts registered by the document (skin `@font-face`) are ignored.
  */
 export function resolveHostControlTokens(
   style: Pick<CSSStyleDeclaration, "getPropertyValue"> | null,
   part: string,
   probeColor: ColorProbe,
   defaults: HostControlDefaults,
+  isWebFont: WebFontCheck = NO_WEB_FONTS,
 ): HostControlTokens {
   const partTokens = readTokenSet(style, (token) => hostControlTokenProperty(part, token));
   const globalTokens = readTokenSet(style, (token) => HOST_CONTROL_GLOBAL_TOKEN_PROPERTIES[token]);
@@ -399,7 +412,7 @@ export function resolveHostControlTokens(
     foreground: formatRgb(palette.foreground),
     border: formatRgb(border),
     radius: sanitizeRadius(merged.radius, defaults.radius, defaults.maxRadius),
-    font: sanitizeFont(merged.font, defaults.font),
+    font: sanitizeFont(merged.font, defaults.font, isWebFont),
     size,
     hitTarget,
     fontSize,
@@ -432,6 +445,11 @@ export interface HostControlThemeBindingOptions {
   defaults: HostControlDefaults;
   /** The active skin root (or a slot anchor) to read token values from. */
   source: () => Element | null;
+  /**
+   * When this returns false another owner (the recovery slot binding) is
+   * writing the control's tokens, so `apply()` leaves them untouched.
+   */
+  active?: () => boolean;
 }
 
 export interface HostControlThemeBinding {
@@ -441,13 +459,29 @@ export interface HostControlThemeBinding {
 
 /**
  * Bind one host-owned control to the active skin's token set. The returned
- * binding owns the hidden colour probe and never stores a token value on the
- * skin side; callers re-apply it when the active skin or the control changes.
+ * binding owns the hidden probe and never stores a token value on the skin
+ * side. Callers re-apply it when the active skin or the control changes; the
+ * binding also re-applies itself when stylesheets in `<head>` or the document
+ * root attributes change, because a stored skin id is known before its CSS
+ * (and therefore its tokens) has been injected.
  */
 export function bindHostControlTheme(options: HostControlThemeBindingOptions): HostControlThemeBinding {
-  let probe: HostControlColorProbe | null = null;
-  return {
+  let probe: HostControlProbe | null = null;
+  let observer: MutationObserver | null = null;
+  const doc = options.layer.shadow.ownerDocument;
+  const win = doc.defaultView;
+
+  // MutationObserver already batches a burst of changes into one callback.
+  // Frames are avoided on purpose: they do not run in background tabs.
+  if (win && typeof win.MutationObserver === "function") {
+    observer = new win.MutationObserver(() => binding.apply());
+    observer.observe(doc.head, { childList: true, subtree: true, characterData: true });
+    observer.observe(doc.documentElement, { attributes: true });
+  }
+
+  const binding: HostControlThemeBinding = {
     apply() {
+      if (options.active && !options.active()) return;
       const control = options.control();
       if (!control) return;
       const source = options.source();
@@ -462,14 +496,20 @@ export function bindHostControlTheme(options: HostControlThemeBindingOptions): H
         applyHostControlTokens(control, null);
         return;
       }
-      probe ??= createHostControlColorProbe(options.layer.shadow);
-      applyHostControlTokens(control, resolveHostControlTokens(style, options.part, probe.probeColor, options.defaults));
+      probe ??= createHostControlProbe(options.layer.shadow);
+      applyHostControlTokens(
+        control,
+        resolveHostControlTokens(style, options.part, probe.probeColor, options.defaults, probe.isWebFont),
+      );
     },
     dispose() {
+      observer?.disconnect();
+      observer = null;
       probe?.dispose();
       probe = null;
     },
   };
+  return binding;
 }
 
 /** The active skin root; the token source for controls without a slot anchor. */
@@ -480,19 +520,23 @@ export function findSkinRoot(skinId: string | undefined, doc: Document = documen
   return null;
 }
 
-export interface HostControlColorProbe {
+export interface HostControlProbe {
   /** Resolve a CSS colour through the browser, inside the closed shadow root. */
   probeColor(raw: string | undefined): string | undefined;
+  /** True when `family` (lower-cased, unquoted) comes from a document `@font-face`. */
+  isWebFont(family: string): boolean;
   dispose(): void;
 }
 
 /**
- * A hidden probe element for resolving arbitrary CSS colour syntax (for
- * example `color-mix()` or `oklch()`) to a concrete `rgb()` value.
+ * A hidden probe for resolving arbitrary CSS colour syntax (for example
+ * `color-mix()` or `oklch()`) to a concrete `rgb()` value, and for spotting
+ * fonts that a skin registered itself.
  */
-export function createHostControlColorProbe(shadow: ShadowRoot): HostControlColorProbe {
+export function createHostControlProbe(shadow: ShadowRoot): HostControlProbe {
   const doc = shadow.ownerDocument;
   const win = doc.defaultView;
+  let canvas: CanvasRenderingContext2D | null | undefined;
   const element = doc.createElement("span");
   element.setAttribute("aria-hidden", "true");
   element.style.cssText = "position:absolute;left:-9999px;top:0;width:0;height:0;visibility:hidden;pointer-events:none;";
@@ -507,13 +551,42 @@ export function createHostControlColorProbe(shadow: ShadowRoot): HostControlColo
     return win.getComputedStyle(element).color;
   };
 
+  /**
+   * Browsers serialise `oklch()`, `lab()` and most `color-mix()` results in
+   * their own colour space instead of `rgb()`. Paint those into a 1×1 canvas
+   * to get sRGB channels the contrast check understands.
+   */
+  const toRgb = (computed: string): string | undefined => {
+    if (parseCssColor(computed)) return computed;
+    if (canvas === undefined) {
+      canvas = doc.createElement("canvas").getContext("2d", { willReadFrequently: true });
+      if (canvas) canvas.canvas.width = canvas.canvas.height = 1;
+    }
+    if (!canvas) return undefined;
+    canvas.clearRect(0, 0, 1, 1);
+    canvas.fillStyle = "#000";
+    canvas.fillStyle = computed;
+    canvas.fillRect(0, 0, 1, 1);
+    const [r, g, b] = canvas.getImageData(0, 0, 1, 1).data;
+    return formatRgb({ r, g, b });
+  };
+
   return {
     probeColor(raw) {
       if (!raw) return undefined;
       const first = resolveWith(raw, "rgb(1, 2, 3)");
-      if (first !== "rgb(1, 2, 3)") return first;
+      if (first !== "rgb(1, 2, 3)") return first === undefined ? undefined : toRgb(first);
       const second = resolveWith(raw, "rgb(4, 5, 6)");
-      return second === "rgb(4, 5, 6)" ? undefined : second;
+      return second === undefined || second === "rgb(4, 5, 6)" ? undefined : toRgb(second);
+    },
+    isWebFont(family) {
+      const fonts = doc.fonts;
+      if (!fonts) return false;
+      let found = false;
+      fonts.forEach((face) => {
+        if (!found && fontFamilyNames(face.family).includes(family)) found = true;
+      });
+      return found;
     },
     dispose() {
       element.remove();

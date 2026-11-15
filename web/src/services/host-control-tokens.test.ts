@@ -14,6 +14,7 @@ import {
   SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS,
   applyHostControlTokens,
   contrastRatio,
+  fontFamilyNames,
   hasHostControlTokens,
   hostControlTokenKey,
   hostControlTokenProperty,
@@ -247,4 +248,20 @@ test("WCAG contrast follows the relative-luminance formula", () => {
   assert.equal(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }), 21);
   assert.equal(contrastRatio({ r: 12, g: 34, b: 56 }, { r: 12, g: 34, b: 56 }), 1);
   assert.ok(HOST_CONTROL_MIN_FOREGROUND_CONTRAST > HOST_CONTROL_MIN_ACCENT_CONTRAST);
+});
+
+test("host controls ignore fonts registered by a skin @font-face", () => {
+  assert.deepEqual(fontFamilyNames(`"Wave Font", 'Other' , sans-serif`), ["wave font", "other", "sans-serif"]);
+  const webFonts = new Set(["blank glyphs"]);
+  const isWebFont = (family: string) => webFonts.has(family);
+  const resolve = (font: string) => resolveHostControlTokens(
+    style({ "--skin-host-font": font }),
+    "app.skin-load-recovery",
+    raw => raw,
+    SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS,
+    isWebFont,
+  ).font;
+  assert.equal(resolve('"Blank Glyphs", sans-serif'), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
+  assert.equal(resolve("Tahoma, 'blank glyphs'"), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
+  assert.equal(resolve('Tahoma, "Segoe UI", sans-serif'), 'Tahoma, "Segoe UI", sans-serif');
 });

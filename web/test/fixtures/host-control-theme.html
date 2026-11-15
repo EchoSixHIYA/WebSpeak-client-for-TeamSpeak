@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host control theme fixture</title>
+<style>
+  html, body { margin: 0; font: 12px/1.5 system-ui, sans-serif; }
+  /* A skin-registered font: host-owned controls must refuse it. */
+  @font-face { font-family: "Blank Glyphs"; src: url(data:font/woff2;base64,AAAA); }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-skin="community.theme-fixture" data-ws-part="app"></div>
+<pre id="result">pending</pre>
+<script type="module">
+import { createHostOwnedLayer } from "/src/services/host-owned-layer.ts";
+import { SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS, bindHostControlTheme, findSkinRoot } from "/src/services/host-control-tokens.ts";
+
+const output = document.getElementById("result");
+const frames = () => new Promise((resolve) => setTimeout(resolve, 120));
+const addSkinStyle = (css) => {
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.append(style);
+  return style;
+};
+
+(async () => {
+  const layer = createHostOwnedLayer("theme-fixture", `.banner { background: var(--ws-control-background, #fffbeb); color: var(--ws-control-foreground, #78350f); font-family: var(--ws-control-font, serif); }`);
+  const control = document.createElement("section");
+  control.className = "banner";
+  control.textContent = "Use built-in skin";
+  layer.container.append(control);
+  const theme = bindHostControlTheme({
+    layer,
+    control: () => control,
+    part: "app.skin-load-recovery",
+    defaults: SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS,
+    source: () => findSkinRoot("community.theme-fixture"),
+  });
+  const snap = (name) => ({
+    name,
+    inlineBackground: control.style.getPropertyValue("--ws-control-background"),
+    inlineFont: control.style.getPropertyValue("--ws-control-font"),
+    background: getComputedStyle(control).backgroundColor,
+  });
+  const results = [];
+
+  // The stored skin id is known before its stylesheet arrives.
+  theme.apply();
+  results.push(snap("before-skin-css"));
+
+  // Late skin CSS: oklch() background must resolve to sRGB and theme the banner
+  // without any caller re-applying the binding.
+  addSkinStyle(`.ws-skin-root { --skin-host-background: oklch(0.25 0.05 250); --skin-host-foreground: #ffffff; --skin-host-accent: #47dcc4; --skin-host-font: "Blank Glyphs", sans-serif; }`);
+  await frames();
+  results.push(snap("late-skin-css"));
+
+  addSkinStyle(`.ws-skin-root { --skin-host-font: Tahoma, "Segoe UI", sans-serif; }`);
+  await frames();
+  results.push(snap("system-font"));
+
+  theme.dispose();
+  addSkinStyle(`.ws-skin-root { --skin-host-background: #ffffff; --skin-host-foreground: #111111; }`);
+  await frames();
+  results.push(snap("after-dispose"));
+
+  output.textContent = JSON.stringify({ results });
+})().catch((error) => {
+  output.textContent = JSON.stringify({ error: String(error && error.stack || error) });
+});
+</script>
+</body>
+</html>

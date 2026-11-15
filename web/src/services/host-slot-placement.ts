@@ -20,11 +20,11 @@ import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
 import {
   RECOVERY_CONTROL_DEFAULTS,
   applyHostControlTokens,
-  createHostControlColorProbe,
+  createHostControlProbe,
   findSkinRoot,
   resolveHostControlTokens,
   type HostControlTokens,
-  type HostControlColorProbe,
+  type HostControlProbe,
 } from "./host-control-tokens.js";
 
 export interface SlotViewport {
@@ -338,7 +338,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   let lastReason: SlotFailureReason | undefined;
   let currentAnchor: HTMLElement | null = null;
   let observer: ResizeObserver | null = null;
-  const colorProbe: HostControlColorProbe = createHostControlColorProbe(layer.shadow);
+  const probe: HostControlProbe = createHostControlProbe(layer.shadow);
   let frame: number | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
@@ -349,12 +349,12 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   const cancelFrame = (handle: number): void => win.cancelAnimationFrame(handle);
 
   function readTokens(source: Element | null): HostControlTokens {
-    if (!source) return resolveHostControlTokens(null, "host.recovery", colorProbe.probeColor, RECOVERY_CONTROL_DEFAULTS);
     return resolveHostControlTokens(
-      win.getComputedStyle(source),
+      source ? win.getComputedStyle(source) : null,
       "host.recovery",
-      colorProbe.probeColor,
+      probe.probeColor,
       RECOVERY_CONTROL_DEFAULTS,
+      probe.isWebFont,
     );
   }
 
@@ -531,7 +531,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       win.removeEventListener("scroll", schedule, { capture: true });
       clearPlacement();
       applyHostControlTokens(control, null);
-      colorProbe.dispose();
+      probe.dispose();
     },
   };
 }

@@ -169,7 +169,7 @@ test("the public-skin composable opts in only through chrome.json#visibleParts",
   assert.doesNotMatch(usePublicSkin, /\.test\(skin\.css\)/);
 });
 
-async function dumpDom(url) {
+async function dumpDom(url, extraArgs = []) {
   return await new Promise((resolve, reject) => {
     const child = spawn(CHROME, [
       "--headless=new",
@@ -177,6 +177,7 @@ async function dumpDom(url) {
       "--disable-gpu",
       "--disable-dev-shm-usage",
       "--hide-scrollbars",
+      ...extraArgs,
       "--dump-dom",
       url,
     ], { stdio: ["ignore", "pipe", "pipe"] });
@@ -300,4 +301,35 @@ test("a declared slot docks the capsule and falls back at runtime", { skip: !CHR
   assert.equal(byName.disposed.inlineLeft, "");
   assert.equal(byName.disposed.atDefaultCorner, true);
   assert.equal(byName.disposed.leftoverAccent, "");
+});
+
+test("host control tokens follow late skin CSS, resolve modern colours and refuse skin fonts", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  // The fixture awaits animation frames, so give headless Chrome virtual time.
+  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-control-theme.html`, ["--virtual-time-budget=10000"]);
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  const byName = Object.fromEntries(payload.results.map((result) => [result.name, result]));
+
+  assert.equal(byName["before-skin-css"].inlineBackground, "", "tokens were applied before the skin declared any");
+  const late = byName["late-skin-css"];
+  assert.match(late.inlineBackground, /^rgb\(\d+, \d+, \d+\)$/, "late skin CSS did not re-theme the control");
+  assert.notEqual(late.inlineBackground, "rgb(255, 251, 235)", "the oklch() background fell back to the default palette");
+  assert.equal(late.background, late.inlineBackground);
+  assert.equal(late.inlineFont, "ui-sans-serif, system-ui, sans-serif", "a skin @font-face reached a host-owned control");
+  assert.equal(byName["system-font"].inlineFont, 'Tahoma, "Segoe UI", sans-serif');
+  assert.equal(byName["after-dispose"].inlineBackground, late.inlineBackground, "a disposed binding kept observing the document");
 });
