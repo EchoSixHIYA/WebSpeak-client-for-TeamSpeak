@@ -240,10 +240,14 @@ watch([toolbar, () => props.toolbarTarget], ([element, target]) => {
   fallbackAvoidance = bindFloatingAvoidance({
     element,
     isSelf: node => element.contains(node),
-    margins: { top: 16, right: 16, bottom: 16, left: 16 },
+    // Same numbers as .ws-plugin-toolbar-fallback in plugin-overlay.css.
+    margins: insets => ({ top: 16 + insets.top, right: 16, bottom: 16 + insets.bottom, left: 16 }),
     defaultPosition: 'bottom-right',
     apply: next => { fallbackPosition.value = next; },
-    paused: () => drawerOpen.value || element.matches(':hover') || element.contains(document.activeElement),
+    // Sticky :hover after a tap on touch screens must not pause avoidance.
+    paused: () => drawerOpen.value
+      || (matchMedia('(hover: hover)').matches && element.matches(':hover'))
+      || element.contains(document.activeElement),
   });
 }, { flush: 'post' });
 onBeforeUnmount(() => { fallbackAvoidance?.dispose(); fallbackAvoidance = undefined; });

@@ -13,8 +13,11 @@
  * visible interactive controls at runtime and moves the host control to the
  * candidate position that covers the fewest of them (protected parts and
  * controls inside an open dialog count more). When every position collides,
- * the caller may fall back to a compact footprint. The host control stays in
- * the viewport and stays clickable in every position; only its corner changes.
+ * the caller may fall back to a compact footprint (only when that frees at
+ * least one control). The host control stays in the viewport and stays
+ * clickable in every position; only its corner changes. It does not move while
+ * hovered or focused, and never moves onto the last pointer position or the
+ * focused control.
  */
 
 import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
@@ -62,9 +65,33 @@ export const HOST_FLOATING_INTERVAL_MS = 400;
 export const HOST_FLOATING_AFTER_CLICK_MS = 150;
 /** Obstacle weights. */
 export const FLOATING_WEIGHT_CONTROL = 1;
-export const FLOATING_WEIGHT_PROTECTED = 4;
+/** Above dialogs and the other host control: a protected control is the last thing to cover. */
+export const FLOATING_WEIGHT_PROTECTED = 16;
 export const FLOATING_WEIGHT_DIALOG = 8;
 export const FLOATING_WEIGHT_HOST = 8;
+/** Weight of the user's last pointer position and focused control when moving. */
+export const FLOATING_WEIGHT_POINTER = 8;
+/**
+ * Folding to the compact mark must free at least one control's worth of score
+ * (every covered obstacle costs at least `weight × 0.25`). A sliver less of a
+ * viewport-sized click-away layer is not a reason to hide the buttons.
+ */
+export const FLOATING_FOLD_MIN_GAIN = 0.25;
+/**
+ * Anti-flap: a move needs the collision to persist for `MOVE_CONFIRM_MS`, moves
+ * are at least `MOVE_MIN_INTERVAL_MS` apart, and more than `FLAP_MAX_MOVES`
+ * moves within `FLAP_WINDOW_MS` (an animated or hostile skin) park the control
+ * at its default corner for `FLAP_FREEZE_MS`, so it is never a moving target.
+ */
+export const HOST_FLOATING_MOVE_CONFIRM_MS = 250;
+export const HOST_FLOATING_MOVE_MIN_INTERVAL_MS = 1000;
+export const HOST_FLOATING_FLAP_WINDOW_MS = 10_000;
+export const HOST_FLOATING_FLAP_MAX_MOVES = 6;
+export const HOST_FLOATING_FLAP_FREEZE_MS = 10_000;
+/** Parts that wrap ordinary controls; a control inside them is not "protected" by that alone. */
+const CONTAINER_PARTS: ReadonlySet<string> = new Set(["app", "home.footer"]);
+/** Radius around the last pointer position that a move must not land on. */
+const POINTER_RADIUS = 16;
 
 /** Rect a control of `size` would occupy at `position`. */
 export function floatingRect(
@@ -117,9 +144,12 @@ export interface FloatingChoice {
 }
 
 /**
- * Keep `current` while it is collision-free; otherwise take the position with
- * the lowest score (ties keep `current`, then follow `FLOATING_POSITIONS`
- * order so the default corner wins whenever it is as good as any other).
+ * Keep `current` while it is collision-free (a free control never moves, even
+ * when the default corner becomes free again: stability beats tidiness);
+ * otherwise take the position with the lowest score. Ties keep `current`, then
+ * follow `FLOATING_POSITIONS` order. `moveObstacles` (the user's pointer and
+ * focused control) only count against positions the control would move to, so
+ * it never jumps under the cursor or onto the field being typed in.
  */
 export function chooseFloatingPosition(input: {
   current: FloatingPosition;
@@ -127,13 +157,16 @@ export function chooseFloatingPosition(input: {
   viewport: FloatingViewport;
   margins: FloatingMargins;
   obstacles: readonly FloatingObstacle[];
+  moveObstacles?: readonly FloatingObstacle[];
   positions?: readonly FloatingPosition[];
 }): FloatingChoice {
   const positions = input.positions ?? FLOATING_POSITIONS;
-  const scoreAt = (position: FloatingPosition) => floatingScore(
-    floatingRect(position, input.size, input.viewport, input.margins),
-    input.obstacles,
-  );
+  const moveObstacles = input.moveObstacles ?? [];
+  const scoreAt = (position: FloatingPosition) => {
+    const footprint = floatingRect(position, input.size, input.viewport, input.margins);
+    const score = floatingScore(footprint, input.obstacles);
+    return position === input.current || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
+  };
   const currentScore = scoreAt(input.current);
   if (currentScore === 0) return { position: input.current, score: 0 };
   let best: FloatingChoice = { position: input.current, score: currentScore };
@@ -146,11 +179,42 @@ export function chooseFloatingPosition(input: {
   return best;
 }
 
+/** Fold to the compact mark only when that frees at least one control's worth. */
+export function shouldFold(full: FloatingChoice, reduced: FloatingChoice): boolean {
+  return full.score > 0 && reduced.score <= full.score - FLOATING_FOLD_MIN_GAIN + 1e-6;
+}
+
+/** Margins of a floating control: its own spacing plus the device safe area. */
+export function readSafeAreaInsets(parent: Node & ParentNode): FloatingMargins {
+  const zero = { top: 0, right: 0, bottom: 0, left: 0 };
+  const doc = parent.ownerDocument ?? (parent as unknown as Document);
+  const view = doc?.defaultView;
+  if (!view) return zero;
+  const probe = doc.createElement("span");
+  probe.setAttribute("aria-hidden", "true");
+  probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;width:0;height:0;overflow:hidden;"
+    + "padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
+  parent.appendChild(probe);
+  try {
+    const style = view.getComputedStyle(probe);
+    const read = (value: string) => Math.max(0, Number.parseFloat(value) || 0);
+    return { top: read(style.paddingTop), right: read(style.paddingRight), bottom: read(style.paddingBottom), left: read(style.paddingLeft) };
+  } finally {
+    probe.remove();
+  }
+}
+
+function rectsIntersect(first: HostPartRect, second: HostPartRect): boolean {
+  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
 /* ------------------------------------------------------------------ *
  * DOM binding
  * ------------------------------------------------------------------ */
 
-const INTERACTIVE_SELECTOR = "a[href],button,input:not([type='hidden']),select,textarea,summary,[role='button'],[role='tab'],[role='menuitem'],[role='link'],[contenteditable='true']";
+const INTERACTIVE_SELECTOR = "a[href],button,input:not([type='hidden']),select,textarea,summary,iframe,audio[controls],video[controls],"
+  + "[role='button'],[role='tab'],[role='menuitem'],[role='link'],[role='option'],[role='switch'],[role='checkbox'],[role='radio'],"
+  + "[contenteditable='true'],[tabindex]:not([tabindex='-1'])";
 const DIALOG_SELECTOR = "dialog[open],[role='dialog'],[role='alertdialog'],[aria-modal='true']";
 
 /** Live host floating controls, so they also avoid each other. */
@@ -170,18 +234,30 @@ export function collectFloatingObstacles(options: {
   /** Elements that belong to the floating control (light DOM wrapper or layer host). */
   isSelf: (element: Element) => boolean;
   owner: Element;
+  /**
+   * Only controls intersecting one of these rects can change a score; others
+   * skip the style read and hit test (keeps a 3 000-control skin cheap).
+   */
+  regions?: readonly HostPartRect[];
 }): FloatingObstacle[] {
-  const { doc, isSelf, owner } = options;
+  const { doc, isSelf, owner, regions } = options;
   const view = doc.defaultView;
   if (!view) return [];
   const obstacles: FloatingObstacle[] = [];
   const viewportWidth = view.innerWidth;
   const viewportHeight = view.innerHeight;
+  const others = [...registry].filter(entry => entry.owner !== owner).map(entry => entry.owner);
   for (const element of doc.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)) {
     if (isSelf(element)) continue;
+    // Another host floating control is added once below, with its own weight.
+    if (others.some(other => other.contains(element))) continue;
     const rect = element.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) continue;
     if (rect.right <= 0 || rect.bottom <= 0 || rect.left >= viewportWidth || rect.top >= viewportHeight) continue;
+    if (regions && !regions.some(region => rectsIntersect(region, rect))) continue;
+    // Invisible (opacity 0 / visibility hidden) controls cannot be covered.
+    if (typeof element.checkVisibility === "function"
+      && !element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
     const style = view.getComputedStyle(element);
     if (style.visibility === "hidden" || style.visibility === "collapse" || style.pointerEvents === "none") continue;
     // Disabled controls still count: a "Send" button is disabled only until the
@@ -191,9 +267,10 @@ export function collectFloatingObstacles(options: {
     const hit = doc.elementFromPoint(x, y);
     if (!hit || !(hit === element || element.contains(hit) || isSelf(hit))) continue;
     const part = element.closest("[data-ws-part]")?.getAttribute("data-ws-part") ?? "";
-    const weight = element.closest(DIALOG_SELECTOR)
-      ? FLOATING_WEIGHT_DIALOG
-      : PROTECTED_PART_IDS.has(part) ? FLOATING_WEIGHT_PROTECTED : FLOATING_WEIGHT_CONTROL;
+    const protectedPart = PROTECTED_PART_IDS.has(part) && !CONTAINER_PARTS.has(part);
+    const weight = protectedPart
+      ? FLOATING_WEIGHT_PROTECTED
+      : element.closest(DIALOG_SELECTOR) ? FLOATING_WEIGHT_DIALOG : FLOATING_WEIGHT_CONTROL;
     obstacles.push({ rect: toRect(rect), weight });
   }
   for (const entry of registry) {
@@ -209,7 +286,14 @@ export interface FloatingAvoidanceOptions {
   element: HTMLElement;
   /** Element that identifies "self" for hit tests (layer host or the element). */
   isSelf: (element: Element) => boolean;
-  margins: FloatingMargins;
+  /**
+   * Fixed margins, or margins derived from the device safe-area insets (the
+   * CSS positions the control with `env(safe-area-inset-*)`, so the model must
+   * use the same numbers). Insets are re-read on bind and on resize.
+   */
+  margins: FloatingMargins | ((insets: FloatingMargins) => FloatingMargins);
+  /** Where the safe-area probe is inserted (the control's shadow root or element). */
+  insetsParent?: Node & ParentNode;
   defaultPosition?: FloatingPosition;
   /** Apply a position (attribute/class on the element; never inline skin styles). */
   apply: (position: FloatingPosition) => void;
@@ -227,7 +311,7 @@ export interface FloatingAvoidance {
 }
 
 export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): FloatingAvoidance {
-  const { element, isSelf, margins, apply, onCompactChange } = options;
+  const { element, isSelf, apply, onCompactChange } = options;
   const doc = element.ownerDocument;
   const view = doc.defaultView;
   const defaultPosition = options.defaultPosition ?? "bottom-left";
@@ -236,6 +320,26 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   let fullSize: FloatingSize = { width: 0, height: 0 };
   let disposed = false;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let lastViewport = { width: 0, height: 0 };
+  let margins: FloatingMargins = { top: 0, right: 0, bottom: 0, left: 0 };
+  let pointer: { x: number; y: number } | null = null;
+  let pendingSince = 0;
+  let lastMoveAt = Number.NEGATIVE_INFINITY;
+  let frozenUntil = 0;
+  let moveTimes: number[] = [];
+  let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleConfirm(delay: number) {
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(() => { confirmTimer = undefined; safeEvaluate(); }, Math.max(0, delay) + 20);
+  }
+  function refreshMargins() {
+    const spec = options.margins;
+    if (typeof spec !== "function") { margins = spec; return; }
+    let insets = { top: 0, right: 0, bottom: 0, left: 0 };
+    try { insets = readSafeAreaInsets(options.insetsParent ?? element); } catch { /* keep zero insets */ }
+    margins = spec(insets);
+  }
+  refreshMargins();
   const entry = {
     owner: element as Element,
     rect: () => {
@@ -257,22 +361,77 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
     if (options.paused?.()) return;
     const box = element.getBoundingClientRect();
     if (!(box.width > 0) || !(box.height > 0)) return;
-    // The expanded footprint is what the user sees on hover/focus, so score
-    // with the largest full size observed (never the compact size).
-    if (!compact) fullSize = { width: Math.max(fullSize.width, box.width), height: Math.max(fullSize.height, box.height) };
-    const size = fullSize.width > 0 ? fullSize : { width: box.width, height: box.height };
     const viewport = { width: view.innerWidth, height: view.innerHeight };
-    const obstacles = collectFloatingObstacles({ doc, isSelf, owner: element });
-    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles });
+    if (viewport.width !== lastViewport.width || viewport.height !== lastViewport.height) {
+      // Rotation / resize: re-read the safe area and forget the old footprint.
+      lastViewport = viewport;
+      fullSize = { width: 0, height: 0 };
+      refreshMargins();
+    }
+    // Score with the expanded footprint the user sees on hover/focus: the live
+    // size while expanded (it follows language changes), the last expanded
+    // size while folded.
+    if (!compact) fullSize = { width: box.width, height: box.height };
+    const size = fullSize.width > 0 ? fullSize : { width: box.width, height: box.height };
+    const small = options.compactSize?.() ?? null;
+    const regions: HostPartRect[] = [];
+    for (const candidate of FLOATING_POSITIONS) {
+      regions.push(floatingRect(candidate, size, viewport, margins));
+      if (small && small.width > 0 && small.height > 0) regions.push(floatingRect(candidate, small, viewport, margins));
+    }
+    const obstacles = collectFloatingObstacles({ doc, isSelf, owner: element, regions });
+    const moveObstacles: FloatingObstacle[] = [];
+    if (pointer) {
+      moveObstacles.push({ rect: { left: pointer.x - POINTER_RADIUS, top: pointer.y - POINTER_RADIUS, width: POINTER_RADIUS * 2, height: POINTER_RADIUS * 2, right: pointer.x + POINTER_RADIUS, bottom: pointer.y + POINTER_RADIUS }, weight: FLOATING_WEIGHT_POINTER });
+    }
+    const focused = doc.activeElement;
+    if (focused && focused !== doc.body && focused !== doc.documentElement && !isSelf(focused)) {
+      const rect = focused.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) moveObstacles.push({ rect: toRect(rect), weight: FLOATING_WEIGHT_POINTER });
+    }
+    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles });
     let next = full;
     let nextCompact = false;
-    const small = full.score > 0 ? options.compactSize?.() : null;
-    if (small && small.width > 0 && small.height > 0) {
-      const reduced = chooseFloatingPosition({ current: full.position, size: small, viewport, margins, obstacles });
-      if (reduced.score < full.score - 1e-6) {
+    if (full.score > 0 && small && small.width > 0 && small.height > 0) {
+      const reduced = chooseFloatingPosition({ current: full.position, size: small, viewport, margins, obstacles, moveObstacles });
+      if (shouldFold(full, reduced)) {
         next = reduced;
         nextCompact = true;
       }
+    }
+    if (next.position === position && nextCompact === compact) {
+      pendingSince = 0;
+      return;
+    }
+    const now = Date.now();
+    if (now < frozenUntil) return;
+    if (!pendingSince) {
+      pendingSince = now;
+      scheduleConfirm(HOST_FLOATING_MOVE_CONFIRM_MS);
+      return;
+    }
+    if (now - pendingSince < HOST_FLOATING_MOVE_CONFIRM_MS) {
+      scheduleConfirm(HOST_FLOATING_MOVE_CONFIRM_MS - (now - pendingSince));
+      return;
+    }
+    if (now - lastMoveAt < HOST_FLOATING_MOVE_MIN_INTERVAL_MS) {
+      scheduleConfirm(HOST_FLOATING_MOVE_MIN_INTERVAL_MS - (now - lastMoveAt));
+      return;
+    }
+    pendingSince = 0;
+    lastMoveAt = now;
+    moveTimes = moveTimes.filter(time => now - time < HOST_FLOATING_FLAP_WINDOW_MS);
+    moveTimes.push(now);
+    if (moveTimes.length > HOST_FLOATING_FLAP_MAX_MOVES) {
+      // Flapping: park at the default corner, expanded, and hold still.
+      moveTimes = [];
+      frozenUntil = now + HOST_FLOATING_FLAP_FREEZE_MS;
+      if (position !== defaultPosition) {
+        position = defaultPosition;
+        apply(position);
+      }
+      setCompact(false);
+      return;
     }
     if (next.position !== position) {
       position = next.position;
@@ -299,10 +458,17 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
     if (clickTimer) clearTimeout(clickTimer);
     clickTimer = setTimeout(safeEvaluate, HOST_FLOATING_AFTER_CLICK_MS);
   };
+  const onPointer = (event: PointerEvent) => { pointer = { x: event.clientX, y: event.clientY }; };
+  const onPointerLeave = () => { pointer = null; };
   if (view) {
     timer = setInterval(safeEvaluate, HOST_FLOATING_INTERVAL_MS);
     view.addEventListener("resize", safeEvaluate, { passive: true });
     doc.addEventListener("click", afterClick, { capture: true, passive: true });
+    // A scrolled list can carry a control under the host control.
+    doc.addEventListener("scroll", afterClick, { capture: true, passive: true });
+    doc.addEventListener("pointermove", onPointer, { capture: true, passive: true });
+    doc.addEventListener("pointerdown", onPointer, { capture: true, passive: true });
+    doc.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
   }
   safeEvaluate();
 
@@ -314,8 +480,13 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       registry.delete(entry);
       if (timer) clearInterval(timer);
       if (clickTimer) clearTimeout(clickTimer);
+      if (confirmTimer) clearTimeout(confirmTimer);
       view?.removeEventListener("resize", safeEvaluate);
       doc.removeEventListener("click", afterClick, { capture: true });
+      doc.removeEventListener("scroll", afterClick, { capture: true });
+      doc.removeEventListener("pointermove", onPointer, { capture: true });
+      doc.removeEventListener("pointerdown", onPointer, { capture: true });
+      doc.documentElement.removeEventListener("pointerleave", onPointerLeave);
       setCompact(false);
     },
   };

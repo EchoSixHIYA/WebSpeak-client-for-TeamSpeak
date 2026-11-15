@@ -316,7 +316,7 @@ test("floating host controls move off skin controls at runtime", { skip: !CHROME
   const port = address && typeof address === "object" ? address.port : 0;
   assert.ok(port, "Vite did not expose a listening port");
 
-  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-floating-placement.html`, ["--virtual-time-budget=10000", "--window-size=1280,800"]);
+  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-floating-placement.html`, ["--virtual-time-budget=60000", "--window-size=1280,800"]);
   const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
   assert.ok(match, "the fixture did not emit a result block");
   const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
@@ -332,6 +332,18 @@ test("floating host controls move off skin controls at runtime", { skip: !CHROME
   assert.equal(first.capsuleHit, true, "the moved capsule is not clickable");
   assert.equal(first.compact, false);
 
+  // Settled: repeated re-checks over ~2 s never move it again (no jitter).
+  assert.deepEqual(byName.stable.positions, [first.position], JSON.stringify(byName.stable));
+  // A full-screen click-away layer is no reason to fold to the mark.
+  assert.equal(byName["click-away"].compact, false, JSON.stringify(byName["click-away"]));
+  // Two host floating controls never overlap, settle, and neither covers Send.
+  const two = byName["two-controls"];
+  assert.equal(two.overlap, false, JSON.stringify(two));
+  assert.equal(two.capMoves, 1, JSON.stringify(two));
+  assert.ok(two.libMoves <= 2, JSON.stringify(two));
+  assert.equal(two.sendCovered, false, JSON.stringify(two));
+  assert.deepEqual(two.covered, [], JSON.stringify(two));
+
   // A modal sheet opened by a click: its buttons are freed within one re-check.
   // Controls under the modal backdrop are not reachable anyway and do not count.
   assert.deepEqual(byName["after-click-sheet"].covered.filter((id) => id === "cancel" || id === "enter"), [], JSON.stringify(byName["after-click-sheet"]));
@@ -343,6 +355,17 @@ test("floating host controls move off skin controls at runtime", { skip: !CHROME
   assert.equal(byName.wall.capsuleHit, true);
 
   assert.equal(byName["wall-removed"].compact, false);
+  // Weighting: plain skin buttons are ordinary even inside the protected app root.
+  assert.deepEqual(
+    { plain: byName.weights.plain, mic: byName.weights.mic, ghost: byName.weights.ghost, custom: byName.weights.custom },
+    { plain: 1, mic: 16, ghost: 0, custom: 1 },
+    JSON.stringify(byName.weights),
+  );
+  // 12 s of a control hopping every 200 ms: at most a handful of moves, then the
+  // capsule holds still (moves ≥ 1 s apart, frozen after 6 in 10 s).
+  t.diagnostic(`flap ${JSON.stringify(byName.flap)} two ${JSON.stringify(byName["two-controls"])}`);
+  assert.ok(byName.flap.moves <= 8, JSON.stringify(byName.flap));
+  assert.equal(byName.flap.capsuleHit, true);
   assert.equal(byName.disposed.compact, false);
 });
 

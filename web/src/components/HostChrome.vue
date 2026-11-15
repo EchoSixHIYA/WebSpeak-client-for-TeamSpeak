@@ -251,6 +251,9 @@ const compactPinned = ref(false);
 const floatPosition = ref<FloatingPosition>("bottom-left");
 const floatCompact = ref(false);
 let floatingAvoidance: FloatingAvoidance | undefined;
+let floatingElement: HTMLElement | null = null;
+/** Sticky `:hover` after a tap on touch screens must not pause avoidance. */
+const canHover = () => typeof matchMedia === "function" && matchMedia("(hover: hover)").matches;
 
 const compact = computed(() => !shortcutExpanded.value
   && !compactPinned.value
@@ -301,15 +304,26 @@ function syncSlotBinding() {
 }
 
 function bindFloating() {
+  const control = recoveryPopover.value;
+  // Idempotent: called on mount and whenever the popover element appears.
+  if (floatingAvoidance && floatingElement === control) return;
   floatingAvoidance?.dispose();
   floatingAvoidance = undefined;
-  const control = recoveryPopover.value;
+  floatingElement = null;
   if (!control || !layer) return;
   const host = layer.host;
+  floatingElement = control;
   floatingAvoidance = bindFloatingAvoidance({
     element: control,
     isSelf: node => node === host || host.contains(node),
-    margins: { top: 12, right: 12, bottom: 38, left: 12 },
+    // Same numbers as RECOVERY_LAYER_CSS, including env(safe-area-inset-*).
+    margins: insets => ({
+      top: Math.max(12, insets.top),
+      right: Math.max(12, insets.right),
+      bottom: 38 + insets.bottom,
+      left: Math.max(12, insets.left),
+    }),
+    insetsParent: layer.shadow,
     defaultPosition: "bottom-left",
     apply: next => { floatPosition.value = next; },
     compactSize: () => {
@@ -322,7 +336,7 @@ function bindFloating() {
     paused: () => slotMode.value === "slotted"
       || shortcutExpanded.value
       || compactPinned.value
-      || control.matches(":hover")
+      || (canHover() && control.matches(":hover"))
       || Boolean(layer.shadow.activeElement),
   });
 }
@@ -366,6 +380,7 @@ watch([recoveryVisible, recoveryPopover], () => {
   void nextTick(() => {
     syncPopover();
     slotBinding?.revalidate();
+    bindFloating();
     floatingAvoidance?.revalidate();
   });
 }, { flush: "post" });
@@ -397,6 +412,8 @@ onBeforeUnmount(() => {
   if (compactHoldTimer) clearTimeout(compactHoldTimer);
   slotBinding?.dispose();
   floatingAvoidance?.dispose();
+  floatingAvoidance = undefined;
+  floatingElement = null;
   recoveryTheme?.dispose();
   window.removeEventListener("resize", refreshLauncherReachability);
   window.removeEventListener("keydown", onKeydown, true);
