@@ -88,6 +88,14 @@ export const HOST_FLOATING_MOVE_MIN_INTERVAL_MS = 1000;
 export const HOST_FLOATING_FLAP_WINDOW_MS = 10_000;
 export const HOST_FLOATING_FLAP_MAX_MOVES = 6;
 export const HOST_FLOATING_FLAP_FREEZE_MS = 10_000;
+/**
+ * After the screen changes (home <-> voice page, skin switch) the old spot was
+ * chosen for controls that no longer exist, so for this long the control moves
+ * as soon as a sample disagrees, without the confirm delay or minimum interval.
+ */
+export const HOST_FLOATING_SCREEN_CHANGE_MS = 1500;
+/** Re-samples after a screen change (the new screen renders over a few frames). */
+export const HOST_FLOATING_SCREEN_CHANGE_SAMPLES_MS = [0, 120, 400, 900] as const;
 /** Parts that wrap ordinary controls; a control inside them is not "protected" by that alone. */
 const CONTAINER_PARTS: ReadonlySet<string> = new Set(["app", "home.footer"]);
 /** Radius around the last pointer position that a move must not land on. */
@@ -144,12 +152,14 @@ export interface FloatingChoice {
 }
 
 /**
- * Keep `current` while it is collision-free (a free control never moves, even
- * when the default corner becomes free again: stability beats tidiness);
- * otherwise take the position with the lowest score. Ties keep `current`, then
- * follow `FLOATING_POSITIONS` order. `moveObstacles` (the user's pointer and
- * focused control) only count against positions the control would move to, so
- * it never jumps under the cursor or onto the field being typed in.
+ * Keep `current` while it is collision-free; otherwise take the position with
+ * the lowest score. Ties keep `current`, then follow `FLOATING_POSITIONS`
+ * order. When `home` (the default corner) is given and both it and `current`
+ * are free, go back home: a spot picked for one screen must not linger over
+ * controls that appear on the next one (e.g. after leaving the voice page).
+ * `moveObstacles` (the user's pointer and focused control) only count against
+ * positions the control would move to, so it never jumps under the cursor or
+ * onto the field being typed in.
  */
 export function chooseFloatingPosition(input: {
   current: FloatingPosition;
@@ -159,6 +169,7 @@ export function chooseFloatingPosition(input: {
   obstacles: readonly FloatingObstacle[];
   moveObstacles?: readonly FloatingObstacle[];
   positions?: readonly FloatingPosition[];
+  home?: FloatingPosition;
 }): FloatingChoice {
   const positions = input.positions ?? FLOATING_POSITIONS;
   const moveObstacles = input.moveObstacles ?? [];
@@ -168,7 +179,10 @@ export function chooseFloatingPosition(input: {
     return position === input.current || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
   };
   const currentScore = scoreAt(input.current);
-  if (currentScore === 0) return { position: input.current, score: 0 };
+  if (currentScore === 0) {
+    if (input.home && input.home !== input.current && scoreAt(input.home) === 0) return { position: input.home, score: 0 };
+    return { position: input.current, score: 0 };
+  }
   let best: FloatingChoice = { position: input.current, score: currentScore };
   for (const position of positions) {
     if (position === input.current) continue;
@@ -306,6 +320,12 @@ export interface FloatingAvoidanceOptions {
 
 export interface FloatingAvoidance {
   revalidate(): void;
+  /**
+   * The page behind the control changed (route/view or skin switch): drop any
+   * pending confirmation and re-place promptly instead of keeping a spot that
+   * was picked for the previous screen.
+   */
+  screenChanged(): void;
   readonly position: FloatingPosition;
   dispose(): void;
 }
@@ -328,6 +348,8 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   let frozenUntil = 0;
   let moveTimes: number[] = [];
   let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+  let urgentUntil = 0;
+  let screenTimers: ReturnType<typeof setTimeout>[] = [];
   function scheduleConfirm(delay: number) {
     if (confirmTimer) clearTimeout(confirmTimer);
     confirmTimer = setTimeout(() => { confirmTimer = undefined; safeEvaluate(); }, Math.max(0, delay) + 20);
@@ -389,7 +411,7 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       const rect = focused.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) moveObstacles.push({ rect: toRect(rect), weight: FLOATING_WEIGHT_POINTER });
     }
-    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles });
+    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles, home: defaultPosition });
     let next = full;
     let nextCompact = false;
     if (full.score > 0 && small && small.width > 0 && small.height > 0) {
@@ -405,16 +427,17 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
     }
     const now = Date.now();
     if (now < frozenUntil) return;
-    if (!pendingSince) {
+    const urgent = now < urgentUntil;
+    if (!urgent && !pendingSince) {
       pendingSince = now;
       scheduleConfirm(HOST_FLOATING_MOVE_CONFIRM_MS);
       return;
     }
-    if (now - pendingSince < HOST_FLOATING_MOVE_CONFIRM_MS) {
+    if (!urgent && now - pendingSince < HOST_FLOATING_MOVE_CONFIRM_MS) {
       scheduleConfirm(HOST_FLOATING_MOVE_CONFIRM_MS - (now - pendingSince));
       return;
     }
-    if (now - lastMoveAt < HOST_FLOATING_MOVE_MIN_INTERVAL_MS) {
+    if (!urgent && now - lastMoveAt < HOST_FLOATING_MOVE_MIN_INTERVAL_MS) {
       scheduleConfirm(HOST_FLOATING_MOVE_MIN_INTERVAL_MS - (now - lastMoveAt));
       return;
     }
@@ -472,11 +495,21 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   }
   safeEvaluate();
 
+  function screenChanged() {
+    if (disposed) return;
+    for (const pending of screenTimers) clearTimeout(pending);
+    pendingSince = 0;
+    urgentUntil = Date.now() + HOST_FLOATING_SCREEN_CHANGE_MS;
+    screenTimers = HOST_FLOATING_SCREEN_CHANGE_SAMPLES_MS.map(delay => setTimeout(safeEvaluate, delay));
+  }
+
   return {
     revalidate: safeEvaluate,
+    screenChanged,
     get position() { return position; },
     dispose() {
       disposed = true;
+      for (const pending of screenTimers) clearTimeout(pending);
       registry.delete(entry);
       if (timer) clearInterval(timer);
       if (clickTimer) clearTimeout(clickTimer);

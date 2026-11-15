@@ -355,6 +355,12 @@ test("floating host controls move off skin controls at runtime", { skip: !CHROME
   assert.equal(byName.wall.capsuleHit, true);
 
   assert.equal(byName["wall-removed"].compact, false);
+  // A screen change re-places the capsule within ~150 ms: back to the free
+  // default corner, off the control that appeared under its old spot.
+  const screen = byName["screen-change"];
+  assert.notEqual(screen.away, "bottom-left", JSON.stringify(screen));
+  assert.equal(screen.position, "bottom-left", JSON.stringify(screen));
+  assert.equal(screen.exportCovered, false, JSON.stringify(screen));
   // Weighting: plain skin buttons are ordinary even inside the protected app root.
   assert.deepEqual(
     { plain: byName.weights.plain, mic: byName.weights.mic, ghost: byName.weights.ghost, custom: byName.weights.custom },

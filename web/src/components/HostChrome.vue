@@ -393,6 +393,12 @@ watch([slotConfig, hostChromeActiveSkinId], () => {
     syncSlotBinding();
   });
 }, { flush: "post" });
+// Home <-> voice page and skin switches replace the controls the floating
+// capsule was avoiding; re-place it promptly (and back to its default corner
+// when that is free) instead of leaving it where the previous screen needed it.
+watch([() => props.connected, hostChromeActiveSkinId], () => {
+  void nextTick(() => floatingAvoidance?.screenChanged());
+}, { flush: "post" });
 watch(thirdPartyAllowed, allowed => { if (!allowed) shortcutOpen.value = false; });
 
 onMounted(() => {

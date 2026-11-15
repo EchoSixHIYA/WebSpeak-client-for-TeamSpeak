@@ -135,6 +135,23 @@ try {
   await settle();
   results.push(snap("wall-removed"));
 
+  // Screen change (voice page -> home): the dock goes away and a new control
+  // appears exactly where the capsule was parked. screenChanged() re-places it
+  // at once (back to the now-free default corner), without the confirm delay.
+  const away = binding.position;
+  const capRect = control.getBoundingClientRect();
+  document.getElementById("mic").style.display = "none";
+  document.body.insertAdjacentHTML("beforeend", `<button type="button" id="export" style="position:fixed;left:${capRect.left}px;top:${capRect.top}px;width:${capRect.width}px;height:${capRect.height}px">Export identity</button>`);
+  binding.screenChanged();
+  await sleep(150);
+  results.push({ ...snap("screen-change"), away, exportCovered: (() => {
+    const r = document.getElementById("export").getBoundingClientRect();
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  })() });
+  document.getElementById("export").remove();
+  document.getElementById("mic").style.display = "";
+  await settle();
+
   // Weights: an unmarked skin button inside the protected "app" root is an
   // ordinary control; the microphone is protected; invisible controls do not
   // count; a custom div[tabindex] button does.

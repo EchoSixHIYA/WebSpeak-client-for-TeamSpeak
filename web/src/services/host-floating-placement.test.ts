@@ -47,6 +47,19 @@ test("the default corner is kept while it is free", () => {
   assert.deepEqual(choice, { position: "bottom-left", score: 0 });
 });
 
+test("a free capsule away from home goes back once the default corner is free, but not while home is busy or under the pointer", () => {
+  // Left the voice page: the spot picked there is free, and so is home.
+  const back = chooseFloatingPosition({ current: "middle-right", size: capsule, viewport, margins, obstacles: [], home: "bottom-left" });
+  assert.deepEqual(back, { position: "bottom-left", score: 0 });
+  // Home still covers the microphone: stay put (no flapping).
+  const busy = chooseFloatingPosition({ current: "middle-right", size: capsule, viewport, margins, obstacles: [{ rect: rect(150, 730, 34, 34), weight: FLOATING_WEIGHT_PROTECTED }], home: "bottom-left" });
+  assert.equal(busy.position, "middle-right");
+  // The pointer rests on home: do not jump under it.
+  const pointer: FloatingObstacle = { rect: rect(84, 727, 32, 32), weight: FLOATING_WEIGHT_POINTER };
+  const underPointer = chooseFloatingPosition({ current: "middle-right", size: capsule, viewport, margins, obstacles: [], moveObstacles: [pointer], home: "bottom-left" });
+  assert.equal(underPointer.position, "middle-right");
+});
+
 test("a capsule over the microphone moves to the first free corner", () => {
   // Persona-style dock: microphone at x≈226 under the default capsule.
   const obstacles: FloatingObstacle[] = [
