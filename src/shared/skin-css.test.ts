@@ -340,6 +340,57 @@ test("protected controls cannot be hidden through variables or moved off-screen"
   assert.doesNotThrow(() => compile('[data-ws-part="host.watermark"] { margin-left: -9999px; }'));
 });
 
+test("protected controls accept every purely visual property", () => {
+  const themed = compileSkinCss(`
+    :root {
+      --skin-ink: #f8fafc;
+      --skin-card: #0f172a;
+      --skin-line: #38bdf8;
+      --skin-pad: 14px;
+      --skin-size: 56px;
+      --skin-shadow: 0 10px 30px #0006;
+    }
+    [data-ws-part="voice.audio-dock.microphone"],
+    [data-ws-part="voice.connection-status.reconnect"],
+    [data-ws-part="home.footer.clear"],
+    [data-ws-part="auth.password.dialog"] {
+      color: var(--skin-ink);
+      background-color: var(--skin-card);
+      background-image: linear-gradient(135deg, #123456, #654321), url("assets/protected-pattern.png");
+      border: 2px solid var(--skin-line);
+      border-radius: 18px;
+      font-family: var(--skin-font, Tahoma, "Segoe UI", sans-serif);
+      font-size: 15px;
+      padding: var(--skin-pad);
+      width: var(--skin-size);
+      height: var(--skin-size);
+      box-shadow: var(--skin-shadow);
+      text-shadow: 0 1px 2px #0008;
+    }
+    [data-ws-part="voice.audio-dock.microphone-panel"]::before,
+    [data-ws-part="auth.password.actions"] > button {
+      background: var(--skin-line);
+      border-color: var(--skin-line);
+      border-radius: 12px;
+    }
+  `, "demo-skin", new Set(["assets/protected-pattern.png"]), 3);
+
+  assert.match(themed.css, /\[data-ws-part="voice\.audio-dock\.microphone"\]/);
+  assert.match(themed.css, /wskin-asset:assets%2Fprotected-pattern\.png/);
+  // The hide/move guarantees are unchanged.
+  for (const css of [
+    '[data-ws-part="voice.audio-dock.microphone"] { display: none; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { visibility: hidden; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { opacity: 0; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { pointer-events: none; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { clip-path: inset(100%); }',
+    '[data-ws-part="voice.audio-dock.microphone"] { transform: translateY(-9999px); }',
+    ':root { --skin-pull: -9999px; } [data-ws-part="voice.audio-dock.microphone"] { margin-left: var(--skin-pull); }',
+  ]) {
+    assert.throws(() => compile(css), /must remain available|must remain on screen|cannot use indirect values/, css);
+  }
+});
+
 test("host chrome cannot be restyled into a viewport-sized overlay", () => {
   assert.throws(
     () => compile('[data-ws-part="host.plugins.overlay"] { position: fixed; inset: 0; z-index: 2147483647; }'),

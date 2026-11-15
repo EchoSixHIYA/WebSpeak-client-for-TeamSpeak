@@ -31,10 +31,10 @@ const CSS = `
 .cap {
   position: fixed; inset: auto auto 12px 12px; margin: 0;
   display: flex; gap: 4px; padding: 4px; border: 0; pointer-events: auto;
-  background: var(--ws-recovery-background, #fff);
-  color: var(--ws-recovery-foreground, #31524f);
+  background: var(--ws-control-background, #fff);
+  color: var(--ws-control-foreground, #31524f);
 }
-.cap button { min-height: var(--ws-recovery-hit, 28px); padding: 0 8px; }
+.cap button { min-height: var(--ws-control-hit, 28px); padding: 0 8px; }
 `;
 try {
   const layer = createHostOwnedLayer("recovery", CSS);
@@ -113,7 +113,7 @@ try {
   binding.dispose();
   results.push({
     ...snap("disposed"),
-    leftoverAccent: control.style.getPropertyValue("--ws-recovery-accent"),
+    leftoverAccent: control.style.getPropertyValue("--ws-control-accent"),
   });
   output.textContent = JSON.stringify({ results, changes });
 } catch (error) {

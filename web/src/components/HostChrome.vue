@@ -85,6 +85,11 @@ import {
 import { bindHostSlot, type HostSlotBinding } from "../services/host-slot-placement.js";
 import { shouldShowRecovery } from "../services/host-chrome-visibility.js";
 import { thirdPartyAllowed } from "../services/instance-authorization.js";
+import {
+  RECOVERY_CONTROL_DEFAULTS,
+  bindHostControlTheme,
+  findSkinRoot,
+} from "../services/host-control-tokens.js";
 
 const props = withDefaults(defineProps<{ language: SiteLanguage; connected?: boolean; pluginLibraryAvailable?: boolean }>(), { connected: false });
 const copy = computed(() => hostChromeCopy[props.language] ?? hostChromeCopy.en);
@@ -102,12 +107,12 @@ const RECOVERY_LAYER_CSS = `
   gap: 4px;
   max-width: calc(100vw - 24px);
   padding: 4px 5px 4px 9px;
-  border: 1px solid #9db6b2;
-  border-radius: var(--ws-recovery-radius, 999px);
-  background: var(--ws-recovery-background, color-mix(in srgb, #ffffff 92%, transparent));
-  color: var(--ws-recovery-foreground, #31524f);
-  font-family: var(--ws-recovery-font, ui-sans-serif, system-ui, sans-serif);
-  font-size: var(--ws-recovery-font-size, 11px);
+  border: 1px solid var(--ws-control-border, #9db6b2);
+  border-radius: var(--ws-control-radius, 999px);
+  background: var(--ws-control-background, color-mix(in srgb, #ffffff 92%, transparent));
+  color: var(--ws-control-foreground, #31524f);
+  font-family: var(--ws-control-font, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--ws-control-font-size, 11px);
   box-shadow: 0 6px 18px #0f2a2626;
   pointer-events: auto;
 }
@@ -122,18 +127,18 @@ const RECOVERY_LAYER_CSS = `
 .ws-host-recovery button {
   display: inline-flex;
   align-items: center;
-  min-height: var(--ws-recovery-hit, 28px);
+  min-height: var(--ws-control-hit, 28px);
   padding: 4px 9px;
-  border: 1px solid #9db6b2;
-  border-radius: var(--ws-recovery-radius, 999px);
-  background: var(--ws-recovery-background, #fff);
-  color: var(--ws-recovery-foreground, #31524f);
+  border: 1px solid var(--ws-control-border, #9db6b2);
+  border-radius: var(--ws-control-radius, 999px);
+  background: var(--ws-control-background, #fff);
+  color: var(--ws-control-foreground, #31524f);
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
 }
 .ws-host-recovery button[data-ws-recovery-action="built-in"] {
-  border-color: var(--ws-recovery-builtin-border, #b45309);
+  border-color: var(--ws-control-builtin-border, #b45309);
   background: #fff7ed;
   color: #7c2d12;
 }
@@ -142,10 +147,10 @@ const RECOVERY_LAYER_CSS = `
 .ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) { gap: 0; padding: 4px; }
 .ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) .ws-host-recovery-action { display: none; }
 .ws-host-recovery.ws-host-recovery-compact:not(:hover):not(:focus-within) .ws-host-recovery-mark {
-  min-width: var(--ws-recovery-hit, 28px);
-  min-height: var(--ws-recovery-hit, 28px);
+  min-width: var(--ws-control-hit, 28px);
+  min-height: var(--ws-control-hit, 28px);
 }
-.ws-host-recovery.ws-host-recovery-compact:focus-visible { outline: 2px solid var(--ws-recovery-accent, #4c8f88); outline-offset: 2px; }
+.ws-host-recovery.ws-host-recovery-compact:focus-visible { outline: 2px solid var(--ws-control-accent, #4c8f88); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .ws-host-recovery, .ws-host-recovery button { transition: none !important; }
 }
@@ -172,6 +177,21 @@ const showRecovery = computed(() => shouldShowRecovery({
 // already reset). It never renders decoration on its own.
 const shortcutOpen = ref(false);
 const recoveryPopover = ref<HTMLElement | null>(null);
+
+/**
+ * Theme the capsule even when the skin does not declare a slot. `bindHostSlot`
+ * still reads the anchor first when a slot exists; this root-level pass covers
+ * the floating capsule and is overwritten by the anchor values on the next
+ * revalidation.
+ */
+const recoveryTheme = layer ? bindHostControlTheme({
+  layer,
+  control: () => recoveryPopover.value,
+  part: "host.recovery",
+  defaults: RECOVERY_CONTROL_DEFAULTS,
+  source: () => findSkinRoot(hostChromeActiveSkinId.value),
+}) : null;
+
 const recoveryVisible = computed(() => showRecovery.value || (shortcutOpen.value && thirdPartyAllowed.value));
 
 /**
@@ -238,6 +258,9 @@ let slotBinding: HostSlotBinding | undefined;
 function syncSlotBinding() {
   slotBinding?.dispose();
   slotBinding = undefined;
+  // Disposing a slot clears its inline tokens; restore the root-level theme
+  // before deciding whether a new anchor should override it.
+  recoveryTheme?.apply();
   // A fresh binding starts floating and reports its first successful dock.
   slotMode.value = "floating";
   const control = recoveryPopover.value;
@@ -294,6 +317,9 @@ watch([recoveryVisible, recoveryPopover], () => {
     slotBinding?.revalidate();
   });
 }, { flush: "post" });
+watch([recoveryPopover, hostChromeActiveSkinId], () => {
+  void nextTick(() => recoveryTheme?.apply());
+}, { flush: "post", immediate: true });
 watch([slotConfig, hostChromeActiveSkinId], () => {
   void nextTick(() => {
     syncPopover();
@@ -317,6 +343,7 @@ onBeforeUnmount(() => {
   if (reachabilityTimer) clearInterval(reachabilityTimer);
   if (compactHoldTimer) clearTimeout(compactHoldTimer);
   slotBinding?.dispose();
+  recoveryTheme?.dispose();
   window.removeEventListener("resize", refreshLauncherReachability);
   window.removeEventListener("keydown", onKeydown, true);
   window.removeEventListener("pointerdown", onDocumentPointerDown, true);

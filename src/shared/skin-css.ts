@@ -67,7 +67,12 @@ const HOST_OVERLAY_LOCKED_PROPERTIES = new Set([
   "aspect-ratio", "margin", "margin-block", "margin-inline", "margin-block-start", "margin-block-end",
   "margin-inline-start", "margin-inline-end",
 ]);
-/** Properties whose indirect values could smuggle a hidden or moved control past the static checks. */
+/**
+ * Properties whose indirect values could smuggle a hidden or moved control past
+ * the static checks. Purely visual properties (colour, background, border,
+ * radius, font, shadow, padding, width/height) are deliberately absent: a
+ * protected control may theme them with `var()`.
+ */
 const INDIRECT_VALUE_PROPERTIES = new Set([
   "all", "display", "visibility", "opacity", "pointer-events", "clip-path", "mask", "mask-image",
   "position", "top", "right", "bottom", "left", "inset",

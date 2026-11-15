@@ -2,22 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   INITIAL_SLOT_MODE_STATE,
-  RECOVERY_BUILT_IN_BUTTON_BACKGROUND,
-  RECOVERY_MIN_ACCENT_CONTRAST,
-  RECOVERY_MIN_FONT_SIZE,
-  RECOVERY_MIN_FOREGROUND_CONTRAST,
-  RECOVERY_MIN_HIT_TARGET,
-  RECOVERY_SIZE_METRICS,
   computeSlotPlacement,
-  contrastRatio,
   evaluateSlottedControl,
   nextSlotModeState,
-  parseCssColor,
   rectsOverlap,
-  relativeLuminance,
-  resolveRecoveryTokens,
   type SlotAnchorSnapshot,
 } from "./host-slot-placement.js";
+import { HOST_CONTROL_MIN_HIT_TARGET } from "./host-control-tokens.js";
 import type { HostPartRect } from "./host-chrome-visibility.js";
 
 const rect = (left: number, top: number, width: number, height: number): HostPartRect => ({
@@ -41,7 +32,7 @@ const baseEvaluation = {
   anchor: anchor(),
   controlRect: rect(180, 105, 120, 30),
   viewport: { width: 800, height: 600 },
-  minHitTarget: RECOVERY_MIN_HIT_TARGET,
+  minHitTarget: HOST_CONTROL_MIN_HIT_TARGET,
   hitTestOk: true,
 };
 
@@ -135,90 +126,6 @@ test("control size, position and hit test are enforced", () => {
   );
 });
 
-test("CSS colours parse to RGB and ignore alpha for contrast", () => {
-  assert.deepEqual(parseCssColor("#1d4f9c"), { r: 29, g: 79, b: 156 });
-  assert.deepEqual(parseCssColor("#fff"), { r: 255, g: 255, b: 255 });
-  assert.deepEqual(parseCssColor("#ffff"), { r: 255, g: 255, b: 255 });
-  assert.deepEqual(parseCssColor("rgb(29, 79, 156)"), { r: 29, g: 79, b: 156 });
-  assert.deepEqual(parseCssColor("rgb(29 79 156 / 50%)"), { r: 29, g: 79, b: 156 });
-  assert.deepEqual(parseCssColor("rgba(255, 0, 0, .4)"), { r: 255, g: 0, b: 0 });
-  assert.deepEqual(parseCssColor("rgb(300, -5, 0)"), { r: 255, g: 0, b: 0 });
-  for (const invalid of ["", "red", "hsl(10, 20%, 30%)", "color(srgb 1 0 0)", "#12345", "rgb(1, 2)"]) {
-    assert.equal(parseCssColor(invalid), null, invalid);
-  }
-});
-
-test("WCAG contrast follows the relative-luminance formula", () => {
-  assert.equal(relativeLuminance({ r: 0, g: 0, b: 0 }), 0);
-  assert.equal(relativeLuminance({ r: 255, g: 255, b: 255 }), 1);
-  assert.equal(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }), 21);
-  assert.equal(contrastRatio({ r: 12, g: 34, b: 56 }, { r: 12, g: 34, b: 56 }), 1);
-});
-
-test("skin tokens default to the host palette", () => {
-  const tokens = resolveRecoveryTokens();
-  assert.deepEqual(tokens, {
-    accent: "rgb(180, 83, 9)",
-    builtInBorder: "rgb(180, 83, 9)",
-    background: "rgb(255, 255, 255)",
-    foreground: "rgb(49, 82, 79)",
-    radius: 999,
-    font: "ui-sans-serif, system-ui, sans-serif",
-    size: "small",
-    hitTarget: 28,
-    fontSize: 11,
-  });
-});
-
-test("a readable skin palette is kept and translucent backgrounds become opaque", () => {
-  const tokens = resolveRecoveryTokens({
-    accent: "#47dcc4",
-    background: "rgba(9, 19, 23, 0.4)",
-    foreground: "#edf8f5",
-  });
-  assert.equal(tokens.accent, "rgb(71, 220, 196)");
-  assert.equal(tokens.background, "rgb(9, 19, 23)");
-  assert.equal(tokens.foreground, "rgb(237, 248, 245)");
-});
-
-test("an unreadable colour group falls back as a whole", () => {
-  const lowForeground = resolveRecoveryTokens({ background: "#777777", foreground: "#888888", accent: "#47dcc4" });
-  assert.equal(lowForeground.background, "rgb(255, 255, 255)");
-  assert.equal(lowForeground.foreground, "rgb(49, 82, 79)");
-  assert.equal(lowForeground.accent, "rgb(180, 83, 9)");
-
-  const lowAccent = resolveRecoveryTokens({ background: "#ffffff", foreground: "#31524f", accent: "#eeeeee" });
-  assert.equal(lowAccent.accent, "rgb(180, 83, 9)");
-  assert.ok(contrastRatio(parseCssColor(lowAccent.accent)!, parseCssColor(lowAccent.background)!) >= RECOVERY_MIN_ACCENT_CONTRAST);
-  assert.ok(contrastRatio(parseCssColor(lowAccent.foreground)!, parseCssColor(lowAccent.background)!) >= RECOVERY_MIN_FOREGROUND_CONTRAST);
-});
-
-test("radius, font and size tokens are sanitized and host minimums win", () => {
-  assert.equal(resolveRecoveryTokens({ radius: "12px" }).radius, 12);
-  assert.equal(resolveRecoveryTokens({ radius: "2000px" }).radius, 999);
-  assert.equal(resolveRecoveryTokens({ radius: "-5px" }).radius, 0);
-  assert.equal(resolveRecoveryTokens({ radius: "1em" }).radius, 999);
-  assert.equal(resolveRecoveryTokens({ radius: "12" }).radius, 999);
-
-  assert.equal(
-    resolveRecoveryTokens({ font: 'Tahoma, "Segoe UI", sans-serif' }).font,
-    'Tahoma, "Segoe UI", sans-serif',
-  );
-  for (const font of ["url(https://example.invalid/a.woff2)", "Tahoma; color: red", "x".repeat(121)]) {
-    assert.equal(resolveRecoveryTokens({ font }).font, "ui-sans-serif, system-ui, sans-serif", font);
-  }
-
-  assert.equal(resolveRecoveryTokens({ size: "medium" }).hitTarget, 32);
-  assert.equal(resolveRecoveryTokens({ size: "medium" }).fontSize, 12);
-  assert.equal(resolveRecoveryTokens({ size: "large" }).hitTarget, 36);
-  assert.equal(resolveRecoveryTokens({ size: "large" }).fontSize, 13);
-  assert.equal(resolveRecoveryTokens({ size: "huge" }).size, "small");
-  for (const metrics of Object.values(RECOVERY_SIZE_METRICS)) {
-    assert.ok(metrics.hitTarget >= RECOVERY_MIN_HIT_TARGET);
-    assert.ok(metrics.fontSize >= RECOVERY_MIN_FONT_SIZE);
-  }
-});
-
 test("the mode gate does not flap between the anchor and the fallback", () => {
   let state = INITIAL_SLOT_MODE_STATE;
   // The first valid check slots immediately, even under the anti-flap rule.
@@ -258,15 +165,4 @@ test("rect overlap ignores edge contact and sub-pixel slivers", () => {
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(100, 0, 50, 40)), false);
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(99.5, 0, 50, 40)), false);
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(0, 60, 100, 40)), false);
-});
-
-test("the built-in button border only uses an accent visible on its fixed light background", () => {
-  // Passes against the dark skin background, but vanishes on #fff7ed.
-  const pale = resolveRecoveryTokens({ background: "#141414", foreground: "#ffffff", accent: "#fff7ec" });
-  assert.equal(pale.accent, "rgb(255, 247, 236)");
-  assert.equal(pale.builtInBorder, "rgb(180, 83, 9)");
-  assert.ok(contrastRatio(parseCssColor(pale.builtInBorder)!, RECOVERY_BUILT_IN_BUTTON_BACKGROUND) >= RECOVERY_MIN_ACCENT_CONTRAST);
-
-  const strong = resolveRecoveryTokens({ background: "#ffffff", foreground: "#111111", accent: "#1d4ed8" });
-  assert.equal(strong.builtInBorder, "rgb(29, 78, 216)");
 });

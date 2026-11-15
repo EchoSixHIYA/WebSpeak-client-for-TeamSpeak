@@ -17,6 +17,15 @@ import type { SkinChromeSlotAlign } from "../../../src/shared/skin-chrome.js";
 import type { HostOwnedLayer } from "./host-owned-layer.js";
 import { isHostPartReachable, type HostPartRect } from "./host-chrome-visibility.js";
 import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
+import {
+  RECOVERY_CONTROL_DEFAULTS,
+  applyHostControlTokens,
+  createHostControlColorProbe,
+  findSkinRoot,
+  resolveHostControlTokens,
+  type HostControlTokens,
+  type HostControlColorProbe,
+} from "./host-control-tokens.js";
 
 export interface SlotViewport {
   width: number;
@@ -191,229 +200,6 @@ export function nextSlotModeState(
 }
 
 /* ------------------------------------------------------------------ *
- * Style tokens
- * ------------------------------------------------------------------ */
-
-export type RecoverySizeTier = "small" | "medium" | "large";
-
-export interface RecoverySizeMetrics {
-  /** Host-enforced minimum button hit target in CSS pixels. */
-  readonly hitTarget: number;
-  /** Host-enforced minimum font size in CSS pixels. */
-  readonly fontSize: number;
-}
-
-export const RECOVERY_MIN_HIT_TARGET = 28;
-export const RECOVERY_MIN_FONT_SIZE = 11;
-export const RECOVERY_MIN_FOREGROUND_CONTRAST = 4.5;
-export const RECOVERY_MIN_ACCENT_CONTRAST = 3;
-
-/** Host-controlled metrics; a skin can choose a tier, never a smaller size. */
-export const RECOVERY_SIZE_METRICS: Readonly<Record<RecoverySizeTier, RecoverySizeMetrics>> = {
-  small: { hitTarget: RECOVERY_MIN_HIT_TARGET, fontSize: RECOVERY_MIN_FONT_SIZE },
-  medium: { hitTarget: 32, fontSize: 12 },
-  large: { hitTarget: 36, fontSize: 13 },
-};
-
-export interface RecoveryRawTokens {
-  /** Computed-style colour values; unresolved CSS values are rejected. */
-  accent?: string;
-  background?: string;
-  foreground?: string;
-  radius?: string;
-  font?: string;
-  size?: string;
-}
-
-export interface RecoveryTokens {
-  accent: string;
-  /**
-   * Border of the built-in-skin button, which keeps its own fixed light
-   * background (`#fff7ed`). The skin accent is used only when it stays visible
-   * against that background; otherwise the host default accent is used there.
-   */
-  builtInBorder: string;
-  background: string;
-  foreground: string;
-  radius: number;
-  font: string;
-  size: RecoverySizeTier;
-  hitTarget: number;
-  fontSize: number;
-}
-
-export interface RgbColor {
-  r: number;
-  g: number;
-  b: number;
-}
-
-/** CSS custom properties a skin declares on the anchor or an ancestor. */
-export const RECOVERY_SKIN_TOKEN_PROPERTIES = {
-  accent: "--skin-recovery-accent",
-  background: "--skin-recovery-background",
-  foreground: "--skin-recovery-foreground",
-  radius: "--skin-recovery-radius",
-  font: "--skin-recovery-font",
-  size: "--skin-recovery-size",
-} as const;
-
-/** Host-owned variables set inside the closed shadow root. */
-export const RECOVERY_APPLIED_VARIABLES = {
-  accent: "--ws-recovery-accent",
-  builtInBorder: "--ws-recovery-builtin-border",
-  background: "--ws-recovery-background",
-  foreground: "--ws-recovery-foreground",
-  radius: "--ws-recovery-radius",
-  font: "--ws-recovery-font",
-  hitTarget: "--ws-recovery-hit",
-  fontSize: "--ws-recovery-font-size",
-} as const;
-
-const DEFAULT_ACCENT: RgbColor = { r: 180, g: 83, b: 9 };
-/** Fixed background of the built-in-skin button (`#fff7ed`). */
-export const RECOVERY_BUILT_IN_BUTTON_BACKGROUND: RgbColor = { r: 255, g: 247, b: 237 };
-const DEFAULT_BACKGROUND: RgbColor = { r: 255, g: 255, b: 255 };
-const DEFAULT_FOREGROUND: RgbColor = { r: 49, g: 82, b: 79 };
-const DEFAULT_RADIUS = 999;
-const DEFAULT_FONT = "ui-sans-serif, system-ui, sans-serif";
-const MAX_RADIUS = 999;
-const MAX_FONT_LENGTH = 120;
-const FONT_FAMILY_PATTERN = /^[A-Za-z0-9 ,'"-]{1,120}$/;
-
-/** Parse `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()` and `rgba()`. */
-export function parseCssColor(value: string | undefined | null): RgbColor | null {
-  if (!value) return null;
-  const text = value.trim().toLowerCase();
-  const hex = /^#([0-9a-f]{3,8})$/.exec(text);
-  if (hex) {
-    const digits = hex[1];
-    if (digits.length === 3 || digits.length === 4) {
-      return {
-        r: Number.parseInt(digits[0] + digits[0], 16),
-        g: Number.parseInt(digits[1] + digits[1], 16),
-        b: Number.parseInt(digits[2] + digits[2], 16),
-      };
-    }
-    if (digits.length === 6 || digits.length === 8) {
-      return {
-        r: Number.parseInt(digits.slice(0, 2), 16),
-        g: Number.parseInt(digits.slice(2, 4), 16),
-        b: Number.parseInt(digits.slice(4, 6), 16),
-      };
-    }
-    return null;
-  }
-
-  const fn = /^rgba?\(([^()]*)\)$/.exec(text);
-  if (!fn) return null;
-  const parts = fn[1].replace(/\//g, " ").split(/[\s,]+/).filter(Boolean);
-  if (parts.length < 3 || parts.length > 4) return null;
-  const channels: number[] = [];
-  for (const part of parts.slice(0, 3)) {
-    const percent = part.endsWith("%");
-    const parsed = Number.parseFloat(part);
-    if (!Number.isFinite(parsed)) return null;
-    const channel = percent ? parsed * 2.55 : parsed;
-    channels.push(Math.round(Math.min(255, Math.max(0, channel))));
-  }
-  return { r: channels[0], g: channels[1], b: channels[2] };
-}
-
-export function formatRgb(color: RgbColor): string {
-  return `rgb(${color.r}, ${color.g}, ${color.b})`;
-}
-
-/** WCAG 2.x relative luminance, 0 (black) to 1 (white). */
-export function relativeLuminance(color: RgbColor): number {
-  const channel = (value: number): number => {
-    const normalized = Math.min(255, Math.max(0, value)) / 255;
-    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
-}
-
-export function contrastRatio(first: RgbColor, second: RgbColor): number {
-  const lighter = Math.max(relativeLuminance(first), relativeLuminance(second));
-  const darker = Math.min(relativeLuminance(first), relativeLuminance(second));
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-export function isRecoverySizeTier(value: unknown): value is RecoverySizeTier {
-  return value === "small" || value === "medium" || value === "large";
-}
-
-function sanitizeRadius(value: string | undefined): number {
-  if (!value) return DEFAULT_RADIUS;
-  const match = /^(-?\d+(?:\.\d+)?)px$/i.exec(value.trim());
-  if (!match) return DEFAULT_RADIUS;
-  const radius = Number.parseFloat(match[1]);
-  return Number.isFinite(radius) ? Math.min(MAX_RADIUS, Math.max(0, radius)) : DEFAULT_RADIUS;
-}
-
-function sanitizeFont(value: string | undefined): string {
-  if (!value) return DEFAULT_FONT;
-  const font = value.trim().replace(/\s+/g, " ");
-  if (!font || font.length > MAX_FONT_LENGTH || !FONT_FAMILY_PATTERN.test(font) || !/[A-Za-z0-9]/.test(font)) {
-    return DEFAULT_FONT;
-  }
-  return font;
-}
-
-/**
- * Sanitize skin-provided tokens. Colours are all-or-nothing: a readable
- * foreground/background pair and a visible accent keep the skin palette;
- * otherwise the whole colour group reverts to the host palette so a skin can
- * never make the recovery action unreadable.
- */
-export function resolveRecoveryTokens(raw: RecoveryRawTokens = {}): RecoveryTokens {
-  const accent = parseCssColor(raw.accent) ?? DEFAULT_ACCENT;
-  const background = parseCssColor(raw.background) ?? DEFAULT_BACKGROUND;
-  const foreground = parseCssColor(raw.foreground) ?? DEFAULT_FOREGROUND;
-  const readable = contrastRatio(foreground, background) >= RECOVERY_MIN_FOREGROUND_CONTRAST
-    && contrastRatio(accent, background) >= RECOVERY_MIN_ACCENT_CONTRAST;
-  const palette = readable ? { accent, background, foreground } : {
-    accent: DEFAULT_ACCENT,
-    background: DEFAULT_BACKGROUND,
-    foreground: DEFAULT_FOREGROUND,
-  };
-  const sizeValue = raw.size?.trim();
-  const size = isRecoverySizeTier(sizeValue) ? sizeValue : "small";
-  const metrics = RECOVERY_SIZE_METRICS[size];
-  const builtInBorder = contrastRatio(palette.accent, RECOVERY_BUILT_IN_BUTTON_BACKGROUND) >= RECOVERY_MIN_ACCENT_CONTRAST
-    ? palette.accent
-    : DEFAULT_ACCENT;
-  return {
-    accent: formatRgb(palette.accent),
-    builtInBorder: formatRgb(builtInBorder),
-    background: formatRgb(palette.background),
-    foreground: formatRgb(palette.foreground),
-    radius: sanitizeRadius(raw.radius),
-    font: sanitizeFont(raw.font),
-    size,
-    hitTarget: metrics.hitTarget,
-    fontSize: metrics.fontSize,
-  };
-}
-
-/** Apply (or clear) host-owned variables on the control inside the shadow root. */
-export function applyRecoveryTokens(control: HTMLElement, tokens: RecoveryTokens | null): void {
-  const style = control.style;
-  if (!tokens) {
-    for (const property of Object.values(RECOVERY_APPLIED_VARIABLES)) style.removeProperty(property);
-    return;
-  }
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.accent, tokens.accent);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.builtInBorder, tokens.builtInBorder);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.background, tokens.background);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.foreground, tokens.foreground);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.radius, `${tokens.radius}px`);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.font, tokens.font);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.hitTarget, `${tokens.hitTarget}px`);
-  style.setProperty(RECOVERY_APPLIED_VARIABLES.fontSize, `${tokens.fontSize}px`);
-}
-
-/* ------------------------------------------------------------------ *
  * DOM binding
  * ------------------------------------------------------------------ */
 
@@ -506,14 +292,6 @@ export function resolveSkinAnchor(
   return null;
 }
 
-/** The active skin's root element; the token source while no anchor is usable. */
-export function findSkinRoot(skinId: string | undefined, doc: Document = document): Element | null {
-  for (const root of doc.querySelectorAll(".ws-skin-root")) {
-    if (!skinId || root.getAttribute("data-ws-skin") === skinId) return root;
-  }
-  return null;
-}
-
 export interface HostSlotModeChange {
   mode: "slotted" | "floating";
   reason?: SlotFailureReason;
@@ -560,7 +338,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   let lastReason: SlotFailureReason | undefined;
   let currentAnchor: HTMLElement | null = null;
   let observer: ResizeObserver | null = null;
-  let probe: HTMLElement | null = null;
+  const colorProbe: HostControlColorProbe = createHostControlColorProbe(layer.shadow);
   let frame: number | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
@@ -570,45 +348,14 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   const requestFrame = (callback: FrameRequestCallback): number => win.requestAnimationFrame(callback);
   const cancelFrame = (handle: number): void => win.cancelAnimationFrame(handle);
 
-  function ensureProbe(): HTMLElement | null {
-    if (probe) return probe;
-    probe = doc.createElement("span");
-    probe.setAttribute("aria-hidden", "true");
-    probe.style.cssText = "position:absolute;left:-9999px;top:0;width:0;height:0;visibility:hidden;pointer-events:none;";
-    layer.shadow.append(probe);
-    return probe;
-  }
-
-  /** Resolve a CSS colour through the browser, inside the closed shadow root. */
-  function probeColor(raw: string | undefined): string | undefined {
-    if (!raw) return undefined;
-    const element = ensureProbe();
-    if (!element) return undefined;
-    // An invalid value leaves the previous colour in place. Probe against two
-    // different sentinels so a real token equal to one of them still resolves.
-    const resolveWith = (sentinel: string): string => {
-      element.style.color = sentinel;
-      element.style.color = raw;
-      return win.getComputedStyle(element).color;
-    };
-    const first = resolveWith("rgb(1, 2, 3)");
-    if (first !== "rgb(1, 2, 3)") return first;
-    const second = resolveWith("rgb(4, 5, 6)");
-    return second === "rgb(4, 5, 6)" ? undefined : second;
-  }
-
-  function readTokens(source: Element | null): RecoveryTokens {
-    if (!source) return resolveRecoveryTokens();
-    const style = win.getComputedStyle(source);
-    const read = (property: string): string | undefined => style.getPropertyValue(property).trim() || undefined;
-    return resolveRecoveryTokens({
-      accent: probeColor(read(RECOVERY_SKIN_TOKEN_PROPERTIES.accent)),
-      background: probeColor(read(RECOVERY_SKIN_TOKEN_PROPERTIES.background)),
-      foreground: probeColor(read(RECOVERY_SKIN_TOKEN_PROPERTIES.foreground)),
-      radius: read(RECOVERY_SKIN_TOKEN_PROPERTIES.radius),
-      font: read(RECOVERY_SKIN_TOKEN_PROPERTIES.font),
-      size: read(RECOVERY_SKIN_TOKEN_PROPERTIES.size),
-    });
+  function readTokens(source: Element | null): HostControlTokens {
+    if (!source) return resolveHostControlTokens(null, "host.recovery", colorProbe.probeColor, RECOVERY_CONTROL_DEFAULTS);
+    return resolveHostControlTokens(
+      win.getComputedStyle(source),
+      "host.recovery",
+      colorProbe.probeColor,
+      RECOVERY_CONTROL_DEFAULTS,
+    );
   }
 
   function clearPlacement(): void {
@@ -656,7 +403,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     const tokenSource = anchorElement
       ?? (options.skinId ? findSkinRoot(options.skinId, doc) : null);
     const tokens = readTokens(tokenSource);
-    applyRecoveryTokens(control, tokenSource ? tokens : null);
+    applyHostControlTokens(control, tokenSource ? tokens : null);
 
     const controlBox = control.getBoundingClientRect();
     maxSize = {
@@ -783,9 +530,8 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       win.removeEventListener("resize", schedule);
       win.removeEventListener("scroll", schedule, { capture: true });
       clearPlacement();
-      applyRecoveryTokens(control, null);
-      probe?.remove();
-      probe = null;
+      applyHostControlTokens(control, null);
+      colorProbe.dispose();
     },
   };
 }

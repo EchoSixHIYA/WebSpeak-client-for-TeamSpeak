@@ -92,6 +92,13 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(hostChromeService, /export function activeHostSlot/);
   assert.match(hostChromeService, /HOST_SLOTTABLE_PART_IDS\.has\(part\)/);
   assert.match(hostChromeService, /isThirdPartySkinActive\(\)/);
+  // Host-owned controls share one sanitized token reader; no per-control palette copy.
+  assert.match(hostChrome, /bindHostControlTheme/);
+  assert.match(hostChrome, /--ws-control-background/);
+  assert.match(recoveryNotice, /SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS/);
+  assert.match(recoveryNotice, /--ws-control-background/);
+  assert.match(authorization, /PERMISSION_CONTROL_DEFAULTS/);
+  assert.match(authorization, /--ws-control-background/);
 
   // Authorization: showModal() inside the same host-owned mechanism.
   assert.match(authorization, /createHostOwnedLayer\('authorization'/);
