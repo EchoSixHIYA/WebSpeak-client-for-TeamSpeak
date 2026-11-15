@@ -375,6 +375,46 @@ test("floating host controls move off skin controls at runtime", { skip: !CHROME
   assert.equal(byName.disposed.compact, false);
 });
 
+test("floating host controls see through toasts and still step off a control while frozen", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(`http://127.0.0.1:${port}/test/fixtures/host-floating-transient.html`, ["--virtual-time-budget=60000", "--window-size=1280,800"]);
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  const byName = Object.fromEntries(payload.results.map((result) => [result.name, result]));
+  t.diagnostic(JSON.stringify(payload.results));
+
+  // open-voice-surface desktop: toasts passing over "Share accompaniment" no
+  // longer make the default bottom-right corner look free.
+  const toast = byName["toast-transient"];
+  assert.notEqual(toast.settled, "bottom-right", JSON.stringify(toast));
+  assert.ok(!toast.positions.includes("bottom-right"), JSON.stringify(toast));
+  assert.equal(toast.coveredSamples, 0, JSON.stringify(toast));
+  assert.equal(toast.finalCovered, false, JSON.stringify(toast));
+
+  // Parked at the default corner by the flap freeze on top of a control: one
+  // escape about 1 s after the freeze (inside the 3 s pin), then still for the rest of it.
+  const freeze = byName["freeze-escape"];
+  assert.equal(freeze.flapMoves, 6, JSON.stringify(freeze));
+  assert.equal(freeze.parkedPosition, "bottom-right", JSON.stringify(freeze));
+  assert.equal(freeze.escapes.length, 1, JSON.stringify(freeze));
+  assert.notEqual(freeze.escapes[0].position, "bottom-right", JSON.stringify(freeze));
+  assert.ok(freeze.escapes[0].afterPinMs < 3000, JSON.stringify(freeze));
+  assert.equal(freeze.movesWhileHeld, 0, JSON.stringify(freeze));
+});
+
 test("host control tokens follow late skin CSS, resolve modern colours and refuse skin fonts", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
   const server = await createServer({
     root: webRoot,

@@ -9,6 +9,7 @@ import {
   floatingRect,
   shouldFold,
   floatingScore,
+  reachableThrough,
   type FloatingObstacle,
 } from "./host-floating-placement.js";
 import type { HostPartRect } from "./host-chrome-visibility.js";
@@ -141,4 +142,39 @@ test("with every spot taken, the capsule covers a dialog button before a protect
   const choice = chooseFloatingPosition({ current: "bottom-left", size: wide, viewport: mobile, margins, obstacles });
   const footprint = floatingRect(choice.position, wide, mobile, margins);
   assert.equal(floatingScore(footprint, [obstacles[0]]), 0, choice.position);
+});
+
+test("a toast or the other host control passing over a control does not hide it from the obstacle check", () => {
+  // Stand-ins for elementsFromPoint() results, topmost first.
+  const button = { id: "accompaniment" } as unknown as Element;
+  const icon = { id: "accompaniment-icon" } as unknown as Element;
+  const toast = { id: "toast" } as unknown as Element;
+  const toastText = { id: "toast-text" } as unknown as Element;
+  const otherHost = { id: "library-launcher" } as unknown as Element;
+  const skinLayer = { id: "skin-panel" } as unknown as Element;
+  const backdrop = { id: "modal-backdrop" } as unknown as Element;
+  const isTarget = (element: Element) => element === button || element === icon;
+  const isTransparent = (element: Element) => element === toast || element === toastText || element === otherHost;
+  assert.equal(reachableThrough([icon, button], isTarget, isTransparent), true);
+  // The toast is on top for a moment: the control under it still counts.
+  assert.equal(reachableThrough([toastText, toast, icon, button], isTarget, isTransparent), true);
+  assert.equal(reachableThrough([otherHost, toast, button], isTarget, isTransparent), true);
+  // A skin layer or modal backdrop really hides it (even under a toast).
+  assert.equal(reachableThrough([skinLayer, button], isTarget, isTransparent), false);
+  assert.equal(reachableThrough([toast, backdrop, button], isTarget, isTransparent), false);
+  assert.equal(reachableThrough([toast], isTarget, isTransparent), false);
+  assert.equal(reachableThrough([], isTarget, isTransparent), false);
+});
+
+test("a corner whose control is counted (not hidden by a toast) is never chosen as the free default corner", () => {
+  // Library launcher: default bottom-right, parked top-left because the skin's
+  // accompaniment button sits in the bottom-right corner.
+  const launcher = { width: 34, height: 34 };
+  const launcherMargins = { top: 16, right: 16, bottom: 16, left: 16 };
+  const accompaniment = { rect: rect(1218, 738, 34, 34), weight: FLOATING_WEIGHT_PROTECTED };
+  const counted = chooseFloatingPosition({ current: "top-left", size: launcher, viewport, margins: launcherMargins, obstacles: [accompaniment], home: "bottom-right" });
+  assert.equal(counted.position, "top-left");
+  // What 854a488 did while a toast hid the button: the corner looked free.
+  const hidden = chooseFloatingPosition({ current: "top-left", size: launcher, viewport, margins: launcherMargins, obstacles: [], home: "bottom-right" });
+  assert.equal(hidden.position, "bottom-right");
 });

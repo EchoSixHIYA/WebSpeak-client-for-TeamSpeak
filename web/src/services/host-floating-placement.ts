@@ -17,7 +17,9 @@
  * least one control). The host control stays in the viewport and stays
  * clickable in every position; only its corner changes. It does not move while
  * hovered or focused, and never moves onto the last pointer position or the
- * focused control.
+ * focused control. A control briefly hidden by a toast (or by the other host
+ * floating control) still counts, so a passing toast never makes its corner
+ * look free.
  */
 
 import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
@@ -81,7 +83,8 @@ export const FLOATING_FOLD_MIN_GAIN = 0.25;
  * Anti-flap: a move needs the collision to persist for `MOVE_CONFIRM_MS`, moves
  * are at least `MOVE_MIN_INTERVAL_MS` apart, and more than `FLAP_MAX_MOVES`
  * moves within `FLAP_WINDOW_MS` (an animated or hostile skin) park the control
- * at its default corner for `FLAP_FREEZE_MS`, so it is never a moving target.
+ * at its default corner for `FLAP_FREEZE_MS`, so it is never a moving target
+ * (one escape per freeze is allowed when that corner covers a control).
  */
 export const HOST_FLOATING_MOVE_CONFIRM_MS = 250;
 export const HOST_FLOATING_MOVE_MIN_INTERVAL_MS = 1000;
@@ -230,9 +233,35 @@ const INTERACTIVE_SELECTOR = "a[href],button,input:not([type='hidden']),select,t
   + "[role='button'],[role='tab'],[role='menuitem'],[role='link'],[role='option'],[role='switch'],[role='checkbox'],[role='radio'],"
   + "[contenteditable='true'],[tabindex]:not([tabindex='-1'])";
 const DIALOG_SELECTOR = "dialog[open],[role='dialog'],[role='alertdialog'],[aria-modal='true']";
+/**
+ * Transient layers that float over the skin for a moment (the app toast). A
+ * control under one is still there a second later, so it keeps counting as an
+ * obstacle: otherwise a toast passing over a corner makes that corner look
+ * free and the host control jumps onto the control the toast was covering.
+ */
+const TRANSIENT_OVERLAY_SELECTOR = "[data-ws-part='app.toast']";
 
 /** Live host floating controls, so they also avoid each other. */
-const registry = new Set<{ owner: Element; rect: () => HostPartRect | null }>();
+const registry = new Set<{ owner: Element; isSelf: (element: Element) => boolean; rect: () => HostPartRect | null }>();
+
+/**
+ * Whether a control is the topmost thing at a point once see-through layers
+ * are skipped. `stack` is `elementsFromPoint` (topmost first); `isTarget` is
+ * the control (or the floating control being placed, which is the collision
+ * we want to resolve); `isTransparent` marks transient overlays and the other
+ * host floating controls, which do not hide a control from this check.
+ */
+export function reachableThrough(
+  stack: readonly Element[],
+  isTarget: (element: Element) => boolean,
+  isTransparent: (element: Element) => boolean,
+): boolean {
+  for (const element of stack) {
+    if (isTarget(element)) return true;
+    if (!isTransparent(element)) return false;
+  }
+  return false;
+}
 
 function toRect(rect: DOMRect | HostPartRect): HostPartRect {
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
@@ -260,7 +289,15 @@ export function collectFloatingObstacles(options: {
   const obstacles: FloatingObstacle[] = [];
   const viewportWidth = view.innerWidth;
   const viewportHeight = view.innerHeight;
-  const others = [...registry].filter(entry => entry.owner !== owner).map(entry => entry.owner);
+  const otherEntries = [...registry].filter(entry => entry.owner !== owner);
+  const others = otherEntries.map(entry => entry.owner);
+  const transparent = (element: Element) => element.closest(TRANSIENT_OVERLAY_SELECTOR) !== null
+    || otherEntries.some(entry => entry.isSelf(element));
+  const stackAt = (x: number, y: number): Element[] => {
+    if (typeof doc.elementsFromPoint === "function") return doc.elementsFromPoint(x, y);
+    const hit = doc.elementFromPoint(x, y);
+    return hit ? [hit] : [];
+  };
   for (const element of doc.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)) {
     if (isSelf(element)) continue;
     // Another host floating control is added once below, with its own weight.
@@ -278,8 +315,10 @@ export function collectFloatingObstacles(options: {
     // user types, and the host control must not sit on it either way.
     const x = Math.min(Math.max(rect.left + rect.width / 2, 0), viewportWidth - 1);
     const y = Math.min(Math.max(rect.top + rect.height / 2, 0), viewportHeight - 1);
-    const hit = doc.elementFromPoint(x, y);
-    if (!hit || !(hit === element || element.contains(hit) || isSelf(hit))) continue;
+    // Look through toasts and the other host floating control: what they hide
+    // now is back in a moment. A modal backdrop or a skin layer still hides it.
+    const isTarget = (hit: Element) => hit === element || element.contains(hit) || isSelf(hit);
+    if (!reachableThrough(stackAt(x, y), isTarget, transparent)) continue;
     const part = element.closest("[data-ws-part]")?.getAttribute("data-ws-part") ?? "";
     const protectedPart = PROTECTED_PART_IDS.has(part) && !CONTAINER_PARTS.has(part);
     const weight = protectedPart
@@ -346,6 +385,7 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   let pendingSince = 0;
   let lastMoveAt = Number.NEGATIVE_INFINITY;
   let frozenUntil = 0;
+  let frozenEscaped = false;
   let moveTimes: number[] = [];
   let confirmTimer: ReturnType<typeof setTimeout> | undefined;
   let urgentUntil = 0;
@@ -364,6 +404,7 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   refreshMargins();
   const entry = {
     owner: element as Element,
+    isSelf,
     rect: () => {
       const rect = element.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 ? toRect(rect) : null;
@@ -426,7 +467,15 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       return;
     }
     const now = Date.now();
-    if (now < frozenUntil) return;
+    const frozen = now < frozenUntil;
+    if (frozen) {
+      // Frozen at the default corner: hold still, except one escape per
+      // freeze when the parked spot covers a control and the move frees some
+      // of it (e.g. a toast hid that control when the control was parked).
+      const parked = floatingRect(position, compact && small ? small : size, viewport, margins);
+      const parkedScore = floatingScore(parked, obstacles);
+      if (frozenEscaped || !(parkedScore > 0 && next.score < parkedScore - 1e-6)) return;
+    }
     const urgent = now < urgentUntil;
     if (!urgent && !pendingSince) {
       pendingSince = now;
@@ -443,12 +492,23 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
     }
     pendingSince = 0;
     lastMoveAt = now;
+    if (frozen) {
+      // The escape does not count as flapping, and is the only one until the freeze ends.
+      frozenEscaped = true;
+      if (next.position !== position) {
+        position = next.position;
+        apply(position);
+      }
+      setCompact(nextCompact);
+      return;
+    }
     moveTimes = moveTimes.filter(time => now - time < HOST_FLOATING_FLAP_WINDOW_MS);
     moveTimes.push(now);
     if (moveTimes.length > HOST_FLOATING_FLAP_MAX_MOVES) {
       // Flapping: park at the default corner, expanded, and hold still.
       moveTimes = [];
       frozenUntil = now + HOST_FLOATING_FLAP_FREEZE_MS;
+      frozenEscaped = false;
       if (position !== defaultPosition) {
         position = defaultPosition;
         apply(position);
