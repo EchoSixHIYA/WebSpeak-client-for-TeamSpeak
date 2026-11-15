@@ -160,6 +160,9 @@ export interface FloatingChoice {
  * order. When `home` (the default corner) is given and both it and `current`
  * are free, go back home: a spot picked for one screen must not linger over
  * controls that appear on the next one (e.g. after leaving the voice page).
+ * The binding passes `home` only right after a screen change: on the same
+ * screen a free-looking default corner may just be hidden for a moment (a
+ * modal dialog's backdrop, a toast) and going back there would cover it.
  * `moveObstacles` (the user's pointer and focused control) only count against
  * positions the control would move to, so it never jumps under the cursor or
  * onto the field being typed in.
@@ -452,7 +455,11 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       const rect = focused.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) moveObstacles.push({ rect: toRect(rect), weight: FLOATING_WEIGHT_POINTER });
     }
-    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles, home: defaultPosition });
+    const now = Date.now();
+    const urgent = now < urgentUntil;
+    // Return home only after a screen change (see chooseFloatingPosition).
+    const home = urgent ? defaultPosition : undefined;
+    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles, home });
     let next = full;
     let nextCompact = false;
     if (full.score > 0 && small && small.width > 0 && small.height > 0) {
@@ -466,7 +473,6 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       pendingSince = 0;
       return;
     }
-    const now = Date.now();
     const frozen = now < frozenUntil;
     if (frozen) {
       // Frozen at the default corner: hold still, except one escape per
@@ -476,7 +482,6 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       const parkedScore = floatingScore(parked, obstacles);
       if (frozenEscaped || !(parkedScore > 0 && next.score < parkedScore - 1e-6)) return;
     }
-    const urgent = now < urgentUntil;
     if (!urgent && !pendingSince) {
       pendingSince = now;
       scheduleConfirm(HOST_FLOATING_MOVE_CONFIRM_MS);

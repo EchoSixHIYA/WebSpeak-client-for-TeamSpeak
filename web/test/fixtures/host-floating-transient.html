@@ -57,8 +57,9 @@ try {
   const accompaniment = document.getElementById("accompaniment");
 
   // A. A toast keeps passing over the accompaniment button (every mic/output
-  // toggle shows one). The launcher must not take the "free" default corner
-  // while the toast hides the button, and must never end up covering it.
+  // toggle shows one), then a modal dialog hides it. The launcher must not
+  // take the "free" default corner while the button is hidden, and must never
+  // end up covering it.
   {
     const { lib, binding } = makeLauncher();
     binding.revalidate(); await sleep(1400); binding.revalidate(); await sleep(50);
@@ -77,7 +78,20 @@ try {
       }
     }
     await sleep(1500);
-    results.push({ name: "toast-transient", settled, positions: [...positions], coveredSamples, samples, final: binding.position, finalCovered: coveredByLib(accompaniment) });
+    // A modal dialog (audio settings) opens over everything: its backdrop
+    // hides the accompaniment button, so the default corner looks free. On the
+    // same screen that is no reason to go back there.
+    const modalPositions = new Set();
+    document.body.insertAdjacentHTML("beforeend", '<div id="backdrop" style="position:fixed;inset:0;z-index:20;background:#0006"></div>'
+      + '<div id="settings" role="dialog" aria-modal="true" style="position:fixed;left:440px;top:200px;width:400px;height:300px;z-index:21;background:#fff">'
+      + '<button type="button" id="close-settings" style="margin:16px">Close</button></div>');
+    for (let i = 0; i < 20; i++) { binding.revalidate(); modalPositions.add(binding.position); await sleep(100); }
+    document.getElementById("backdrop").remove();
+    document.getElementById("settings").remove();
+    binding.revalidate();
+    await sleep(100);
+    const afterModal = { positions: [...modalPositions], position: binding.position, accompanimentCovered: coveredByLib(accompaniment) };
+    results.push({ name: "toast-transient", afterModal, settled, positions: [...positions], coveredSamples, samples, final: binding.position, finalCovered: coveredByLib(accompaniment) });
     binding.dispose();
     lib.remove();
   }

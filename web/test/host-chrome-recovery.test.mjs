@@ -396,13 +396,17 @@ test("floating host controls see through toasts and still step off a control whi
   const byName = Object.fromEntries(payload.results.map((result) => [result.name, result]));
   t.diagnostic(JSON.stringify(payload.results));
 
-  // open-voice-surface desktop: toasts passing over "Share accompaniment" no
-  // longer make the default bottom-right corner look free.
+  // open-voice-surface desktop: toasts passing over "Share accompaniment" (or
+  // the audio-settings modal) no longer make the default corner look free.
   const toast = byName["toast-transient"];
   assert.notEqual(toast.settled, "bottom-right", JSON.stringify(toast));
   assert.ok(!toast.positions.includes("bottom-right"), JSON.stringify(toast));
   assert.equal(toast.coveredSamples, 0, JSON.stringify(toast));
   assert.equal(toast.finalCovered, false, JSON.stringify(toast));
+  // Same screen, modal backdrop over the corner: no return home, so the
+  // button is usable the moment the dialog closes.
+  assert.ok(!toast.afterModal.positions.includes("bottom-right"), JSON.stringify(toast));
+  assert.equal(toast.afterModal.accompanimentCovered, false, JSON.stringify(toast));
 
   // Parked at the default corner by the flap freeze on top of a control: one
   // escape about 1 s after the freeze (inside the 3 s pin), then still for the rest of it.
