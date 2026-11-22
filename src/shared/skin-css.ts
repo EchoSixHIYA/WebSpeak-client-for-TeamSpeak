@@ -871,11 +871,15 @@ function parseAnimationLayers(value: string, property: string): { parsed: Return
   const names = groups.map((nodes) => {
     const words = nodes.filter((node) => node.type === "word" || node.type === "string");
     if (property === "animation-name") {
+      if (words[0]?.type === "string") return words[0];
       const name = words[0] ? decodeCssEscapes(words[0].value).toLowerCase() : "";
       return words[0] && name !== "none" && !CSS_WIDE_KEYWORDS.has(name) ? words[0] : null;
     }
     const used = new Set<string>();
     for (const node of words) {
+      // Quoted strings always name keyframes, even "linear" or "none";
+      // only unquoted words may fill the shorthand's keyword slots.
+      if (node.type === "string") return node;
       const token = decodeCssEscapes(node.value).toLowerCase();
       const dimension = parseDimension(token);
       if (dimension && ["", "s", "ms"].includes(dimension.unit)) continue;

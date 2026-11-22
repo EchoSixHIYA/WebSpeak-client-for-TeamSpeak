@@ -364,6 +364,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     control.style.removeProperty("top");
     control.style.removeProperty("right");
     control.style.removeProperty("bottom");
+    control.style.removeProperty("translate");
   }
 
   function applyPlacement(left: number, top: number): void {
@@ -372,6 +373,9 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     control.style.top = `${top}px`;
     control.style.right = "auto";
     control.style.bottom = "auto";
+    // Floating positions may centre the capsule with a percentage translate.
+    // Slot coordinates already include alignment, including during hit tests.
+    control.style.translate = "none";
   }
 
   function hitTestAt(left: number, top: number, size: { width: number; height: number }): boolean {

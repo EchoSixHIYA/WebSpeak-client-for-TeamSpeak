@@ -682,6 +682,19 @@ test("escaped, namespaced and :is()/:where() animation names cannot bypass the p
   assert.match(webkit.css, /-webkit-animation: ws-demo-skin-fade 2s ease/);
 });
 
+test("quoted animation names stay names even when they match shorthand keywords", () => {
+  for (const name of ["linear", "ease", "reverse", "paused", "infinite", "none", "initial"]) {
+    const frames = `@keyframes ${name} { from { opacity: .5; } to { opacity: 1; } }`;
+    const shorthand = compile(`${frames} [data-ws-part="home.feature"] { animation: "${name}" 2s ease-in-out infinite; }`);
+    assert.ok(shorthand.css.includes(`animation: "ws-demo-skin-${name}" 2s ease-in-out infinite`), shorthand.css);
+    const longhand = compile(`${frames} [data-ws-part="home.feature"] { animation-name: "${name}"; }`);
+    assert.ok(longhand.css.includes(`animation-name: "ws-demo-skin-${name}"`), longhand.css);
+    assert.throws(() => compile(`@keyframes ${name} { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: "${name}" 1s ease; }`), /must remain available/);
+  }
+  const layers = compile('@keyframes linear { to { opacity: 1; } } @keyframes paused { to { opacity: 1; } } [data-ws-part="home.feature"] { animation: "linear" 2s ease, "paused" 3s linear; }');
+  assert.ok(layers.css.includes('animation: "ws-demo-skin-linear" 2s ease, "ws-demo-skin-paused" 3s linear'), layers.css);
+});
+
 test("keyframes cannot turn the plugin overlay into a fullscreen layer", () => {
   for (const css of [
     '@keyframes k { to { position: fixed; inset: 0; z-index: 2147483647; } } [data-ws-part="host.plugins.overlay"] { animation: k 1s forwards; }',

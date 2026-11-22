@@ -34,6 +34,8 @@ const CSS = `
   background: var(--ws-control-background, #fff);
   color: var(--ws-control-foreground, #31524f);
 }
+.cap[data-ws-float^="middle"] { bottom: auto; top: 50%; translate: 0 -50%; }
+.cap[data-ws-float$="center"] { left: 50%; translate: -50% 0; }
 .cap button { min-height: var(--ws-control-hit, 28px); padding: 0 8px; }
 `;
 try {
@@ -79,6 +81,20 @@ try {
 
   const results = [];
   results.push(snap("initial"));
+
+  // A floating fallback may have moved to a centred position. Its CSS
+  // translation must not offset the slot's fixed coordinates or hit test.
+  for (const position of ["middle-left", "middle-right", "top-center", "bottom-center"]) {
+    anchor.style.display = "none";
+    binding.revalidate();
+    control.dataset.wsFloat = position;
+    results.push({ ...snap(`fallback-${position}`), translated: getComputedStyle(control).translate !== "none" });
+    anchor.style.display = "";
+    binding.revalidate();
+    binding.revalidate();
+    results.push({ ...snap(`redocked-${position}`), translate: getComputedStyle(control).translate });
+  }
+  delete control.dataset.wsFloat;
 
   anchor.style.display = "none";
   binding.revalidate();

@@ -563,6 +563,14 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
   function screenChanged() {
     if (disposed) return;
     for (const pending of screenTimers) clearTimeout(pending);
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmTimer = undefined;
+    // Freeze and move history belong to the old screen. Carrying them over
+    // can strand the capsule on a newly mounted microphone or other control.
+    frozenUntil = 0;
+    frozenEscaped = false;
+    moveTimes = [];
+    lastMoveAt = Number.NEGATIVE_INFINITY;
     pendingSince = 0;
     urgentUntil = Date.now() + HOST_FLOATING_SCREEN_CHANGE_MS;
     screenTimers = HOST_FLOATING_SCREEN_CHANGE_SAMPLES_MS.map(delay => setTimeout(safeEvaluate, delay));

@@ -275,6 +275,17 @@ test("a declared slot docks the capsule and falls back at runtime", { skip: !CHR
   assert.equal(initial.color, "rgb(255, 255, 255)", "skin foreground token was not applied");
   assert.ok(initial.buttonHeight >= 36, "the large size tier minimum was not enforced");
 
+  for (const position of ["middle-left", "middle-right", "top-center", "bottom-center"]) {
+    const fallback = byName[`fallback-${position}`];
+    assert.equal(fallback.mode, "floating", JSON.stringify(fallback));
+    assert.equal(fallback.translated, true, "floating CSS translation was not restored");
+    const docked = byName[`redocked-${position}`];
+    assert.equal(docked.mode, "slotted", JSON.stringify(docked));
+    assert.equal(docked.insideAnchor, true, JSON.stringify(docked));
+    assert.equal(docked.hitIsLayerHost, true, JSON.stringify(docked));
+    assert.equal(docked.translate, "none", JSON.stringify(docked));
+  }
+
   assert.equal(byName["anchor-hidden"].mode, "floating");
   assert.equal(byName["anchor-hidden"].reason, "anchor-missing");
   assert.equal(byName["anchor-hidden"].inlineLeft, "");
@@ -417,6 +428,33 @@ test("floating host controls see through toasts and still step off a control whi
   assert.notEqual(freeze.escapes[0].position, "bottom-right", JSON.stringify(freeze));
   assert.ok(freeze.escapes[0].afterPinMs < 3000, JSON.stringify(freeze));
   assert.equal(freeze.movesWhileHeld, 0, JSON.stringify(freeze));
+
+  const screen = byName["screen-change-during-freeze"];
+  assert.ok(screen.sinceFreezeMs < 10000, "the test must switch screens before the old freeze expires");
+  assert.equal(screen.coveredBeforeScreenChange, true, JSON.stringify(screen));
+  assert.notEqual(screen.position, screen.frozenPosition, JSON.stringify(screen));
+  assert.equal(screen.microphoneCovered, false, JSON.stringify(screen));
+});
+
+test("compiled quoted keyword animations still run in the browser", { skip: !CHROME && "google-chrome is not installed" }, async () => {
+  const raw = '@keyframes linear { from { opacity: .5; } to { opacity: 1; } } [data-ws-part="home.feature"] { animation: "linear" 10s ease-in-out infinite; }';
+  const compiled = compileSkinCss(raw, "community.animation-fixture", {}, 3).css;
+  const html = `<!doctype html><html><head><style id="css"></style></head><body>
+    <div class="ws-skin-root" data-ws-skin="community.animation-fixture"><div data-ws-part="home.feature">Feature</div></div>
+    <pre id="result"></pre><script>
+    const target = document.querySelector('[data-ws-part="home.feature"]');
+    const style = document.getElementById('css');
+    style.textContent = ${JSON.stringify(raw)};
+    const before = target.getAnimations().length;
+    style.textContent = ${JSON.stringify(compiled)};
+    document.getElementById('result').textContent = JSON.stringify({ before, after: target.getAnimations().length });
+    </script></body></html>`;
+  const dom = await dumpDom(`data:text/html;base64,${Buffer.from(html).toString("base64")}`);
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the animation fixture did not emit a result block");
+  const payload = JSON.parse(match[1]);
+  assert.equal(payload.before, 1, JSON.stringify(payload));
+  assert.equal(payload.after, 1, JSON.stringify(payload));
 });
 
 test("host control tokens follow late skin CSS, resolve modern colours and refuse skin fonts", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {

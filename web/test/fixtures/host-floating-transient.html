@@ -134,10 +134,28 @@ try {
       movesWhileHeld: moves.length - heldFrom,
       sinceFreezeMs: Math.round(performance.now() - pinnedAt),
     });
+
+    // A different screen must not inherit the old screen's exhausted freeze
+    // escape or move history. Its microphone now occupies the parked spot.
+    const frozenPosition = binding.position;
+    document.getElementById("walls").remove();
+    hopper.setAttribute("data-ws-part", "voice.audio-dock.microphone");
+    chase(lib);
+    const coveredBeforeScreenChange = coveredByLib(hopper);
+    binding.screenChanged();
+    await sleep(200);
+    binding.revalidate();
+    results.push({
+      name: "screen-change-during-freeze",
+      frozenPosition,
+      position: binding.position,
+      coveredBeforeScreenChange,
+      microphoneCovered: coveredByLib(hopper),
+      sinceFreezeMs: Math.round(performance.now() - pinnedAt),
+    });
     binding.dispose();
     lib.remove();
     hopper.remove();
-    document.getElementById("walls").remove();
     accompaniment.style.display = "";
   }
 
