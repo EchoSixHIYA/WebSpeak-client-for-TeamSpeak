@@ -7,6 +7,26 @@
   --skin-panel: #ffffff;
   --skin-border: #c9c9c9;
   --skin-text: #141414;
+
+  /* Host-owned protected controls: one global set, per-part overrides below. */
+  --skin-host-accent: #1d4f9c;
+  --skin-host-background: #ffffff;
+  --skin-host-foreground: #141414;
+  --skin-host-border: #9db6b2;
+  --skin-host-radius: 10px;
+  --skin-host-font: Tahoma, "Segoe UI", sans-serif;
+  --skin-host-size: medium;
+  --skin-recovery-accent: #1d4f9c;
+  --skin-recovery-background: #ffffff;
+  --skin-recovery-foreground: #141414;
+  --skin-recovery-border: #9db6b2;
+  --skin-recovery-radius: 999px;
+  --skin-load-recovery-accent: #b45309;
+  --skin-load-recovery-background: #fff7ed;
+  --skin-load-recovery-foreground: #7c2d12;
+  --skin-permission-accent: #1d4f9c;
+  --skin-permission-background: #ffffff;
+  --skin-permission-foreground: #141414;
 }
 
 [data-ws-page] {
@@ -25,6 +45,50 @@
 [data-ws-part="voice.audio-dock"] {
   border-top: 1px solid var(--skin-border);
   background: #f7f9fb;
+  /* Fold the trusted recovery capsule into the audio dock (chrome.json#slots). */
+  --skin-recovery-accent: #1d4f9c;
+  --skin-recovery-background: #ffffff;
+  --skin-recovery-foreground: #141414;
+  --skin-recovery-radius: 999px;
+  --skin-recovery-font: Tahoma, "Segoe UI", sans-serif;
+  --skin-recovery-size: small;
+}
+
+/* --- Protected app-DOM controls: purely visual theming is allowed --- */
+[data-ws-part="voice.audio-dock.microphone"] button,
+[data-ws-part="voice.audio-dock.output"] button,
+[data-ws-part="voice.connection-status.reconnect"],
+[data-ws-part="home.footer.clear"] {
+  color: #141414;
+  background: linear-gradient(180deg, #ffffff, #eef3fa);
+  border: 1px solid var(--skin-accent);
+  border-radius: 8px;
+  font-family: Tahoma, "Segoe UI", sans-serif;
+  font-size: 12px;
+  padding: 8px 12px;
+  min-height: 44px;
+  box-shadow: 0 2px 6px #1d4f9c22;
+}
+
+[data-ws-part="voice.audio-dock.microphone"] button:hover,
+[data-ws-part="voice.audio-dock.output"] button:hover,
+[data-ws-part="voice.connection-status.reconnect"]:hover,
+[data-ws-part="home.footer.clear"]:hover {
+  background: #e7eefb;
+}
+
+[data-ws-part="auth.password.dialog"],
+[data-ws-part="voice.audio-settings"] {
+  background: #ffffff;
+  border: 2px solid var(--skin-accent);
+  border-radius: 18px;
+  box-shadow: 0 18px 48px #1d4f9c33;
+}
+
+[data-ws-part="auth.password.dialog"] h2,
+[data-ws-part="voice.audio-settings"] h2 {
+  color: var(--skin-accent);
+  letter-spacing: .01em;
 }
 
 /* --- Host chrome (outside .ws-skin-root) --- */

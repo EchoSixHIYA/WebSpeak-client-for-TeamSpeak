@@ -43,6 +43,17 @@ export const HOST_TRUSTED_PART_IDS: ReadonlySet<string> = new Set([
   "host.permission",
 ]);
 
+/**
+ * Trusted host controls that an open skin may fold into its own layout through
+ * `chrome.json#slots`. The key names the protected part, not a CSS hook: the
+ * skin only declares an anchor rectangle, the host still owns, paints and
+ * hit-tests the control. Extend this set (for example with `host.permission`)
+ * when another protected control learns the same runtime placement.
+ */
+export const HOST_SLOTTABLE_PART_IDS: ReadonlySet<string> = new Set([
+  "host.recovery",
+]);
+
 /** All host-owned parts (used by the part registry and documentation). */
 export const HOST_PART_IDS: ReadonlySet<string> = new Set([
   ...HOST_CHROME_PART_IDS,

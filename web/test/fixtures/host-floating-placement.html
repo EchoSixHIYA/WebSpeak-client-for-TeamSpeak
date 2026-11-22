@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host floating placement fixture</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  /* Skin audio dock in the bottom-left corner, where the capsule floats by default. */
+  #mic { position: fixed; left: 20px; bottom: 40px; width: 120px; height: 34px; }
+  /* Skin "Send" button (disabled until the user types) in the bottom-right corner. */
+  #send { position: fixed; right: 20px; bottom: 20px; width: 60px; height: 34px; }
+  /* A right-hand side sheet whose buttons sit where the capsule moved to. */
+  #sheet { position: fixed; inset: 0 0 0 auto; width: 320px; background: #eee; }
+  #sheet button { position: absolute; right: 8px; width: 280px; height: 40px; }
+  #cancel { top: 8px; } #enter { bottom: 30px; }
+  #backdrop { position: fixed; inset: 0; background: #0006; }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-skin="community.float-fixture" data-ws-part="app">
+  <div data-ws-part="voice.audio-dock.microphone"><button type="button" id="mic">Mic</button></div>
+  <button type="button" id="send" disabled>Send</button>
+  <button type="button" id="top-left" style="position:fixed;left:8px;top:8px;width:220px;height:44px">Server strip</button>
+</div>
+<pre id="result">pending</pre>
+<script type="module">
+import { createHostOwnedLayer } from "/src/services/host-owned-layer.ts";
+import { bindFloatingAvoidance, collectFloatingObstacles } from "/src/services/host-floating-placement.ts";
+
+const output = document.getElementById("result");
+const CSS = `
+.cap { position: fixed; inset: auto auto 38px 12px; margin: 0; display: flex; gap: 4px; padding: 4px; border: 0; width: 200px; height: 30px; pointer-events: auto; }
+.cap[data-ws-float$="right"] { left: auto; right: 12px; }
+.cap[data-ws-float^="top"] { bottom: auto; top: 12px; }
+.cap[data-ws-float^="middle"] { bottom: auto; top: 50%; translate: 0 -50%; }
+.cap[data-ws-float$="center"] { left: 50%; translate: -50% 0; }
+.cap.compact { width: 30px; }
+`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Moves are confirmed after a short dwell and rate-limited (anti-flap).
+let binding;
+const settle = async () => { binding.revalidate(); await sleep(1400); binding.revalidate(); await sleep(50); };
+try {
+  const layer = createHostOwnedLayer("recovery", CSS);
+  const control = document.createElement("div");
+  control.className = "cap";
+  control.setAttribute("popover", "manual");
+  control.innerHTML = '<button type="button">Use built-in skin</button>';
+  layer.container.append(control);
+  control.showPopover();
+  const host = layer.host;
+  let compact = false;
+  binding = bindFloatingAvoidance({
+    element: control,
+    isSelf: (node) => node === host || host.contains(node),
+    margins: { top: 12, right: 12, bottom: 38, left: 12 },
+    apply: (position) => control.setAttribute("data-ws-float", position),
+    compactSize: () => ({ width: 30, height: 38 }),
+    onCompactChange: (next) => { compact = next; control.classList.toggle("compact", next); },
+  });
+  const covered = () => ["mic", "send", "top-left", "cancel", "enter"].filter((id) => {
+    const element = document.getElementById(id);
+    if (!element) return false;
+    const r = element.getBoundingClientRect();
+    if (!(r.width > 0)) return false;
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  });
+  const snap = (name) => ({ name, position: binding.position, compact, covered: covered(), capsuleHit: (() => {
+    const r = control.getBoundingClientRect();
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  })() });
+  const results = [];
+  await settle();
+  results.push(snap("dock-and-send"));
+
+  // Stability: repeated re-checks (interval + manual) never move a settled capsule.
+  const seen = new Set([binding.position]);
+  for (let i = 0; i < 6; i++) { binding.revalidate(); seen.add(binding.position); await sleep(120); }
+  await sleep(1300); seen.add(binding.position);
+  results.push({ ...snap("stable"), positions: [...seen] });
+
+  // A full-screen click-away layer (role=button) is "covered" everywhere; a
+  // sliver less of it is no reason to fold the capsule to its mark.
+  document.body.insertAdjacentHTML("beforeend", '<div id="clickaway" role="button" tabindex="0" style="position:fixed;inset:0"></div>');
+  await settle();
+  results.push(snap("click-away"));
+  document.getElementById("clickaway").remove();
+  await settle();
+
+  // A second host floating control (like the application-library launcher):
+  // the two never overlap and settle without flapping.
+  const lib = document.createElement("div");
+  lib.id = "lib";
+  lib.style.cssText = "position:fixed;right:16px;bottom:16px;width:44px;height:44px;z-index:5";
+  lib.innerHTML = '<button type="button" style="width:44px;height:44px">L</button>';
+  document.body.append(lib);
+  const libPositions = new Set();
+  const libBinding = bindFloatingAvoidance({
+    element: lib,
+    isSelf: (node) => lib.contains(node),
+    margins: (insets) => ({ top: 16 + insets.top, right: 16, bottom: 16 + insets.bottom, left: 16 }),
+    defaultPosition: "bottom-right",
+    apply: (position) => {
+      libPositions.add(position);
+      lib.style.left = position.endsWith("left") ? "16px" : position.endsWith("center") ? "calc(50% - 22px)" : "auto";
+      lib.style.right = position.endsWith("right") ? "16px" : "auto";
+      lib.style.top = position.startsWith("top") ? "16px" : position.startsWith("middle") ? "calc(50% - 22px)" : "auto";
+      lib.style.bottom = position.startsWith("bottom") ? "16px" : "auto";
+    },
+  });
+  const capPositions = new Set([binding.position]);
+  for (let i = 0; i < 12; i++) { libBinding.revalidate(); binding.revalidate(); capPositions.add(binding.position); await sleep(400); }
+  const cr = control.getBoundingClientRect(), lr = lib.getBoundingClientRect();
+  const overlap = !(cr.right <= lr.left || lr.right <= cr.left || cr.bottom <= lr.top || lr.bottom <= cr.top);
+  results.push({ ...snap("two-controls"), overlap, libPosition: libBinding.position, libMoves: libPositions.size, capMoves: capPositions.size, sendCovered: document.elementFromPoint(...(() => { const r = document.getElementById("send").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())?.closest("#lib") != null });
+  libBinding.dispose();
+  lib.remove();
+  await settle();
+
+  // A bottom sheet opens behind a backdrop: only its buttons count now.
+  document.body.insertAdjacentHTML("beforeend", '<div id="backdrop"></div><div id="sheet" role="dialog" aria-modal="true"><button type="button" id="cancel">Cancel</button><button type="button" id="enter">Enter channel</button></div>');
+  document.getElementById("cancel").click();
+  await sleep(1400);
+  results.push({ ...snap("after-click-sheet"), before: results[0].position });
+
+  // Everything is covered: the capsule folds to its mark at the least harmful spot.
+  document.getElementById("sheet").remove();
+  document.getElementById("backdrop").remove();
+  document.body.insertAdjacentHTML("beforeend", '<div id="wall" style="position:fixed;inset:0;display:grid;grid-template-columns:repeat(20,1fr)">' + '<button type="button"></button>'.repeat(400) + "</div>");
+  await settle();
+  results.push(snap("wall"));
+
+  document.getElementById("wall").remove();
+  await settle();
+  results.push(snap("wall-removed"));
+
+  // Screen change (voice page -> home): the dock goes away and a new control
+  // appears exactly where the capsule was parked. screenChanged() re-places it
+  // at once (back to the now-free default corner), without the confirm delay.
+  const away = binding.position;
+  const capRect = control.getBoundingClientRect();
+  document.getElementById("mic").style.display = "none";
+  document.body.insertAdjacentHTML("beforeend", `<button type="button" id="export" style="position:fixed;left:${capRect.left}px;top:${capRect.top}px;width:${capRect.width}px;height:${capRect.height}px">Export identity</button>`);
+  binding.screenChanged();
+  await sleep(150);
+  results.push({ ...snap("screen-change"), away, exportCovered: (() => {
+    const r = document.getElementById("export").getBoundingClientRect();
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === host;
+  })() });
+  document.getElementById("export").remove();
+  document.getElementById("mic").style.display = "";
+  await settle();
+
+  // Weights: an unmarked skin button inside the protected "app" root is an
+  // ordinary control; the microphone is protected; invisible controls do not
+  // count; a custom div[tabindex] button does.
+  document.querySelector(".ws-skin-root").insertAdjacentHTML("beforeend",
+    '<button type="button" id="plain" style="position:fixed;left:600px;top:300px;width:60px;height:30px">Plain</button>'
+    + '<button type="button" id="ghost" style="position:fixed;left:700px;top:300px;width:60px;height:30px;opacity:0">Ghost</button>'
+    + '<div id="custom" tabindex="0" style="position:fixed;left:800px;top:300px;width:60px;height:30px">Custom</div>');
+  const weightOf = (id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    const hit = collectFloatingObstacles({ doc: document, isSelf: () => false, owner: document.body })
+      .find((o) => Math.abs(o.rect.left - r.left) < 0.5 && Math.abs(o.rect.top - r.top) < 0.5);
+    return hit ? hit.weight : 0;
+  };
+  results.push({ name: "weights", plain: weightOf("plain"), mic: weightOf("mic"), ghost: weightOf("ghost"), custom: weightOf("custom") });
+  for (const id of ["plain", "ghost", "custom"]) document.getElementById(id).remove();
+
+  // Anti-flap: a skin control hopping between the free spots every 200 ms
+  // (all other spots taken) cannot keep the capsule moving.
+  document.body.insertAdjacentHTML("beforeend", '<div id="walls">'
+    + ["left:8px;top:8px", "right:8px;top:8px", "left:8px;top:380px", "right:8px;top:380px", "left:540px;top:8px", "left:540px;bottom:20px"]
+      .map((pos) => `<button type="button" style="position:fixed;${pos};width:230px;height:44px"></button>`).join("") + "</div>");
+  document.body.insertAdjacentHTML("beforeend", '<button type="button" id="hopper" style="position:fixed;bottom:40px;left:20px;width:220px;height:34px"></button>');
+  const hopper = document.getElementById("hopper");
+  const flapPositions = [];
+  let last = binding.position;
+  for (let i = 0; i < 60; i++) {
+    hopper.style.left = i % 2 ? "auto" : "20px";
+    hopper.style.right = i % 2 ? "20px" : "auto";
+    binding.revalidate();
+    if (binding.position !== last) { flapPositions.push(binding.position); last = binding.position; }
+    await sleep(200);
+  }
+  results.push({ name: "flap", moves: flapPositions.length, capsuleHit: snap("x").capsuleHit });
+  hopper.remove();
+  document.getElementById("walls").remove();
+
+  binding.dispose();
+  results.push({ ...snap("disposed") });
+  output.textContent = JSON.stringify({ results });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error && error.stack || error) });
+}
+</script>
+</body>
+</html>

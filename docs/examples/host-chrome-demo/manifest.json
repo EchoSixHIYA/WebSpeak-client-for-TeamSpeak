@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "author": "WebSpeak Project",
   "license": "AGPL-3.0-only",
-  "description": "Minimal open skin demonstrating host chrome theming, declarative hiding and bitmap icon overrides.",
+  "description": "Minimal open skin demonstrating host chrome theming, protected-control theming, declarative hiding and bitmap icon overrides.",
   "entry": "skin.css",
   "chrome": "chrome.json",
   "minAppVersion": "0.3.2"

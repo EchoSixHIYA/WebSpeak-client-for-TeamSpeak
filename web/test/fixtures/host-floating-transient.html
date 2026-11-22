@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host floating placement: transient overlays and the flap freeze</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  /* open-voice-surface desktop: "Share accompaniment" sits in the bottom-right
+     corner, exactly where the application-library launcher floats by default. */
+  #accompaniment { position: fixed; right: 20px; bottom: 20px; width: 34px; height: 34px; }
+  #lib { position: fixed; width: 44px; height: 44px; z-index: 5; }
+  #lib button { width: 44px; height: 44px; }
+  .toast { position: fixed; right: 12px; bottom: 12px; width: 320px; height: 70px; z-index: 10; background: #222; color: #fff; }
+  .wall { position: fixed; width: 60px; height: 60px; }
+  #hopper { position: fixed; width: 60px; height: 60px; }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-skin="community.float-transient" data-ws-part="app">
+  <div data-ws-part="voice.audio-dock"><button type="button" id="accompaniment" aria-label="Share accompaniment">♪</button></div>
+</div>
+<pre id="result">pending</pre>
+<script type="module">
+import { bindFloatingAvoidance } from "/src/services/host-floating-placement.ts";
+
+const output = document.getElementById("result");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const centre = (element) => { const r = element.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+const coveredByLib = (element) => document.elementFromPoint(...centre(element))?.closest("#lib") != null;
+
+function makeLauncher(onMove) {
+  const lib = document.createElement("div");
+  lib.id = "lib";
+  lib.innerHTML = '<button type="button" aria-label="Plugins">L</button>';
+  document.body.append(lib);
+  let bound = false;
+  const binding = bindFloatingAvoidance({
+    element: lib,
+    isSelf: (node) => lib.contains(node),
+    margins: { top: 16, right: 16, bottom: 16, left: 16 },
+    defaultPosition: "bottom-right",
+    apply: (position) => {
+      lib.style.left = position.endsWith("left") ? "16px" : position.endsWith("center") ? "calc(50% - 22px)" : "auto";
+      lib.style.right = position.endsWith("right") ? "16px" : "auto";
+      lib.style.top = position.startsWith("top") ? "16px" : position.startsWith("middle") ? "calc(50% - 22px)" : "auto";
+      lib.style.bottom = position.startsWith("bottom") ? "16px" : "auto";
+      if (bound) onMove?.(position);
+    },
+  });
+  bound = true;
+  return { lib, binding };
+}
+
+try {
+  const results = [];
+  const accompaniment = document.getElementById("accompaniment");
+
+  // A. A toast keeps passing over the accompaniment button (every mic/output
+  // toggle shows one), then a modal dialog hides it. The launcher must not
+  // take the "free" default corner while the button is hidden, and must never
+  // end up covering it.
+  {
+    const { lib, binding } = makeLauncher();
+    binding.revalidate(); await sleep(1400); binding.revalidate(); await sleep(50);
+    const settled = binding.position;
+    const positions = new Set();
+    let coveredSamples = 0;
+    let samples = 0;
+    for (let cycle = 0; cycle < 8; cycle++) {
+      document.body.insertAdjacentHTML("beforeend", '<div class="toast" data-ws-part="app.toast" role="status">Microphone muted</div>');
+      for (let i = 0; i < 9; i++) { binding.revalidate(); positions.add(binding.position); await sleep(100); }
+      document.querySelector(".toast").remove();
+      for (let i = 0; i < 6; i++) {
+        binding.revalidate(); positions.add(binding.position);
+        samples++; if (coveredByLib(accompaniment)) coveredSamples++;
+        await sleep(100);
+      }
+    }
+    await sleep(1500);
+    // A modal dialog (audio settings) opens over everything: its backdrop
+    // hides the accompaniment button, so the default corner looks free. On the
+    // same screen that is no reason to go back there.
+    const modalPositions = new Set();
+    document.body.insertAdjacentHTML("beforeend", '<div id="backdrop" style="position:fixed;inset:0;z-index:20;background:#0006"></div>'
+      + '<div id="settings" role="dialog" aria-modal="true" style="position:fixed;left:440px;top:200px;width:400px;height:300px;z-index:21;background:#fff">'
+      + '<button type="button" id="close-settings" style="margin:16px">Close</button></div>');
+    for (let i = 0; i < 20; i++) { binding.revalidate(); modalPositions.add(binding.position); await sleep(100); }
+    document.getElementById("backdrop").remove();
+    document.getElementById("settings").remove();
+    binding.revalidate();
+    await sleep(100);
+    const afterModal = { positions: [...modalPositions], position: binding.position, accompanimentCovered: coveredByLib(accompaniment) };
+    results.push({ name: "toast-transient", afterModal, settled, positions: [...positions], coveredSamples, samples, final: binding.position, finalCovered: coveredByLib(accompaniment) });
+    binding.dispose();
+    lib.remove();
+  }
+
+  // B. Flap freeze: a skin control that always jumps under the launcher makes
+  // it flap until it is parked at the default corner for 10 s. If the parked
+  // spot covers a control, the launcher still steps off it once, then holds
+  // still for the rest of the freeze (anti-jitter stays intact).
+  {
+    accompaniment.style.display = "none";
+    const walls = ["left:8px;top:8px", "right:8px;top:8px", "left:8px;top:370px", "right:8px;top:370px", "left:610px;top:8px", "left:610px;bottom:8px"];
+    document.body.insertAdjacentHTML("beforeend", '<div id="walls">' + walls.map((pos) => `<button type="button" class="wall" style="${pos}"></button>`).join("") + "</div>"
+      + '<button type="button" id="hopper"></button>');
+    const hopper = document.getElementById("hopper");
+    const chase = (lib) => {
+      const r = lib.getBoundingClientRect();
+      hopper.style.left = `${r.left - 8}px`;
+      hopper.style.top = `${r.top - 8}px`;
+    };
+    const moves = [];
+    const { lib, binding } = makeLauncher((position) => moves.push({ position, at: performance.now() }));
+    const started = performance.now();
+    while (moves.length < 6 && performance.now() - started < 20_000) { chase(lib); binding.revalidate(); await sleep(100); }
+    const flapMoves = moves.length;
+    // The 7th move within 10 s triggers the freeze; keep the control under the launcher.
+    const pinnedAt = performance.now();
+    while (performance.now() - pinnedAt < 3000) { chase(lib); binding.revalidate(); await sleep(100); }
+    const escapes = moves.slice(flapMoves);
+    const afterEscape = { position: binding.position, hopperCovered: coveredByLib(hopper) };
+    // Still frozen (< 10 s since the freeze): the escape was the only move.
+    const heldFrom = moves.length;
+    const holdStart = performance.now();
+    while (performance.now() - holdStart < 2500) { chase(lib); binding.revalidate(); await sleep(100); }
+    results.push({
+      name: "freeze-escape",
+      flapMoves,
+      parkedPosition: moves[flapMoves - 1]?.position,
+      escapes: escapes.map((move) => ({ position: move.position, afterPinMs: Math.round(move.at - pinnedAt) })),
+      afterEscape,
+      movesWhileHeld: moves.length - heldFrom,
+      sinceFreezeMs: Math.round(performance.now() - pinnedAt),
+    });
+    binding.dispose();
+    lib.remove();
+    hopper.remove();
+    document.getElementById("walls").remove();
+    accompaniment.style.display = "";
+  }
+
+  output.textContent = JSON.stringify({ results });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error && error.stack || error) });
+}
+</script>
+</body>
+</html>

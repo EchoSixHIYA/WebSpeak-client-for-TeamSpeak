@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileSkinCss, OPTIONAL_VISUAL_PARTS } from "./skin-css.js";
 import { DECORATIVE_PART_IDS as LAYOUT_DECORATIVE, PROTECTED_PART_IDS } from "./skin-layout.js";
-import { DECORATIVE_PART_IDS } from "./skin-visual-parts.js";
+import { DECORATIVE_PART_IDS, HOST_SLOTTABLE_PART_IDS } from "./skin-visual-parts.js";
 import {
   compileSkinChromeCss,
   DEFAULT_HIDDEN_HOST_PARTS,
@@ -196,6 +196,62 @@ test("chrome.json declares hidden parts and icon bitmaps, with path and size val
   assert.throws(() => validateSkinChromeAssets(valid, () => ({ bytes: 10, mime: "text/plain" })), /raster image/);
 });
 
+test("chrome.json slots accept skin-owned anchors and reject trusted host UI", () => {
+  assert.deepEqual([...HOST_SLOTTABLE_PART_IDS], ["host.recovery"]);
+
+  const explicit = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true },
+    },
+  }));
+  assert.deepEqual(explicit.slots?.["host.recovery"], {
+    anchor: "voice.audio-dock",
+    align: "start",
+    compact: true,
+  });
+
+  // Defaults: align "end", compact off. Component and runtime-plugin parts are
+  // ordinary anchors; only host/trusted parts are off limits.
+  const defaults = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": { anchor: "skin.voice.harbor-dock.part-anchor" },
+    },
+  }));
+  assert.deepEqual(defaults.slots?.["host.recovery"], {
+    anchor: "skin.voice.harbor-dock.part-anchor",
+    align: "end",
+    compact: false,
+  });
+  assert.doesNotThrow(() => parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: { "host.recovery": { anchor: "skin.voice.runtime_plugin_voice-surface__dock.part-anchor" } },
+  })));
+
+  // Slot declarations are runtime input, not compiled CSS: the generated host
+  // stylesheet must stay exactly as empty as before.
+  assert.equal(compileSkinChromeCss(explicit, "demo-skin"), "");
+
+  const invalidDocuments: Array<[unknown, RegExp]> = [
+    [{ schemaVersion: 1, slots: [] }, /must be an object/],
+    [{ schemaVersion: 1, slots: { "host.permission": { anchor: "voice.audio-dock" } } }, /Unknown slottable host part/],
+    [{ schemaVersion: 1, slots: { "host.recovery": "voice.audio-dock" } }, /must be an object/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "host.plugins.launcher" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.connection-status" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "app" } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", align: "left" } } }, /invalid align/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", compact: "yes" } } }, /compact must be a boolean/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", extra: true } } }, /unsupported field/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "../escape" } } }, /not a valid part name/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "Voice Audio Dock" } } }, /not a valid part name/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "" } } }, /at most 240 characters/],
+  ];
+  for (const [value, message] of invalidDocuments) {
+    assert.throws(() => parseSkinChromeDocument(JSON.stringify(value)), message, JSON.stringify(value));
+  }
+});
+
 test("instance-level hidden parts ignore unknown and protected names", () => {
   assert.deepEqual(parseHiddenHostParts("host.watermark, host.hint voice.audio-dock home.footer"), ["host.watermark", "host.hint"]);
   assert.deepEqual(parseHiddenHostParts(["host.hint", "host.hint", "nope"]), ["host.hint"]);
@@ -247,10 +303,12 @@ test("protected controls cannot be hidden through variables or moved off-screen"
     '[data-ws-part="voice.audio-dock"] { margin-left: -9999px; }',
     '[data-ws-part="voice.audio-dock"] { margin-inline: -9999px; }',
     '[data-ws-part="voice.audio-dock"] { margin-block-start: -1200px; }',
-    '[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -999px; }',
+    '[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -1000px; }',
     '[data-ws-part="voice.audio-dock"] { margin-left: -100vw; }',
-    '[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 500px); }',
+    '[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 5000px); }',
     '[data-ws-part="voice.audio-dock"] { transform: matrix(1, 0, 0, 1, -4000, 0); }',
+    '[data-ws-part="voice.audio-dock"] { margin-left: -1e4px; }',
+    '[data-ws-part="voice.audio-dock"] { transform: translateX(calc(2px*-1000)); }',
   ]) {
     assert.throws(() => compile(css), /must remain on screen/, css);
   }
@@ -263,8 +321,18 @@ test("protected controls cannot be hidden through variables or moved off-screen"
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { background: var(--skin-panel); }'));
   assert.doesNotThrow(() => compile(':root { --skin-hide: none; } [data-ws-part="host.watermark"] { display: var(--skin-hide); }'));
   // A small margin on a protected control and a decorative dock child are still
-  // legitimate v3 theming.
+  // legitimate v3 theming. Ordinary placement is no longer mistaken for a
+  // yeet: only values clearly beyond a viewport are rejected.
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: -6px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: 0 0 0 -999px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin-left: calc(20px - 500px); }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { position: fixed; top: 140px; left: 260px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin-top: 120px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { margin: 0 auto 120px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { top: 100%; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { scale: 100%; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { rotate: 4deg; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] { transform: rotate(8deg); }'));
   assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock"] > div:first-child { display: none; }'));
   // The off-screen guard only protects the subject, not decorative or
   // non-protected parts.
@@ -272,12 +340,76 @@ test("protected controls cannot be hidden through variables or moved off-screen"
   assert.doesNotThrow(() => compile('[data-ws-part="host.watermark"] { margin-left: -9999px; }'));
 });
 
+test("protected controls accept every purely visual property", () => {
+  const themed = compileSkinCss(`
+    :root {
+      --skin-ink: #f8fafc;
+      --skin-card: #0f172a;
+      --skin-line: #38bdf8;
+      --skin-pad: 14px;
+      --skin-size: 56px;
+      --skin-shadow: 0 10px 30px #0006;
+    }
+    [data-ws-part="voice.audio-dock.microphone"],
+    [data-ws-part="voice.connection-status.reconnect"],
+    [data-ws-part="home.footer.clear"],
+    [data-ws-part="auth.password.dialog"] {
+      color: var(--skin-ink);
+      background-color: var(--skin-card);
+      background-image: linear-gradient(135deg, #123456, #654321), url("assets/protected-pattern.png");
+      border: 2px solid var(--skin-line);
+      border-radius: 18px;
+      font-family: var(--skin-font, Tahoma, "Segoe UI", sans-serif);
+      font-size: 15px;
+      padding: var(--skin-pad);
+      width: var(--skin-size);
+      height: var(--skin-size);
+      box-shadow: var(--skin-shadow);
+      text-shadow: 0 1px 2px #0008;
+    }
+    [data-ws-part="voice.audio-dock.microphone-panel"]::before,
+    [data-ws-part="auth.password.actions"] > button {
+      background: var(--skin-line);
+      border-color: var(--skin-line);
+      border-radius: 12px;
+    }
+  `, "demo-skin", new Set(["assets/protected-pattern.png"]), 3);
+
+  assert.match(themed.css, /\[data-ws-part="voice\.audio-dock\.microphone"\]/);
+  assert.match(themed.css, /wskin-asset:assets%2Fprotected-pattern\.png/);
+  // The hide/move guarantees are unchanged.
+  for (const css of [
+    '[data-ws-part="voice.audio-dock.microphone"] { display: none; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { visibility: hidden; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { opacity: 0; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { pointer-events: none; }',
+    '[data-ws-part="voice.audio-dock.microphone"] { clip-path: inset(100%); }',
+    '[data-ws-part="voice.audio-dock.microphone"] { transform: translateY(-9999px); }',
+    ':root { --skin-pull: -9999px; } [data-ws-part="voice.audio-dock.microphone"] { margin-left: var(--skin-pull); }',
+    // Literal filter/clip/content-visibility hiding is rejected, so a variable
+    // must not smuggle the same value past the check.
+    ':root { --skin-x: opacity(0); } [data-ws-part="voice.audio-dock.microphone"] { filter: var(--skin-x); }',
+    ':root { --skin-x: opacity(0); } [data-ws-part="voice.audio-dock.microphone"] { -webkit-filter: var(--skin-x); }',
+    ':root { --skin-x: rect(0, 0, 0, 0); } [data-ws-part="voice.audio-dock.microphone"] { clip: var(--skin-x); }',
+    ':root { --skin-x: hidden; } [data-ws-part="voice.audio-dock.microphone"] { content-visibility: var(--skin-x); }',
+  ]) {
+    assert.throws(() => compile(css), /must remain available|must remain on screen|cannot use indirect values/, css);
+  }
+});
+
+test("indirect filter values stay free outside protected controls", () => {
+  for (const version of [2, 3] as const) {
+    assert.doesNotThrow(() => compileSkinCss(':root { --skin-glow: drop-shadow(0 0 4px #0ff); } [data-ws-part="voice.header"] { filter: var(--skin-glow); }', "demo-skin", new Set(), version));
+  }
+  // Literal visual filters remain allowed on protected controls.
+  assert.doesNotThrow(() => compile('[data-ws-part="voice.audio-dock.microphone"] { filter: drop-shadow(0 0 4px #0ff) saturate(1.2); }'));
+});
+
 test("host chrome cannot be restyled into a viewport-sized overlay", () => {
   assert.throws(
     () => compile('[data-ws-part="host.plugins.overlay"] { position: fixed; inset: 0; z-index: 2147483647; }'),
     /layout is owned by WebSpeak/,
   );
-  assert.throws(() => compile('[data-ws-part="host.watermark"] { position: fixed; }'), /layout is owned by WebSpeak/);
   assert.throws(() => compile('[data-ws-part="host.plugins.overlay"] { width: 100vw; height: 100vh; }'), /fullscreen overlay/);
 
   // Descendant rules are the same escape: `*` can turn the library contents
@@ -286,7 +418,6 @@ test("host chrome cannot be restyled into a viewport-sized overlay", () => {
     '[data-ws-part="host.plugins.overlay"] * { position: fixed; inset: 0; z-index: 2147483647; }',
     '[data-ws-part="host.plugins.overlay"] * { width: 100vw; height: 100vh; }',
     '[data-ws-part="host.plugins.overlay"] .ws-plugin-library { position: fixed; top: 0; left: 0; }',
-    '[data-ws-part="host.watermark"] * { z-index: 2147483647; }',
   ]) {
     assert.throws(() => compile(css), /layout is owned by WebSpeak|fullscreen overlay/, css);
   }
@@ -299,12 +430,290 @@ test("host chrome cannot be restyled into a viewport-sized overlay", () => {
     assert.throws(() => compile(css), /layout is owned by WebSpeak|fullscreen overlay/, css);
   }
 
+  // Decorative host chrome is not on the recovery path: it may be repositioned,
+  // resized, restacked and animated, at most with a warning.
+  for (const css of [
+    '[data-ws-part="host.watermark"] { position: fixed; }',
+    '[data-ws-part="host.watermark"] * { z-index: 2147483647; }',
+    '[data-ws-part="host.watermark"] { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2147483647; opacity: .2; }',
+    '[data-ws-part="host.plugins.launcher"] { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }',
+    '[data-ws-part="host.hint"] { position: absolute; transform: translateX(-10px); }',
+    '[data-ws-part="host.voice-status-decoration"] { position: fixed; inset: 0; pointer-events: none; }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+
   // Colors, borders, radius, shadows and artwork stay available, including on
   // descendants of the overlay.
   const themed = compile('[data-ws-part="host.plugins.overlay"] { border: 2px solid #1d4f9c; border-radius: 4px; background: #fff; box-shadow: 0 2px 8px #0003; }');
   assert.match(themed.css, /data-ws-part="host\.plugins\.overlay"/);
   assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] * { color: #fff; border-color: #1d4f9c; border-radius: 6px; }'));
   assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.launcher"] { background: #1d4f9c; width: 120px; }'));
+  // Overlay contents may use normal sizing and margins; only a viewport-sized
+  // box would turn the library contents into a fullscreen mask.
+  assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] button { min-width: 44px; min-height: 44px; }'));
+  assert.doesNotThrow(() => compile('[data-ws-part="host.plugins.overlay"] * { margin: 0; }'));
+});
+
+test("keyframes follow the same protected-control rules as regular declarations", () => {
+  const rejected: Array<[string, RegExp]> = [
+    ['@keyframes k { to { display: none; opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { to { visibility: hidden; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { to { transform: translateX(-9999px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    ['@keyframes k { to { inset: 0 0 0 -120vw; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    ['@keyframes k { to { filter: opacity(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain available/],
+    ['@keyframes k { to { filter: brightness(0); } } [data-ws-part="voice.audio-dock"] { animation-name: k; }', /must remain available/],
+    // A variable animation name must not hide the name from the walk.
+    [':root { --skin-anim: k; } @keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: var(--skin-anim) 1s forwards; }', /cannot use indirect values/],
+    ['@keyframes k { to { opacity: 0; } } [data-ws-part="home.title"] { --skin-anim: k; } [data-ws-part="voice.audio-dock"] { animation-name: var(--skin-anim); }', /cannot use indirect values/],
+  ];
+  for (const [css, message] of rejected) {
+    assert.throws(() => compile(css), (error: unknown) => error instanceof Error && message.test(error.message), css);
+  }
+  // A keyframe shared by a protected and a non-protected part is judged by the
+  // protected reference.
+  assert.throws(
+    () => compile('@keyframes k { to { opacity: 0; } } [data-ws-part="home.title"] { animation: k 1s; } [data-ws-part="voice.audio-dock"] { animation: k 1s; }'),
+    /must remain available/,
+  );
+
+  // Harmless fades, color tweens and gentle motion on non-protected parts, and
+  // visual / motion keyframes on decorative host parts, still compile.
+  for (const css of [
+    '@keyframes fade { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { animation: fade 2s ease; }',
+    '@keyframes tint { from { color: #fff; } to { color: #1d4f9c; } } [data-ws-part="home.header"] { animation: tint 1.2s; }',
+    '@keyframes drift { from { transform: translateY(0); } to { transform: translateY(-6px); } } [data-ws-part="home.hero.eyebrow"] { animation: drift 3s infinite alternate; }',
+    '@keyframes wm { from { opacity: .1; color: #8ab9cf; transform: translateX(0); } to { opacity: .3; color: #2b6d8a; transform: translateX(20px); } } [data-ws-part="host.watermark"] { animation: wm 4s infinite alternate; }',
+    '@keyframes big { to { width: 100vw; height: 100vh; opacity: .2; } } [data-ws-part="host.watermark"] { animation: big 1s forwards; }',
+    '@keyframes hide { to { display: none; } } [data-ws-part="host.hint"] { animation: hide 1s forwards; }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+});
+
+test("keyframes hide protected parts only when the animation can rest there", () => {
+  // Entrances and pulses that merely pass through a hidden/intermediate state
+  // are legitimate: only `to`/`100%` (and a genuinely resting `from`) count.
+  for (const css of [
+    '@keyframes in { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="app"] { animation: in .3s; }',
+    '@keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } [data-ws-part="app.toast"] { animation: toastIn .3s; }',
+    '@keyframes fade { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="voice.connection-status"] { animation: fade .4s; }',
+    '@keyframes slide { from { transform: translateX(-100%); } to { transform: none; } } [data-ws-part="voice.mobile-nav"] { animation: slide .25s; }',
+    '@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } } [data-ws-part="app.toast"] { animation: pop .2s; }',
+    '@keyframes pulse { 50% { opacity: 0; } 100% { opacity: 1; } } [data-ws-part="voice.connection-status"] { animation: pulse 2s infinite; }',
+    '@keyframes in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } } [data-ws-part="host.plugins.overlay"] { animation: in .2s; }',
+    '@keyframes pop { from { scale: 0; } to { scale: 1; } } [data-ws-part="host.plugins.overlay"] { animation: pop .2s; }',
+    '@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } } [data-ws-part="host.plugins.overlay"] { animation: pop .2s; }',
+    '@keyframes slide { from { transform: translateY(8px); } to { transform: translateY(0); } } [data-ws-part="host.plugins.overlay"] { animation: slide .2s; }',
+    // A keyframe without a `to` frame ends on the element's own style.
+    '@keyframes tint { 50% { opacity: 0; } } [data-ws-part="voice.connection-status"] { animation: tint 2s; }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+
+  const rejected: Array<[string, RegExp]> = [
+    ['@keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { 100% { display: none; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { to { transform: translateX(-5000px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    // Reverse/alternate/fill-backwards animations can end (or hold) on `from`.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    ['@keyframes k { from { display: none; } } [data-ws-part="voice.audio-dock"] { animation: k 1s alternate; }', /must remain available/],
+    ['@keyframes k { from { visibility: hidden; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; animation-direction: alternate-reverse; }', /must remain available/],
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; animation-fill-mode: both; }', /must remain available/],
+    ['@keyframes k { 0% { filter: brightness(0); } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    // Declaration order cannot hide a reverse direction behind a longhand.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-direction: normal; animation: k 1s reverse; }', /must remain available/],
+    // A variable fill mode is unknowable, so the start frame is treated as resting.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-name: k; animation-fill-mode: var(--skin-fill); }', /must remain available/],
+    // A paused animation renders its start frame from the first paint.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s paused; }', /must remain available/],
+    ['@keyframes k { from { display: none; } } [data-ws-part="voice.audio-dock"] { animation-name: k; animation-play-state: paused; }', /must remain available/],
+    // Escaped `to`/`from` and `1e2%` must still be recognised as resting steps.
+    ['@keyframes k { \\74 o { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { t\\6f { transform: translateX(-5000px); } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain on screen/],
+    ['@keyframes k { \\66 rom { opacity: 0; } to { opacity: 1; } } [data-ws-part="voice.audio-dock"] { animation: k 1s reverse; }', /must remain available/],
+    ['@keyframes k { 1e2% { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s forwards; }', /must remain available/],
+    // Direction/fill longhands in a sibling rule on the same subject still rest on `from`.
+    ['@keyframes k { from { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; } [data-ws-part="voice.audio-dock"] { animation-direction: reverse; animation-fill-mode: both; }', /must remain available/],
+  ];
+  for (const [css, message] of rejected) {
+    assert.throws(() => compile(css), (error: unknown) => error instanceof Error && message.test(error.message), css);
+  }
+});
+
+test("escaped animation names are matched and rewritten", () => {
+  const escaped = compile('@keyframes pulse { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { animation-name: p\\75 lse; }');
+  assert.match(escaped.css, /animation-name: ws-demo-skin-pulse/);
+  assert.doesNotMatch(escaped.css, /p\\75 lse/);
+
+  const shorthand = compile('@keyframes pulse { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { animation: p\\75 lse .3s ease; }');
+  assert.match(shorthand.css, /animation: ws-demo-skin-pulse \.3s ease/);
+
+  // Only the name slot is rewritten: a keyframe named like a timing keyword
+  // must not turn the timing function into a keyframe reference.
+  const timing = compile('@keyframes linear { from { opacity: 1; } to { opacity: 1; } } [data-ws-part="home.title"] { animation: linear 1s linear; }');
+  assert.match(timing.css, /animation: linear 1s ws-demo-skin-linear/);
+});
+
+test("keyword-shaped animation tokens do not become keyframe references", () => {
+  const named = compile('@keyframes alternate { from { opacity: 1; } to { opacity: 1; } } @keyframes bob { from { transform: translateY(0); } to { transform: translateY(4px); } } [data-ws-part="voice.audio-dock"] { animation: bob 2s alternate; }');
+  assert.match(named.css, /@keyframes ws-demo-skin-alternate/);
+  assert.match(named.css, /animation: ws-demo-skin-bob 2s alternate/);
+  assert.doesNotMatch(named.css, /animation: bob 2s ws-demo-skin-alternate/);
+});
+
+test("normalised hidden values cannot hide protected parts", () => {
+  const hidden: Array<[string, string]> = [
+    ["display", "none"],
+    ["visibility", "hidden"],
+    ["visibility", "collapse"],
+    ["opacity", ".0"],
+    ["opacity", "+0"],
+    ["opacity", "-1"],
+    ["opacity", "0%"],
+    ["opacity", "0.5%"],
+    ["opacity", "0.001"],
+    ["opacity", "calc(0)"],
+    ["filter", "opacity(0.0)"],
+    ["filter", "brightness(0)"],
+    ["-webkit-filter", "opacity(0)"],
+    ["pointer-events", "none"],
+    ["transform", "scale(0)"],
+    ["transform", "scaleX(0)"],
+    ["transform", "scaleY(0)"],
+    ["transform", "scale3d(0, 1, 1)"],
+    ["transform", "scale(0 0)"],
+    ["scale", "0"],
+    ["scale", "0%"],
+    ["scale", "0 0"],
+    ["content-visibility", "hidden"],
+    ["clip-path", "inset(50%)"],
+    ["clip-path", "inset(60% 0)"],
+    ["clip-path", "inset(0 60%)"],
+    ["clip-path", "circle(0)"],
+    ["clip-path", "ellipse(0 10px)"],
+    ["clip", "rect(0,0,0,0)"],
+    ["clip", "rect(0 0 0 0)"],
+    ["mask", "alpha(0)"],
+    ["mask-image", "luminance(0)"],
+    ["mask-image", "linear-gradient(transparent, transparent)"],
+    ["mask-image", "linear-gradient(#0000, #0000)"],
+    ["mask-image", "linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / 0))"],
+    ["mask-image", "conic-gradient(from 0deg, transparent, transparent)"],
+    ["opacity", "0e0"],
+    ["opacity", "1e-3"],
+    ["filter", "opacity(1e-2)"],
+    ["transform", "scale(0e0)"],
+    ["scale", "1e-9"],
+  ];
+  for (const [property, value] of hidden) {
+    const direct = `[data-ws-part="voice.audio-dock"] { ${property}: ${value}; }`;
+    assert.throws(() => compile(direct), /must remain available/, direct);
+    const frame = `@keyframes k { to { ${property}: ${value}; } } [data-ws-part="voice.audio-dock"] { animation: k 1s; }`;
+    assert.throws(() => compile(frame), /must remain available/, frame);
+  }
+  // Partial effects and artwork clipping remain legitimate.
+  for (const css of [
+    '[data-ws-part="voice.audio-dock"] { opacity: .5; }',
+    '[data-ws-part="voice.audio-dock"] { filter: opacity(.4); }',
+    '[data-ws-part="voice.audio-dock"] { transform: scale(.5); }',
+    '[data-ws-part="voice.audio-dock"] { scale: .8; }',
+    '[data-ws-part="voice.audio-dock"] { clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%); }',
+    '[data-ws-part="voice.audio-dock"] { clip-path: inset(20%); }',
+    '[data-ws-part="voice.audio-dock"] { mask-image: linear-gradient(transparent, red); }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
+});
+
+test("selector variants cannot disguise a protected subject", () => {
+  for (const css of [
+    '[data-ws-part="VOICE.AUDIO-DOCK" i] { display: none; }',
+    '[data-ws-part="voice.audio-dock" I] { opacity: 0; }',
+    ':not(:not([data-ws-part="voice.audio-dock"])) { display: none; }',
+    ':not(:not([data-ws-part="voice.audio-dock"]):hover) { visibility: hidden; }',
+    ':nth-child(2n of [data-ws-part="voice.audio-dock"]) { display: none; }',
+    ':nth-last-child(odd of .member, [data-ws-part="voice.audio-dock"]) { pointer-events: none; }',
+    ':not(:not([data-ws-part="voice.audio-dock"]), [data-ws-part="home.title"]) { display: none; }',
+    ':not(:is(:not([data-ws-part="voice.audio-dock"]))) { display: none; }',
+  ]) {
+    assert.throws(() => compile(css), /must remain available/, css);
+  }
+  // The `s` flag keeps matching case-sensitive, so this selects nothing.
+  assert.doesNotThrow(() => compile('[data-ws-part="VOICE.AUDIO-DOCK" s] { display: none; }'));
+  // A single :not() still means "every other element".
+  assert.doesNotThrow(() => compile(':not([data-ws-part="voice.audio-dock"]) { display: none; }'));
+});
+
+test("escaped, namespaced and :is()/:where() animation names cannot bypass the protected-control locks", () => {
+  const rejected: Array<[string, RegExp]> = [
+    // Escaped property name used to skip the keyframe mapping walk.
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { anim\\61 tion: k 1s forwards; }', /must remain available/],
+    // A pack can predict the namespace and reference the already-renamed keyframe.
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { animation: ws-demo-skin-k 1s forwards; }', /must remain available/],
+    // The protected subject can be wrapped in a functional pseudo-class.
+    [':is([data-ws-part="voice.audio-dock"]) { display: none; }', /must remain available/],
+    [':where([data-ws-part="voice.audio-dock"]) { display: none; }', /must remain available/],
+    ['@keyframes k { to { opacity: 0; } } :is([data-ws-part="voice.audio-dock"]) { animation: k 1s forwards; }', /must remain available/],
+    // -webkit-* animation longhands participate in the same walks.
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { -webkit-animation: k 1s forwards; }', /must remain available/],
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { -webkit-animation-name: k; }', /must remain available/],
+    ['[data-ws-part="voice.audio-dock"] { -webkit-animation: var(--skin-a); }', /cannot use indirect values/],
+    // Escaped *values* used to bail out of the mapping walk on a backslash and
+    // still resolve to the renamed keyframe in the browser.
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { animation: ws-demo-skin-\\6b  1s forwards; }', /must remain available/],
+    ['@keyframes k { to { display: none; } } [data-ws-part="voice.audio-dock"] { animation: ws-demo-skin-\\00006b  1s forwards; }', /must remain available/],
+    ['@keyframes k { to { opacity: 0; } } [data-ws-part="voice.audio-dock"] { animation-name: \\6b; }', /must remain available/],
+    // Prefixed visual-removal properties must use the same checks as the unprefixed form.
+    ['[data-ws-part="voice.audio-dock"] { -webkit-filter: opacity(0); }', /must remain available/],
+    ['[data-ws-part="voice.audio-dock"] { -webkit-transform: scale(0); }', /must remain available/],
+  ];
+  for (const [css, message] of rejected) {
+    assert.throws(() => compile(css), (error: unknown) => error instanceof Error && message.test(error.message), css);
+  }
+
+  // `:not()` does not make the protected part the subject; only a v3 warning.
+  assert.doesNotThrow(() => compile(':not([data-ws-part="voice.audio-dock"]) { display: none; }'));
+
+  // A harmless -webkit-animation on a non-protected part still compiles and its
+  // keyframe name is rewritten into the skin namespace.
+  const webkit = compile('@keyframes fade { from { opacity: 0; } to { opacity: 1; } } [data-ws-part="home.title"] { -webkit-animation: fade 2s ease; }');
+  assert.match(webkit.css, /@keyframes ws-demo-skin-fade/);
+  assert.match(webkit.css, /-webkit-animation: ws-demo-skin-fade 2s ease/);
+});
+
+test("keyframes cannot turn the plugin overlay into a fullscreen layer", () => {
+  for (const css of [
+    '@keyframes k { to { position: fixed; inset: 0; z-index: 2147483647; } } [data-ws-part="host.plugins.overlay"] { animation: k 1s forwards; }',
+    '@keyframes k { to { width: 100vw; height: 100vh; } } [data-ws-part="host.plugins.overlay"] * { animation: k 1s forwards; }',
+    '@keyframes k { to { zoom: 10; } } [data-ws-part="host.plugins.overlay"] { animation: k 1s forwards; }',
+    '@keyframes k { to { transform: scale(10); } } [data-ws-part="host.plugins.overlay"] { animation-name: k; }',
+    '@keyframes k { to { position: fixed; inset: 0; z-index: 2147483647; } } [data-ws-part="host.plugins.overlay"] { --skin-a: ws-demo-skin-k; animation: var(--skin-a) 1s forwards; }',
+    '[data-ws-part="host.plugins.overlay"] * { width: calc(50vw * 2); }',
+    '[data-ws-part="host.plugins.overlay"] * { width: calc(99vw + 1vw); }',
+  ]) {
+    assert.throws(() => compile(css), /layout is owned by WebSpeak|fullscreen overlay/, css);
+  }
+  // The same animation is harmless on decorative host chrome.
+  assert.doesNotThrow(() => compile('@keyframes k { to { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2147483647; opacity: .2; } } [data-ws-part="host.watermark"] { animation: k 1s forwards; }'));
+});
+
+test("large layout restyles of non-protected parts and decorative host chrome compile", () => {
+  for (const css of [
+    '[data-ws-part="home.header"] { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; position: relative; width: 80vw; height: 50vh; }',
+    '[data-ws-part="home.header"] { display: flex; flex-direction: column; align-items: stretch; translate: 24px 0; }',
+    '[data-ws-part="voice.audio-dock"] > div:first-child { position: absolute; width: 100vw; height: 100vh; }',
+    // Whole-page and protected-part layout rewrites are the owner's explicit
+    // use case; placement is no longer mistaken for a yeet.
+    '[data-ws-part="app"] { display: grid; grid-template-areas: "rail main"; grid-template-columns: 72px 1fr; position: relative; }',
+    '[data-ws-part="voice.audio-dock"] { position: fixed; top: 140px; left: 260px; display: flex; flex-direction: column; gap: 10px; }',
+    '[data-ws-part="home"] { display: flex; flex-direction: column; align-items: stretch; min-height: 100vh; }',
+    // Official example skins (harbor, kaak) clip their own artwork.
+    '[data-ws-part="home.header"] { clip-path: polygon(0 0, 100% 0, 100% 82%, 0 100%); }',
+    '[data-ws-part="host.watermark"] { position: fixed; inset: 0; width: 100vw; height: 100vh; transform: rotate(-8deg); }',
+  ]) {
+    assert.doesNotThrow(() => compile(css), css);
+  }
 });
 
 test("official and built-in skins hide host decorations unless the active skin opts in", () => {

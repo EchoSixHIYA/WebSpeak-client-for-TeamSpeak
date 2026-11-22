@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host slot placement fixture</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { position: relative; width: 100vw; height: 100vh; }
+  #dock { position: absolute; left: 40px; top: 200px; width: 640px; height: 56px; }
+  #anchor { position: absolute; left: 0; top: 4px; width: 320px; height: 48px; }
+  #mic { position: absolute; right: 8px; top: 11px; width: 120px; height: 34px; }
+</style>
+</head>
+<body>
+<!-- A skin surface: an empty anchor node on the left, a protected control on the right. -->
+<div class="ws-skin-root" data-ws-skin="community.slot-fixture" data-ws-part="app">
+  <div id="dock" data-ws-part="voice.audio-dock">
+    <div id="anchor" data-ws-part="skin.voice.dock.part-anchor"
+      style="--skin-recovery-accent:#ffcc00;--skin-recovery-background:#102030;--skin-recovery-foreground:#ffffff;--skin-recovery-size:large"></div>
+    <button type="button" id="mic" data-ws-part="voice.audio-dock.microphone">Mic</button>
+  </div>
+</div>
+<pre id="result">pending</pre>
+<script type="module">
+import { createHostOwnedLayer } from "/src/services/host-owned-layer.ts";
+import { bindHostSlot } from "/src/services/host-slot-placement.ts";
+
+const output = document.getElementById("result");
+const CSS = `
+.cap {
+  position: fixed; inset: auto auto 12px 12px; margin: 0;
+  display: flex; gap: 4px; padding: 4px; border: 0; pointer-events: auto;
+  background: var(--ws-control-background, #fff);
+  color: var(--ws-control-foreground, #31524f);
+}
+.cap button { min-height: var(--ws-control-hit, 28px); padding: 0 8px; }
+`;
+try {
+  const layer = createHostOwnedLayer("recovery", CSS);
+  const control = document.createElement("div");
+  control.className = "cap";
+  control.setAttribute("popover", "manual");
+  control.innerHTML = '<button type="button">Use built-in skin</button>';
+  layer.container.append(control);
+  control.showPopover();
+
+  const anchor = document.getElementById("anchor");
+  const mic = document.getElementById("mic");
+  const changes = [];
+  const binding = bindHostSlot({
+    layer,
+    control,
+    anchor: "skin.voice.dock.part-anchor",
+    skinId: "community.slot-fixture",
+    align: "start",
+    onModeChange: (change) => changes.push(change),
+  });
+
+  const snap = (name) => {
+    const rect = control.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const style = getComputedStyle(control);
+    return {
+      name,
+      mode: changes.at(-1)?.mode ?? "floating",
+      reason: changes.at(-1)?.reason,
+      inlineLeft: control.style.left,
+      insideAnchor: rect.left >= anchorRect.left - 0.5 && rect.right <= anchorRect.right + 0.5
+        && rect.top >= anchorRect.top - 0.5 && rect.bottom <= anchorRect.bottom + 0.5,
+      atDefaultCorner: Math.abs(rect.left - 12) < 1 && Math.abs(innerHeight - 12 - rect.bottom) < 1,
+      hitIsLayerHost: hit === layer.host,
+      background: style.backgroundColor,
+      color: style.color,
+      buttonHeight: control.querySelector("button").getBoundingClientRect().height,
+    };
+  };
+
+  const results = [];
+  results.push(snap("initial"));
+
+  anchor.style.display = "none";
+  binding.revalidate();
+  results.push(snap("anchor-hidden"));
+
+  anchor.style.display = "";
+  binding.revalidate();
+  results.push(snap("restored-once"));
+  binding.revalidate();
+  results.push(snap("restored-twice"));
+
+  mic.style.left = "8px";
+  mic.style.right = "auto";
+  binding.revalidate();
+  results.push(snap("covers-mic"));
+  mic.style.left = "";
+  mic.style.right = "";
+  binding.revalidate();
+  binding.revalidate();
+
+  anchor.style.transform = "translateX(-5000px)";
+  binding.revalidate();
+  results.push(snap("anchor-offscreen"));
+  anchor.style.transform = "";
+  binding.revalidate();
+  binding.revalidate();
+
+  anchor.style.setProperty("--skin-recovery-foreground", "#102030");
+  binding.revalidate();
+  results.push(snap("unreadable-tokens"));
+
+  binding.dispose();
+  results.push({
+    ...snap("disposed"),
+    leftoverAccent: control.style.getPropertyValue("--ws-control-accent"),
+  });
+  output.textContent = JSON.stringify({ results, changes });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error && error.stack || error) });
+}
+</script>
+</body>
+</html>
