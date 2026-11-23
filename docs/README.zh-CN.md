@@ -134,7 +134,7 @@ docker compose up -d
 
 从 [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) 下载与系统和架构匹配的 `windows-x64.zip`、`linux-x64.tar.gz` 或 `linux-arm64.tar.gz`，解压后运行对应启动脚本。发布包自带 Node.js 运行时和生产依赖。Docker 镜像支持 amd64/arm64。
 
-Linux x64 发布包（已按官方 `build-release.yml` 产物形态验证）可以在管理控制台直接升级：控制台只读取官方 GitHub Releases，缺少匹配的 `SHA256SUMS.txt` 条目时拒绝安装，校验通过后仅替换程序代码并重启进程。`SHA256SUMS.txt` 只是 SHA-256 校验和，不是数字签名。`data/`、`config.json`、`certs/`、已安装的皮肤和插件都会保留。开始前建议先导出备份。Windows 发布包可以检查版本，但控制台应用更新尚未经真实 Windows 环境验证，因此已禁用，请下载新包后手动替换。Linux arm64 与 x64 使用同一代码路径，但未在本环境实测。Docker 和源码运行不能在控制台应用更新。
+Linux x64 发布包（已按官方 `build-release.yml` 产物形态验证）可以在管理控制台直接升级：控制台只读取官方 GitHub Releases，缺少匹配的 `SHA256SUMS.txt` 条目时拒绝安装，校验通过后仅替换程序代码并重启进程。`SHA256SUMS.txt` 只是 SHA-256 校验和，不是数字签名。`data/`、`config.json`、`certs/`、已安装的皮肤和插件都会保留。开始前建议先导出备份。Windows 发布包可以检查版本，但控制台应用更新尚未经真实 Windows 环境验证，因此已禁用，请下载新包后手动替换。Linux arm64 发布包可以检查版本，但由于原地替换尚未在真实 arm64 硬件验证，控制台应用已禁用；请下载新版发布包后手动替换。Docker 和源码运行不能在控制台应用更新。
 
 Release 同时提供 Android `arm64-v8a`、`armeabi-v7a` 和 `x86_64` APK。它们使用 debug 签名，可手动侧载测试；不是 Google Play 发布包，Android 真机语音仍需验收。
 

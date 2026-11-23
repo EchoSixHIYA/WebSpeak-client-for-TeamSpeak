@@ -17,7 +17,10 @@ export const CODE_ENTRIES = [
   "README.md",
   "LICENSE",
   "config.example.json",
-  "start-webspeak.sh",
+  // start-webspeak.sh is deliberately absent: the launcher must stay at the
+  // install root for the whole swap so an interrupted update can still be
+  // recovered by running ./start-webspeak.sh. It is installed atomically by
+  // the updater before the runner swaps any code.
   "start-webspeak.cmd",
 ] as const;
 
@@ -114,6 +117,26 @@ export function setCodeSwapCopyForTests(copy: CopyEntry | null): void {
   copyEntry = copy ?? defaultCopyEntry;
 }
 
+/**
+ * Test-only fault-injection seam. When the named directory exists, the swap
+ * pauses in the exact window between "old code moved aside" and "new code
+ * moved in" so a test can SIGKILL the runner. Production never sets this
+ * variable; it is a local barrier directory, not a URL or network switch.
+ */
+const SWAP_BARRIER_ENV = "WEBSPEAK_TEST_SWAP_BARRIER_DIR";
+
+function swapWindowBarrier(): void {
+  const directory = process.env[SWAP_BARRIER_ENV];
+  if (!directory || !existsSync(directory)) return;
+  writeFileSync(path.join(directory, "swap-window-reached"), String(process.pid));
+  const resume = path.join(directory, "resume");
+  const deadline = Date.now() + 30_000;
+  const waiter = new Int32Array(new SharedArrayBuffer(4));
+  while (!existsSync(resume) && Date.now() < deadline) {
+    Atomics.wait(waiter, 0, 0, 20);
+  }
+}
+
 function moveIfPresent(from: string, to: string): void {
   if (!existsSync(from)) return;
   mkdirSync(path.dirname(to), { recursive: true });
@@ -183,6 +206,7 @@ export function swapCode(rootDir: string, stagedRoot: string, backupDir: string)
       movedToBackup.push(entry);
       writeSwapManifest(backupDir, movedToBackup);
     }
+    swapWindowBarrier();
     for (const entry of CODE_ENTRIES) {
       if (!existsSync(path.join(stagedRoot, entry))) continue;
       moveIfPresent(path.join(stagedRoot, entry), path.join(rootDir, entry));

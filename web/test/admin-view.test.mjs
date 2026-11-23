@@ -725,6 +725,19 @@ test("settings and operations render explicit localized sections with valid deep
   }
 });
 
+test("update error codes resolve to their dedicated five-language labels", async () => {
+  const { adminOrganizationCopy } = await vite.ssrLoadModule("/src/i18n/admin-organization.ts");
+  await mount("/admin/server");
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    state.language = language;
+    const copy = adminOrganizationCopy[language];
+    assert.equal(state.i18n.errorText("UPDATE_LOCK_FAILED"), copy.updateErrorLockFailed);
+    assert.equal(state.i18n.errorText("UPDATE_UNAVAILABLE"), copy.updateErrorUnavailable);
+    assert.equal(state.i18n.errorText("UPDATE_RESTART_UNAVAILABLE"), copy.updateErrorUnavailable);
+    assert.notEqual(state.i18n.errorText("UPDATE_LOCK_FAILED"), copy.updateErrorGeneric);
+  }
+});
+
 
 test("loading saved custom Query ports never treats them as unsaved transport defaults", async () => {
   for (const [transport, queryPort] of [["ssh", 10011], ["tcp", 10022]]) {

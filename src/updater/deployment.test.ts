@@ -77,7 +77,8 @@ test("a complete packaged tree is detected as a release package", t => {
   const info = detectDeployment({ rootDir: root, env: {}, isDocker: false, platform: "linux", architecture: "arm64" });
   assert.equal(info.mode, "release-package");
   assert.equal(info.assetKind, "linux-arm64");
-  assert.equal(info.applyAllowed, true);
+  assert.equal(info.applyAllowed, false);
+  assert.equal(info.reasonCode, "LINUX_ARM64_APPLY_UNVERIFIED");
   assert.equal(detectDeployment({ rootDir: root, env: { WEBSPEAK_DEPLOYMENT_MODE: "docker" }, isDocker: false, platform: "linux" }).mode, "docker");
 });
 
@@ -127,6 +128,20 @@ test("windows release packages are visible but apply stays disabled", t => {
   });
   assert.equal(linux.applyAllowed, true);
   assert.equal(linux.reasonCode, null);
+});
+
+test("linux arm64 release packages are checkable but apply is gated off", t => {
+  const root = releasePackageRoot(t);
+  const arm64 = detectDeployment({ rootDir: root, env: {}, isDocker: false, platform: "linux", architecture: "arm64" });
+  assert.equal(arm64.mode, "release-package");
+  assert.equal(arm64.assetKind, "linux-arm64");
+  assert.equal(arm64.applyAllowed, false);
+  assert.equal(arm64.reasonCode, "LINUX_ARM64_APPLY_UNVERIFIED");
+  assert.equal(arm64.upgradePath, "release-package");
+
+  const x64 = detectDeployment({ rootDir: root, env: {}, isDocker: false, platform: "linux", architecture: "x64" });
+  assert.equal(x64.applyAllowed, true);
+  assert.equal(x64.reasonCode, null);
 });
 
 test("unsupported platforms are visible but cannot apply", t => {

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
-  closeSync, copyFileSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, closeSync, copyFileSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync,
 } from "node:fs";
 import { rename, rm } from "node:fs/promises";
 import path from "node:path";
@@ -83,6 +83,29 @@ const CHECKSUM_LIMIT = 1024 * 1024;
 const DOWNLOAD_LIMIT = 512 * 1024 * 1024;
 
 /**
+ * Install the recovery-capable launcher before the runner tears down dist/
+ * and runtime/. The staged package ships the canonical script (same file CI
+ * generates), so even the first upgrade from the old four-line launcher has
+ * a self-healing ./start-webspeak.sh on the official path at all times.
+ */
+function installRecoveryLauncher(rootDir: string, stagedRoot: string): void {
+  const source = path.join(stagedRoot, "start-webspeak.sh");
+  // Source installs and hand-built test packages have no launcher; real
+  // release packages always do.
+  if (!existsSync(source)) return;
+  const target = path.join(rootDir, "start-webspeak.sh");
+  const temporary = `${target}.${process.pid}.tmp`;
+  try {
+    copyFileSync(source, temporary);
+    chmodSync(temporary, 0o755);
+    renameSync(temporary, target);
+  } catch (error) {
+    try { rmSync(temporary, { force: true }); } catch { /* Preserve the original error. */ }
+    throw error;
+  }
+}
+
+/**
  * Every local module the restart runner imports at runtime. The runner is
  * copied into an isolated directory under data/updates, so any omission here
  * makes Node fail with ERR_MODULE_NOT_FOUND before the helper can swap code.
@@ -107,6 +130,7 @@ export class UpdateService {
   private state: PersistedUpdateState = emptyUpdateState();
   private applying = false;
   private releaseLock: (() => void) | null = null;
+  private runnerPid: number | null = null;
 
   constructor(private readonly options: UpdateServiceOptions) {
     this.deployment = detectDeployment({
@@ -253,6 +277,7 @@ export class UpdateService {
       throw new UpdateError("UPDATE_IN_PROGRESS", "Another update task is already running.", 409);
     }
     this.applying = true;
+    this.runnerPid = null;
     const taskId = `upd_${Date.now().toString(36)}_${randomBytes(6).toString("hex")}`;
     const startedAt = this.now().toISOString();
     const task: UpdateTaskView = {
@@ -317,6 +342,7 @@ export class UpdateService {
         throw error;
       }
       this.finishStep(task, "stage", "succeeded");
+      installRecoveryLauncher(this.options.rootDir, stagedRoot);
       const planPath = path.join(taskDirectory, "plan.json");
       const runnerDirectory = path.join(taskDirectory, "runner");
       const plan = {
@@ -375,6 +401,7 @@ export class UpdateService {
       try { rmSync(taskDirectory, { recursive: true, force: true }); } catch { /* Best effort. */ }
       this.releaseLock?.();
       this.releaseLock = null;
+      this.runnerPid = null;
       // A runner that died after taking over leaves its own pid in the lock.
       // Only a provably dead owner is removed; a live lock is left alone.
       clearStaleUpdateLock(this.lockPath);
@@ -479,10 +506,11 @@ export class UpdateService {
 
   /**
    * Copy the runner and all of its runtime imports into an isolated directory,
-   * start it detached, and wait briefly to prove it did not die on startup.
+   * start it detached, and wait until it has taken over the update lock.
    * A successful spawn alone is not enough: Node resolves the whole ESM module
    * graph before executing the helper, so a missing file only shows up as an
-   * early exit. Returning here means the helper is actually running.
+   * early exit. Ownership of the lock also proves the runner is alive after
+   * its startup window and really controls this task before we promise 202.
    */
   async launchRunner(planPath: string, runnerDirectory: string): Promise<number> {
     const sourceDirectory = this.options.runnerSourceDir ?? path.dirname(fileURLToPath(import.meta.url));
@@ -507,7 +535,7 @@ export class UpdateService {
       nodePath = process.execPath;
     }
     const log = path.join(path.dirname(planPath), "runner.log");
-    const graceMs = this.options.runnerStartupTimeoutMs ?? 750;
+    const graceMs = this.options.runnerStartupTimeoutMs ?? 1_500;
     return new Promise<number>((resolve, reject) => {
       let child: ChildProcess;
       let fd: number | null = null;
@@ -527,11 +555,11 @@ export class UpdateService {
         if (fd !== null) closeSync(fd);
       }
       let settled = false;
-      let timer: NodeJS.Timeout | undefined;
+      let poll: NodeJS.Timeout | undefined;
       const fail = (message: string) => {
         if (settled) return;
         settled = true;
-        if (timer) clearTimeout(timer);
+        if (poll) clearInterval(poll);
         reject(new UpdateError("UPDATE_RUNNER_FAILED", message, 500));
       };
       child.once("error", (error) => fail(error.message));
@@ -540,17 +568,53 @@ export class UpdateService {
       });
       child.once("spawn", () => {
         child.unref();
-        timer = setTimeout(() => {
+        const deadline = Date.now() + graceMs;
+        poll = setInterval(() => {
           if (settled) return;
-          settled = true;
-          if (!child.pid) {
-            reject(new UpdateError("UPDATE_RUNNER_FAILED", "The restart runner did not report a process id.", 500));
+          const pid = child.pid;
+          if (!pid) {
+            fail("The restart runner did not report a process id.");
             return;
           }
-          resolve(child.pid);
-        }, graceMs);
+          if (Date.now() > deadline) {
+            fail("The restart runner did not take over the update lock in time.");
+            return;
+          }
+          if (!pidIsAlive(pid) || !lockOwnedBy(this.lockPath, pid)) return;
+          settled = true;
+          if (poll) clearInterval(poll);
+          this.runnerPid = pid;
+          resolve(pid);
+        }, 25);
       });
     });
+  }
+
+  /**
+   * Last chance guard for the promise made with 202. The parent still exists
+   * for a short window after the handshake, so re-check that the runner is
+   * alive and still owns the lock before the caller exits the process.
+   */
+  runnerStillHealthy(): boolean {
+    const pid = this.runnerPid;
+    // No runner was launched through this instance (source install, mocked
+    // route test): there is nothing extra to verify.
+    if (pid === null) return true;
+    return pidIsAlive(pid) && lockOwnedBy(this.lockPath, pid);
+  }
+}
+
+function pidIsAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+function lockOwnedBy(lockPath: string, pid: number): boolean {
+  try {
+    const record = JSON.parse(readFileSync(lockPath, "utf8")) as { pid?: unknown };
+    return record?.pid === pid;
+  } catch {
+    return false;
   }
 }
 

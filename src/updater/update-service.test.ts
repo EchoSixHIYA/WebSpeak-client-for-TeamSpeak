@@ -573,3 +573,92 @@ test("the real restart runner starts with every runtime module and survives the 
   const log = readFileSync(path.join(updatesDir, "runner.log"), "utf8");
   assert.ok(!log.includes("ERR_MODULE_NOT_FOUND"), `runner log has no missing module: ${log}`);
 });
+
+test("the runner handshake requires lock takeover and a later death is caught before exit", async t => {
+  const directory = workspace(t);
+  const compiled = path.join(directory, "compiled");
+  await compileRunnerSources(compiled);
+  const rootDir = path.join(directory, "app");
+  createPackageFiles(rootDir, "0.3.2");
+  const dataDir = path.join(directory, "data");
+  const updatesDir = path.join(dataDir, "updates");
+  mkdirSync(updatesDir, { recursive: true });
+  const taskId = "upd_handshake";
+  const statePath = path.join(updatesDir, "state.json");
+  const lockPath = path.join(updatesDir, "update.lock");
+  const planPath = path.join(updatesDir, "plan.json");
+  const makeTask = () => ({
+    id: taskId, status: "restarting" as const, fromVersion: "0.3.2", targetVersion: "0.4.0",
+    startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+    errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+  });
+  const writePlan = () => writeFileSync(planPath, JSON.stringify({
+    schemaVersion: 1, taskId, rootDir, statePath, lockPath,
+    stagedRoot: path.join(updatesDir, "staged"),
+    backupDir: path.join(updatesDir, "backups", taskId),
+    fromVersion: "0.3.2", targetVersion: "0.4.0", nodePath: process.execPath,
+    appEntry: path.join(rootDir, "dist", "index.js"),
+    health: { protocol: "http", port: 39998, path: "/api/health" },
+    waitForPid: process.pid, parentTimeoutMs: 60_000, healthTimeoutMs: 100, pollIntervalMs: 50,
+    appLogPath: path.join(updatesDir, "app.log"),
+  }, null, 2));
+  writeUpdateState(statePath, { schemaVersion: 1, task: makeTask() });
+  writeFileSync(lockPath, JSON.stringify({ pid: process.pid, taskId, createdAt: "2026-01-01T00:00:00.000Z" }));
+  writePlan();
+
+  const service = new UpdateService({
+    rootDir, dataDir, currentVersion: "0.3.2", logger, platform: "linux", architecture: "x64", env: {}, isDocker: false,
+    fetch: fakeFetch([], new Map()), runnerSourceDir: compiled, runnerStartupTimeoutMs: 1_500,
+  });
+  const pid = await service.launchRunner(planPath, path.join(updatesDir, "runner"));
+  t.after(() => stopProcess(pid));
+  assert.equal(service.runnerStillHealthy(), true, "runner owns the lock right after the handshake");
+
+  await stopProcess(pid);
+  assert.equal(service.runnerStillHealthy(), false, "a runner that died after 202 is caught before process.exit");
+});
+
+test("a runner that cannot take over the lock never passes the handshake", async t => {
+  const directory = workspace(t);
+  const compiled = path.join(directory, "compiled");
+  await compileRunnerSources(compiled);
+  const rootDir = path.join(directory, "app");
+  createPackageFiles(rootDir, "0.3.2");
+  const dataDir = path.join(directory, "data");
+  const updatesDir = path.join(dataDir, "updates");
+  mkdirSync(updatesDir, { recursive: true });
+  const taskId = "upd_bad_lock";
+  const statePath = path.join(updatesDir, "state.json");
+  const lockPath = path.join(updatesDir, "update.lock");
+  const planPath = path.join(updatesDir, "plan.json");
+  writeUpdateState(statePath, {
+    schemaVersion: 1,
+    task: {
+      id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+      startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+      errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+    },
+  });
+  // A different task owns the lock: the runner must refuse to steal it.
+  writeFileSync(lockPath, JSON.stringify({ pid: process.pid, taskId: "upd_other", createdAt: "2026-01-01T00:00:00.000Z" }));
+  writeFileSync(planPath, JSON.stringify({
+    schemaVersion: 1, taskId, rootDir, statePath, lockPath,
+    stagedRoot: path.join(updatesDir, "staged"),
+    backupDir: path.join(updatesDir, "backups", taskId),
+    fromVersion: "0.3.2", targetVersion: "0.4.0", nodePath: process.execPath,
+    appEntry: path.join(rootDir, "dist", "index.js"),
+    health: { protocol: "http", port: 39997, path: "/api/health" },
+    waitForPid: process.pid, parentTimeoutMs: 60_000, healthTimeoutMs: 100, pollIntervalMs: 50,
+    appLogPath: path.join(updatesDir, "app.log"),
+  }, null, 2));
+
+  const service = new UpdateService({
+    rootDir, dataDir, currentVersion: "0.3.2", logger, platform: "linux", architecture: "x64", env: {}, isDocker: false,
+    fetch: fakeFetch([], new Map()), runnerSourceDir: compiled, runnerStartupTimeoutMs: 1_500,
+  });
+  await assert.rejects(
+    service.launchRunner(planPath, path.join(updatesDir, "runner")),
+    updateErrorCode("UPDATE_RUNNER_FAILED"),
+  );
+  assert.equal(service.runnerStillHealthy(), true, "no runner was recorded, so the guard is a no-op");
+});

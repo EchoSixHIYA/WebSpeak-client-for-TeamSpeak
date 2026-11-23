@@ -352,6 +352,7 @@ function blockedReasonText(code: string | null) {
     case 'PLATFORM_UNSUPPORTED': return tr('updateBlockedPlatform');
     case 'ARCH_UNSUPPORTED': return tr('updateBlockedArch');
     case 'WINDOWS_APPLY_UNVERIFIED': return tr('updateBlockedWindows');
+    case 'LINUX_ARM64_APPLY_UNVERIFIED': return tr('updateBlockedArm64');
     case 'UPDATE_ASSET_UNAVAILABLE': return tr('updateAssetMissing');
     case 'UPDATE_CHECKSUM_MISSING': return tr('updateChecksumMissing');
     default: return tr('updateBlockedUnavailable');

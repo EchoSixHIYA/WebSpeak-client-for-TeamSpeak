@@ -73,6 +73,15 @@ async function main() {
     updateService,
     restartAfterUpdate: () => {
       void (async () => {
+        if (!updateService.runnerStillHealthy()) {
+          // 202 already promised a restart, but the helper died before this
+          // process left. Stay up and reconcile instead of reporting success
+          // and silently abandoning the update.
+          logger.warn("The restart runner is no longer healthy; keeping this process and reconciling the update state");
+          try { updateService.initialize(); }
+          catch (error) { logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Update state could not be reconciled"); }
+          return;
+        }
         logger.info("Stopping for scheduled update");
         try { await webServer?.stop(); }
         catch (error) { logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Web server did not stop cleanly for update"); }

@@ -45,6 +45,12 @@ export function detectDeployment(options: DeploymentDetectionOptions): Deploymen
     // real Windows release package. Report versions, but never fake an apply.
     applyAllowed = false;
     reasonCode = "WINDOWS_APPLY_UNVERIFIED";
+  } else if (platform === "linux" && architecture === "arm64") {
+    // arm64 packages are built and can be checked, but the in-place swap has
+    // only been exercised on x64. Gate on the detected capability itself so
+    // "unverified" is never rendered as "can apply" in the UI.
+    applyAllowed = false;
+    reasonCode = "LINUX_ARM64_APPLY_UNVERIFIED";
   }
   return {
     mode,
