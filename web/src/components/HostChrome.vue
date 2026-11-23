@@ -490,6 +490,13 @@ function rectOf(control: HTMLElement): HostPartRect {
   };
 }
 
+/** Every recovery toolbar currently docked in the top layer. */
+function dockedToolbarRects(): HostPartRect[] {
+  return [groupToolbarElement.value, builtInToolbarElement.value, libraryToolbarElement.value]
+    .filter((element): element is HTMLElement => Boolean(element) && isToolbarShown(element))
+    .map(rectOf);
+}
+
 /** Other docked recovery toolbars this entry must not cover on a narrow screen. */
 function otherToolbarRects(control: HTMLElement): HostPartRect[] {
   return [groupToolbarElement.value, builtInToolbarElement.value, libraryToolbarElement.value]
@@ -547,6 +554,8 @@ function syncSlotBindings() {
       anchor: capsuleConfig.anchor,
       skinId: hostChromeActiveSkinId.value,
       align: capsuleConfig.align,
+      // A slotted capsule must not cover a still-docked split toolbar either.
+      otherControls: () => dockedToolbarRects(),
       onModeChange: change => { slotMode.value = change.mode; },
     });
   }
@@ -592,6 +601,11 @@ function bindFloating() {
       return { width: hit + 10, height: hit + 10 };
     },
     onCompactChange: next => { floatCompact.value = next; },
+    // Docked toolbars are inside the closed shadow root, so the light-DOM
+    // obstacle scan cannot see them. In split mode the library toolbar falls
+    // back to this capsule while the built-in toolbar stays docked; without
+    // this exclusion the capsule could cover it (320px GUI failure).
+    avoidRects: () => dockedToolbarRects(),
     // Never move the capsule under the user's pointer or focus, and leave a
     // docked capsule to the slot binding.
     paused: () => slotMode.value === "slotted"

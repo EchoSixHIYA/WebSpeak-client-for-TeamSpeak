@@ -16,6 +16,9 @@
   #home-anchor { left: 20px; }
   #voice-anchor { left: 20px; display: none; }
   #dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; }
+  #dock button { height: 32px; padding: 0 10px; border: 1px solid #47dcc4; border-radius: 8px; background: #102030; color: #fff; font: inherit; }
+  #output-dock { position: absolute; right: 12px; bottom: 12px; }
+  #output-dock button { height: 32px; padding: 0 10px; border: 1px solid #47dcc4; border-radius: 8px; background: #102030; color: #fff; font: inherit; }
 </style>
 </head>
 <body>
@@ -34,6 +37,9 @@
   </div>
   <div id="dock" data-ws-part="voice.audio-dock">
     <button type="button" data-ws-part="voice.audio-dock.microphone">Mic</button>
+  </div>
+  <div id="output-dock" data-ws-part="voice.audio-dock">
+    <button type="button" data-ws-part="voice.audio-dock.output">Output</button>
   </div>
 </div>
 <div id="app"></div>
@@ -74,6 +80,23 @@ const isVisible = (element) => {
   const style = getComputedStyle(element);
   const rect = element.getBoundingClientRect();
   return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+};
+// Real hit testing, not element.click(): a fallback capsule can be fully
+// covered by a still-docked toolbar while still reporting a visible box. All
+// recovery buttons live in the closed shadow root, so elementFromPoint on the
+// document retargets to the layer host; scoping it to the shadow root reveals
+// which action is actually on top at the button's own centre.
+const hitOf = (button, layer) => {
+  const box = button.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  const docHit = document.elementFromPoint(x, y);
+  const shadowHit = layer?.shadow.elementFromPoint(x, y);
+  const hitButton = (shadowHit ?? docHit)?.closest?.("[data-ws-recovery-action]");
+  return {
+    docHitIsLayerHost: docHit === layer?.host,
+    hitAction: hitButton?.getAttribute("data-ws-recovery-action") ?? null,
+  };
 };
 
 // The real PluginPanel calls createPluginAppClient().list() on mount. Keep it
@@ -171,9 +194,12 @@ try {
         height: rectOf(button).height,
         visible: isVisible(button),
         inViewport: withinViewport(rectOf(button)),
+        ...hitOf(button, layer),
       })),
       capsuleOpen: isOpen(cap),
       capsuleVisible: isVisible(cap),
+      capsuleFloat: cap?.getAttribute("data-ws-float") ?? null,
+      capsuleRect: cap ? rectOf(cap) : null,
       capsuleActions: capActions,
       launcherPresent: Boolean(lch),
       launcherVisible: isVisible(lch),
@@ -214,6 +240,7 @@ try {
       height: rectOf(button).height,
       visible: isVisible(button),
       inViewport: withinViewport(rectOf(button)),
+      ...hitOf(button, layer),
     }));
   }
   hostLanguage.value = "de";

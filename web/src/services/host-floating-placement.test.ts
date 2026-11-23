@@ -6,6 +6,7 @@ import {
   FLOATING_WEIGHT_PROTECTED,
   FLOATING_WEIGHT_POINTER,
   chooseFloatingPosition,
+  floatingHitsAvoidRect,
   floatingRect,
   shouldFold,
   floatingScore,
@@ -31,6 +32,23 @@ test("floating rects follow the corner margins and stay inside the viewport", ()
   const narrow = floatingRect("bottom-right", { width: 500, height: 38 }, { width: 390, height: 844 }, margins);
   assert.equal(narrow.left, 0);
   assert.ok(narrow.bottom <= 844);
+});
+
+test("a docked host toolbar is an excluded floating spot, not just a weighted obstacle", () => {
+  // 318px stage from the GUI retest: a 218x36 built-in toolbar docked at the
+  // top-left; the fallback capsule is 169x38. Top corners overlap it, so a
+  // capsule pushed off the bottom dock must not land there.
+  const narrow = { width: 318, height: 638 };
+  const cap = { width: 169, height: 38 };
+  const dockedToolbar = rect(20, 10, 218, 36);
+  assert.equal(floatingHitsAvoidRect("top-left", cap, narrow, margins, [dockedToolbar]), true);
+  assert.equal(floatingHitsAvoidRect("top-right", cap, narrow, margins, [dockedToolbar]), true);
+  assert.equal(floatingHitsAvoidRect("top-center", cap, narrow, margins, [dockedToolbar]), true);
+  assert.equal(floatingHitsAvoidRect("middle-left", cap, narrow, margins, [dockedToolbar]), false);
+  assert.equal(floatingHitsAvoidRect("middle-right", cap, narrow, margins, [dockedToolbar]), false);
+  assert.equal(floatingHitsAvoidRect("bottom-left", cap, narrow, margins, [dockedToolbar]), false);
+  // A one-pixel brush against the footprint is not a cover.
+  assert.equal(floatingHitsAvoidRect("top-left", cap, narrow, margins, [rect(180, 50, 10, 10)]), false);
 });
 
 test("score is zero without overlap, ignores 1px brushes and weights dialog and (above all) protected controls", () => {

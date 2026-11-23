@@ -55,7 +55,7 @@ const scenarios = [
 ];
 
 test("host chrome renders recovery and authorization in a closed-shadow top layer", async () => {
-  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice, slotPlacement, pluginPanel, presentation, controlTokens] = await Promise.all([
+  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice, slotPlacement, floatingPlacement, pluginPanel, presentation, controlTokens] = await Promise.all([
     read("../src/components/HostChrome.vue"),
     read("../src/components/InstanceAuthorization.vue"),
     read("../src/services/host-owned-layer.ts"),
@@ -63,6 +63,7 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
     read("../src/composables/usePublicSkin.ts"),
     read("../src/components/SkinLoadRecoveryNotice.vue"),
     read("../src/services/host-slot-placement.ts"),
+    read("../src/services/host-floating-placement.ts"),
     read("../src/components/PluginPanel.vue"),
     read("../src/services/host-recovery-presentation.ts"),
     read("../src/services/host-control-tokens.ts"),
@@ -117,6 +118,13 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   // Two split recovery toolbars must not cover each other on a narrow screen.
   assert.match(slotPlacement, /covers-host-control/);
   assert.match(hostChrome, /otherControls:/);
+  // A fallback capsule must also avoid toolbars that are still docked: they
+  // live in the closed shadow root and are invisible to the light-DOM obstacle
+  // scan, so the document scan alone cannot protect their labels/clicks.
+  assert.match(hostChrome, /avoidRects:/);
+  assert.match(hostChrome, /dockedToolbarRects\(\)/);
+  assert.match(floatingPlacement, /avoidRects\?:/);
+  assert.match(floatingPlacement, /forbiddenAt\(/);
   assert.match(hostChromeService, /export function activeHostSlot/);
   assert.match(hostChromeService, /HOST_SLOTTABLE_PART_IDS\.has\(part\)/);
   assert.match(hostChromeService, /isThirdPartySkinActive\(\)/);
@@ -665,6 +673,10 @@ test("real PluginPanel launcher is de-duplicated by group and split toolbars on 
       assert.equal(entry.visible, true, `${context}: button is not visible`);
       assert.equal(entry.inViewport, true, `${context}: button escaped the viewport: ${JSON.stringify(entry.rect)}`);
       assert.ok(entry.height >= 28, `${context}: button fell below the host hit target (${entry.height})`);
+      // A visible box is not enough: elementFromPoint at the button's own
+      // centre must resolve to that button, not to a sibling host control.
+      assert.equal(entry.docHitIsLayerHost, true, `${context}: ${entry.action} is not in the host top layer`);
+      assert.equal(entry.hitAction, entry.action, `${context}: ${entry.action} centre is covered by ${entry.hitAction}`);
     }
   };
 
@@ -764,6 +776,21 @@ test("real PluginPanel launcher is de-duplicated by group and split toolbars on 
   assert.equal(narrowSplit.initial.launcherPresent, false, "the real launcher reappeared at 320px");
   assert.equal(narrowSplit.initial.visibleLibraryEntries, 1, "the narrow fallback added a duplicate library entry");
   observableButtons(narrowSplit.initial, "split 320px");
+  // The pushed-out library toolbar falls back to the capsule while built-in
+  // stays docked. Both bottom corners of the fixture are occupied, which is
+  // what drives the capsule toward the top bar (the GUI-retested failure).
+  // Assert the two footprints are disjoint and each action's centre resolves
+  // to its own button via elementFromPoint, not a synthetic element.click().
+  const dockedSplitBar = narrowSplit.initial.toolbars.find((bar) => bar.open);
+  const dockedSplitButton = narrowSplit.initial.visibleActions.find((entry) => entry.action === "built-in");
+  const capsuleSplitButton = narrowSplit.initial.visibleActions.find((entry) => entry.action === "library");
+  assert.ok(dockedSplitBar && dockedSplitButton && capsuleSplitButton, "split 320px did not show one docked and one fallback action");
+  assert.equal(
+    overlaps(dockedSplitBar.rect, capsuleSplitButton.rect), false,
+    `fallback capsule covers the docked toolbar at 320px: ${JSON.stringify({ toolbar: dockedSplitBar.rect, capsule: capsuleSplitButton.rect })}`,
+  );
+  assert.equal(dockedSplitButton.hitAction, "built-in", "the docked built-in button is not the hit target at its centre");
+  assert.equal(capsuleSplitButton.hitAction, "library", "the fallback library button is not the hit target at its centre");
   assert.equal(narrowSplit.clicks.builtIn, true, "the docked split button was not clickable at 320px");
   assert.equal(narrowSplit.clicks.library, true, "the fallback capsule button was not clickable at 320px");
   for (const lang of ["de", "ru", "ja"]) {
