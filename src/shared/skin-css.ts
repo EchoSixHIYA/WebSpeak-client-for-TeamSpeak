@@ -104,6 +104,7 @@ const FORBIDDEN_SCOPE_ATTRIBUTES = new Set([
   // opting into the element by attribute.
   "data-ws-host-layer",
   "data-ws-host-recovery",
+  "data-ws-host-recovery-toolbar",
   "data-ws-host-layer-content",
   "data-ws-recovery-action",
 ]);

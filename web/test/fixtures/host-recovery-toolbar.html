@@ -217,6 +217,32 @@ try {
     toolbarOpen: isOpen(toolbar()),
   };
 
+  // On macOS ⌥/⇧ turn the letter into a derived character (US layout: ®), so
+  // `key` is not "r". The physical code must match. A skin-style capture
+  // listener calling preventDefault() must not swallow the chord either.
+  const skinCapture = (event) => { if (event.type === "keydown") event.preventDefault(); };
+  window.addEventListener("keydown", skinCapture, true);
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "®", code: "KeyR", metaKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  window.removeEventListener("keydown", skinCapture, true);
+  await nextTick();
+  await sleep(80);
+  const macShortcut = {
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+    focusedAction: layer.shadow.activeElement?.getAttribute?.("data-ws-recovery-action") ?? null,
+    capsuleActions: [...(capsule()?.querySelectorAll("[data-ws-recovery-action]") ?? [])]
+      .map((button) => button.getAttribute("data-ws-recovery-action")),
+  };
+  capsule().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await nextTick();
+  await sleep(150);
+  const afterMacEscape = {
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+  };
+
   // Invalid / unreadable toolbar tokens must not make the button invisible.
   const voiceAnchor = document.getElementById("voice-anchor");
   voiceAnchor.style.setProperty("--skin-recovery-toolbar-background", "rgba(0,0,0,0)");
@@ -242,6 +268,8 @@ try {
     redocked,
     shortcut,
     afterEscape,
+    macShortcut,
+    afterMacEscape,
     invalidTokens,
   });
 } catch (error) {

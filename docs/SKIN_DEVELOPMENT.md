@@ -440,7 +440,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 - 宿主外壳的布局与层级：应用库外壳 `host.plugins.overlay` 仍由 WebSpeak 拥有——皮肤可改颜色、边框、圆角、阴影和素材，但不能用 `position`、`inset`、`z-index`、`transform`、尺寸等把它或其子元素变成全屏遮罩。装饰性宿主部件（`host.watermark`、`host.hint`、`host.voice-status-decoration`、`host.plugins.launcher`）可以被重定位、改变尺寸和动画化；恢复路径不依赖它们。
 - 自定义变量仍必须使用 `--skin-` 前缀（不能覆盖宿主内部令牌），`@import`、脚本、`expression()`、`javascript:` 等仍被拒绝。
 - 皮肤根作用域只在根内部向下生效。编译器会拒绝任何以 `:root` 开头、紧跟兄弟组合符（`+` / `~`）的选择器，例如 `:root ~ *`、`:root ~ [data-ws-host-layer]` 或 `:root:hover + div`；这类规则会被改写为皮肤根的兄弟选择器，从而够到 body 上的宿主层。`:root [data-ws-part="home.header"]`、`:root > [data-ws-part=…]` 这类后代/子代写法仍然可用。
-- 宿主自有层的属性 `data-ws-host-layer`、`data-ws-host-recovery`、`data-ws-host-layer-content` 与 `data-ws-recovery-action` **不是皮肤钩子**：它们不在公开部件表中，编译器会按名称拒绝引用它们的皮肤选择器（包括 `:root [data-ws-host-layer]` 这类带公开钩子的混合写法）。
+- 宿主自有层的属性 `data-ws-host-layer`、`data-ws-host-recovery`、`data-ws-host-recovery-toolbar`、`data-ws-host-layer-content` 与 `data-ws-recovery-action` **不是皮肤钩子**：它们不在公开部件表中，编译器会按名称拒绝引用它们的皮肤选择器（包括 `:root [data-ws-host-layer]`、`:root [data-ws-part="home.header"] [data-ws-host-recovery-toolbar]` 这类带公开钩子的混合写法）。
 - 无 Popover API 或顶层提升被拒绝时，恢复胶囊会退回固定宿主层并使用 32 位最大 `z-index: 2147483647`。宿主层在 `#app` 之后追加到 `document.body`；与树内皮肤层同为最大层级时，后绘制的宿主层仍在上面。顶层（top layer）路径的 `showPopover()` / `showModal()` 仍高于两者。
 
 可主题化的宿主部件：
@@ -463,7 +463,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 **显示规则**：只要当前是第三方（非内置/非官方）皮肤，恢复入口就作为小型常驻胶囊显示在左下角（皮肤可通过下文的 `chrome.json#slots` 申请停靠到自己的锚点，或用 `mode: "toolbar"` 改成宿主顶栏按钮）；它不是水印或装饰条，官方 Day、Night、ILLUSIA 与 KAAK 皮肤不会自动出现它。对内置/官方皮肤，它只在 `host.plugins.launcher` 被实例配置或 `chrome.json` 声明隐藏、或宿主在已连接状态下检测到启动器被 CSS 隐藏/移出视口/不可点击时作为兜底出现。
 
-**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；无论胶囊是停靠、浮动还是被 `mode: "toolbar"` 替换，快捷键都会临时隐藏工具栏并显示完整胶囊。它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。监听器运行在捕获阶段，皮肤或插件脚本提前调用 `preventDefault()` 不会吞掉该组合键。
+**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；无论胶囊是停靠、浮动还是被 `mode: "toolbar"` 替换，快捷键都会临时隐藏工具栏并显示完整胶囊。macOS 上 ⌥ 会把字母键变成派生字符（美式为 `®`），宿主同时按物理键码 `KeyR` 判定，所以该组合键仍然生效。它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。监听器运行在捕获阶段，皮肤或插件脚本提前调用 `preventDefault()` 不会吞掉该组合键。
 
 `host.recovery` 与 `host.permission` 这两个名称仅保留为文档/布局元数据中的概念标识，**不对应可被皮肤命中的 DOM 钩子**。当前客户端没有渲染 `host.permission` 元素；授权界面由宿主自己的 `InstanceAuthorization` 对话框绘制，它和恢复胶囊一样位于闭合 Shadow DOM 的顶层。皮肤加载失败的横幅保留 `app.skin-load-recovery` 部件标识（「切换到内置皮肤」），它同样运行在闭合 Shadow DOM 宿主层中。三者都只能通过受保护控件令牌间接换肤，编译后的皮肤 CSS 无法命中或改写它们。`skin.library` 是皮肤菜单里的应用库快捷入口，可作辅助路径，但**不是**兜底。
 

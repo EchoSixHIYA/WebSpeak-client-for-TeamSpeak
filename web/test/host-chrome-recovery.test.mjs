@@ -593,6 +593,15 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
   assert.equal(payload.afterEscape.capsuleOpen, false);
   assert.equal(payload.afterEscape.toolbarOpen, true, "closing the shortcut did not restore the docked toolbar");
 
+  // The macOS chord arrives with a derived `key` (®) + physical `code` KeyR,
+  // under a capture listener that calls preventDefault(); it must still work.
+  assert.equal(payload.macShortcut.capsuleOpen, true, "the macOS ⌘⌥⇧R chord did not summon the capsule");
+  assert.equal(payload.macShortcut.toolbarOpen, false, "the macOS chord must yield to the summoned capsule");
+  assert.equal(payload.macShortcut.focusedAction, "built-in", "the macOS chord did not focus the first host button");
+  assert.deepEqual(payload.macShortcut.capsuleActions, ["built-in", "library"]);
+  assert.equal(payload.afterMacEscape.capsuleOpen, false);
+  assert.equal(payload.afterMacEscape.toolbarOpen, true, "closing the macOS chord did not restore the docked toolbar");
+
   assert.equal(payload.invalidTokens.visible, true, "invalid toolbar tokens hid the button");
   assert.equal(payload.invalidTokens.inViewport, true);
   assert.equal(payload.invalidTokens.background, "rgb(255, 255, 255)", "transparent background must fall back to a visible surface");

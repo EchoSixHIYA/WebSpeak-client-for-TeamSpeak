@@ -133,16 +133,18 @@ export function requestBuiltInSkin(): void {
   builtInSkinRequests.value += 1;
 }
 
-type RecoveryShortcutEvent = Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "key">;
+type RecoveryShortcutEvent = Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "key" | "code">;
 
 /**
  * The documented recovery shortcut: Ctrl+Alt+Shift+R, or ⌘+⌥+⇧+R on macOS.
- * The letter is matched case-insensitively, but every modifier is required so
- * ordinary app shortcuts (Ctrl+R, Alt+R, Ctrl+Shift+R) keep their meaning.
+ * On macOS, Option/Shift turn the letter key into a derived character (US
+ * layout: ®), so `event.key` is not "r". Match the physical `code` as well;
+ * every modifier is still required so ordinary app shortcuts (Ctrl+R, Alt+R,
+ * Ctrl+Shift+R) keep their meaning.
  */
 export function isRecoveryShortcut(event: RecoveryShortcutEvent): boolean {
   return (event.ctrlKey || event.metaKey)
     && event.altKey
     && event.shiftKey
-    && event.key.toLowerCase() === "r";
+    && (event.key?.toLowerCase() === "r" || event.code === "KeyR");
 }

@@ -108,12 +108,15 @@ test("host-owned layer attributes are not skin hooks", () => {
   for (const attribute of [
     "data-ws-host-layer",
     "data-ws-host-recovery",
+    "data-ws-host-recovery-toolbar",
     "data-ws-host-layer-content",
     "data-ws-recovery-action",
   ]) {
     // A public hook in the same selector gets past the "must use a public hook"
     // check, so the attribute-name rejection is what stops the selector.
     assert.throws(() => compile(`:root [${attribute}] { display: none; }`), /host attribute/, attribute);
+    // A :root-prefixed mixed selector with a public part hook must also fail.
+    assert.throws(() => compile(`:root [data-ws-part="home.header"] [${attribute}] { color: red; }`), /host attribute/, attribute);
     assert.throws(() => compile(`[data-ws-part="home.header"] [${attribute}] { color: red; }`), /host attribute/, attribute);
     assert.throws(() => compile(`[data-ws-part="home.header"] [${attribute}="x"] { color: red; }`), /host attribute/, attribute);
   }
