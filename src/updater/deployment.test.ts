@@ -103,6 +103,32 @@ test("asset names and platform support are pinned to official release shapes", (
   assert.equal(upgradePathFor("source"), "source");
 });
 
+test("windows release packages are visible but apply stays disabled", t => {
+  const root = releasePackageRoot(t, "win32");
+  const windows = detectDeployment({
+    rootDir: root,
+    env: {},
+    isDocker: false,
+    platform: "win32",
+    architecture: "x64",
+  });
+  assert.equal(windows.mode, "release-package");
+  assert.equal(windows.assetKind, "windows-x64");
+  assert.equal(windows.applyAllowed, false);
+  assert.equal(windows.reasonCode, "WINDOWS_APPLY_UNVERIFIED");
+  assert.equal(windows.upgradePath, "release-package");
+
+  const linux = detectDeployment({
+    rootDir: releasePackageRoot(t),
+    env: {},
+    isDocker: false,
+    platform: "linux",
+    architecture: "x64",
+  });
+  assert.equal(linux.applyAllowed, true);
+  assert.equal(linux.reasonCode, null);
+});
+
 test("unsupported platforms are visible but cannot apply", t => {
   const root = releasePackageRoot(t);
   const info = detectDeployment({ rootDir: root, env: {}, isDocker: false, platform: "linux", architecture: "s390x" });

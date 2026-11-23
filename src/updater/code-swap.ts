@@ -1,4 +1,5 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseStableVersion } from "./version.js";
 
@@ -79,14 +80,38 @@ export function locatePackageRoot(extractedDir: string, version: string, platfor
 function moveEntry(from: string, to: string): void {
   try {
     renameSync(from, to);
+    return;
   } catch (error) {
     // Staging and backups may live on another filesystem than the install
-    // directory. A rename cannot cross devices, so fall back to a copy that
-    // only removes the source once the copy has completed.
+    // directory. A rename cannot cross devices, so fall back to a copy.
     if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    cpSync(from, to, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true });
-    rmSync(from, { recursive: true, force: true });
   }
+  // Copy into a temporary sibling first: a failure halfway through must
+  // never leave a partial entry at `to`, because rollback would otherwise
+  // mistake it for the complete previous version.
+  const temporary = `${to}.copy-${process.pid}-${randomBytes(6).toString("hex")}`;
+  try {
+    copyEntry(from, temporary);
+    renameSync(temporary, to);
+  } catch (error) {
+    rmSync(temporary, { recursive: true, force: true });
+    throw error;
+  }
+  // The copy is committed at `to`. Removing the source is cleanup only.
+  try { rmSync(from, { recursive: true, force: true }); } catch { /* Source remains for later cleanup. */ }
+}
+
+type CopyEntry = (from: string, to: string) => void;
+
+const defaultCopyEntry: CopyEntry = (from, to) => {
+  cpSync(from, to, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true });
+};
+
+let copyEntry: CopyEntry = defaultCopyEntry;
+
+/** Test seam for exercising a cross-device copy that fails halfway through. */
+export function setCodeSwapCopyForTests(copy: CopyEntry | null): void {
+  copyEntry = copy ?? defaultCopyEntry;
 }
 
 function moveIfPresent(from: string, to: string): void {
@@ -96,17 +121,75 @@ function moveIfPresent(from: string, to: string): void {
 }
 
 /**
+ * Backups written by this version contain only atomically moved entries.
+ * The manifest records which entries were moved completely, so a backup that
+ * was partially written by an older implementation (or tampered with) can be
+ * rejected instead of overwriting an intact install tree.
+ */
+const SWAP_MANIFEST = ".webspeak-swap.json";
+
+function writeSwapManifest(backupDir: string, entries: string[]): void {
+  const target = path.join(backupDir, SWAP_MANIFEST);
+  const temporary = `${target}.${process.pid}.tmp`;
+  writeFileSync(temporary, JSON.stringify({ schemaVersion: 1, entries }, null, 2), "utf8");
+  renameSync(temporary, target);
+}
+
+function readSwapManifest(backupDir: string): Set<string> | null {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path.join(backupDir, SWAP_MANIFEST), "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    if (record.schemaVersion !== 1 || !Array.isArray(record.entries)) return null;
+    return new Set(record.entries.filter((entry): entry is string => typeof entry === "string"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Undo only the entries that this swap actually moved. The entry whose move
+ * failed is left untouched: its source is still intact and no partial
+ * destination exists.
+ */
+function restoreMovedEntries(rootDir: string, backupDir: string, movedToBackup: string[], movedToRoot: string[]): void {
+  const rejected = path.join(backupDir, "rejected");
+  for (const entry of [...movedToRoot].reverse()) {
+    moveIfPresent(path.join(rootDir, entry), path.join(rejected, entry));
+  }
+  for (const entry of [...movedToBackup].reverse()) {
+    const saved = path.join(backupDir, entry);
+    if (!existsSync(saved)) continue;
+    const current = path.join(rootDir, entry);
+    if (existsSync(current)) moveIfPresent(current, path.join(rejected, entry));
+    moveIfPresent(saved, current);
+  }
+}
+
+/**
  * Move the previous code aside, then move the verified side-by-side package
  * into place. `data/`, `config.json` and `certs/` are never in CODE_ENTRIES.
  */
 export function swapCode(rootDir: string, stagedRoot: string, backupDir: string): void {
+  const movedToBackup: string[] = [];
+  const movedToRoot: string[] = [];
   try {
     if (existsSync(backupDir)) throw new Error("Backup directory already exists.");
     mkdirSync(backupDir, { recursive: true });
-    for (const entry of CODE_ENTRIES) moveIfPresent(path.join(rootDir, entry), path.join(backupDir, entry));
-    for (const entry of CODE_ENTRIES) moveIfPresent(path.join(stagedRoot, entry), path.join(rootDir, entry));
+    writeSwapManifest(backupDir, []);
+    for (const entry of CODE_ENTRIES) {
+      if (!existsSync(path.join(rootDir, entry))) continue;
+      moveIfPresent(path.join(rootDir, entry), path.join(backupDir, entry));
+      movedToBackup.push(entry);
+      writeSwapManifest(backupDir, movedToBackup);
+    }
+    for (const entry of CODE_ENTRIES) {
+      if (!existsSync(path.join(stagedRoot, entry))) continue;
+      moveIfPresent(path.join(stagedRoot, entry), path.join(rootDir, entry));
+      movedToRoot.push(entry);
+    }
   } catch (error) {
-    try { restoreCode(rootDir, backupDir); }
+    try { restoreMovedEntries(rootDir, backupDir, movedToBackup, movedToRoot); }
     catch { /* Report the original swap error; rollback failure is handled by the caller. */ }
     if (error instanceof CodeSwapError) throw error;
     throw new CodeSwapError("UPDATE_SWAP_FAILED", error instanceof Error ? error.message : "Release package swap failed.");
@@ -115,19 +198,25 @@ export function swapCode(rootDir: string, stagedRoot: string, backupDir: string)
 
 /**
  * Restore the previous code. New code is moved aside instead of deleted so it
- * remains available for diagnostics.
+ * remains available for diagnostics. When a swap manifest exists, only
+ * entries it proves were moved completely are considered.
  */
 export function restoreCode(rootDir: string, backupDir: string): void {
   if (!existsSync(backupDir)) throw new CodeSwapError("UPDATE_ROLLBACK_FAILED", "Code backup directory is missing.");
+  const manifest = readSwapManifest(backupDir);
   const rejected = path.join(backupDir, "rejected");
   try {
     for (const entry of CODE_ENTRIES) {
+      if (manifest && !manifest.has(entry)) continue;
       const current = path.join(rootDir, entry);
       if (existsSync(current) && existsSync(path.join(backupDir, entry))) {
         moveIfPresent(current, path.join(rejected, entry));
       }
     }
-    for (const entry of CODE_ENTRIES) moveIfPresent(path.join(backupDir, entry), path.join(rootDir, entry));
+    for (const entry of CODE_ENTRIES) {
+      if (manifest && !manifest.has(entry)) continue;
+      moveIfPresent(path.join(backupDir, entry), path.join(rootDir, entry));
+    }
   } catch (error) {
     throw new CodeSwapError("UPDATE_ROLLBACK_FAILED", error instanceof Error ? error.message : "Code rollback failed.");
   }

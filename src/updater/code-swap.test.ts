@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  CodeSwapError, locatePackageRoot, restoreCode, swapCode, validateStagedPackage,
+  CodeSwapError, locatePackageRoot, restoreCode, setCodeSwapCopyForTests, swapCode, validateStagedPackage,
 } from "./code-swap.js";
 import { createPackageFiles } from "./test-support.js";
 
@@ -112,6 +112,55 @@ test("code swap copies across filesystems when rename reports EXDEV", t => {
   // The copy fallback removes the source only after a successful copy.
   assert.equal(existsSync(path.join(staged, "dist")), false);
   assert.equal(existsSync(path.join(staged, "package.json")), false);
+});
+
+test("a cross-device copy that fails halfway leaves the complete previous tree in place", t => {
+  const shared = "/dev/shm";
+  if (!existsSync(shared)) {
+    t.skip("no separate filesystem available for the EXDEV test");
+    return;
+  }
+  const root = path.join(workspace(t), "root"), backup = path.join(workspace(t), "backup");
+  const stagedBase = mkdtempSync(path.join(shared, "webspeak-swap-fail-"));
+  t.after(() => {
+    setCodeSwapCopyForTests(null);
+    rmSync(stagedBase, { recursive: true, force: true });
+  });
+  const staged = path.join(stagedBase, "staged");
+
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  persistentState(root);
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code" });
+  if (statSync(root).dev === statSync(staged).dev) {
+    t.skip("tmp and /dev/shm share a device on this system");
+    return;
+  }
+
+  let copies = 0;
+  setCodeSwapCopyForTests((_from, to) => {
+    copies += 1;
+    // Simulate the fallback copy dying after it has written part of the
+    // entry, which is exactly the state that must never reach the root.
+    mkdirSync(to, { recursive: true });
+    writeFileSync(path.join(to, "index.js"), "half");
+    throw new Error("simulated copy failure");
+  });
+
+  assert.throws(() => swapCode(root, staged, backup), (error: unknown) =>
+    error instanceof CodeSwapError && error.code === "UPDATE_SWAP_FAILED");
+  assert.equal(copies, 1);
+
+  // The previous tree was restored completely, with no half-copied entry.
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "old code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.3.2");
+  assert.equal(readFileSync(path.join(root, "data", "webspeak.db"), "utf8"), "data-content");
+  assert.deepEqual(readdirSync(root).filter((entry) => entry.includes(".copy-")), []);
+  // The backup was not turned into a half-copied source for a later restore.
+  assert.equal(existsSync(path.join(backup, "dist", "index.js")), false);
+  // A failed copy leaves the staged package untouched for diagnosis/retry.
+  assert.equal(readFileSync(path.join(staged, "dist", "index.js"), "utf8"), "new code");
 });
 
 test("restoreCode returns the previous code and keeps rejected code for inspection", t => {

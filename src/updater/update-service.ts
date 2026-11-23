@@ -69,16 +69,25 @@ export interface UpdateServiceOptions {
   apiBaseUrl?: string;
   repository?: string;
   now?: () => Date;
-  /** Compiled directory containing restart-runner.js and code-swap.js. */
+  /** Compiled directory containing the restart runner and its runtime imports. */
   runnerSourceDir?: string;
   /** Test seam replacing the detached runner spawn. */
   launchRunner?: (planPath: string, runnerDir: string) => Promise<void>;
+  /** How long a freshly spawned runner must stay alive before apply succeeds. */
+  runnerStartupTimeoutMs?: number;
   healthTimeoutMs?: number;
   downloadTimeoutMs?: number;
 }
 
 const CHECKSUM_LIMIT = 1024 * 1024;
 const DOWNLOAD_LIMIT = 512 * 1024 * 1024;
+
+/**
+ * Every local module the restart runner imports at runtime. The runner is
+ * copied into an isolated directory under data/updates, so any omission here
+ * makes Node fail with ERR_MODULE_NOT_FOUND before the helper can swap code.
+ */
+const RUNNER_RUNTIME_FILES = ["restart-runner.js", "code-swap.js", "version.js", "update-state.js"] as const;
 
 interface DownloadResult {
   sha256: string;
@@ -366,6 +375,9 @@ export class UpdateService {
       try { rmSync(taskDirectory, { recursive: true, force: true }); } catch { /* Best effort. */ }
       this.releaseLock?.();
       this.releaseLock = null;
+      // A runner that died after taking over leaves its own pid in the lock.
+      // Only a provably dead owner is removed; a live lock is left alone.
+      clearStaleUpdateLock(this.lockPath);
       throw updateError;
     } finally {
       this.applying = false;
@@ -465,16 +477,27 @@ export class UpdateService {
     return { sha256: hash.digest("hex"), bytes };
   }
 
-  private async launchRunner(planPath: string, runnerDirectory: string): Promise<void> {
+  /**
+   * Copy the runner and all of its runtime imports into an isolated directory,
+   * start it detached, and wait briefly to prove it did not die on startup.
+   * A successful spawn alone is not enough: Node resolves the whole ESM module
+   * graph before executing the helper, so a missing file only shows up as an
+   * early exit. Returning here means the helper is actually running.
+   */
+  async launchRunner(planPath: string, runnerDirectory: string): Promise<number> {
     const sourceDirectory = this.options.runnerSourceDir ?? path.dirname(fileURLToPath(import.meta.url));
-    const runnerSource = path.join(sourceDirectory, "restart-runner.js");
-    const swapSource = path.join(sourceDirectory, "code-swap.js");
-    if (!existsSync(runnerSource) || !existsSync(swapSource)) {
-      throw new UpdateError("UPDATE_RUNNER_MISSING", "The compiled restart runner is missing; rebuild the application before updating.", 500);
+    const missing = RUNNER_RUNTIME_FILES.filter((file) => !existsSync(path.join(sourceDirectory, file)));
+    if (missing.length > 0) {
+      throw new UpdateError(
+        "UPDATE_RUNNER_MISSING",
+        `The compiled restart runner is incomplete (missing ${missing.join(", ")}); rebuild the application before updating.`,
+        500,
+      );
     }
     mkdirSync(runnerDirectory, { recursive: true });
-    copyFileSync(runnerSource, path.join(runnerDirectory, "restart-runner.js"));
-    copyFileSync(swapSource, path.join(runnerDirectory, "code-swap.js"));
+    for (const file of RUNNER_RUNTIME_FILES) {
+      copyFileSync(path.join(sourceDirectory, file), path.join(runnerDirectory, file));
+    }
     writeFileSync(path.join(runnerDirectory, "package.json"), JSON.stringify({ type: "module" }), "utf8");
     let nodePath: string;
     if (this.deployment.platform === "win32") {
@@ -484,10 +507,12 @@ export class UpdateService {
       nodePath = process.execPath;
     }
     const log = path.join(path.dirname(planPath), "runner.log");
-    await new Promise<void>((resolve, reject) => {
+    const graceMs = this.options.runnerStartupTimeoutMs ?? 750;
+    return new Promise<number>((resolve, reject) => {
       let child: ChildProcess;
+      let fd: number | null = null;
       try {
-        const fd = openSync(log, "a");
+        fd = openSync(log, "a");
         child = spawn(nodePath, [path.join(runnerDirectory, "restart-runner.js"), planPath], {
           cwd: this.options.rootDir,
           env: process.env,
@@ -495,13 +520,36 @@ export class UpdateService {
           windowsHide: true,
           stdio: ["ignore", fd, fd],
         });
-        closeSync(fd);
       } catch (error) {
         reject(error);
         return;
+      } finally {
+        if (fd !== null) closeSync(fd);
       }
-      child.once("error", reject);
-      child.once("spawn", () => { child.unref(); resolve(); });
+      let settled = false;
+      let timer: NodeJS.Timeout | undefined;
+      const fail = (message: string) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        reject(new UpdateError("UPDATE_RUNNER_FAILED", message, 500));
+      };
+      child.once("error", (error) => fail(error.message));
+      child.once("exit", (code, signal) => {
+        fail(`The restart runner exited before taking over (code ${code ?? "none"}, signal ${signal ?? "none"}).`);
+      });
+      child.once("spawn", () => {
+        child.unref();
+        timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          if (!child.pid) {
+            reject(new UpdateError("UPDATE_RUNNER_FAILED", "The restart runner did not report a process id.", 500));
+            return;
+          }
+          resolve(child.pid);
+        }, graceMs);
+      });
     });
   }
 }

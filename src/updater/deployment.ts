@@ -35,15 +35,22 @@ export function detectDeployment(options: DeploymentDetectionOptions): Deploymen
     mode = packaged ? "release-package" : "source";
   }
   const assetKind = mode === "release-package" ? assetKindFor(platform, architecture) : null;
+  let applyAllowed = mode === "release-package" && assetKind !== null;
   let reasonCode: string | null = null;
   if (mode === "docker") reasonCode = "DEPLOYMENT_DOCKER";
   else if (mode === "source") reasonCode = "DEPLOYMENT_SOURCE";
   else if (!assetKind) reasonCode = platform !== "linux" && platform !== "win32" ? "PLATFORM_UNSUPPORTED" : "ARCH_UNSUPPORTED";
+  else if (platform === "win32") {
+    // The copy-node.exe-then-swap approach has not been verified against a
+    // real Windows release package. Report versions, but never fake an apply.
+    applyAllowed = false;
+    reasonCode = "WINDOWS_APPLY_UNVERIFIED";
+  }
   return {
     mode,
     platform,
     architecture,
-    applyAllowed: mode === "release-package" && assetKind !== null,
+    applyAllowed,
     reasonCode,
     upgradePath: upgradePathFor(mode),
     assetKind,

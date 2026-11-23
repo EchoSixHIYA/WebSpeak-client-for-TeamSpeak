@@ -5,6 +5,7 @@ import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CodeSwapError, restoreCode, swapCode } from "./code-swap.js";
+import { takeOverUpdateLock } from "./update-state.js";
 import type { PersistedUpdateState } from "./update-state.js";
 import type { UpdateTaskView } from "../shared/update.js";
 
@@ -267,13 +268,6 @@ async function stopApp(child: ChildProcess | undefined): Promise<void> {
   while (!exited(child) && Date.now() < hardDeadline) await sleep(100);
 }
 
-function removeLock(plan: RestartPlan): void {
-  try {
-    const parsed = JSON.parse(readFileSync(plan.lockPath, "utf8")) as { taskId?: string };
-    if (parsed.taskId === plan.taskId) rmSync(plan.lockPath, { force: true });
-  } catch { /* Lock already reclaimed. */ }
-}
-
 export async function runRestartPlan(planPath: string): Promise<number> {
   const plan = readPlan(planPath);
   const state = new StateWriter(plan);
@@ -281,7 +275,16 @@ export async function runRestartPlan(planPath: string): Promise<number> {
   let newApp: ChildProcess | undefined;
   state.status("restarting");
   state.step("restart", "running");
+  // Take over the update lock before doing anything else. The parent process
+  // is about to exit and its lock would otherwise have a dead pid, letting a
+  // second instance starting in this window roll the healthy code back.
+  let releaseLock: (() => void) | null = null;
   try {
+    try {
+      releaseLock = takeOverUpdateLock(plan.lockPath, plan.taskId);
+    } catch (error) {
+      throw new RunnerError("UPDATE_LOCK_FAILED", error instanceof Error ? error.message : "The update lock could not be taken over.");
+    }
     await waitForParent(plan.waitForPid, plan.parentTimeoutMs);
     state.step("swap", "running");
     swapCode(plan.rootDir, plan.stagedRoot, plan.backupDir);
@@ -295,7 +298,8 @@ export async function runRestartPlan(planPath: string): Promise<number> {
     if (!healthy) throw new RunnerError("UPDATE_HEALTH_CHECK_FAILED", `The updated version did not report ${plan.targetVersion} on /api/health.`);
     state.step("restart", "succeeded");
     state.status("succeeded");
-    removeLock(plan);
+    releaseLock();
+    releaseLock = null;
     try { rmSync(plan.stagedRoot, { recursive: true, force: true }); } catch { /* Best effort. */ }
     return 0;
   } catch (error) {
@@ -316,7 +320,7 @@ export async function runRestartPlan(planPath: string): Promise<number> {
         state.step("rollback", "failed", rollbackError instanceof Error ? rollbackError.message : "Code rollback failed.");
         state.rolledBack(false);
         state.status("failed", { code: "UPDATE_ROLLBACK_FAILED", message: `${message} Code rollback also failed.` });
-        removeLock(plan);
+        releaseLock?.();
         return 1;
       }
     }
@@ -327,7 +331,7 @@ export async function runRestartPlan(planPath: string): Promise<number> {
     } else {
       state.status("failed", { code, message });
     }
-    removeLock(plan);
+    releaseLock?.();
     return 1;
   }
 }

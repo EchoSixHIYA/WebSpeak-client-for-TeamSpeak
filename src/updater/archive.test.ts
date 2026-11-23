@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { ArchiveError, extractReleaseArchive } from "./archive.js";
@@ -58,13 +58,48 @@ test("zip entries that traverse or use absolute paths are rejected before writin
   }
 });
 
-test("symbolic and hard links are refused for both archive formats", async t => {
-  const tarSymlink = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "symlink", linkname: "/etc/passwd" }]));
-  await assert.rejects(extractReleaseArchive(tarSymlink.archive, tarSymlink.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
-  const tarHardlink = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "hardlink", linkname: "target" }]));
-  await assert.rejects(extractReleaseArchive(tarHardlink.archive, tarHardlink.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
-  const zipSymlink = fixture(t, "release.zip", createZip([{ name: "link", data: "/etc/passwd", mode: 0o120777 }]));
-  await assert.rejects(extractReleaseArchive(zipSymlink.archive, zipSymlink.destination, "release.zip"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+test("official relative .bin symlinks are accepted and resolve inside the package", async t => {
+  const { archive, destination } = fixture(t, "release.tar.gz", createTarGz([
+    { name: "webspeak/", type: "directory" },
+    { name: "webspeak/node_modules/nanoid/bin/nanoid.cjs", data: "#!/usr/bin/env node\nconsole.log('nanoid');\n", mode: 0o755 },
+    { name: "webspeak/node_modules/.bin/nanoid", type: "symlink", linkname: "../nanoid/bin/nanoid.cjs" },
+  ]));
+  await extractReleaseArchive(archive, destination, "release.tar.gz");
+  const link = path.join(destination, "webspeak/node_modules/.bin/nanoid");
+  assert.equal(lstatSync(link).isSymbolicLink(), true);
+  assert.equal(readlinkSync(link), "../nanoid/bin/nanoid.cjs");
+  assert.equal(readFileSync(link, "utf8"), "#!/usr/bin/env node\nconsole.log('nanoid');\n");
+});
+
+test("zip relative symlinks are accepted while absolute targets are refused", async t => {
+  const accepted = fixture(t, "release.zip", createZip([
+    { name: "webspeak/real.txt", data: "payload" },
+    { name: "webspeak/link.txt", data: "real.txt", mode: 0o120777 },
+  ]));
+  await extractReleaseArchive(accepted.archive, accepted.destination, "release.zip");
+  const link = path.join(accepted.destination, "webspeak/link.txt");
+  assert.equal(lstatSync(link).isSymbolicLink(), true);
+  assert.equal(readlinkSync(link), "real.txt");
+  assert.equal(readFileSync(link, "utf8"), "payload");
+
+  const refused = fixture(t, "release.zip", createZip([{ name: "link", data: "/etc/passwd", mode: 0o120777 }]));
+  await assert.rejects(extractReleaseArchive(refused.archive, refused.destination, "release.zip"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+});
+
+test("absolute, escaping, empty and hard-link entries are refused", async t => {
+  const absoluteTar = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "symlink", linkname: "/etc/passwd" }]));
+  await assert.rejects(extractReleaseArchive(absoluteTar.archive, absoluteTar.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+  const driveTar = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "symlink", linkname: "C:\\Windows\\system32" }]));
+  await assert.rejects(extractReleaseArchive(driveTar.archive, driveTar.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+  const hardlink = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "hardlink", linkname: "target" }]));
+  await assert.rejects(extractReleaseArchive(hardlink.archive, hardlink.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+  for (const linkname of ["", "..", "../outside", "a/../../../outside", "\\etc\\passwd"]) {
+    const escaping = fixture(t, "release.tar.gz", createTarGz([{ name: "link", type: "symlink", linkname }]));
+    await assert.rejects(extractReleaseArchive(escaping.archive, escaping.destination, "release.tar.gz"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
+    assert.equal(existsSync(path.join(escaping.directory, "outside")), false);
+  }
+  const zipAbsolute = fixture(t, "release.zip", createZip([{ name: "link", data: "/etc/passwd", mode: 0o120777 }]));
+  await assert.rejects(extractReleaseArchive(zipAbsolute.archive, zipAbsolute.destination, "release.zip"), rejectsWith("UPDATE_ARCHIVE_UNSAFE"));
 });
 
 test("unsupported archive formats and malformed archives are rejected", async t => {

@@ -303,6 +303,7 @@
           </div>
           <div v-if="availableUpdates.length" class="update-release-list">
             <strong>{{ tr('updateSelectRelease') }}</strong>
+            <p class="field-help">{{ tr('updateChecksumNotice') }}</p>
             <label v-for="release in availableUpdates" :key="release.version" class="update-release-row">
               <input v-model="selectedVersion" type="radio" :value="release.version" :disabled="!release.canApply || updateApplying" />
               <span><strong>v{{ release.version }}</strong> <small>{{ formatDate(release.publishedAt) }}</small></span>
@@ -350,6 +351,7 @@ function blockedReasonText(code: string | null) {
     case 'DEPLOYMENT_SOURCE': return tr('updateBlockedSource');
     case 'PLATFORM_UNSUPPORTED': return tr('updateBlockedPlatform');
     case 'ARCH_UNSUPPORTED': return tr('updateBlockedArch');
+    case 'WINDOWS_APPLY_UNVERIFIED': return tr('updateBlockedWindows');
     case 'UPDATE_ASSET_UNAVAILABLE': return tr('updateAssetMissing');
     case 'UPDATE_CHECKSUM_MISSING': return tr('updateChecksumMissing');
     default: return tr('updateBlockedUnavailable');

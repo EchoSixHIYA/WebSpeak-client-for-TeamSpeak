@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import test, { type TestContext } from "node:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Logger } from "../logger.js";
 import { CHECKSUM_ASSET_NAME, OFFICIAL_REPOSITORY } from "./releases.js";
 import { UpdateError, UpdateService, type UpdateErrorCode, type UpdateServiceOptions } from "./update-service.js";
@@ -438,4 +441,135 @@ test("initialization keeps a live task but reconciles it once its process is gon
   restarted.initialize();
   assert.equal(restarted.getStatus().task?.status, "failed");
   assert.equal(restarted.getStatus().task?.errorCode, "UPDATE_INTERRUPTED");
+});
+
+test("initialization does not roll back a task whose lock belongs to another live process", async t => {
+  const fixture = createService(t, [], new Map());
+  const taskId = "upd_other_process";
+  const statePath = path.join(fixture.dataDir, "updates", "state.json");
+  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+  const owner = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+  t.after(() => { try { owner.kill("SIGKILL"); } catch { /* Already gone. */ } });
+  await once(owner, "spawn");
+  assert.ok(owner.pid);
+
+  writeUpdateState(statePath, {
+    schemaVersion: 1,
+    task: {
+      id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+      startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+      errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+    },
+  });
+  writeFileSync(lockPath, JSON.stringify({ pid: owner.pid, taskId, createdAt: "2026-01-01T00:00:00.000Z" }));
+
+  const restarted = new UpdateService({
+    rootDir: fixture.rootDir, dataDir: fixture.dataDir, currentVersion: "0.3.2", logger,
+    platform: "linux", architecture: "x64", env: {}, isDocker: false, fetch: fakeFetch([], new Map()),
+    now: () => new Date("2026-01-01T00:10:00.000Z"),
+  });
+  restarted.initialize();
+
+  const status = restarted.getStatus();
+  assert.equal(status.task?.status, "restarting");
+  assert.equal(status.task?.errorCode, null);
+  assert.equal(status.task?.rolledBack, false);
+  assert.equal(existsSync(lockPath), true);
+});
+
+/** Every module the detached runner imports, compiled side by side. */
+const RUNNER_RUNTIME_FILES = ["restart-runner.js", "code-swap.js", "version.js", "update-state.js"];
+
+async function compileRunnerSources(destination: string): Promise<void> {
+  const { build } = await import("esbuild");
+  const sourceDirectory = path.dirname(fileURLToPath(import.meta.url));
+  await build({
+    entryPoints: RUNNER_RUNTIME_FILES.map((file) => path.join(sourceDirectory, file.replace(/\.js$/, ".ts"))),
+    outdir: destination,
+    bundle: false,
+    format: "esm",
+    platform: "node",
+    target: "node22",
+    logLevel: "silent",
+  });
+}
+
+function processIsAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+async function stopProcess(pid: number): Promise<void> {
+  try { process.kill(pid, "SIGKILL"); } catch { /* Already gone. */ }
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline && processIsAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+test("the real restart runner starts with every runtime module and survives the grace window", async t => {
+  const directory = workspace(t);
+  const compiled = path.join(directory, "compiled");
+  await compileRunnerSources(compiled);
+  const rootDir = path.join(directory, "app");
+  createPackageFiles(rootDir, "0.3.2");
+  const dataDir = path.join(directory, "data");
+  const updatesDir = path.join(dataDir, "updates");
+  mkdirSync(updatesDir, { recursive: true });
+  const taskId = "upd_real_runner";
+  const statePath = path.join(updatesDir, "state.json");
+  writeUpdateState(statePath, {
+    schemaVersion: 1,
+    task: {
+      id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+      startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+      errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+    },
+  });
+  const planPath = path.join(updatesDir, "plan.json");
+  const runnerDirectory = path.join(updatesDir, "runner");
+  const lockPath = path.join(updatesDir, "update.lock");
+  writeFileSync(planPath, JSON.stringify({
+    schemaVersion: 1,
+    taskId,
+    rootDir,
+    statePath,
+    lockPath,
+    stagedRoot: path.join(updatesDir, "staged"),
+    backupDir: path.join(updatesDir, "backups", taskId),
+    fromVersion: "0.3.2",
+    targetVersion: "0.4.0",
+    nodePath: process.execPath,
+    appEntry: path.join(rootDir, "dist", "index.js"),
+    // Deliberately not 3040 so the test cannot collide with a real server.
+    health: { protocol: "http", port: 39999, path: "/api/health" },
+    // The test process stays alive, so the runner waits instead of swapping.
+    waitForPid: process.pid,
+    parentTimeoutMs: 60_000,
+    healthTimeoutMs: 100,
+    pollIntervalMs: 50,
+    appLogPath: path.join(updatesDir, "app.log"),
+  }, null, 2));
+
+  const service = new UpdateService({
+    rootDir, dataDir, currentVersion: "0.3.2", logger,
+    platform: "linux", architecture: "x64", env: {}, isDocker: false,
+    fetch: fakeFetch([], new Map()),
+    runnerSourceDir: compiled,
+    runnerStartupTimeoutMs: 600,
+  });
+  // Call the real launcher: no spawn mock, the compiled runner is executed.
+  const pid = await service.launchRunner(planPath, runnerDirectory);
+  t.after(() => stopProcess(pid));
+
+  assert.ok(Number.isInteger(pid) && pid > 0, "the runner reported a pid");
+  for (const file of RUNNER_RUNTIME_FILES) {
+    assert.equal(existsSync(path.join(runnerDirectory, file)), true, `${file} was copied next to the runner`);
+  }
+  assert.doesNotThrow(() => process.kill(pid, 0), "the runner is still alive after the grace window");
+  const lock = JSON.parse(readFileSync(lockPath, "utf8"));
+  assert.equal(lock.taskId, taskId);
+  assert.equal(lock.pid, pid);
+  const log = readFileSync(path.join(updatesDir, "runner.log"), "utf8");
+  assert.ok(!log.includes("ERR_MODULE_NOT_FOUND"), `runner log has no missing module: ${log}`);
 });

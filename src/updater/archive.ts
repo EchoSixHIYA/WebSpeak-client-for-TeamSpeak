@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream, type Stats } from "node:fs";
-import { chmod, mkdir, open, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, stat, symlink, writeFile, type FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { once } from "node:events";
 import { createGunzip, createInflateRaw } from "node:zlib";
@@ -78,6 +78,47 @@ function resolveEntry(destination: string, relative: string): string {
   const root = path.resolve(destination);
   if (target !== root && !target.startsWith(root + path.sep)) unsafe("Archive entry escapes the extraction directory.");
   return target;
+}
+
+const SYMLINK_ROOT = "/__webspeak_extract_root__";
+
+/**
+ * Official release packages use relative links inside node_modules/.bin
+ * (for example `nanoid -> ../nanoid/bin/nanoid.cjs`). A link is accepted only
+ * when its target is relative and, after lexical normalization, still points
+ * strictly inside the extraction root. Absolute paths, drive letters, parent
+ * traversal, empty targets and links that resolve to the root itself are
+ * rejected before anything is created.
+ */
+export function safeSymlinkTarget(entryRelative: string, rawTarget: string): string {
+  if (!rawTarget) unsafe("Archive symbolic link has an empty target.");
+  if (rawTarget.includes("\0")) unsafe("Archive symbolic link target is invalid.");
+  const normalized = rawTarget.replaceAll("\\", "/");
+  if (normalized.startsWith("/")) unsafe("Archive symbolic link uses an absolute target.");
+  if (/^[A-Za-z]:/.test(normalized)) unsafe("Archive symbolic link target is drive-qualified.");
+  const entryDirectory = path.posix.dirname(entryRelative);
+  const resolved = path.posix.resolve(SYMLINK_ROOT, entryDirectory === "." ? "" : entryDirectory, normalized);
+  if (!resolved.startsWith(`${SYMLINK_ROOT}/`)) {
+    unsafe("Archive symbolic link escapes the extraction directory.");
+  }
+  return normalized;
+}
+
+async function createSymlink(destination: string, relative: string, linkTarget: string): Promise<void> {
+  const root = path.resolve(destination);
+  const target = resolveEntry(destination, relative);
+  // Second boundary check against the real destination, not only the
+  // archive-relative form. The link is never dereferenced while validating.
+  const lexicallyResolved = path.resolve(destination, path.posix.dirname(relative), linkTarget);
+  if (lexicallyResolved === root || !lexicallyResolved.startsWith(root + path.sep)) {
+    unsafe("Archive symbolic link escapes the extraction directory.");
+  }
+  try {
+    await symlink(linkTarget, target);
+  } catch (error) {
+    if (error instanceof ArchiveError) throw error;
+    throw new ArchiveError("UPDATE_ARCHIVE_INVALID", `Archive symbolic link ${relative} could not be created.`);
+  }
 }
 
 function isZeroBlock(buffer: Buffer): boolean {
@@ -205,13 +246,12 @@ async function extractTarGz(file: string, destination: string, limits: ExtractLi
       continue;
     }
     const entryName = pax.path ?? longName ?? name;
+    const linkName = pax.linkpath ?? readCString(header.subarray(157, 257));
     longName = undefined;
     pax = {};
     if (!entryName) invalid("Archive entry has no name.");
-    if (type === "1" || type === "2") {
-      unsafe(`Archive entry ${entryName} is a ${type === "1" ? "hard link" : "symbolic link"}; links are not accepted.`);
-    }
-    if (type !== "0" && type !== "7" && type !== "5") {
+    if (type === "1") unsafe(`Archive entry ${entryName} is a hard link; hard links are not accepted.`);
+    if (type !== "0" && type !== "2" && type !== "7" && type !== "5") {
       throw new ArchiveError("UPDATE_ARCHIVE_UNSUPPORTED", `Archive entry ${entryName} has unsupported type ${type}.`);
     }
     entries++;
@@ -222,6 +262,14 @@ async function extractTarGz(file: string, destination: string, limits: ExtractLi
     const target = resolveEntry(destination, relative);
     if (type === "5") {
       await mkdir(target, { recursive: true, mode: mode || 0o755 });
+      await reader.skip(padded);
+      continue;
+    }
+    if (type === "2") {
+      if (size !== 0) invalid(`Archive symbolic link ${entryName} has unexpected content.`);
+      const linkTarget = safeSymlinkTarget(relative, linkName);
+      await mkdir(path.dirname(target), { recursive: true });
+      await createSymlink(destination, relative, linkTarget);
       await reader.skip(padded);
       continue;
     }
@@ -253,11 +301,46 @@ interface ZipEntry {
   localOffset: number;
   mode: number;
   directory: boolean;
+  symlink: boolean;
 }
 
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
+
+async function readZipEntryBuffer(
+  handle: FileHandle,
+  entry: ZipEntry,
+  file: string,
+  archiveSize: number,
+  limit: number,
+): Promise<Buffer> {
+  const header = Buffer.alloc(30);
+  await handle.read(header, 0, 30, entry.localOffset);
+  if (header.readUInt32LE(0) !== LOCAL_SIGNATURE) invalid(`ZIP entry ${entry.name} has an invalid local header.`);
+  const nameLength = header.readUInt16LE(26);
+  const extraLength = header.readUInt16LE(28);
+  const dataStart = entry.localOffset + 30 + nameLength + extraLength;
+  if (dataStart + entry.compressedSize > archiveSize) invalid(`ZIP entry ${entry.name} is truncated.`);
+  if (entry.compressedSize === 0) return Buffer.alloc(0);
+  const chunks: Buffer[] = [];
+  let total = 0;
+  const collector = new StreamTransform({
+    transform(chunk: Buffer, _encoding, callback) {
+      total += chunk.length;
+      if (total > limit) {
+        callback(new ArchiveError("UPDATE_ARCHIVE_UNSAFE", `ZIP symbolic link ${entry.name} has an oversized target.`));
+        return;
+      }
+      chunks.push(chunk);
+      callback();
+    },
+  });
+  const source = createReadStream(file, { start: dataStart, end: dataStart + entry.compressedSize - 1 });
+  if (entry.method === 8) await pipeline(source, createInflateRaw(), collector);
+  else await pipeline(source, collector);
+  return Buffer.concat(chunks);
+}
 
 async function extractZip(file: string, destination: string, limits: ExtractLimits): Promise<void> {
   const handle = await open(file, "r");
@@ -313,15 +396,21 @@ async function extractZip(file: string, destination: string, limits: ExtractLimi
       }
       const unixMode = versionMadeBy >> 8 === 3 ? externalAttributes >>> 16 : 0;
       const fileType = unixMode & 0o170000;
-      if (fileType === 0o120000) unsafe(`ZIP entry ${name} is a symbolic link.`);
-      if (fileType !== 0 && fileType !== 0o100000 && fileType !== 0o040000) {
+      if (fileType !== 0 && fileType !== 0o100000 && fileType !== 0o040000 && fileType !== 0o120000) {
         unsafe(`ZIP entry ${name} has an unsupported file type.`);
       }
-      const directoryEntry = name.endsWith("/") || fileType === 0o040000;
+      const symlinkEntry = fileType === 0o120000;
+      if (symlinkEntry && uncompressedSize > 64 * 1024) {
+        unsafe(`ZIP symbolic link ${name} has an oversized target.`);
+      }
+      const directoryEntry = !symlinkEntry && (name.endsWith("/") || fileType === 0o040000);
       if (!directoryEntry && uncompressedSize > limits.maxFileBytes) limitExceeded("Archive entry exceeds the file size limit.");
       total += directoryEntry ? 0 : uncompressedSize;
       if (total > limits.maxTotalBytes) limitExceeded("Archive expands beyond the size limit.");
-      entries.push({ name, flags, method, compressedSize, uncompressedSize, localOffset, mode: unixMode & 0o777, directory: directoryEntry });
+      entries.push({
+        name, flags, method, compressedSize, uncompressedSize, localOffset,
+        mode: unixMode & 0o777, directory: directoryEntry, symlink: symlinkEntry,
+      });
     }
     for (const entry of entries) {
       const relative = safeArchivePath(entry.name);
@@ -332,6 +421,12 @@ async function extractZip(file: string, destination: string, limits: ExtractLimi
         continue;
       }
       await mkdir(path.dirname(target), { recursive: true });
+      if (entry.symlink) {
+        const rawTarget = (await readZipEntryBuffer(handle, entry, file, info.size, 64 * 1024)).toString("utf8");
+        const linkTarget = safeSymlinkTarget(relative, rawTarget);
+        await createSymlink(destination, relative, linkTarget);
+        continue;
+      }
       if (entry.compressedSize === 0) {
         await writeFile(target, Buffer.alloc(0), { mode: entry.mode || 0o644, flag: "wx" });
         continue;
