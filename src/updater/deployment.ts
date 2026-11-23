@@ -16,20 +16,23 @@ export interface DeploymentInfo extends UpdateDeploymentView {
   assetKind: "linux-x64" | "linux-arm64" | "windows-x64" | null;
 }
 
-const EXPLICIT_MODES: UpdateDeploymentMode[] = ["docker", "release-package", "source"];
-
 export function detectDeployment(options: DeploymentDetectionOptions): DeploymentInfo {
   const platform = options.platform ?? process.platform;
   const architecture = options.architecture ?? process.arch;
   const env = options.env ?? process.env;
   const explicit = env.WEBSPEAK_DEPLOYMENT_MODE?.trim().toLowerCase();
+  const packaged = isReleasePackageRoot(options.rootDir, platform);
   let mode: UpdateDeploymentMode;
-  if (explicit && (EXPLICIT_MODES as string[]).includes(explicit)) {
-    mode = explicit as UpdateDeploymentMode;
-  } else if (options.isDocker ?? runningInContainer(env)) {
+  // Container detection always wins: an explicit "release-package" override
+  // must never make an image replaceable from inside the container.
+  if (explicit === "docker" || (options.isDocker ?? runningInContainer(env))) {
     mode = "docker";
+  } else if (explicit === "source") {
+    mode = "source";
   } else {
-    mode = isReleasePackageRoot(options.rootDir, platform) ? "release-package" : "source";
+    // An explicit "release-package" only counts when the tree really is a
+    // complete release package; otherwise applying would be unsafe.
+    mode = packaged ? "release-package" : "source";
   }
   const assetKind = mode === "release-package" ? assetKindFor(platform, architecture) : null;
   let reasonCode: string | null = null;

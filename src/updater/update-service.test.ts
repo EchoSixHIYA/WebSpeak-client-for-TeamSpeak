@@ -7,7 +7,7 @@ import type { Logger } from "../logger.js";
 import { CHECKSUM_ASSET_NAME, OFFICIAL_REPOSITORY } from "./releases.js";
 import { UpdateError, UpdateService, type UpdateErrorCode, type UpdateServiceOptions } from "./update-service.js";
 import { createPackageFiles, createTarGz, sha256Hex, type TarFixtureEntry } from "./test-support.js";
-import { readUpdateState } from "./update-state.js";
+import { readUpdateState, writeUpdateState } from "./update-state.js";
 
 const logger: Logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
 const ASSET_NAME = "webspeak-webclient-v0.4.0-linux-x64.tar.gz";
@@ -337,6 +337,78 @@ test("a concurrent lock leaves the running task state untouched", async t => {
   await assert.rejects(service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_IN_PROGRESS"));
   assert.equal(readUpdateState(path.join(dataDir, "updates", "state.json")).task, null);
   assert.equal(service.getStatus().task, null);
+});
+
+test("getStatus reports the task the restart runner persisted, not stale memory", async t => {
+  const archive = packageArchive("0.4.0");
+  const checksums = Buffer.from(checksumText(ASSET_NAME, archive));
+  const { service, dataDir } = createService(t, [{
+    version: "0.4.0",
+    assets: [
+      { name: ASSET_NAME, data: archive },
+      { name: CHECKSUM_ASSET_NAME, data: checksums },
+    ],
+  }], new Map([
+    [`https://github.com/${OFFICIAL_REPOSITORY}/releases/download/v0.4.0/${ASSET_NAME}`, archive],
+    [`https://github.com/${OFFICIAL_REPOSITORY}/releases/download/v0.4.0/${CHECKSUM_ASSET_NAME}`, checksums],
+  ]));
+
+  const task = await service.applyUpdate("0.4.0", "0.4.0");
+  assert.equal(service.getStatus().task?.status, "restarting");
+  // The runner rolls the task back in another process, after this one
+  // already returned the prepared task.
+  writeUpdateState(path.join(dataDir, "updates", "state.json"), {
+    schemaVersion: 1,
+    task: {
+      ...task, status: "failed", finishedAt: "2026-01-01T00:05:00.000Z", updatedAt: "2026-01-01T00:05:00.000Z",
+      errorCode: "UPDATE_HEALTH_CHECK_FAILED", errorMessage: "health check failed", rolledBack: true,
+    },
+  });
+  const status = service.getStatus();
+  assert.equal(status.task?.status, "failed");
+  assert.equal(status.task?.rolledBack, true);
+  assert.equal(status.task?.errorCode, "UPDATE_HEALTH_CHECK_FAILED");
+});
+
+test("initialization restores the previous code from an interrupted swap backup", t => {
+  const fixture = createService(t, [], new Map());
+  const taskId = "upd_interrupted_swap";
+  const statePath = path.join(fixture.dataDir, "updates", "state.json");
+  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+  const backupDir = path.join(fixture.dataDir, "updates", "backups", taskId);
+
+  // The process died after moving the previous code aside and only part of
+  // the new package had been moved in.
+  mkdirSync(path.join(backupDir, "dist"), { recursive: true });
+  writeFileSync(path.join(backupDir, "dist", "index.js"), "// old code\n");
+  writeFileSync(path.join(backupDir, "package.json"), JSON.stringify({ name: "webspeak-webclient", version: "0.3.2" }));
+  writeFileSync(path.join(fixture.rootDir, "dist", "index.js"), "// new code\n");
+  writeFileSync(path.join(fixture.rootDir, "package.json"), JSON.stringify({ name: "webspeak-webclient", version: "0.4.0" }));
+
+  writeUpdateState(statePath, {
+    schemaVersion: 1,
+    task: {
+      id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+      startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+      errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+    },
+  });
+  writeFileSync(lockPath, JSON.stringify({ pid: 0, taskId, createdAt: "2026-01-01T00:00:00.000Z" }));
+
+  const restarted = new UpdateService({
+    rootDir: fixture.rootDir, dataDir: fixture.dataDir, currentVersion: "0.4.0", logger,
+    platform: "linux", architecture: "x64", env: {}, isDocker: false, fetch: fakeFetch([], new Map()),
+    now: () => new Date("2026-01-01T00:10:00.000Z"),
+  });
+  restarted.initialize();
+
+  assert.equal(readFileSync(path.join(fixture.rootDir, "dist", "index.js"), "utf8"), "// old code\n");
+  assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.3.2");
+  const status = restarted.getStatus();
+  assert.equal(status.task?.status, "failed");
+  assert.equal(status.task?.rolledBack, true);
+  assert.equal(status.task?.errorCode, "UPDATE_INTERRUPTED");
+  assert.equal(existsSync(lockPath), false);
 });
 
 test("initialization keeps a live task but reconciles it once its process is gone", async t => {

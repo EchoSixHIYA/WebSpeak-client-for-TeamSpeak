@@ -24,13 +24,38 @@ function releasePackageRoot(t: test.TestContext, platform: "linux" | "win32" = "
   return root;
 }
 
-test("deployment mode honours the explicit environment override", () => {
+test("an explicit release-package override cannot bypass container detection", () => {
   const env = { WEBSPEAK_DEPLOYMENT_MODE: "release-package" };
   const info = detectDeployment({ rootDir: "/does/not/exist", env, isDocker: true, platform: "linux", architecture: "x64" });
-  assert.equal(info.mode, "release-package");
-  assert.equal(info.applyAllowed, true);
-  assert.equal(info.reasonCode, null);
-  assert.equal(info.upgradePath, "release-package");
+  assert.equal(info.mode, "docker");
+  assert.equal(info.applyAllowed, false);
+  assert.equal(info.reasonCode, "DEPLOYMENT_DOCKER");
+  assert.equal(info.upgradePath, "docker-compose");
+});
+
+test("an explicit release-package override requires a complete package tree", t => {
+  const missing = detectDeployment({
+    rootDir: "/does/not/exist",
+    env: { WEBSPEAK_DEPLOYMENT_MODE: "release-package" },
+    isDocker: false,
+    platform: "linux",
+    architecture: "x64",
+  });
+  assert.equal(missing.mode, "source");
+  assert.equal(missing.applyAllowed, false);
+  assert.equal(missing.reasonCode, "DEPLOYMENT_SOURCE");
+
+  const root = releasePackageRoot(t);
+  const complete = detectDeployment({
+    rootDir: root,
+    env: { WEBSPEAK_DEPLOYMENT_MODE: "release-package" },
+    isDocker: false,
+    platform: "linux",
+    architecture: "x64",
+  });
+  assert.equal(complete.mode, "release-package");
+  assert.equal(complete.applyAllowed, true);
+  assert.equal(complete.reasonCode, null);
 });
 
 test("docker and source deployments never allow an in-console apply", () => {

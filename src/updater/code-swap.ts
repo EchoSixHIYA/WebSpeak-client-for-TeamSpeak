@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import { parseStableVersion } from "./version.js";
 
@@ -76,10 +76,23 @@ export function locatePackageRoot(extractedDir: string, version: string, platfor
   return root;
 }
 
+function moveEntry(from: string, to: string): void {
+  try {
+    renameSync(from, to);
+  } catch (error) {
+    // Staging and backups may live on another filesystem than the install
+    // directory. A rename cannot cross devices, so fall back to a copy that
+    // only removes the source once the copy has completed.
+    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    cpSync(from, to, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true });
+    rmSync(from, { recursive: true, force: true });
+  }
+}
+
 function moveIfPresent(from: string, to: string): void {
   if (!existsSync(from)) return;
   mkdirSync(path.dirname(to), { recursive: true });
-  renameSync(from, to);
+  moveEntry(from, to);
 }
 
 /**

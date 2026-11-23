@@ -465,10 +465,11 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       if (version !== confirmVersion) throw new UpdateError("UPDATE_CONFIRMATION_REQUIRED", "The confirmation does not match the selected version.");
       const task = await options.updateService.applyUpdate(version, confirmVersion);
       options.service.database.addAudit("ADMIN_UPDATE_STARTED", { version });
-      response.once("finish", () => {
-        setTimeout(() => options.restartAfterUpdate?.(), 250).unref();
-      });
       response.status(202).json({ ok: true, task });
+      // Do not wait for the response to finish: a reverse proxy or a client
+      // that disconnects early must not leave the restart runner waiting for
+      // this process until its timeout expires.
+      setTimeout(() => options.restartAfterUpdate?.(), 250).unref();
     } catch (error: unknown) {
       sendUpdateError(response, error);
     }

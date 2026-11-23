@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -82,6 +82,36 @@ test("code swap replaces only code and preserves data, config, certs, skins and 
   }
   assert.deepEqual(JSON.parse(readFileSync(path.join(root, "config.json"), "utf8")), { siteName: "kept" });
   assert.equal(existsSync(path.join(backup, "config.json")), false);
+});
+
+test("code swap copies across filesystems when rename reports EXDEV", t => {
+  const shared = "/dev/shm";
+  if (!existsSync(shared)) {
+    t.skip("no separate filesystem available for the EXDEV test");
+    return;
+  }
+  const root = path.join(workspace(t), "root"), backup = path.join(workspace(t), "backup");
+  const stagedBase = mkdtempSync(path.join(shared, "webspeak-swap-xdev-"));
+  t.after(() => rmSync(stagedBase, { recursive: true, force: true }));
+  const staged = path.join(stagedBase, "staged");
+
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code", "node_modules/new.txt": "new dependency" });
+  if (statSync(root).dev === statSync(staged).dev) {
+    t.skip("tmp and /dev/shm share a device on this system");
+    return;
+  }
+
+  swapCode(root, staged, backup);
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "new code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.4.0");
+  assert.equal(readFileSync(path.join(root, "node_modules", "new.txt"), "utf8"), "new dependency");
+  assert.equal(readFileSync(path.join(backup, "dist", "index.js"), "utf8"), "old code");
+  // The copy fallback removes the source only after a successful copy.
+  assert.equal(existsSync(path.join(staged, "dist")), false);
+  assert.equal(existsSync(path.join(staged, "package.json")), false);
 });
 
 test("restoreCode returns the previous code and keeps rejected code for inspection", t => {

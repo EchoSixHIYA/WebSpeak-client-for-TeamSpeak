@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import type { Logger } from "../logger.js";
 import type { UpdateCheckView, UpdateReleaseView, UpdateStatusView, UpdateTaskStatus, UpdateTaskView } from "../shared/update.js";
 import { ArchiveError, extractReleaseArchive } from "./archive.js";
-import { CodeSwapError, locatePackageRoot } from "./code-swap.js";
+import { CodeSwapError, locatePackageRoot, restoreCode } from "./code-swap.js";
 import { detectDeployment, releaseAssetName, type DeploymentInfo } from "./deployment.js";
 import {
   assertOfficialDownloadUrl, CHECKSUM_ASSET_NAME, GitHubReleaseSource, ReleaseSourceError,
@@ -40,6 +40,8 @@ export type UpdateErrorCode =
   | "UPDATE_ARCHIVE_LIMIT"
   | "UPDATE_ARCHIVE_UNSUPPORTED"
   | "UPDATE_PACKAGE_INVALID"
+  | "UPDATE_SWAP_FAILED"
+  | "UPDATE_ROLLBACK_FAILED"
   | "UPDATE_RELEASE_UNAVAILABLE"
   | "UPDATE_RUNNER_MISSING"
   | "UPDATE_RUNNER_FAILED"
@@ -126,7 +128,8 @@ export class UpdateService {
     // A live lock owner (for example a second process starting by mistake)
     // must not have its in-flight task reconciled as interrupted.
     if (!task || !isActiveTaskStatus(task.status) || !updateLockIsHeld(this.lockPath, task.id)) {
-      const changed = reconcileInterruptedState(this.state, this.options.currentVersion, this.now().toISOString());
+      const recovered = task && isActiveTaskStatus(task.status) ? this.recoverInterruptedSwap(task) : null;
+      const changed = recovered !== null || reconcileInterruptedState(this.state, this.options.currentVersion, this.now().toISOString());
       if (changed) writeUpdateState(this.statePath, this.state);
     }
     clearStaleUpdateLock(this.lockPath);
@@ -137,7 +140,45 @@ export class UpdateService {
     }, "Update service initialized");
   }
 
+  /**
+   * A crash during the swap leaves the previous code in the backup directory
+   * and possibly only partial new code in the install directory. Restore the
+   * previous code before reporting the task, rather than trusting a version
+   * whose files may be incomplete.
+   */
+  private recoverInterruptedSwap(task: NonNullable<PersistedUpdateState["task"]>): boolean | null {
+    const backupDir = path.join(this.backupsDir, task.id);
+    if (!existsSync(backupDir)) return null;
+    const now = this.now().toISOString();
+    let restored = false;
+    try {
+      restoreCode(this.options.rootDir, backupDir);
+      restored = true;
+    } catch (error) {
+      this.options.logger.warn({
+        taskId: task.id,
+        err: error instanceof Error ? error.message : String(error),
+      }, "Interrupted update code could not be restored from backup");
+    }
+    task.status = "failed";
+    task.finishedAt = now;
+    task.updatedAt = now;
+    task.rolledBack = restored;
+    if (restored) {
+      task.errorCode = "UPDATE_INTERRUPTED";
+      task.errorMessage = "The process stopped during the update. The previous version was restored from the backup.";
+    } else {
+      task.errorCode = "UPDATE_ROLLBACK_FAILED";
+      task.errorMessage = "The process stopped during the update and the code could not be restored automatically. Restore the previous version from the backup.";
+    }
+    return true;
+  }
+
   getStatus(): UpdateStatusView {
+    // The restart runner updates the persisted task after this process has
+    // already returned a response, so always report the on-disk state. Do not
+    // replace the in-memory state: an apply in progress still writes to it.
+    const state = readUpdateState(this.statePath);
     return {
       currentVersion: this.options.currentVersion,
       deployment: {
@@ -148,7 +189,7 @@ export class UpdateService {
         reasonCode: this.deployment.reasonCode,
         upgradePath: this.deployment.upgradePath,
       },
-      task: this.state.task,
+      task: state.task,
     };
   }
 
@@ -486,6 +527,6 @@ function mapError(error: unknown): UpdateError {
   if (error instanceof UpdateLockedError) return new UpdateError("UPDATE_IN_PROGRESS", error.message, 409);
   if (error instanceof ReleaseSourceError) return new UpdateError("UPDATE_RELEASE_UNAVAILABLE", error.message, 502);
   if (error instanceof ArchiveError) return new UpdateError(error.code, error.message, 422);
-  if (error instanceof CodeSwapError) return new UpdateError(error.code === "UPDATE_ROLLBACK_FAILED" ? "UPDATE_FAILED" : "UPDATE_PACKAGE_INVALID", error.message, 422);
+  if (error instanceof CodeSwapError) return new UpdateError(error.code, error.message, 422);
   return new UpdateError("UPDATE_FAILED", error instanceof Error ? error.message : "The update failed.", 500);
 }

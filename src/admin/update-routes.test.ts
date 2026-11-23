@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { mkdtempSync, rmSync } from "node:fs";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
@@ -149,6 +150,30 @@ test("a confirmed apply returns the task and stops the process after the respons
   assert.deepEqual(f.applyCalls, [["0.4.0", "0.4.0"]]);
   assert.ok(f.database.recentAudit(10).some((event) => event.event === "ADMIN_UPDATE_STARTED"));
   await new Promise<void>((resolve) => setTimeout(resolve, 400));
+  assert.equal(f.restarted(), true);
+});
+
+test("a client that disconnects before the response still schedules the restart", async t => {
+  const f = await fixture(t);
+  const { cookie, csrf } = await f.login();
+  const body = JSON.stringify({ version: "0.4.0", confirmVersion: "0.4.0" });
+  const url = new URL(`${f.origin}/api/admin/update/apply`);
+  const request = http.request({
+    hostname: url.hostname, port: url.port, path: url.pathname, method: "POST",
+    headers: {
+      origin: f.origin, cookie, "x-csrf-token": csrf, "content-type": "application/json",
+      "content-length": Buffer.byteLength(body),
+    },
+  });
+  request.on("error", () => { /* Expected once the socket is destroyed. */ });
+  request.end(body);
+  const deadline = Date.now() + 2_000;
+  while (f.applyCalls.length === 0 && Date.now() < deadline) await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(f.applyCalls, [["0.4.0", "0.4.0"]]);
+  // Close the connection without consuming the response. The restart must not
+  // depend on the response finish event.
+  request.destroy();
+  await new Promise<void>((resolve) => setTimeout(resolve, 700));
   assert.equal(f.restarted(), true);
 });
 
