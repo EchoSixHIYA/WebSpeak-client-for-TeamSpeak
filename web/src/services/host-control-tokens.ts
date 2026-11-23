@@ -44,6 +44,36 @@ export const HOST_CONTROL_TOKEN_NAMES = [
 
 export type HostControlTokenName = (typeof HOST_CONTROL_TOKEN_NAMES)[number];
 
+/**
+ * Extra tokens read only for `mode: "toolbar"` recovery buttons. They make a
+ * host-owned button able to match a neighbouring top-bar button without
+ * giving the skin any DOM control:
+ *
+ *   --skin-recovery-toolbar-<token>          (per-part)
+ *   --skin-host-toolbar-<token>              (global fallback)
+ *
+ * Colours fall back to the normal `--skin-recovery-*` / `--skin-host-*` set;
+ * radius, padding, height, font size and shadow use toolbar defaults so a
+ * capsule radius (999px) or the fixed pale built-in button never leaks in.
+ */
+export const HOST_TOOLBAR_TOKEN_NAMES = [
+  "background", "foreground", "border", "radius", "font", "font-size", "padding", "height", "shadow",
+] as const;
+
+export type HostToolbarTokenName = (typeof HOST_TOOLBAR_TOKEN_NAMES)[number];
+
+export const HOST_TOOLBAR_GLOBAL_TOKEN_PROPERTIES: Readonly<Record<HostToolbarTokenName, string>> = {
+  background: "--skin-host-toolbar-background",
+  foreground: "--skin-host-toolbar-foreground",
+  border: "--skin-host-toolbar-border",
+  radius: "--skin-host-toolbar-radius",
+  font: "--skin-host-toolbar-font",
+  "font-size": "--skin-host-toolbar-font-size",
+  padding: "--skin-host-toolbar-padding",
+  height: "--skin-host-toolbar-height",
+  shadow: "--skin-host-toolbar-shadow",
+};
+
 /** Global token set read from the active skin root (or a slot anchor). */
 export const HOST_CONTROL_GLOBAL_TOKEN_PROPERTIES: Readonly<Record<HostControlTokenName, string>> = {
   accent: "--skin-host-accent",
@@ -74,6 +104,10 @@ export function hostControlTokenProperty(part: string, token: HostControlTokenNa
   return `--skin-${hostControlTokenKey(part)}-${token}`;
 }
 
+export function hostToolbarTokenProperty(part: string, token: HostToolbarTokenName): string {
+  return `--skin-${hostControlTokenKey(part)}-toolbar-${token}`;
+}
+
 /** Host-owned variables written inside the closed shadow root. */
 export const HOST_CONTROL_APPLIED_VARIABLES = {
   accent: "--ws-control-accent",
@@ -86,6 +120,21 @@ export const HOST_CONTROL_APPLIED_VARIABLES = {
   hitTarget: "--ws-control-hit",
   fontSize: "--ws-control-font-size",
   builtInBorder: "--ws-control-builtin-border",
+} as const;
+
+/** Host-owned variables read by the toolbar-mode button CSS. */
+export const HOST_TOOLBAR_APPLIED_VARIABLES = {
+  background: "--ws-toolbar-background",
+  foreground: "--ws-toolbar-foreground",
+  border: "--ws-toolbar-border",
+  radius: "--ws-toolbar-radius",
+  font: "--ws-toolbar-font",
+  fontSize: "--ws-toolbar-font-size",
+  paddingX: "--ws-toolbar-padding-x",
+  paddingY: "--ws-toolbar-padding-y",
+  minHeight: "--ws-toolbar-min-height",
+  shadow: "--ws-toolbar-shadow",
+  focus: "--ws-toolbar-focus",
 } as const;
 
 export interface HostControlRawTokens {
@@ -130,6 +179,23 @@ export interface HostControlTokens {
   builtInBorder?: string;
 }
 
+/** Resolved style of a toolbar-mode recovery button (applied to its wrapper). */
+export interface HostControlToolbarTokens {
+  background: string;
+  foreground: string;
+  border: string;
+  radius: number;
+  font: string;
+  fontSize: number;
+  paddingX: number;
+  paddingY: number;
+  /** Minimum button height; never below the current size tier hit target. */
+  minHeight: number;
+  shadow: string;
+  /** Focus ring colour, from the readable accent of the control palette. */
+  focus: string;
+}
+
 export interface RgbColor {
   r: number;
   g: number;
@@ -147,6 +213,23 @@ const ON_ACCENT_DARK: RgbColor = { r: 17, g: 24, b: 39 };
 const MAX_RADIUS = 999;
 const MAX_FONT_LENGTH = 120;
 const FONT_FAMILY_PATTERN = /^[A-Za-z0-9 ,'"-]{1,120}$/;
+/** Toolbar-mode geometry limits; a skin cannot shrink below host minimums. */
+export const TOOLBAR_DEFAULT_RADIUS = 6;
+export const TOOLBAR_MAX_RADIUS = 24;
+export const TOOLBAR_DEFAULT_PADDING_X = 12;
+export const TOOLBAR_DEFAULT_PADDING_Y = 6;
+export const TOOLBAR_MAX_PADDING = 48;
+export const TOOLBAR_MAX_HEIGHT = 72;
+export const TOOLBAR_MAX_FONT_SIZE = 20;
+const MAX_SHADOW_LENGTH = 160;
+const LENGTH_PX_PATTERN = /^(-?\d+(?:\.\d+)?)px$/i;
+const PADDING_PATTERN = /^(\d+(?:\.\d+)?)px(?:\s+(\d+(?:\.\d+)?)px)?$/i;
+/**
+ * A single box-shadow value: optional `inset`, two to four px offsets/sizes
+ * and one simple colour. `url()`, `var()`, extra shadows and declarations are
+ * rejected so a token can never load a resource or escape the inline value.
+ */
+const SHADOW_PATTERN = /^(?:none|(?:inset\s+)?(?:-?(?:0|(?:\d+(?:\.\d+)?)px)\s+){2,4}(?:#[0-9a-f]{3,8}|rgba?\([^()]*\)|[a-z]+))$/i;
 /**
  * The skin compiler renames every skin/plugin `@font-face` family to
  * `ws-<skin id>[-<plugin id>]-<name>` (see `compileSkinCss` in
@@ -447,6 +530,143 @@ export function applyHostControlTokens(control: HTMLElement, tokens: HostControl
   style.setProperty(HOST_CONTROL_APPLIED_VARIABLES.hitTarget, `${tokens.hitTarget}px`);
   style.setProperty(HOST_CONTROL_APPLIED_VARIABLES.fontSize, `${tokens.fontSize}px`);
   if (tokens.builtInBorder) style.setProperty(HOST_CONTROL_APPLIED_VARIABLES.builtInBorder, tokens.builtInBorder);
+}
+
+function readToolbarTokenSet(
+  style: Pick<CSSStyleDeclaration, "getPropertyValue"> | null,
+  resolveProperty: (token: HostToolbarTokenName) => string,
+): Partial<Record<HostToolbarTokenName, string>> {
+  if (!style) return {};
+  const tokens: Partial<Record<HostToolbarTokenName, string>> = {};
+  for (const token of HOST_TOOLBAR_TOKEN_NAMES) {
+    const value = style.getPropertyValue(resolveProperty(token)).trim();
+    if (value) tokens[token] = value;
+  }
+  return tokens;
+}
+
+function sanitizeToolbarFontSize(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const match = LENGTH_PX_PATTERN.exec(value.trim());
+  if (!match) return fallback;
+  const size = Number.parseFloat(match[1]);
+  return Number.isFinite(size)
+    ? Math.min(TOOLBAR_MAX_FONT_SIZE, Math.max(HOST_CONTROL_MIN_FONT_SIZE, fallback, size))
+    : fallback;
+}
+
+function sanitizeToolbarPadding(value: string | undefined): { x: number; y: number } | undefined {
+  if (!value) return undefined;
+  const match = PADDING_PATTERN.exec(value.trim());
+  if (!match) return undefined;
+  const first = Number.parseFloat(match[1]);
+  const second = match[2] === undefined ? first : Number.parseFloat(match[2]);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return undefined;
+  const clamp = (size: number) => Math.min(TOOLBAR_MAX_PADDING, Math.max(0, size));
+  return { x: clamp(second), y: clamp(first) };
+}
+
+function sanitizeToolbarHeight(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const match = LENGTH_PX_PATTERN.exec(value.trim());
+  if (!match) return fallback;
+  const height = Number.parseFloat(match[1]);
+  return Number.isFinite(height)
+    ? Math.min(TOOLBAR_MAX_HEIGHT, Math.max(fallback, height))
+    : fallback;
+}
+
+function sanitizeToolbarShadow(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const shadow = value.trim().replace(/\s+/g, " ");
+  if (!shadow || shadow.length > MAX_SHADOW_LENGTH || !SHADOW_PATTERN.test(shadow)) return undefined;
+  return shadow;
+}
+
+/** True when the skin declares at least one toolbar-mode token. */
+export function hasHostToolbarTokens(
+  style: Pick<CSSStyleDeclaration, "getPropertyValue"> | null,
+  part: string,
+): boolean {
+  if (!style) return false;
+  return HOST_TOOLBAR_TOKEN_NAMES.some((token) =>
+    Boolean(style.getPropertyValue(hostToolbarTokenProperty(part, token)).trim())
+    || Boolean(style.getPropertyValue(HOST_TOOLBAR_GLOBAL_TOKEN_PROPERTIES[token]).trim())
+  );
+}
+
+/**
+ * Resolve the toolbar button palette and geometry.
+ *
+ * The base control palette is resolved first (background/foreground/accent/
+ * border/font/size, with every existing readability floor). Toolbar tokens
+ * then override colours and radius; an unreadable toolbar colour pair falls
+ * back to the readable base pair, so an invalid or transparent value can never
+ * make the button invisible. `font-size`, `padding` and `height` may raise the
+ * button but never go below `HOST_CONTROL_MIN_FONT_SIZE` / the current hit
+ * target; `shadow` accepts one simple box-shadow value and otherwise becomes
+ * `none` (no fixed capsule shadow).
+ */
+export function resolveHostControlToolbarTokens(
+  style: Pick<CSSStyleDeclaration, "getPropertyValue"> | null,
+  part: string,
+  probeColor: ColorProbe,
+  defaults: HostControlDefaults,
+  isWebFont: WebFontCheck = NO_WEB_FONTS,
+): HostControlToolbarTokens {
+  const base = resolveHostControlTokens(style, part, probeColor, defaults, isWebFont);
+  const globalTokens = readToolbarTokenSet(style, (token) => HOST_TOOLBAR_GLOBAL_TOKEN_PROPERTIES[token]);
+  const partTokens = readToolbarTokenSet(style, (token) => hostToolbarTokenProperty(part, token));
+  const merged = { ...globalTokens, ...partTokens };
+
+  const baseBackground = parseCssColor(base.background) ?? defaults.background;
+  const baseForeground = parseCssColor(base.foreground) ?? defaults.foreground;
+  const baseBorder = parseCssColor(base.border) ?? defaults.border;
+  let background = parseCssColor(probeColor(merged.background)) ?? baseBackground;
+  let foreground = parseCssColor(probeColor(merged.foreground)) ?? baseForeground;
+  // A toolbar colour pair must keep the same text contrast floor as the
+  // capsule; on any failure the already-readable base palette wins as a pair.
+  if (contrastRatio(foreground, background) < HOST_CONTROL_MIN_FOREGROUND_CONTRAST) {
+    background = baseBackground;
+    foreground = baseForeground;
+  }
+  const border = resolveBorder(merged.border, background, probeColor) ?? baseBorder;
+  const padding = sanitizeToolbarPadding(merged.padding);
+
+  return {
+    background: formatRgb(background),
+    foreground: formatRgb(foreground),
+    border: formatRgb(border),
+    radius: sanitizeRadius(merged.radius, TOOLBAR_DEFAULT_RADIUS, TOOLBAR_MAX_RADIUS),
+    font: sanitizeFont(merged.font, base.font, isWebFont),
+    fontSize: sanitizeToolbarFontSize(merged["font-size"], base.fontSize),
+    paddingX: padding?.x ?? TOOLBAR_DEFAULT_PADDING_X,
+    paddingY: padding?.y ?? TOOLBAR_DEFAULT_PADDING_Y,
+    minHeight: sanitizeToolbarHeight(merged.height, base.hitTarget),
+    shadow: sanitizeToolbarShadow(merged.shadow) ?? "none",
+    focus: base.accent,
+  };
+}
+
+/** Apply (or clear) toolbar-mode variables on the button wrapper. */
+export function applyHostControlToolbarTokens(
+  control: HTMLElement,
+  tokens: HostControlToolbarTokens | null,
+): void {
+  const style = control.style;
+  for (const property of Object.values(HOST_TOOLBAR_APPLIED_VARIABLES)) style.removeProperty(property);
+  if (!tokens) return;
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.background, tokens.background);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.foreground, tokens.foreground);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.border, tokens.border);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.radius, `${tokens.radius}px`);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.font, tokens.font);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.fontSize, `${tokens.fontSize}px`);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.paddingX, `${tokens.paddingX}px`);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.paddingY, `${tokens.paddingY}px`);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.minHeight, `${tokens.minHeight}px`);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.shadow, tokens.shadow);
+  style.setProperty(HOST_TOOLBAR_APPLIED_VARIABLES.focus, tokens.focus);
 }
 
 export interface HostControlThemeBindingOptions {

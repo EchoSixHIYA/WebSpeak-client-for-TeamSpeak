@@ -308,7 +308,7 @@ Disable and save the relay configuration to remove the relay option from the wel
 
 Skins own appearance, layout and their attached widgets. Administrators install, enable and choose the default skin. Authors use the public contract without changing WebSpeak source code.
 
-[Development guide](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [Skin catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice example](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
+[Development guide](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [Skin catalog](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice example](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) · [Host chrome toolbar example](./examples/HOST-CHROME-TOOLBAR.md)
 
 ### Functional plugins `.wplugin`
 

@@ -26,6 +26,8 @@ v3 保留安全的标准元素和属性白名单；组件可通过完整页面 s
 
 可直接查看 [ILLUSIA 风示例源码](examples/illusia-voice/) 与 [示例说明](examples/ILLUSIA-VOICE.md)。它使用本地美术素材和 CSS 完整定制首页、语音房间、成员区、聊天空状态及播放器，同时沿用 WebSpeak 提供的基础翻译；也是管理控制台内置且不可移除的示例皮肤。
 
+宿主外壳与恢复入口的 toolbar 停靠见 [Host Chrome Toolbar 示例](examples/HOST-CHROME-TOOLBAR.md)：它用最小包演示 `mode: "toolbar"`、按页候选锚点、工具栏令牌、应用库去重和坏锚点回退，不包含任何真实服务器或成员数据。
+
 ## 使用与发布
 
 管理员在 `/admin/skins` 查看三款随 WebSpeak 提供的内置皮肤，并可导入、替换、启用/停用或删除实例自定义皮肤；还可指定访客首次访问时使用的默认皮肤。默认日间、默认夜间和 ILLUSIA 风为受保护内置项，不可替换、停用或移除。访客手动选择的皮肤保存在该浏览器，后续实例默认值变更不会覆盖该明确选择；仅自动套用过旧默认值的浏览器会采用最新实例默认值。皮肤包会缓存在浏览器本地；页面启动时会查询实例目录，目录可用且版本更新时拉取新包。若网络不可用，已缓存的版本仍可使用。
@@ -406,7 +408,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 | 聊天与菜单 | `voice.chat`、`voice.chat.tabs`、`voice.chat.tab`、`voice.chat.heading`、`voice.chat.messages`、`voice.chat.event`、`voice.chat.message`、`voice.chat.message-avatar`、`voice.chat.message-body`、`voice.chat.message-bubble`、`voice.chat.empty`、`voice.chat.composer`、`voice.chat.status`、`voice.context-menu-backdrop`、`voice.context-menu`、`voice.context-menu.header`、`voice.context-menu.move-submenu` |
 | 屏幕共享 | `voice.screen-share-settings`、`voice.screen-share-settings.heading`、`voice.screen-share-settings.fields`、`voice.screen-share-settings.note`、`voice.screen-share-settings.actions`、`voice.screen-player`、`voice.screen-player.stage`、`voice.screen-player.video`、`voice.screen-player.placeholder`、`voice.screen-player.exit`、`voice.screen-player.viewers`、`voice.screen-player.viewer-avatar`、`voice.screen-player.live`、`voice.screen-player.source`、`voice.screen-player.controls`、`voice.screen-player.volume`、`voice.screen-player.fullscreen` |
 | `/demo` 演示页 | `demo.header`、`demo.brand`、`demo.header-tools`、`demo.badge`、`demo.skin-switcher`、`demo.language-switcher`、`demo.home-link`、`demo.reconnect`、`demo.reconnect.restore`、`demo.layout`、`demo.channels`、`demo.channels.heading`、`demo.channel`、`demo.channel.select`、`demo.channel.members`、`demo.main`、`demo.hero`、`demo.live`、`demo.hero.title`、`demo.hero.description`、`demo.hero.online`、`demo.wave`、`demo.voice-heading`、`demo.voice-grid`、`demo.voice-card`、`demo.avatar`、`demo.member-name`、`demo.member-status`、`demo.chat.heading`、`demo.chat.tabs`、`demo.chat.tab`、`demo.chat.messages`、`demo.chat.message`、`demo.chat.empty`、`demo.chat.composer`、`demo.chat.input`、`demo.chat.send`、`demo.actions`、`demo.actions.heading`、`demo.action.speaking`、`demo.action.poke`、`demo.action.reconnect`、`demo.note`、`demo.user`、`demo.poke-notification`、`demo.poke.dismiss` |
-| 宿主外壳（皮肤根之外 / 宿主固定绘制） | 可主题化：`host.plugins.launcher`、`host.plugins.overlay`、`host.watermark`、`host.hint`、`host.voice-status-decoration`；`host.recovery`（可经 `chrome.json#slots` 停靠，并可用 `--skin-recovery-*` / `--skin-host-*` 令牌换肤）/ `host.permission` 与 `app.skin-load-recovery`（无 CSS 钩子；分别用 `--skin-permission-*` / `--skin-load-recovery-*` 令牌换肤，见下文）；`skin.library` 是皮肤菜单里的应用库入口 |
+| 宿主外壳（皮肤根之外 / 宿主固定绘制） | 可主题化：`host.plugins.launcher`、`host.plugins.overlay`、`host.watermark`、`host.hint`、`host.voice-status-decoration`；`host.recovery`（可经 `chrome.json#slots` 以胶囊或 `mode: "toolbar"` 的宿主按钮停靠，并可用 `--skin-recovery-*` / `--skin-host-*` 以及 `--skin-recovery-toolbar-*` / `--skin-host-toolbar-*` 令牌换肤）/ `host.permission` 与 `app.skin-load-recovery`（无 CSS 钩子；分别用 `--skin-permission-*` / `--skin-load-recovery-*` 令牌换肤，见下文）；`skin.library` 是皮肤菜单里的应用库入口 |
 | 首页页脚拆分 | `home.footer`（容器，不可隐藏）、`home.footer.decoration`（装饰文案，可隐藏）、`home.footer.clear`（必要链接，受保护） |
 
 `voice.member.avatar` 是语音活动区头像；`voice.member.mic-status` 在成员麦克风静音时显示，状态值为 `muted`；`voice.member.action-trigger` 是打开宿主成员操作菜单的按钮，由成员卡片小组件的 `options.memberActions` 控制；`voice.member-row.avatar` 是右侧成员树头像。语音成员列表的动态项提供 `.ws-voice-member-enter-active`、`.ws-voice-member-leave-active`、`.ws-voice-member-enter-from`、`.ws-voice-member-leave-to` 和 `.ws-voice-member-move` 动效钩子，可分别设置加入、离开和排序变化的过渡。状态属性还会使用 `current`、`drag-over`、`dragging`、`self`、`events-empty` 和 `messages-empty`。当前根节点以及屏幕共享播放器、弹窗、菜单都属于同一皮肤作用域。
@@ -453,15 +455,15 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 ### 恢复入口与授权对话框：结构上不可被皮肤触及
 
-`host.recovery`（恢复入口）与 `host.permission`（授权对话框）是可信宿主控件。它们**不是**可供皮肤选择或直接改写的 CSS 钩子；当前客户端把两者渲染在 `Teleport` 到 `body` 的宿主层里，该层满足下面三条，编译后的皮肤 CSS 无法命中、遮挡或禁用它们。皮肤可以通过下文「受保护控件的主题化」中的受控令牌让它们融入外观，`host.recovery` 还可以通过 `chrome.json#slots` 停靠到皮肤布局：
+`host.recovery`（恢复入口）与 `host.permission`（授权对话框）是可信宿主控件。它们**不是**可供皮肤选择或直接改写的 CSS 钩子；当前客户端把两者渲染在 `Teleport` 到 `body` 的宿主层里，该层满足下面三条，编译后的皮肤 CSS 无法命中、遮挡或禁用它们。皮肤可以通过下文「受保护控件的主题化」中的受控令牌让它们融入外观，`host.recovery` 还可以通过 `chrome.json#slots` 停靠到皮肤布局，或声明 `mode: "toolbar"` 后以无胶囊壳的宿主按钮并入皮肤顶栏（见下文「工具栏模式」）：
 
 1. **闭合 Shadow DOM**：内容位于 `attachShadow({ mode: "closed" })` 的根内。作者 CSS（无论影子根开或闭）不能跨越 shadow 边界；宿主层元素本身也不带任何 `data-ws-part`，因此连文档级宿主作用域（`:root[data-ws-host-skin="…"] [data-ws-part="host.…"]`）也匹配不到。
 2. **顶层（top layer）**：恢复入口是 `popover="manual"`，授权对话框是 `<dialog>` + `showModal()`。顶层绘制高于所有普通层叠上下文，包括皮肤把某个公开部件写成 `position: fixed; inset: 0; z-index: 2147483647` 的全屏层。
 3. **不依赖可主题化浮层**：恢复面板的「使用内置皮肤」直接重置到内置 Day/Night 皮肤，不经过 `host.plugins.overlay`；即使皮肤把该浮层写成 `display: none !important` 或 `pointer-events: none`，重置仍然生效。「应用库」按钮只是一条便利路径，会走常规应用库浮层，因此不是兜底路径。
 
-**显示规则**：只要当前是第三方（非内置/非官方）皮肤，恢复入口就作为小型常驻胶囊显示在左下角（皮肤可通过下文的 `chrome.json#slots` 申请停靠到自己的锚点）；它不是水印或装饰条，官方 Day、Night、ILLUSIA 与 KAAK 皮肤不会自动出现它。对内置/官方皮肤，它只在 `host.plugins.launcher` 被实例配置或 `chrome.json` 声明隐藏、或宿主在已连接状态下检测到启动器被 CSS 隐藏/移出视口/不可点击时作为兜底出现。
+**显示规则**：只要当前是第三方（非内置/非官方）皮肤，恢复入口就作为小型常驻胶囊显示在左下角（皮肤可通过下文的 `chrome.json#slots` 申请停靠到自己的锚点，或用 `mode: "toolbar"` 改成宿主顶栏按钮）；它不是水印或装饰条，官方 Day、Night、ILLUSIA 与 KAAK 皮肤不会自动出现它。对内置/官方皮肤，它只在 `host.plugins.launcher` 被实例配置或 `chrome.json` 声明隐藏、或宿主在已连接状态下检测到启动器被 CSS 隐藏/移出视口/不可点击时作为兜底出现。
 
-**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。监听器运行在捕获阶段，皮肤或插件脚本提前调用 `preventDefault()` 不会吞掉该组合键。
+**键盘快捷键**：第三方皮肤被允许时，`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）随时把同一宿主层恢复入口召唤到顶层并聚焦第一个按钮；无论胶囊是停靠、浮动还是被 `mode: "toolbar"` 替换，快捷键都会临时隐藏工具栏并显示完整胶囊。它不与 WebSpeak 现有快捷键或浏览器常用快捷键冲突。监听器运行在捕获阶段，皮肤或插件脚本提前调用 `preventDefault()` 不会吞掉该组合键。
 
 `host.recovery` 与 `host.permission` 这两个名称仅保留为文档/布局元数据中的概念标识，**不对应可被皮肤命中的 DOM 钩子**。当前客户端没有渲染 `host.permission` 元素；授权界面由宿主自己的 `InstanceAuthorization` 对话框绘制，它和恢复胶囊一样位于闭合 Shadow DOM 的顶层。皮肤加载失败的横幅保留 `app.skin-load-recovery` 部件标识（「切换到内置皮肤」），它同样运行在闭合 Shadow DOM 宿主层中。三者都只能通过受保护控件令牌间接换肤，编译后的皮肤 CSS 无法命中或改写它们。`skin.library` 是皮肤菜单里的应用库快捷入口，可作辅助路径，但**不是**兜底。
 
@@ -469,7 +471,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 #### 将恢复入口停靠到皮肤布局（`chrome.json#slots`）
 
-第三方皮肤可以在 `chrome.json` 中用 `slots` 声明一个自己已经拥有的布局锚点，让恢复胶囊停靠在皮肤界面里，而不是固定盖在左下角。胶囊仍然是宿主控件：皮肤只提供锚点部件名和视觉令牌，无法取得它的 DOM、点击处理或 CSS 选择器；未知的 `data-ws-*` 属性仍由生成界面拒绝。内置/官方皮肤没有 `chrome.json`，行为完全不变。
+第三方皮肤可以在 `chrome.json` 中用 `slots` 声明一个自己已经拥有的布局锚点，让恢复入口停靠在皮肤界面里，而不是固定盖在左下角。默认仍是带胶囊壳的恢复胶囊；显式写 `mode: "toolbar"` 时改为无胶囊壳的宿主按钮，可直接并入皮肤顶栏。两种形态都是宿主控件：皮肤只提供锚点部件名和视觉令牌，无法取得它们的 DOM、点击处理或 CSS 选择器；未知的 `data-ws-*` 属性仍由生成界面拒绝。内置/官方皮肤没有 `chrome.json`，行为完全不变。
 
 ```json
 "slots": {
@@ -479,10 +481,11 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 | 字段 | 规则 |
 | --- | --- |
-| 键名 | 目前只接受 `host.recovery`（`src/shared/skin-visual-parts.ts` 的 `HOST_SLOTTABLE_PART_IDS`；后续可加入其他受保护控件）。未知键或未开放控件会被拒绝，错误码为 `SKIN_CHROME_SLOT_INVALID`。 |
-| `anchor` | 必填，必须是 `.ws-skin-root` 内已存在的 `data-ws-part` 名称。不能是 `host.*`，也不能是任何可信宿主部件（如 `app`、`voice.connection-status`、`auth.password.*`）。宿主只取第一个可见匹配；锚点不存在、`display:none`、`visibility:hidden`、完全透明、被裁剪、尺寸过小或大部分移出视口时都会回退。 |
-| `align` | 可选，`start`、`center` 或 `end`，默认 `end`；胶囊在锚点矩形内按此水平对齐，并垂直居中。 |
-| `compact` | 可选布尔值；为 `true` 时停靠后的胶囊折叠为 ◈ 标记，悬停或聚焦后展开。 |
+| 键名 | `host.recovery` 表示整组恢复入口（胶囊或 toolbar 组合）；`host.recovery.built-in` 与 `host.recovery.library` 表示两个独立按钮，只接受 toolbar 形态。同一份 `chrome.json` 只能二选一：声明了 `host.recovery` 就不能再声明独立按钮键，反之亦然。未知键或未开放控件会被拒绝，错误码为 `SKIN_CHROME_SLOT_INVALID`。 |
+| `anchor` | 必填，必须是 `.ws-skin-root` 内已存在的 `data-ws-part` 名称，或 1–8 个候选名称组成的数组（按页面/组件变体排列，重复项自动去重）；宿主按顺序取第一个可见匹配，因此同一份声明可同时覆盖首页和语音页。每个候选名最长 240 字符，不能是 `host.*`，也不能是任何可信宿主部件（如 `app`、`voice.connection-status`、`auth.password.*`）。锚点不存在、`display:none`、`visibility:hidden`、完全透明、被裁剪、尺寸过小或大部分移出视口时都会回退。 |
+| `align` | 可选，`start`、`center` 或 `end`，默认 `end`；控件在锚点矩形内按此水平对齐，并垂直居中。 |
+| `compact` | 可选布尔值；为 `true` 时停靠后的胶囊折叠为 ◈ 标记，悬停或聚焦后展开。仅胶囊模式可用；`mode: "toolbar"` 与 `compact: true` 同时出现会被拒绝。 |
+| `mode` | 可选，`"capsule"` 或 `"toolbar"`。`host.recovery` 省略时保持历史默认 `"capsule"`（旧皮肤无需改动）；`host.recovery.built-in` / `host.recovery.library` 省略时为 `"toolbar"`，且显式写 `"capsule"` 会被拒绝。模式必须显式声明，宿主不会从 `compact` 或其他字段推断。 |
 
 `anchor` 写的是宿主渲染后的完整部件名，而不是组件 id：
 
@@ -490,11 +493,11 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 - v3 组件中带 `part` 的节点：`skin.<page>.<componentId>.part-<part>`；按钮、链接、输入、`role="button"` 或绑定了用户事件的可交互节点会渲染为 `skin.<page>.<componentId>.control-part-<part>`。推荐在 surface 里放一个专门的非交互空节点并设置稳定的 `part`（例如 `skin.voice.harbor-dock.part-anchor`），避免名称随交互语义变化。
 - v4 运行时插件生成的节点：`skin.<page>.runtime_plugin_<pluginId>__<componentId>.part-<part>`（同样有 `control-` 变体）。插件 UI 与 `data-ws-skin-mount` 挂载点都位于 `.ws-skin-root` 内，因此也能作为锚点。
 
-**这不是编译期限制。** `skin.css` 校验器不会因为是否声明 `slots` 而改变，也不会生成额外的隐藏或定位规则；停靠完全由宿主运行时完成。胶囊位于顶层，会挡住它下面的一切，因此宿主还会检查胶囊的占位（按观察到的最大尺寸计算，紧凑模式展开后的宽度也算在内）是否压到了可见的受保护控件（`PROTECTED_PART_IDS`，例如 `voice.audio-dock.microphone`、`voice.audio-dock.output`、`home.footer.clear`、`voice.connection-status.reconnect`）；锚点的祖先容器（如包住专用锚点的 `voice.audio-dock`）不算，锚点自身只有在它是或包含可交互控件时才算。压到时同样回退。示例 `host-chrome-demo` 因此把胶囊靠 `start` 对齐在音频栏左侧的说明文字上，避开右侧的麦克风/输出按钮。锚点一旦不可用，胶囊立即回到默认左下角（仍在闭合 Shadow DOM 和顶层，皮肤无法遮挡或隐藏）。为避免闪烁，回退后需要连续 2 次检查都通过才会重新停靠；停靠期间约每 400 ms 复查一次，浮动态保持原来的 1 s 节奏。窗口缩放、滚动和锚点/胶囊尺寸变化都会触发复查。
+**这不是编译期限制。** `skin.css` 校验器不会因为是否声明 `slots` 而改变，也不会生成额外的隐藏或定位规则；停靠完全由宿主运行时完成。胶囊或 toolbar 按钮位于顶层，会挡住它下面的一切，因此宿主还会检查控件的占位（按观察到的最大尺寸计算，紧凑模式展开后的宽度也算在内）是否压到了可见的受保护控件（`PROTECTED_PART_IDS`，例如 `voice.audio-dock.microphone`、`voice.audio-dock.output`、`home.footer.clear`、`voice.connection-status.reconnect`）；锚点的祖先容器（如包住专用锚点的 `voice.audio-dock`）不算，锚点自身只有在它是或包含可交互控件时才算。压到时同样回退。示例 `host-chrome-demo` 因此把胶囊靠 `start` 对齐在音频栏左侧的说明文字上，避开右侧的麦克风/输出按钮。锚点一旦不可用，胶囊立即回到默认左下角（仍在闭合 Shadow DOM 和顶层，皮肤无法遮挡或隐藏）。为避免闪烁，回退后需要连续 2 次检查都通过才会重新停靠；停靠期间约每 400 ms 复查一次，浮动态保持原来的 1 s 节奏。窗口缩放、滚动和锚点/胶囊尺寸变化都会触发复查。
 
 **浮动位置的运行时避让。** 没有停靠（未声明 `slots`，或锚点回退）时，恢复胶囊默认在左下角；宿主约每 400 ms（以及每次点击后约 150 ms）检查一次它是否盖住了皮肤里可见、处于最上层的可交互控件（按钮、链接、输入框、`[tabindex]` 自定义按钮、iframe 等；禁用的“发送”按钮也算，透明度为 0 的不算；受保护部件权重最高，其次是打开的对话框/底部弹层里的控件；只因位于皮肤根 `app` 之内的普通按钮不算受保护）。盖住时，胶囊会换到左下、右下、左上、右上、左中、右中、底部居中、顶部居中里遮挡最少的位置，但不会换到鼠标最后所在的位置或当前聚焦的控件上；只有收起能至少让出一个控件时，才收成只显示 ◈ 的紧凑形态（悬停、聚焦或点按展开）。鼠标悬停（触屏上不算残留的悬停）或焦点在胶囊内时不会移动。为避免闪动：遮挡要持续约 250 ms 才移动，两次移动至少相隔 1 s，10 s 内移动超过 6 次就停在默认角落 10 s（期间若默认角落盖住了控件，最多再挪开一次，之后保持不动）；判断某个控件是否被盖住时会“看穿”短暂出现的提示条（`app.toast`）和另一个宿主浮动控件，提示条暂时挡住的控件仍按存在计算，不会因此把那个角落误判为空闲；同一页面内，当前位置不遮挡时不会为了回到默认角落而移动（默认角落“看起来空”可能只是被模态对话框的遮罩或提示条暂时挡住）；进入或离开语音页、切换皮肤时，宿主会在约 1.5 s 内跳过确认等待和最短间隔、连续复查几次，并在默认角落和当前位置都空闲（鼠标也不在那里）时回到默认角落，免得为上一屏选的位置盖住下一屏新出现的控件。位置计算和 CSS 一样计入 `env(safe-area-inset-*)`（刘海屏、底部手势条）。宿主自带的应用库悬浮按钮（皮肤没有提供 `voice.plugin-launcher` 挂载点时出现在右下角）使用同一套避让，两者也互相避开。这同样只是运行时行为，不新增任何 `skin.css` 编译期限制；皮肤作者无需为它做任何事，但如果希望胶囊固定在设计好的位置，仍建议用 `slots` 停靠。
 
-**样式令牌**：皮肤可在皮肤根（`:root`）、锚点或锚点的祖先上设置下列普通 `--skin-*` 变量；宿主从锚点（存在时）或活动皮肤根的计算样式读取、校验，再写入闭合 Shadow DOM 内部的宿主变量。没有声明 `slots` 的皮肤也能用这些令牌给浮动态胶囊换肤；锚点仍在 DOM 中时，停靠态和浮动态都会继续使用这些令牌；锚点被移除或隐藏时，宿主读取皮肤根上可继承的值，否则使用默认值。每个 `--skin-recovery-*` 都有全局回退 `--skin-host-<同名>`，`--skin-recovery-*` 优先；只有颜色对比度不达标时整组颜色才回退到宿主默认值。声明了插槽但没写颜色令牌时，胶囊使用不透明的宿主默认色（白底），而不是无插槽时的半透明底。
+**样式令牌**：皮肤可在皮肤根（`:root`）、锚点或锚点的祖先上设置下列普通 `--skin-*` 变量；宿主从锚点（存在时）或活动皮肤根的计算样式读取、校验，再写入闭合 Shadow DOM 内部的宿主变量。没有声明 `slots` 的皮肤也能用这些令牌给浮动态胶囊换肤；锚点仍在 DOM 中时，停靠态和浮动态都会继续使用这些令牌；锚点被移除或隐藏时，宿主读取皮肤根上可继承的值，否则使用默认值。每个 `--skin-recovery-*` 都有全局回退 `--skin-host-<同名>`，`--skin-recovery-*` 优先；只有颜色对比度不达标时整组颜色才回退到宿主默认值。声明了插槽但没写颜色令牌时，胶囊使用不透明的宿主默认色（白底），而不是无插槽时的半透明底。这些胶囊令牌也是 toolbar 颜色的最终回退；toolbar 的圆角、内边距、高度和阴影使用下一节自己的默认值，不会继承胶囊的 999px 圆角或浮动阴影。
 
 | 令牌 | 规则 |
 | --- | --- |
@@ -511,6 +514,74 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 **紧凑模式**：`compact: true` 且成功停靠时，胶囊只显示 ◈ 标记；标记本身达到当前尺寸档位的最小命中区域，区域保留可访问名称，鼠标悬停、键盘聚焦或点按/轻触 ◈ 时展开为完整按钮；点按展开会保持到焦点离开胶囊、在胶囊外按下指针或按 Escape。新皮肤激活后、胶囊首次成功停靠起的约 5 秒内始终显示完整胶囊（从停靠时刻开始计时，皮肤加载慢也不会提前收起），避免用户找不到恢复入口；用快捷键召唤时也始终完整显示。展开/收起不使用动画，`prefers-reduced-motion` 下同样没有过渡。
 
 **键盘快捷键**：`Ctrl+Alt+Shift+R`（macOS 为 `⌘+⌥+⇧+R`）在停靠、浮动态和紧凑模式下行为一致：显示完整胶囊并聚焦第一个按钮，焦点离开胶囊后紧凑模式重新生效；它仍在捕获阶段处理，皮肤或插件的 `preventDefault()` 无法吞掉。
+
+#### 工具栏模式：把恢复按钮并进皮肤顶栏（`mode: "toolbar"`）
+
+默认的恢复入口是带胶囊壳的浮动/停靠胶囊。若皮肤顶栏已有自己的按钮风格，可以在 `chrome.json` 中显式声明 `mode: "toolbar"`，让宿主在锚点位置绘制**无胶囊壳的真实宿主按钮**。按钮仍由宿主创建、标注、聚焦和点击，位于闭合 Shadow DOM 的顶层；皮肤只提供锚点和 `--skin-recovery-toolbar-*` 令牌，不能替换文字、图标、顺序、点击处理或取得 DOM。`.ws-host-toolbar`、`data-ws-host-recovery-toolbar` 与 `data-ws-recovery-action` 都不是公开钩子，皮肤选择器引用它们会被拒绝。
+
+两种声明方式互斥，同一份 `chrome.json` 只能选一种：
+
+**组合式**（两个动作共用一个锚点，并排成一组，顺序为先「使用内置皮肤」、后「应用库」）：
+
+```json
+"slots": {
+  "host.recovery": {
+    "mode": "toolbar",
+    "anchor": ["home.header", "voice.header"],
+    "align": "end"
+  }
+}
+```
+
+**独立式**（每个动作有自己的锚点，可放在顶栏两侧或不同部件上）：
+
+```json
+"slots": {
+  "host.recovery.built-in": {
+    "anchor": ["home.header-tools", "voice.header-actions"],
+    "align": "end"
+  },
+  "host.recovery.library": {
+    "anchor": ["home.header-tools", "voice.header-actions"],
+    "align": "start"
+  }
+}
+```
+
+上面只是示意：两个独立按钮若使用同一锚点，应选不同的 `align` 或不同锚点，否则会互相覆盖。
+
+规则：
+
+- `mode` 省略时，`host.recovery` 仍是 `capsule`，旧皮肤行为不变；独立按钮键省略时是 `toolbar`，显式写 `capsule` 会被拒绝。模式必须显式声明，宿主不会从 `compact` 或其他字段推断。
+- `compact` 只适用于胶囊；toolbar 配 `compact` 会被拒绝。toolbar 永远显示完整文字按钮，不会折叠成 ◈。
+- 组合式下「应用库」按钮只在应用库可用（已连接且插件会话就绪）时渲染；「使用内置皮肤」始终渲染。
+- 独立式下每个动作独立停靠：一个锚点失效只把该动作放回浮动胶囊，另一个仍留在工具栏；两个都失效时显示完整浮动胶囊。toolbar 模式下的胶囊永不折叠，因为它是兜底入口而不是设计目标。
+- 回退、抗抖动和复查节奏与胶囊相同：锚点失效立即回退；恢复后需连续 2 次检查通过才重新停靠；停靠时约 400 ms 复查，浮动时约 1 s。
+- 锚点候选数组按顺序取第一个可见项；页面切换、皮肤重载或锚点显隐后会重新解析，不要求重新绑定。
+- 快捷键 `Ctrl+Alt+Shift+R` / `⌘+⌥+⇧+R` 会隐藏工具栏并召唤完整胶囊；关闭（Escape 或焦点离开）后，锚点仍有效的 toolbar 自动恢复。快捷键仍在捕获阶段处理。
+- 按钮的最小命中高度、可见文字、焦点环和指针/键盘操作都由宿主保证；皮肤不能把 toolbar 变成图标按钮、空白按钮或零尺寸按钮。
+
+**应用库去重**：只要皮肤声明了 toolbar 形式的恢复入口（组合式的 `host.recovery`，或独立式的 `host.recovery.library`），并且应用库可用，宿主就把工具栏里的「应用库」按钮当作该页唯一的应用库入口，并隐藏普通的 `host.plugins.launcher`。即使锚点失效、入口退回浮动胶囊，启动器仍保持隐藏（胶囊继续提供应用库按钮），避免同一页出现两个入口；应用库不可用时启动器照常显示，工具栏也不渲染该按钮。这个去重只影响 toolbar 声明，不改变普通胶囊皮肤或内置皮肤。
+
+**工具栏令牌**：皮肤在皮肤根、锚点或锚点祖先上声明下列普通变量；宿主从每个按钮当前锚点的计算样式读取、校验，再写入闭合 Shadow DOM。每个 `--skin-recovery-toolbar-*` 都有全局回退 `--skin-host-toolbar-*`，前者优先。组合式和独立式按钮共用同一组变量名；由于值按锚点继承，不同页面或不同锚点可以给同一变量不同的值。
+
+| 令牌 | 默认与规则 |
+| --- | --- |
+| `--skin-recovery-toolbar-background` | 按钮背景。省略时沿用已解析的胶囊底色（`--skin-recovery-background` / `--skin-host-background` / 宿主白色）。alpha 视为 1，宿主强制不透明。 |
+| `--skin-recovery-toolbar-foreground` | 文字色。与背景的对比度必须 ≥ 4.5；整组颜色不可读时，背景和文字一起回退到已解析的胶囊配色，而不是只改一项。 |
+| `--skin-recovery-toolbar-border` | 边框色。与背景的对比度必须 ≥ 3，否则使用已解析的胶囊边框。 |
+| `--skin-recovery-toolbar-radius` | 圆角，px 长度，限制 0–24，默认 6；胶囊的 999px 不会带入 toolbar。 |
+| `--skin-recovery-toolbar-font` | 字体族列表，规则与胶囊相同：只接受已安装字体或通用族名，皮肤 `@font-face`（包括 `ws-` 前缀）整项忽略。 |
+| `--skin-recovery-toolbar-font-size` | 字号，px，默认沿用当前尺寸档位的宿主字号（≥ 11/12/13 px），限制 11–20 px；不能低于宿主下限。 |
+| `--skin-recovery-toolbar-padding` | 一个或两个 px 值（`上下 左右`，或一个值表示四边相同），默认 `6px 12px`，每个方向限制 0–48 px。 |
+| `--skin-recovery-toolbar-height` | 最小高度，px，默认当前尺寸档位的最小命中高度（28/32/36 px），限制不低于该值且不超过 72 px。 |
+| `--skin-recovery-toolbar-shadow` | `none` 或单个简单 `box-shadow`（2–4 个 px 偏移/尺寸加一个颜色，最长 160 字符），默认 `none`。`url()`、`var()`、多个阴影和额外声明一律忽略为 `none`，胶囊阴影不会带入。 |
+
+无效、透明或不可读的颜色、越界的字号/高度/内边距、皮肤字体和非法阴影都只会回退到可见的宿主默认值，不会隐藏按钮。toolbar 文字由宿主按当前界面语言本地化，长文本换行而不是裁掉；`prefers-reduced-motion` 下同样没有过渡。
+
+**旧 slots 兼容**：旧包里的 `{ "anchor": ..., "align": ..., "compact": ... }` 没有 `mode`，仍按胶囊停靠，行为不变；`chrome.json` 的其它字段（`visibleParts`、`hiddenParts`、`icons`）不受影响。只有显式写 `mode: "toolbar"` 才会切换形态。
+
+**不影响其它宿主控件**：工具栏令牌只作用于恢复按钮。授权对话框（`--skin-permission-*`）和皮肤加载失败横幅（`--skin-load-recovery-*`）继续使用各自令牌与默认外观；本节的变量不会改变它们。
 
 #### 受保护控件的主题化
 
@@ -628,7 +699,28 @@ v3/v4 清单可增加可选字段 `"chrome": "chrome.json"`，文件位于包根
 | `visibleParts` | 可选，最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的宿主装饰名。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认隐藏；皮肤需在这里明确列出才会渲染。省略该字段时装饰保持隐藏，即使包内已有 `hiddenParts` 或 `icons`（宿主不再根据生成的 CSS 猜测旧包意图）。内置皮肤没有 `chrome.json`，因此始终不显示这些装饰。实例级 `hiddenParts` 与皮肤 `hiddenParts` 仍然优先。 |
 | `hiddenParts` | 最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的名字；编译成 `display:none` 并写入皮肤 CSS。可信控件、恢复入口与必要音频路径（如 `voice.audio-dock`、`voice.connection-status`、`home.footer.clear`）永不允许出现，皮肤 CSS 直接隐藏它们也会被拒绝。 |
 | `icons` | 最多 16 项；键必须是上表的图标槽名；值必须是包内 `assets/icons/<文件名>` 的位图相对路径。 |
-| `slots` | 可选，最多 8 项；键名目前只能是 `host.recovery`，值只能包含 `anchor`、`align`、`compact`。详见上文「将恢复入口停靠到皮肤布局」。未知键、指向 `host.*` 或可信宿主部件的锚点会被拒绝。 |
+| `slots` | 可选，最多 8 项；键名只能是 `host.recovery`（整组）或 `host.recovery.built-in` / `host.recovery.library`（独立 toolbar 按钮），两种写法互斥。值只能包含 `anchor`、`align`、`compact`、`mode`；`anchor` 可以是单个部件名或最多 8 个候选名的数组。详见上文「将恢复入口停靠到皮肤布局」与「工具栏模式」。未知键、指向 `host.*` 或可信宿主部件的锚点、`toolbar` 配 `compact` 都会被拒绝。 |
+
+工具栏形态只需在 `host.recovery` 上写 `"mode": "toolbar"`（两个按钮共用一个锚点）：
+
+```json
+"slots": {
+  "host.recovery": {
+    "mode": "toolbar",
+    "anchor": ["home.header", "voice.header"],
+    "align": "end"
+  }
+}
+```
+
+也可以改用独立按钮键，让两个动作各自停靠：
+
+```json
+"slots": {
+  "host.recovery.built-in": { "anchor": ["home.header-tools", "voice.header-actions"], "align": "end" },
+  "host.recovery.library": { "anchor": ["home.header-tools", "voice.header-actions"], "align": "start" }
+}
+```
 
 图标文件约定：仅 PNG / JPG / WebP / AVIF / GIF（**不接受 SVG**），路径必须位于 `assets/icons/` 下且只有一层文件名（不允许 `..`、绝对路径、`\`、`%`、空格或外部 URL）。导入端与服务端登记时都会校验路径、文件是否存在、MIME 是否为位图、单张不超过 64 KiB、总量不超过 512 KiB。宿主把位图编译进皮肤 CSS 的 `background-image`，并隐藏槽内的矢量图形；`url()` 仍走包内资源解析，无法引用外部地址。
 

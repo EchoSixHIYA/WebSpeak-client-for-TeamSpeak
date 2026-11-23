@@ -85,6 +85,41 @@ test("the recovery entry is persistent for third-party skins only", () => {
   assert.equal(shouldShowRecovery({ ...base, thirdPartyAllowed: false, launcherHiddenByConfig: true }), false);
 });
 
+test("toolbar and per-action recovery slots are exposed for third-party skins", () => {
+  const document = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery.built-in": {
+        mode: "toolbar",
+        anchor: ["skin.home.topbar.part-host-actions", "skin.voice.topbar.part-host-actions"],
+      },
+      "host.recovery.library": {
+        mode: "toolbar",
+        anchor: "skin.voice.topbar.part-host-library",
+      },
+    },
+  }));
+  setSkinHostChromeParts(document);
+  setHostChromeActiveSkin("community.toolbar");
+  try {
+    assert.deepEqual(activeHostSlot("host.recovery.built-in")?.anchor, [
+      "skin.home.topbar.part-host-actions",
+      "skin.voice.topbar.part-host-actions",
+    ]);
+    assert.equal(activeHostSlot("host.recovery.built-in")?.mode, "toolbar");
+    assert.equal(activeHostSlot("host.recovery.library")?.mode, "toolbar");
+    assert.equal(activeHostSlot("host.recovery"), undefined);
+
+    // Bundled skins never see the toolbar declaration; their launcher stays.
+    setHostChromeActiveSkin("builtin.light");
+    assert.equal(activeHostSlot("host.recovery.built-in"), undefined);
+    assert.equal(activeHostSlot("host.recovery.library"), undefined);
+  } finally {
+    setSkinHostChromeParts(undefined);
+    setHostChromeActiveSkin(undefined);
+  }
+});
+
 test("slot declarations are honoured for third-party skins only", () => {
   const document = parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
@@ -97,9 +132,11 @@ test("slot declarations are honoured for third-party skins only", () => {
       anchor: "voice.audio-dock",
       align: "end",
       compact: false,
+      mode: "capsule",
     });
     // A part that is not slottable cannot be selected through chrome.json.
     assert.equal(activeHostSlot("host.permission"), undefined);
+    assert.equal(activeHostSlot("host.recovery.library"), undefined);
 
     // Bundled/official skins keep the default floating placement.
     for (const id of [undefined, "builtin.light", "builtin.dark", "community.illusia-voice", "community.kaak-voice"]) {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  HOST_SLOT_VIEWPORT_INSET,
   INITIAL_SLOT_MODE_STATE,
   computeSlotPlacement,
   evaluateSlottedControl,
@@ -165,4 +166,41 @@ test("rect overlap ignores edge contact and sub-pixel slivers", () => {
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(100, 0, 50, 40)), false);
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(99.5, 0, 50, 40)), false);
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(0, 60, 100, 40)), false);
+});
+
+test("toolbar buttons with long localised labels stay inside a narrow viewport", () => {
+  // German "Integrierten Skin verwenden" / Russian / Japanese labels make a
+  // toolbar button much wider than the capsule's short actions. The placement
+  // clamps it into the viewport; when the control is wider than the viewport
+  // the slot rejects it and the caller falls back to the capsule.
+  const viewport = { width: 320, height: 640 };
+  const wide = { width: 300, height: 64 };
+  const placement = computeSlotPlacement(rect(280, 8, 32, 32), wide, viewport, "end");
+  assert.ok(placement.left >= HOST_SLOT_VIEWPORT_INSET);
+  assert.ok(placement.left + wide.width <= viewport.width - HOST_SLOT_VIEWPORT_INSET);
+
+  const tooWide = rect(4, 8, 340, 64);
+  assert.deepEqual(
+    evaluateSlottedControl({
+      anchor: anchor({ rect: rect(0, 0, 320, 48) }),
+      controlRect: tooWide,
+      viewport,
+      minHitTarget: HOST_CONTROL_MIN_HIT_TARGET,
+      hitTestOk: true,
+    }),
+    { ok: false, reason: "control-offscreen" },
+    "an oversized toolbar must fall back to the visible capsule, not disappear",
+  );
+
+  // A wrapped two-line button (64px high) still passes the minimum hit target.
+  assert.deepEqual(
+    evaluateSlottedControl({
+      anchor: anchor({ rect: rect(0, 0, 320, 120) }),
+      controlRect: rect(4, 8, 300, 64),
+      viewport,
+      minHitTarget: HOST_CONTROL_MIN_HIT_TARGET,
+      hitTestOk: true,
+    }),
+    { ok: true },
+  );
 });

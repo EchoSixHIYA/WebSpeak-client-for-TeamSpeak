@@ -105,6 +105,23 @@ export function openPluginLibrary(): void {
 }
 
 /**
+ * True while a toolbar-mode recovery slot provides the application library.
+ * PluginPanel then hides its ordinary `host.plugins.launcher` so the same page
+ * has exactly one application-library entry. The state is host-only: a skin
+ * can request the slot through chrome.json, but cannot set this flag or click
+ * the host button.
+ */
+const inlineLibraryEntry = ref(false);
+
+export function setInlineLibraryEntryVisible(visible: boolean): void {
+  inlineLibraryEntry.value = visible;
+}
+
+export function isInlineLibraryEntryVisible(): boolean {
+  return inlineLibraryEntry.value;
+}
+
+/**
  * Recovery's guaranteed escape hatch: reset to the built-in Day/Night skin.
  * `usePublicSkin` watches this counter, so it works even when the skinnable
  * plugin overlay is `display: none`.

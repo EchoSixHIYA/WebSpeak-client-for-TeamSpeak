@@ -329,7 +329,7 @@ relay.example.com {
 
 皮肤包负责外观、布局及其附属小组件。管理员可安装、启用和设置默认皮肤；开发时遵循公开接口，无需修改 WebSpeak 源码。
 
-[开发指南](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [皮肤索引仓库](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice 示例](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice)
+[开发指南](./SKIN_DEVELOPMENT.md) · [Agent Skill](../.agents/skills/webspeak-skin-development/SKILL.md) · [皮肤索引仓库](https://github.com/Huddle-Up-Forge/webspeak-skins) · [Discord Voice 示例](https://github.com/Huddle-Up-Forge/webspeak-skin-discord-voice) · [宿主顶栏 toolbar 示例](./examples/HOST-CHROME-TOOLBAR.md)
 
 ### 功能插件 `.wplugin`
 

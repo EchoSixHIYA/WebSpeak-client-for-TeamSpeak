@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="home" data-ws-host-skin="community.toolbar-fixture">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host recovery toolbar fixture</title>
+<script>
+  // Authorize third-party skins before instance-authorization.ts is evaluated.
+  try { localStorage.setItem("webspeak:instance-authorization:v1", JSON.stringify({ schemaVersion: 1, allowed: true })); } catch {}
+</script>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { position: relative; width: 100vw; height: 100vh; }
+  .topbar { position: absolute; left: 0; top: 0; right: 0; height: 56px; background: #f4f7fb; }
+  .anchor { position: absolute; top: 4px; width: 420px; height: 48px; }
+  #home-anchor { left: 20px; }
+  #voice-anchor { left: 20px; display: none; }
+  #dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<!-- A minimal skin surface with one anchor per page. Only one is visible at a
+     time, exactly like a real skin switching between home and voice pages. -->
+<div class="ws-skin-root" data-ws-skin="community.toolbar-fixture" data-ws-page="home" data-ws-part="app">
+  <div class="topbar" data-ws-part="home.header">
+    <span id="home-anchor" class="anchor" data-ws-part="skin.home.topbar.part-host-actions"
+      style="--skin-recovery-toolbar-background:#102030;--skin-recovery-toolbar-foreground:#ffffff;--skin-recovery-toolbar-border:#47dcc4;--skin-recovery-toolbar-radius:8px;--skin-recovery-toolbar-font-size:14px;--skin-recovery-toolbar-padding:6px 14px;--skin-recovery-toolbar-height:36px;--skin-recovery-toolbar-shadow:none"></span>
+  </div>
+  <div class="topbar" data-ws-part="voice.header">
+    <span id="voice-anchor" class="anchor" data-ws-part="skin.voice.topbar.part-host-actions"
+      style="--skin-recovery-toolbar-background:#102030;--skin-recovery-toolbar-foreground:#ffffff;--skin-recovery-toolbar-border:#47dcc4;--skin-recovery-toolbar-radius:8px;--skin-recovery-toolbar-font-size:14px;--skin-recovery-toolbar-padding:6px 14px;--skin-recovery-toolbar-height:36px;--skin-recovery-toolbar-shadow:none"></span>
+  </div>
+  <div id="dock" data-ws-part="voice.audio-dock">
+    <button type="button" data-ws-part="voice.audio-dock.microphone">Mic</button>
+  </div>
+  <button type="button" id="launcher" data-ws-part="host.plugins.launcher">Plugins</button>
+</div>
+<div id="app"></div>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script type="module">
+import { createApp, h, nextTick, ref } from "vue";
+import HostChrome from "/src/components/HostChrome.vue";
+import {
+  hostBuiltInSkinRequests,
+  isInlineLibraryEntryVisible,
+  pluginLibraryRequests,
+  setHostChromeActiveSkin,
+  setSkinHostChromeParts,
+} from "/src/services/host-chrome.ts";
+import { parseSkinChromeDocument } from "../../../src/shared/skin-chrome.ts";
+import { hostOwnedLayers } from "/src/services/host-owned-layer.ts";
+import { resolveSkinAnchor } from "/src/services/host-slot-placement.ts";
+
+const output = document.getElementById("result");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const round = (value) => Math.round(value * 10) / 10;
+const rectOf = (element) => {
+  const rect = element.getBoundingClientRect();
+  return { left: round(rect.left), top: round(rect.top), width: round(rect.width), height: round(rect.height), right: round(rect.right), bottom: round(rect.bottom) };
+};
+const withinViewport = (rect) => rect.left >= -0.5 && rect.top >= -0.5
+  && rect.right <= innerWidth + 0.5 && rect.bottom <= innerHeight + 0.5;
+const withinRect = (inner, outer) => inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5
+  && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
+
+try {
+  setSkinHostChromeParts(parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": {
+        mode: "toolbar",
+        anchor: [
+          "skin.home.topbar.part-host-actions",
+          "skin.voice.topbar.part-host-actions",
+        ],
+        align: "end",
+      },
+    },
+  })));
+  setHostChromeActiveSkin("community.toolbar-fixture");
+
+  const language = ref("de");
+  createApp({
+    render: () => h(HostChrome, {
+      language: language.value,
+      connected: true,
+      pluginLibraryAvailable: true,
+    }),
+  }).mount("#app");
+
+  const layer = hostOwnedLayers().find((entry) => entry.name === "recovery");
+  if (!layer) throw new Error("recovery layer was not created");
+  const toolbar = () => layer.container.querySelector("[data-ws-host-recovery-toolbar]");
+  const capsule = () => layer.container.querySelector("[data-ws-host-recovery]");
+  const buttons = () => [...(toolbar()?.querySelectorAll("button") ?? [])];
+  const isOpen = (element) => Boolean(element?.matches?.(":popover-open"))
+    || (element ? getComputedStyle(element).display !== "none" : false);
+
+  await nextTick();
+  await sleep(300);
+
+  const initial = toolbar();
+  if (!initial) throw new Error("toolbar element was not rendered");
+  const initialRect = rectOf(initial);
+  const homeRect = rectOf(document.getElementById("home-anchor"));
+  const first = buttons()[0];
+  const firstStyle = getComputedStyle(first);
+  const initialSnapshot = {
+    toolbarOpen: isOpen(initial),
+    insideAnchor: withinRect(initialRect, homeRect),
+    insideViewport: withinViewport(initialRect),
+    labels: buttons().map((button) => button.textContent?.trim()),
+    actionCount: buttons().length,
+    capsuleOpen: isOpen(capsule()),
+    background: firstStyle.backgroundColor,
+    foreground: firstStyle.color,
+    border: firstStyle.borderColor,
+    radius: firstStyle.borderTopLeftRadius,
+    fontSize: firstStyle.fontSize,
+    minHeight: firstStyle.minHeight,
+    shadow: firstStyle.boxShadow,
+    clickable: Boolean(first.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) ?? true),
+    launcherSuppressed: isInlineLibraryEntryVisible(),
+    rect: initialRect,
+    buttonRects: buttons().map(rectOf),
+  };
+
+  const builtInBefore = hostBuiltInSkinRequests.value;
+  buttons()[0].click();
+  const builtInClicked = hostBuiltInSkinRequests.value === builtInBefore + 1;
+  const libraryBefore = pluginLibraryRequests.value;
+  buttons()[1].click();
+  const libraryClicked = pluginLibraryRequests.value === libraryBefore + 1;
+
+  // Long German / Russian / Japanese labels must stay visible, inside the
+  // viewport and at least at the host hit-target floor.
+  const languages = {};
+  for (const lang of ["de", "ru", "ja"]) {
+    language.value = lang;
+    await nextTick();
+    await sleep(120);
+    const entries = buttons();
+    languages[lang] = entries.map((button) => ({
+      text: button.textContent?.trim(),
+      rect: rectOf(button),
+      height: button.getBoundingClientRect().height,
+      visible: getComputedStyle(button).display !== "none" && getComputedStyle(button).visibility !== "hidden",
+      inViewport: withinViewport(rectOf(button)),
+    }));
+  }
+  language.value = "de";
+  await nextTick();
+  await sleep(120);
+
+  // Page switch: the home anchor disappears and the voice anchor appears.
+  const root = document.querySelector(".ws-skin-root");
+  document.getElementById("home-anchor").style.display = "none";
+  document.getElementById("voice-anchor").style.display = "block";
+  root.dataset.wsPage = "voice";
+  await sleep(250);
+  const voiceRect = rectOf(document.getElementById("voice-anchor"));
+  const afterSwitch = {
+    toolbarOpen: isOpen(toolbar()),
+    insideVoiceAnchor: withinRect(rectOf(toolbar()), voiceRect),
+    insideViewport: withinViewport(rectOf(toolbar())),
+    resolvedVoice: resolveSkinAnchor(
+      ["skin.home.topbar.part-host-actions", "skin.voice.topbar.part-host-actions"],
+      document,
+      "community.toolbar-fixture",
+    )?.id,
+  };
+
+  // A bad anchor must return the complete, visible floating capsule.
+  document.getElementById("voice-anchor").style.display = "none";
+  await sleep(900);
+  const fallbackCapsule = capsule();
+  const fallbackActions = [...(fallbackCapsule?.querySelectorAll('[data-ws-recovery-action]') ?? [])]
+    .map((button) => button.getAttribute("data-ws-recovery-action"));
+  const fallback = {
+    toolbarOpen: isOpen(toolbar()),
+    capsuleOpen: isOpen(fallbackCapsule),
+    capsuleVisible: fallbackCapsule ? getComputedStyle(fallbackCapsule).display !== "none"
+      && fallbackCapsule.getBoundingClientRect().width > 0
+      && fallbackCapsule.getBoundingClientRect().height > 0 : false,
+    capsuleActions: fallbackActions,
+    launcherSuppressed: isInlineLibraryEntryVisible(),
+  };
+
+  // Restoring the anchor re-docks after the anti-flap streak.
+  document.getElementById("voice-anchor").style.display = "block";
+  await sleep(2200);
+  const redocked = {
+    toolbarOpen: isOpen(toolbar()),
+    insideVoiceAnchor: withinRect(rectOf(toolbar()), rectOf(document.getElementById("voice-anchor"))),
+    capsuleOpen: isOpen(capsule()),
+  };
+
+  // The documented chord still summons the complete capsule and focuses the
+  // first host button, even while the toolbar is docked.
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "r", ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await nextTick();
+  await sleep(80);
+  const shortcut = {
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+    focusedAction: layer.shadow.activeElement?.getAttribute?.("data-ws-recovery-action") ?? null,
+    capsuleActions: [...(capsule()?.querySelectorAll("[data-ws-recovery-action]") ?? [])]
+      .map((button) => button.getAttribute("data-ws-recovery-action")),
+  };
+  capsule().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await nextTick();
+  await sleep(150);
+  const afterEscape = {
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+  };
+
+  // Invalid / unreadable toolbar tokens must not make the button invisible.
+  const voiceAnchor = document.getElementById("voice-anchor");
+  voiceAnchor.style.setProperty("--skin-recovery-toolbar-background", "rgba(0,0,0,0)");
+  voiceAnchor.style.setProperty("--skin-recovery-toolbar-foreground", "#111111");
+  voiceAnchor.style.setProperty("--skin-recovery-toolbar-shadow", "url(https://example.invalid/pixel)");
+  await sleep(700);
+  const fallbackStyle = getComputedStyle(buttons()[0]);
+  const invalidTokens = {
+    background: fallbackStyle.backgroundColor,
+    foreground: fallbackStyle.color,
+    shadow: fallbackStyle.boxShadow,
+    visible: fallbackStyle.display !== "none" && fallbackStyle.visibility !== "hidden",
+    inViewport: withinViewport(rectOf(buttons()[0])),
+  };
+
+  output.textContent = JSON.stringify({
+    initial: initialSnapshot,
+    builtInClicked,
+    libraryClicked,
+    languages,
+    afterSwitch,
+    fallback,
+    redocked,
+    shortcut,
+    afterEscape,
+    invalidTokens,
+  });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error?.stack ?? error) });
+}
+</script>
+</body>
+</html>

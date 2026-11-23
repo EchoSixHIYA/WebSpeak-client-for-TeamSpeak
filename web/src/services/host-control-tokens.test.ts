@@ -9,19 +9,30 @@ import {
   HOST_CONTROL_MIN_FOREGROUND_CONTRAST,
   HOST_CONTROL_MIN_HIT_TARGET,
   HOST_CONTROL_SIZE_METRICS,
+  HOST_TOOLBAR_APPLIED_VARIABLES,
   PERMISSION_CONTROL_DEFAULTS,
   RECOVERY_CONTROL_DEFAULTS,
   SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS,
+  TOOLBAR_DEFAULT_PADDING_X,
+  TOOLBAR_DEFAULT_PADDING_Y,
+  TOOLBAR_DEFAULT_RADIUS,
+  TOOLBAR_MAX_FONT_SIZE,
+  TOOLBAR_MAX_HEIGHT,
+  TOOLBAR_MAX_PADDING,
   applyHostControlTokens,
+  applyHostControlToolbarTokens,
   contrastRatio,
   fontFamilyNames,
   formatRgb,
   hasHostControlTokens,
+  hasHostToolbarTokens,
   hostControlTokenKey,
   hostControlTokenProperty,
+  hostToolbarTokenProperty,
   parseCssColor,
   relativeLuminance,
   resolveHostControlTokens,
+  resolveHostControlToolbarTokens,
   type HostControlRawTokens,
 } from "./host-control-tokens.js";
 
@@ -280,4 +291,143 @@ test("host controls ignore fonts registered by a skin @font-face", () => {
   // non-matching @media is not in document.fonts yet but must still be refused.
   assert.equal(resolve('"ws-community-evil-blank", sans-serif'), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
   assert.equal(resolve("Tahoma, ws-community-evil-blank"), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
+});
+
+const resolveToolbar = (tokens: TokenMap = {}, global: TokenMap = {}) =>
+  resolveHostControlToolbarTokens(
+    style({ ...prefixed("host", {}), ...tokens, ...global }),
+    "host.recovery",
+    raw => raw,
+    RECOVERY_CONTROL_DEFAULTS,
+  );
+
+test("toolbar tokens are independent of the capsule shell and keep host floors", () => {
+  const defaults = resolveToolbar();
+  assert.equal(defaults.background, "rgb(255, 255, 255)");
+  assert.equal(defaults.foreground, "rgb(49, 82, 79)");
+  assert.equal(defaults.border, "rgb(157, 182, 178)");
+  assert.equal(defaults.radius, TOOLBAR_DEFAULT_RADIUS, "a capsule radius must not leak into toolbar mode");
+  assert.equal(defaults.paddingX, TOOLBAR_DEFAULT_PADDING_X);
+  assert.equal(defaults.paddingY, TOOLBAR_DEFAULT_PADDING_Y);
+  assert.equal(defaults.minHeight, HOST_CONTROL_MIN_HIT_TARGET);
+  assert.equal(defaults.fontSize, HOST_CONTROL_MIN_FONT_SIZE);
+  assert.equal(defaults.shadow, "none", "the capsule shadow must not be copied into toolbar mode");
+
+  const custom = resolveToolbar({
+    "--skin-recovery-toolbar-background": "#102030",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+    "--skin-recovery-toolbar-border": "#47dcc4",
+    "--skin-recovery-toolbar-radius": "10px",
+    "--skin-recovery-toolbar-font": "Tahoma, sans-serif",
+    "--skin-recovery-toolbar-font-size": "15px",
+    "--skin-recovery-toolbar-padding": "8px 18px",
+    "--skin-recovery-toolbar-height": "40px",
+    "--skin-recovery-toolbar-shadow": "0 2px 6px #00000033",
+  });
+  assert.equal(custom.background, "rgb(16, 32, 48)");
+  assert.equal(custom.foreground, "rgb(255, 255, 255)");
+  assert.equal(custom.border, "rgb(71, 220, 196)");
+  assert.equal(custom.radius, 10);
+  assert.equal(custom.font, "Tahoma, sans-serif");
+  assert.equal(custom.fontSize, 15);
+  assert.equal(custom.paddingX, 18);
+  assert.equal(custom.paddingY, 8);
+  assert.equal(custom.minHeight, 40);
+  assert.equal(custom.shadow, "0 2px 6px #00000033");
+
+  // Global toolbar tokens lose to the per-part set, but still override defaults.
+  const global = resolveToolbar({}, { "--skin-host-toolbar-background": "#222222", "--skin-host-toolbar-foreground": "#ffffff" });
+  assert.equal(global.background, "rgb(34, 34, 34)");
+  assert.equal(global.foreground, "rgb(255, 255, 255)");
+});
+
+test("unreadable or invalid toolbar tokens fall back to a visible, readable button", () => {
+  // Transparent backgrounds are treated as opaque RGB by parseCssColor; the
+  // result is unreadable against the text and the whole pair reverts.
+  const transparent = resolveToolbar({
+    "--skin-recovery-toolbar-background": "rgba(0, 0, 0, 0)",
+    "--skin-recovery-toolbar-foreground": "#111111",
+  });
+  assert.equal(transparent.background, "rgb(255, 255, 255)");
+  assert.equal(transparent.foreground, "rgb(49, 82, 79)");
+  assert.ok(contrastRatio(parseCssColor(transparent.foreground)!, parseCssColor(transparent.background)!) >= HOST_CONTROL_MIN_FOREGROUND_CONTRAST);
+
+  const lowContrast = resolveToolbar({
+    "--skin-recovery-toolbar-background": "#777777",
+    "--skin-recovery-toolbar-foreground": "#888888",
+  });
+  assert.equal(lowContrast.background, "rgb(255, 255, 255)");
+  assert.equal(lowContrast.foreground, "rgb(49, 82, 79)");
+
+  const invalid = resolveToolbar({
+    "--skin-recovery-toolbar-background": "not-a-colour",
+    "--skin-recovery-toolbar-foreground": "not-a-colour",
+    "--skin-recovery-toolbar-radius": "999px",
+    "--skin-recovery-toolbar-font": "url(https://example.invalid/font.woff2)",
+    "--skin-recovery-toolbar-font-size": "2px",
+    "--skin-recovery-toolbar-padding": "100px",
+    "--skin-recovery-toolbar-height": "2px",
+    "--skin-recovery-toolbar-shadow": "url(https://example.invalid/pixel)",
+  });
+  assert.equal(invalid.background, "rgb(255, 255, 255)");
+  assert.equal(invalid.foreground, "rgb(49, 82, 79)");
+  assert.equal(invalid.radius, 24, "the toolbar radius is clamped to its own maximum");
+  assert.equal(invalid.font, RECOVERY_CONTROL_DEFAULTS.font);
+  assert.equal(invalid.fontSize, HOST_CONTROL_MIN_FONT_SIZE);
+  // A syntactically valid but oversized padding is clamped, not applied raw.
+  assert.equal(invalid.paddingX, TOOLBAR_MAX_PADDING);
+  assert.equal(invalid.paddingY, TOOLBAR_MAX_PADDING);
+  assert.equal(invalid.minHeight, HOST_CONTROL_MIN_HIT_TARGET);
+  assert.equal(invalid.shadow, "none");
+
+  const oversized = resolveToolbar({
+    "--skin-recovery-toolbar-font-size": "64px",
+    "--skin-recovery-toolbar-height": "200px",
+    "--skin-recovery-toolbar-padding": "100px 100px",
+  });
+  assert.equal(oversized.fontSize, TOOLBAR_MAX_FONT_SIZE);
+  assert.equal(oversized.minHeight, TOOLBAR_MAX_HEIGHT);
+  assert.equal(oversized.paddingX, TOOLBAR_MAX_PADDING);
+  assert.equal(oversized.paddingY, TOOLBAR_MAX_PADDING);
+});
+
+test("toolbar tokens reject skin fonts and detect declarations", () => {
+  assert.equal(hostToolbarTokenProperty("host.recovery", "background"), "--skin-recovery-toolbar-background");
+  assert.equal(hostToolbarTokenProperty("host.recovery", "font-size"), "--skin-recovery-toolbar-font-size");
+  assert.equal(hasHostToolbarTokens(style({}), "host.recovery"), false);
+  assert.equal(hasHostToolbarTokens(style({ "--skin-host-toolbar-shadow": "none" }), "host.recovery"), true);
+  assert.equal(hasHostToolbarTokens(style({ "--skin-recovery-toolbar-padding": "4px" }), "host.recovery"), true);
+
+  const webFonts = new Set(["blank glyphs"]);
+  const font = resolveHostControlToolbarTokens(
+    style({ "--skin-recovery-toolbar-font": '"Blank Glyphs", sans-serif' }),
+    "host.recovery",
+    raw => raw,
+    RECOVERY_CONTROL_DEFAULTS,
+    family => webFonts.has(family),
+  ).font;
+  assert.equal(font, RECOVERY_CONTROL_DEFAULTS.font);
+});
+
+test("applying and clearing toolbar tokens writes only toolbar variables", () => {
+  const values = new Map<string, string>();
+  const control = {
+    style: {
+      setProperty: (name: string, value: string) => { values.set(name, value); },
+      removeProperty: (name: string) => { values.delete(name); },
+    },
+  } as unknown as HTMLElement;
+  applyHostControlToolbarTokens(control, resolveToolbar({
+    "--skin-recovery-toolbar-background": "#102030",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+    "--skin-recovery-toolbar-padding": "6px 14px",
+    "--skin-recovery-toolbar-height": "36px",
+  }));
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.background), "rgb(16, 32, 48)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.foreground), "rgb(255, 255, 255)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.paddingX), "14px");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.paddingY), "6px");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.minHeight), "36px");
+  applyHostControlToolbarTokens(control, null);
+  assert.equal(values.size, 0);
 });

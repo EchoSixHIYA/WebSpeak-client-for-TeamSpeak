@@ -55,7 +55,7 @@ const scenarios = [
 ];
 
 test("host chrome renders recovery and authorization in a closed-shadow top layer", async () => {
-  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice, slotPlacement] = await Promise.all([
+  const [hostChrome, authorization, ownedLayer, hostChromeService, publicSkin, recoveryNotice, slotPlacement, pluginPanel, presentation, controlTokens] = await Promise.all([
     read("../src/components/HostChrome.vue"),
     read("../src/components/InstanceAuthorization.vue"),
     read("../src/services/host-owned-layer.ts"),
@@ -63,6 +63,9 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
     read("../src/composables/usePublicSkin.ts"),
     read("../src/components/SkinLoadRecoveryNotice.vue"),
     read("../src/services/host-slot-placement.ts"),
+    read("../src/components/PluginPanel.vue"),
+    read("../src/services/host-recovery-presentation.ts"),
+    read("../src/services/host-control-tokens.ts"),
   ]);
 
   // Recovery: closed shadow root + manual popover + no skin hook.
@@ -86,6 +89,28 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(hostChrome, /activeHostSlot\("host\.recovery"\)/);
   assert.match(hostChrome, /bindHostSlot\(/);
   assert.match(hostChrome, /onModeChange/);
+  // Explicit toolbar presentation: plain host buttons, no capsule shell, real
+  // host click handlers and i18n labels. The mode is a separate schema field,
+  // not inferred from compact.
+  assert.match(hostChrome, /activeHostSlot\("host\.recovery\.built-in"\)/);
+  assert.match(hostChrome, /activeHostSlot\("host\.recovery\.library"\)/);
+  assert.match(hostChrome, /presentation: "toolbar"/);
+  assert.match(hostChrome, /resolveHostRecoveryPresentation/);
+  assert.match(hostChrome, /class="ws-host-toolbar-action"/);
+  assert.match(hostChrome, /data-ws-recovery-action="built-in"[\s\S]*?@click="useBuiltInSkin"/);
+  assert.match(hostChrome, /data-ws-recovery-action="library"[\s\S]*?@click="openLibrary"/);
+  assert.match(hostChrome, /resolveHostRecoveryPresentation\(/);
+  assert.match(presentation, /suppressLauncher/);
+  assert.match(hostChrome, /setInlineLibraryEntryVisible/);
+  assert.match(pluginPanel, /isInlineLibraryEntryVisible/);
+  assert.match(pluginPanel, /!inlineLibraryEntry/);
+  // Toolbar tokens are sanitized by the same shared reader with their own
+  // geometry defaults; no capsule shadow/radius/pale fixed background.
+  assert.match(controlTokens, /HOST_TOOLBAR_TOKEN_NAMES/);
+  assert.match(controlTokens, /resolveHostControlToolbarTokens/);
+  assert.match(slotPlacement, /applyHostControlToolbarTokens/);
+  assert.match(slotPlacement, /resolveHostControlToolbarTokens/);
+  assert.match(slotPlacement, /presentation === "toolbar"/);
   assert.match(slotPlacement, /querySelectorAll\("\.ws-skin-root"\)/);
   assert.match(slotPlacement, /isHostPartReachable\(/);
   assert.match(slotPlacement, /evaluateSlottedControl/);
@@ -490,4 +515,129 @@ test("host control tokens follow late skin CSS, resolve modern colours and refus
   assert.equal(resized.beforeResize, "rgb(16, 32, 48)", "an @media token was not applied");
   assert.notEqual(resized.inlineBackground, resized.beforeResize, "a viewport change did not refresh @media tokens");
   assert.equal(byName["after-dispose"].inlineBackground, late.inlineBackground, "a disposed binding kept observing the document");
+});
+
+test("toolbar-mode recovery docks plain host buttons, de-duplicates the library and falls back", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const run = async (windowSize) => {
+    const dom = await dumpDom(
+      `http://127.0.0.1:${port}/test/fixtures/host-recovery-toolbar.html`,
+      ["--virtual-time-budget=30000", `--window-size=${windowSize}`],
+    );
+    const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+    assert.ok(match, "the toolbar fixture did not emit a result block");
+    return JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  };
+
+  const payload = await run("1280,800");
+  assert.equal(payload.error, undefined, payload.error);
+
+  const initial = payload.initial;
+  assert.equal(initial.toolbarOpen, true, "the toolbar did not dock into the declared anchor");
+  assert.equal(initial.insideAnchor, true, "the toolbar is not placed inside the page anchor");
+  assert.equal(initial.insideViewport, true);
+  assert.equal(initial.actionCount, 2, "the group slot must render both independent host buttons");
+  assert.deepEqual(initial.labels, ["Integrierten Skin verwenden", "Anwendungsbibliothek"]);
+  assert.equal(initial.capsuleOpen, false, "the capsule shell must not be shown next to a docked toolbar");
+  assert.equal(initial.background, "rgb(16, 32, 48)", "toolbar background token was not applied");
+  assert.equal(initial.foreground, "rgb(255, 255, 255)", "toolbar foreground token was not applied");
+  assert.equal(initial.border, "rgb(71, 220, 196)", "toolbar border token was not applied");
+  assert.equal(initial.radius, "8px", "toolbar radius token was not applied");
+  assert.equal(initial.fontSize, "14px", "toolbar font-size token was not applied");
+  assert.equal(initial.minHeight, "36px", "toolbar height token was not applied");
+  assert.equal(initial.shadow, "none", "the capsule shadow must not leak into toolbar mode");
+  assert.equal(initial.clickable, true);
+  assert.equal(initial.launcherSuppressed, true, "the host library button must replace the ordinary launcher");
+  assert.equal(payload.builtInClicked, true, "clicking the toolbar button must run the host reset action");
+  assert.equal(payload.libraryClicked, true, "clicking the toolbar library button must reach the host handler");
+
+  for (const lang of ["de", "ru", "ja"]) {
+    const entries = payload.languages[lang];
+    assert.equal(entries.length, 2, `${lang}: both host buttons must stay rendered`);
+    for (const entry of entries) {
+      assert.ok(entry.text && entry.text.length > 0, `${lang}: button lost its visible label`);
+      assert.equal(entry.visible, true, `${lang}: button is not visible`);
+      assert.equal(entry.inViewport, true, `${lang}: button escaped the viewport`);
+      assert.ok(entry.height >= 28, `${lang}: button fell below the host hit target (${entry.height})`);
+    }
+  }
+
+  assert.equal(payload.afterSwitch.toolbarOpen, true, "the toolbar did not survive the home -> voice page switch");
+  assert.equal(payload.afterSwitch.insideVoiceAnchor, true, "the toolbar stayed on the previous page anchor");
+  assert.equal(payload.afterSwitch.resolvedVoice, "voice-anchor", "the candidate list did not resolve the voice anchor");
+
+  assert.equal(payload.fallback.toolbarOpen, false, "the toolbar stayed visible with a broken anchor");
+  assert.equal(payload.fallback.capsuleVisible, true, "no visible floating recovery entry after the anchor failed");
+  assert.deepEqual(payload.fallback.capsuleActions, ["built-in", "library"]);
+  assert.equal(payload.fallback.launcherSuppressed, true, "the fallback capsule must keep exactly one library entry");
+
+  assert.equal(payload.redocked.toolbarOpen, true, "the toolbar did not re-dock after the anchor returned");
+  assert.equal(payload.redocked.insideVoiceAnchor, true);
+  assert.equal(payload.redocked.capsuleOpen, false);
+
+  assert.equal(payload.shortcut.capsuleOpen, true, "the shortcut did not summon the recovery capsule");
+  assert.equal(payload.shortcut.toolbarOpen, false, "the docked toolbar must yield to the summoned capsule");
+  assert.equal(payload.shortcut.focusedAction, "built-in", "the shortcut did not focus the first host button");
+  assert.deepEqual(payload.shortcut.capsuleActions, ["built-in", "library"]);
+  assert.equal(payload.afterEscape.capsuleOpen, false);
+  assert.equal(payload.afterEscape.toolbarOpen, true, "closing the shortcut did not restore the docked toolbar");
+
+  assert.equal(payload.invalidTokens.visible, true, "invalid toolbar tokens hid the button");
+  assert.equal(payload.invalidTokens.inViewport, true);
+  assert.equal(payload.invalidTokens.background, "rgb(255, 255, 255)", "transparent background must fall back to a visible surface");
+  assert.equal(payload.invalidTokens.foreground, "rgb(49, 82, 79)");
+  assert.equal(payload.invalidTokens.shadow, "none", "the invalid shadow token must not be applied");
+
+  // Narrow viewport: long labels wrap inside the viewport and stay tappable.
+  const narrow = await run("320,640");
+  assert.equal(narrow.error, undefined, narrow.error);
+  assert.equal(narrow.initial.toolbarOpen, true, JSON.stringify(narrow.initial));
+  assert.equal(narrow.initial.insideViewport, true, JSON.stringify(narrow.initial.rect));
+  assert.equal(narrow.initial.actionCount, 2);
+  for (const entry of narrow.languages.de) {
+    assert.equal(entry.visible, true);
+    assert.equal(entry.inViewport, true, JSON.stringify(entry.rect));
+    assert.ok(entry.height >= 28, JSON.stringify(entry));
+  }
+});
+
+test("legacy slots without a mode still dock the capsule", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(
+    `http://127.0.0.1:${port}/test/fixtures/host-recovery-legacy-slot.html`,
+    ["--virtual-time-budget=10000", "--window-size=1280,800"],
+  );
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the legacy slot fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  assert.equal(payload.capsuleOpen, true, "an old slot without mode must keep the capsule presentation");
+  assert.equal(payload.toolbarRendered, false, "an old slot must not grow a toolbar");
+  assert.equal(payload.insideAnchor, true, "the capsule did not dock into the legacy anchor");
+  assert.deepEqual(payload.actions, ["built-in", "library"]);
+  assert.equal(payload.background, "rgb(16, 32, 48)", "the capsule still reads --skin-recovery-* tokens");
+  assert.equal(payload.foreground, "rgb(255, 255, 255)");
+  assert.equal(payload.clicked, true);
 });

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="voice" data-ws-host-skin="community.legacy-slot-fixture">
+<head>
+<meta charset="utf-8" />
+<title>Legacy recovery slot fixture</title>
+<script>
+  try { localStorage.setItem("webspeak:instance-authorization:v1", JSON.stringify({ schemaVersion: 1, allowed: true })); } catch {}
+</script>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { position: relative; width: 100vw; height: 100vh; }
+  #dock { position: absolute; left: 40px; top: 120px; width: 640px; height: 56px; background: #eef4f2; }
+  #anchor { position: absolute; left: 0; top: 4px; width: 320px; height: 48px; }
+</style>
+</head>
+<body>
+<!-- The same anchor shape as the existing slot fixture, but through chrome.json
+     with the historical slot object (no `mode`). -->
+<div class="ws-skin-root" data-ws-skin="community.legacy-slot-fixture" data-ws-page="voice" data-ws-part="app">
+  <div id="dock" data-ws-part="voice.audio-dock">
+    <span id="anchor" data-ws-part="skin.voice.dock.part-anchor"
+      style="--skin-recovery-background:#102030;--skin-recovery-foreground:#ffffff"></span>
+  </div>
+</div>
+<div id="app"></div>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script type="module">
+import { createApp, h, nextTick } from "vue";
+import HostChrome from "/src/components/HostChrome.vue";
+import {
+  hostBuiltInSkinRequests,
+  setHostChromeActiveSkin,
+  setSkinHostChromeParts,
+} from "/src/services/host-chrome.ts";
+import { parseSkinChromeDocument } from "../../../src/shared/skin-chrome.ts";
+import { hostOwnedLayers } from "/src/services/host-owned-layer.ts";
+
+const output = document.getElementById("result");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+try {
+  setSkinHostChromeParts(parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      // No `mode`: the historical slot must keep docking the capsule.
+      "host.recovery": { anchor: "skin.voice.dock.part-anchor", align: "start", compact: false },
+    },
+  })));
+  setHostChromeActiveSkin("community.legacy-slot-fixture");
+  createApp({
+    render: () => h(HostChrome, { language: "en", connected: true, pluginLibraryAvailable: true }),
+  }).mount("#app");
+
+  await nextTick();
+  await sleep(300);
+
+  const layer = hostOwnedLayers().find((entry) => entry.name === "recovery");
+  if (!layer) throw new Error("recovery layer was not created");
+  const capsule = layer.container.querySelector("[data-ws-host-recovery]");
+  const toolbar = layer.container.querySelector("[data-ws-host-recovery-toolbar]");
+  const anchorRect = document.getElementById("anchor").getBoundingClientRect();
+  const capsuleRect = capsule.getBoundingClientRect();
+  const button = capsule.querySelector('[data-ws-recovery-action="built-in"]');
+  const style = getComputedStyle(capsule);
+  const isOpen = Boolean(capsule.matches(":popover-open")) || style.display !== "none";
+  const before = hostBuiltInSkinRequests.value;
+  button.click();
+
+  output.textContent = JSON.stringify({
+    capsuleOpen: isOpen,
+    toolbarRendered: toolbar !== null,
+    insideAnchor: capsuleRect.left >= anchorRect.left - 0.5 && capsuleRect.right <= anchorRect.right + 0.5
+      && capsuleRect.top >= anchorRect.top - 0.5 && capsuleRect.bottom <= anchorRect.bottom + 0.5,
+    actions: [...capsule.querySelectorAll("[data-ws-recovery-action]")]
+      .map((entry) => entry.getAttribute("data-ws-recovery-action")),
+    background: style.backgroundColor,
+    foreground: style.color,
+    clicked: hostBuiltInSkinRequests.value === before + 1,
+  });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error?.stack ?? error) });
+}
+</script>
+</body>
+</html>

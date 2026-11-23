@@ -1,0 +1,96 @@
+/* Host chrome toolbar demo — v3 open skin (schemaVersion 3).
+   The only host integration is chrome.json: the trusted recovery entry is
+   declared as `mode: "toolbar"` and docked into the page header. The skin
+   supplies anchors and tokens; the host still owns the buttons and handlers.
+
+   Selectors stay inside :root, [data-ws-page] and [data-ws-part]. */
+
+:root {
+  --skin-demo-surface: #13263d;
+  --skin-demo-foreground: #eef7ff;
+  --skin-demo-border: #3a628c;
+  --skin-demo-accent: #47dcc4;
+
+  /* Host-owned recovery buttons (toolbar mode). Every value is validated by
+     the host; invalid or unreadable values fall back to a visible button. */
+  --skin-host-toolbar-background: #13263d;
+  --skin-host-toolbar-foreground: #eef7ff;
+  --skin-host-toolbar-border: #3a628c;
+  --skin-host-toolbar-radius: 8px;
+  --skin-host-toolbar-font: Tahoma, "Segoe UI", sans-serif;
+  --skin-host-toolbar-font-size: 12px;
+  --skin-host-toolbar-padding: 7px 14px;
+  --skin-host-toolbar-height: 34px;
+  --skin-host-toolbar-shadow: none;
+
+  /* The floating capsule is the fallback when an anchor disappears. Keep the
+     same palette so a failed toolbar does not turn into a white popup. */
+  --skin-recovery-background: #13263d;
+  --skin-recovery-foreground: #eef7ff;
+  --skin-recovery-border: #3a628c;
+  --skin-recovery-accent: #47dcc4;
+}
+
+[data-ws-page] {
+  color-scheme: dark;
+  color: #e8f0f8;
+  background: #09131f;
+  font-family: Tahoma, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+[data-ws-part="home.header"],
+[data-ws-part="voice.header"] {
+  background: linear-gradient(180deg, #12253c, #0d1a2b);
+  border-bottom: 1px solid #2a4a6a;
+  color: #e8f0f8;
+}
+
+/* Voice page can carry a slightly darker value on its own anchor; the host
+   reads tokens from the anchor that actually docked the button. */
+[data-ws-part="voice.header"] {
+  --skin-recovery-toolbar-background: #0e2236;
+  --skin-recovery-toolbar-foreground: #f4fbff;
+  --skin-recovery-toolbar-border: #4f7fb0;
+}
+
+/* Reserve the right edge of the top bar for the host-owned toolbar. Without
+   this the docked buttons would sit on top of the header actions. */
+@media (min-width: 900px) {
+  [data-ws-part="home.header"],
+  [data-ws-part="voice.header"] {
+    padding-right: 320px;
+  }
+}
+
+[data-ws-part="home.join-card"],
+[data-ws-part="home.content"] {
+  color: #e8f0f8;
+}
+
+[data-ws-part="home.join-card"] {
+  background: #0f1f33;
+  border: 1px solid #2a4a6a;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px #0008;
+}
+
+[data-ws-part="voice.workspace"] {
+  background: #09131f;
+}
+
+[data-ws-part="voice.content"] {
+  color: #e8f0f8;
+}
+
+[data-ws-part="voice.audio-dock"] {
+  background: #0f1f33;
+  border-top: 1px solid #2a4a6a;
+}
+
+[data-ws-part="home.footer"] {
+  color: #9db5c8;
+}
+
+[data-ws-part="home.footer.clear"] {
+  color: var(--skin-demo-accent);
+}
