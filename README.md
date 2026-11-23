@@ -83,9 +83,9 @@ docker compose up -d
 2. 配置 TeamSpeak 目标和访问模式；公网使用 HTTPS。Set the TeamSpeak target and access mode; use HTTPS for public access.
 3. 启用 WebRTC 时放行配置的 UDP 范围，默认 `40000–40099`。Allow the configured UDP range when enabling WebRTC.
 
-数据保存在 `webspeak-data` volume，升级时保留它。以上 Compose 使用主机网络；Windows 服务端可选择[发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。完整说明：[中文部署指南](./docs/README.zh-CN.md#deployment) · [English deployment guide](./docs/README.en.md#deployment)。
+数据保存在 `webspeak-data` volume，升级时保留它。Docker 控制台只能检查版本；升级请在宿主机执行 `docker compose pull && docker compose up -d`，且不要执行 `docker compose down -v`。以上 Compose 使用主机网络；Windows 服务端可选择[发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。完整说明：[中文部署指南](./docs/README.zh-CN.md#deployment) · [English deployment guide](./docs/README.en.md#deployment)。
 
-Data persists in the `webspeak-data` volume. The Compose file uses host networking. Windows x64 and Linux x64/ARM64 release packages include the runtime; Docker images support amd64/arm64.
+Data persists in the `webspeak-data` volume. On Docker, the console only checks versions; upgrade on the host with `docker compose pull && docker compose up -d` and never run `docker compose down -v`. The Compose file uses host networking. Windows x64 and Linux x64/ARM64 release packages include the runtime; Docker images support amd64/arm64.
 
 <a id="documentation"></a>
 

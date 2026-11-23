@@ -12,6 +12,7 @@ import { createPluginAdminRouter } from "../plugins/admin-router.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import type { PluginStore } from "../plugins/store.js";
 import type { PluginRuntime } from "../plugins/runtime.js";
+import { UpdateError, type UpdateService } from "../updater/update-service.js";
 
 export interface AdminConnectionRecord {
   id: string;
@@ -45,6 +46,9 @@ export interface AdminRouterOptions {
   pluginRegistry?: PluginRegistry;
   pluginStore?: PluginStore;
   pluginRuntime?: PluginRuntime;
+  updateService?: UpdateService;
+  /** Stops the current process after the update response has been flushed. */
+  restartAfterUpdate?: () => void;
   startedAt: number;
   clientIp?: (request: Request) => string;
 }
@@ -411,6 +415,62 @@ export function createAdminRouter(options: AdminRouterOptions): Router {
       response.send(backup);
     } catch {
       response.status(500).json({ ok: false, code: "BACKUP_FAILED" });
+    }
+  });
+
+  router.get("/update", (_request, response) => {
+    if (!options.updateService) {
+      response.json({
+        currentVersion: options.version ?? "0.0.0",
+        deployment: {
+          mode: "source",
+          platform: process.platform,
+          architecture: process.arch,
+          applyAllowed: false,
+          reasonCode: "UPDATE_UNAVAILABLE",
+          upgradePath: "source",
+        },
+        task: null,
+      });
+      return;
+    }
+    response.json(options.updateService.getStatus());
+  });
+
+  router.post("/update/check", requireSameOrigin, requireCsrf(options.sessions), async (_request, response) => {
+    if (!options.updateService) {
+      response.status(503).json({ ok: false, code: "UPDATE_UNAVAILABLE" });
+      return;
+    }
+    try {
+      response.json(await options.updateService.checkForUpdates());
+    } catch (error: unknown) {
+      sendUpdateError(response, error);
+    }
+  });
+
+  router.post("/update/apply", requireSameOrigin, requireCsrf(options.sessions), async (request, response) => {
+    if (!options.updateService) {
+      response.status(503).json({ ok: false, code: "UPDATE_UNAVAILABLE" });
+      return;
+    }
+    if (!options.restartAfterUpdate) {
+      response.status(503).json({ ok: false, code: "UPDATE_RESTART_UNAVAILABLE" });
+      return;
+    }
+    try {
+      const body = asRecord(request.body);
+      const version = readString(body, "version", 32);
+      const confirmVersion = readString(body, "confirmVersion", 32);
+      if (version !== confirmVersion) throw new UpdateError("UPDATE_CONFIRMATION_REQUIRED", "The confirmation does not match the selected version.");
+      const task = await options.updateService.applyUpdate(version, confirmVersion);
+      options.service.database.addAudit("ADMIN_UPDATE_STARTED", { version });
+      response.once("finish", () => {
+        setTimeout(() => options.restartAfterUpdate?.(), 250).unref();
+      });
+      response.status(202).json({ ok: true, task });
+    } catch (error: unknown) {
+      sendUpdateError(response, error);
     }
   });
 
@@ -813,4 +873,16 @@ function sendAdminError(response: Response, error: unknown): void {
     return;
   }
   response.status(500).json({ ok: false, code: "INTERNAL_ERROR" });
+}
+
+function sendUpdateError(response: Response, error: unknown): void {
+  if (error instanceof UpdateError) {
+    response.status(error.statusCode).json({ ok: false, code: error.code, message: error.message });
+    return;
+  }
+  if (error instanceof AdminInputError) {
+    response.status(400).json({ ok: false, code: error.code });
+    return;
+  }
+  response.status(500).json({ ok: false, code: "UPDATE_FAILED" });
 }

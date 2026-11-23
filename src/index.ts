@@ -5,6 +5,7 @@ import { createAccelerationRelayServer } from "./server/acceleration-relay.js";
 import { normalizeScreenShareIceServers, type ScreenShareIceServer } from "./server/screen-share.js";
 import { SkinRegistry } from "./admin/skin-registry.js";
 import { PluginRegistry } from "./plugins/registry.js";
+import { UpdateService } from "./updater/update-service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -52,13 +53,33 @@ async function main() {
   logger.info({ dataDir: DATA_DIR }, "Starting WebSpeak server");
 
   const hasCert = existsSync(path.join(CERT_DIR, "cert.pem"));
+  const updateService = new UpdateService({
+    rootDir: ROOT_DIR,
+    dataDir: DATA_DIR,
+    currentVersion: APP_VERSION,
+    logger,
+    port: APP_PORT,
+    https: hasCert,
+  });
+  updateService.initialize();
 
-  const webServer = createWebServer({
+  let webServer: ReturnType<typeof createWebServer> | undefined;
+  webServer = createWebServer({
     port: APP_PORT,
     version: APP_VERSION,
     logFile: path.join(LOG_DIR, "webspeak.log"),
     staticDir: STATIC_DIR,
     certDir: hasCert ? CERT_DIR : undefined,
+    updateService,
+    restartAfterUpdate: () => {
+      void (async () => {
+        logger.info("Stopping for scheduled update");
+        try { await webServer?.stop(); }
+        catch (error) { logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Web server did not stop cleanly for update"); }
+        database.close();
+        process.exit(0);
+      })();
+    },
     voiceBridgeOptions: {
       joinTickets,
       trustedProxies: readTrustedProxies(process.env.WEBSPEAK_TRUSTED_PROXIES),
