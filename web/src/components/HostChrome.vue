@@ -161,7 +161,7 @@ import {
   type FloatingAvoidance,
   type FloatingPosition,
 } from "../services/host-floating-placement.js";
-import { shouldShowRecovery } from "../services/host-chrome-visibility.js";
+import { shouldShowRecovery, type HostPartRect } from "../services/host-chrome-visibility.js";
 import { thirdPartyAllowed } from "../services/instance-authorization.js";
 import {
   RECOVERY_CONTROL_DEFAULTS,
@@ -474,6 +474,30 @@ function syncToolbarPopovers() {
   );
 }
 
+/** A toolbar that is currently displayed (top layer or display fallback). */
+function isToolbarShown(control: HTMLElement | null): boolean {
+  if (!control) return false;
+  if (control.matches?.(":popover-open")) return true;
+  const rect = control.getBoundingClientRect();
+  return getComputedStyle(control).display !== "none" && rect.width > 0 && rect.height > 0;
+}
+
+function rectOf(control: HTMLElement): HostPartRect {
+  const rect = control.getBoundingClientRect();
+  return {
+    left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    right: rect.right, bottom: rect.bottom,
+  };
+}
+
+/** Other docked recovery toolbars this entry must not cover on a narrow screen. */
+function otherToolbarRects(control: HTMLElement): HostPartRect[] {
+  return [groupToolbarElement.value, builtInToolbarElement.value, libraryToolbarElement.value]
+    .filter((element): element is HTMLElement => Boolean(element)
+      && element !== control && isToolbarShown(element))
+    .map(rectOf);
+}
+
 function bindToolbarEntry(
   control: HTMLElement | null,
   config: SkinChromeSlot | undefined,
@@ -487,6 +511,7 @@ function bindToolbarEntry(
     skinId: hostChromeActiveSkinId.value,
     align: config.align,
     presentation: "toolbar",
+    otherControls: () => otherToolbarRects(control),
     // A floating toolbar is a closed popover (display:none). Show it for the
     // synchronous measurement/hit test and hide it again unless it docked.
     prepare: () => syncRecoveryPopover(control, true),

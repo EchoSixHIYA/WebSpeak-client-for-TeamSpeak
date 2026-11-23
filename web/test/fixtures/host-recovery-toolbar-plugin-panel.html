@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="home" data-ws-host-skin="community.plugin-panel-fixture">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Host recovery toolbar + real PluginPanel fixture</title>
+<script>
+  // Authorize third-party skins before instance-authorization.ts is evaluated.
+  try { localStorage.setItem("webspeak:instance-authorization:v1", JSON.stringify({ schemaVersion: 1, allowed: true })); } catch {}
+</script>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { position: relative; width: 100vw; height: 100vh; }
+  .topbar { position: absolute; left: 0; top: 0; right: 0; height: 56px; background: #f4f7fb; }
+  .anchor { position: absolute; top: 4px; width: min(420px, calc(100vw - 40px)); height: 48px; }
+  #home-anchor { left: 20px; }
+  #voice-anchor { left: 20px; display: none; }
+  #dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<!-- Unlike host-recovery-toolbar.html, there is deliberately NO fake
+     `data-ws-part="host.plugins.launcher"` button here. The launcher is the
+     real one rendered by PluginPanel.vue, so dedup is observed at the actual
+     product v-if path and cannot be faked by hiding a static placeholder. -->
+<div class="ws-skin-root" data-ws-skin="community.plugin-panel-fixture" data-ws-page="home" data-ws-part="app">
+  <div class="topbar" data-ws-part="home.header">
+    <span id="home-anchor" class="anchor" data-ws-part="skin.home.topbar.part-host-actions"
+      style="--skin-recovery-toolbar-background:#102030;--skin-recovery-toolbar-foreground:#ffffff;--skin-recovery-toolbar-border:#47dcc4;--skin-recovery-toolbar-radius:8px;--skin-recovery-toolbar-font-size:14px;--skin-recovery-toolbar-padding:6px 14px;--skin-recovery-toolbar-height:36px;--skin-recovery-toolbar-shadow:none"></span>
+  </div>
+  <div class="topbar" data-ws-part="voice.header">
+    <span id="voice-anchor" class="anchor" data-ws-part="skin.voice.topbar.part-host-actions"
+      style="--skin-recovery-toolbar-background:#102030;--skin-recovery-toolbar-foreground:#ffffff;--skin-recovery-toolbar-border:#47dcc4;--skin-recovery-toolbar-radius:8px;--skin-recovery-toolbar-font-size:14px;--skin-recovery-toolbar-padding:6px 14px;--skin-recovery-toolbar-height:36px;--skin-recovery-toolbar-shadow:none"></span>
+  </div>
+  <div id="dock" data-ws-part="voice.audio-dock">
+    <button type="button" data-ws-part="voice.audio-dock.microphone">Mic</button>
+  </div>
+</div>
+<div id="app"></div>
+<div id="plugin-app"></div>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script type="module">
+import { createApp, h, nextTick, ref } from "vue";
+import HostChrome from "/src/components/HostChrome.vue";
+import PluginPanel from "/src/components/PluginPanel.vue";
+import {
+  hostBuiltInSkinRequests,
+  isInlineLibraryEntryVisible,
+  pluginLibraryRequests,
+  setHostChromeActiveSkin,
+  setSkinHostChromeParts,
+} from "/src/services/host-chrome.ts";
+import { parseSkinChromeDocument } from "../../../src/shared/skin-chrome.ts";
+import { hostOwnedLayers } from "/src/services/host-owned-layer.ts";
+import { resolveSkinAnchor } from "/src/services/host-slot-placement.ts";
+
+const output = document.getElementById("result");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const round = (value) => Math.round(value * 10) / 10;
+const rectOf = (element) => {
+  const rect = element.getBoundingClientRect();
+  return { left: round(rect.left), top: round(rect.top), width: round(rect.width), height: round(rect.height), right: round(rect.right), bottom: round(rect.bottom) };
+};
+const withinViewport = (rect) => rect.left >= -0.5 && rect.top >= -0.5
+  && rect.right <= innerWidth + 0.5 && rect.bottom <= innerHeight + 0.5;
+const withinRect = (inner, outer) => inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5
+  && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
+const rectsOverlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
+  && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+const isOpen = (element) => Boolean(element?.matches?.(":popover-open"))
+  || (element ? getComputedStyle(element).display !== "none" && element.getBoundingClientRect().width > 0 : false);
+const isVisible = (element) => {
+  if (!element) return false;
+  const style = getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+};
+
+// The real PluginPanel calls createPluginAppClient().list() on mount. Keep it
+// entirely local and deterministic: no production gateway, no external fetch.
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input?.url ?? "";
+  if (url.includes("/api/plugins")) {
+    return Promise.resolve(new Response(JSON.stringify({ plugins: [] }), {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+  }
+  return nativeFetch(input, init);
+};
+
+const mode = location.hash.slice(1) || "group";
+const anchorList = ["skin.home.topbar.part-host-actions", "skin.voice.topbar.part-host-actions"];
+const slots = mode === "split"
+  ? {
+      "host.recovery.built-in": { mode: "toolbar", anchor: anchorList, align: "start" },
+      "host.recovery.library": { mode: "toolbar", anchor: anchorList, align: "end" },
+    }
+  : mode === "capsule"
+    ? { "host.recovery": { anchor: anchorList, align: "end" } }
+    : { "host.recovery": { mode: "toolbar", anchor: anchorList, align: "end" } };
+
+try {
+  setSkinHostChromeParts(parseSkinChromeDocument(JSON.stringify({ schemaVersion: 1, slots })));
+  setHostChromeActiveSkin("community.plugin-panel-fixture");
+
+  const hostLanguage = ref("de");
+  const pluginLanguage = ref("de");
+  createApp({
+    render: () => h(HostChrome, {
+      language: hostLanguage.value,
+      connected: true,
+      pluginLibraryAvailable: true,
+    }),
+  }).mount("#app");
+  createApp({
+    render: () => h(PluginPanel, {
+      sessionToken: "a".repeat(43),
+      gatewayUrl: location.origin,
+      connected: true,
+      language: pluginLanguage.value,
+      toolbarTarget: null,
+      presentation: "dialog",
+    }),
+  }).mount("#plugin-app");
+
+  const layer = hostOwnedLayers().find((entry) => entry.name === "recovery");
+  if (!layer) throw new Error("recovery layer was not created");
+  const toolbars = () => [...layer.container.querySelectorAll("[data-ws-host-recovery-toolbar]")];
+  const capsule = () => layer.container.querySelector("[data-ws-host-recovery]");
+  const launcher = () => document.querySelector('[data-ws-part="host.plugins.launcher"]');
+  const actions = (element) => [...(element?.querySelectorAll("[data-ws-recovery-action]") ?? [])]
+    .map((button) => button.getAttribute("data-ws-recovery-action"));
+  const openToolbars = () => toolbars().filter(isOpen);
+  // Observe only buttons that are actually displayed. A floating toolbar is a
+  // closed popover (display:none), so its buttons must not be reported as if
+  // the user could see or click them; the fallback capsule owns them instead.
+  const visibleButtons = () => [
+    ...openToolbars().flatMap((toolbar) => [...toolbar.querySelectorAll("button")]),
+    ...(isOpen(capsule()) ? [...(capsule()?.querySelectorAll("button") ?? [])] : []),
+  ];
+
+  await nextTick();
+  await sleep(400);
+
+  const snapshot = () => {
+    const bars = toolbars();
+    const cap = capsule();
+    const lch = launcher();
+    const capActions = isOpen(cap) ? actions(cap) : [];
+    const shown = visibleButtons();
+    const barRects = openToolbars().map(rectOf);
+    const buttonRects = shown.map(rectOf);
+    return {
+      viewport: innerWidth,
+      toolbarCount: bars.length,
+      toolbars: bars.map((bar) => ({
+        open: isOpen(bar),
+        visible: isVisible(bar),
+        rect: rectOf(bar),
+        inViewport: withinViewport(rectOf(bar)),
+        labels: [...bar.querySelectorAll("button")].map((button) => button.textContent?.trim()),
+        actions: actions(bar),
+      })),
+      toolbarOverlap: barRects.length === 2 ? rectsOverlap(barRects[0], barRects[1]) : false,
+      buttonOverlap: buttonRects.length === 2 ? rectsOverlap(buttonRects[0], buttonRects[1]) : false,
+      visibleActions: shown.map((button) => ({
+        action: button.getAttribute("data-ws-recovery-action"),
+        text: button.textContent?.trim(),
+        rect: rectOf(button),
+        height: rectOf(button).height,
+        visible: isVisible(button),
+        inViewport: withinViewport(rectOf(button)),
+      })),
+      capsuleOpen: isOpen(cap),
+      capsuleVisible: isVisible(cap),
+      capsuleActions: capActions,
+      launcherPresent: Boolean(lch),
+      launcherVisible: isVisible(lch),
+      launcherCount: document.querySelectorAll('[data-ws-part="host.plugins.launcher"]').length,
+      inlineFlag: isInlineLibraryEntryVisible(),
+      visibleLibraryEntries: shown.filter((button) => button.getAttribute("data-ws-recovery-action") === "library").length
+        + (isVisible(lch) ? 1 : 0),
+    };
+  };
+
+  const initial = snapshot();
+
+  // Both split toolbars must be individually clickable, not just observable.
+  const builtInBefore = hostBuiltInSkinRequests.value;
+  const libraryBefore = pluginLibraryRequests.value;
+  const builtInButton = visibleButtons().find((button) => button.getAttribute("data-ws-recovery-action") === "built-in");
+  const libraryButton = visibleButtons().find((button) => button.getAttribute("data-ws-recovery-action") === "library");
+  builtInButton?.click();
+  libraryButton?.click();
+  const clicks = {
+    builtIn: hostBuiltInSkinRequests.value === builtInBefore + 1,
+    library: pluginLibraryRequests.value === libraryBefore + 1,
+  };
+
+  // Long labels in de/ru/ja have to remain readable, inside the viewport and
+  // above the host hit-target floor, without the two toolbars covering each
+  // other. This runs at both 1280px and 320px real viewports.
+  const languages = {};
+  for (const lang of ["de", "ru", "ja"]) {
+    hostLanguage.value = lang;
+    pluginLanguage.value = lang;
+    await nextTick();
+    await sleep(900);
+    languages[lang] = visibleButtons().map((button) => ({
+      action: button.getAttribute("data-ws-recovery-action"),
+      text: button.textContent?.trim(),
+      rect: rectOf(button),
+      height: rectOf(button).height,
+      visible: isVisible(button),
+      inViewport: withinViewport(rectOf(button)),
+    }));
+  }
+  hostLanguage.value = "de";
+  pluginLanguage.value = "de";
+  await nextTick();
+  await sleep(900);
+
+  // Page switch: the home anchor disappears and the voice anchor appears.
+  const root = document.querySelector(".ws-skin-root");
+  document.getElementById("home-anchor").style.display = "none";
+  document.getElementById("voice-anchor").style.display = "block";
+  root.dataset.wsPage = "voice";
+  await sleep(350);
+  const voiceAnchorRect = rectOf(document.getElementById("voice-anchor"));
+  const afterSwitch = {
+    ...snapshot(),
+    insideVoiceAnchor: openToolbars().every((bar) => withinRect(rectOf(bar), voiceAnchorRect)),
+    resolvedVoice: resolveSkinAnchor(anchorList, document, "community.plugin-panel-fixture")?.id,
+  };
+
+  // A bad anchor must return a visible floating capsule, still with exactly
+  // one library entry (real PluginPanel launcher stays suppressed for toolbar
+  // modes even while the fallback capsule shows the library action).
+  document.getElementById("voice-anchor").style.display = "none";
+  await sleep(1100);
+  const fallback = snapshot();
+
+  // Restoring the anchor re-docks after the anti-flap streak.
+  document.getElementById("voice-anchor").style.display = "block";
+  await sleep(2300);
+  const redocked = snapshot();
+  // A narrow split layout must settle on one docked toolbar instead of
+  // swapping the two actions between the anchor and the capsule every tick.
+  const redockSamples = [];
+  for (let sample = 0; sample < 4; sample += 1) {
+    redockSamples.push(openToolbars().map((bar) => actions(bar).join("+")).join("|"));
+    await sleep(250);
+  }
+  redocked.stable = redockSamples.every((value) => value === redockSamples[0]);
+  redocked.samples = redockSamples;
+
+  // The chord summons the complete capsule and focuses its first button; Esc
+  // returns to the docked toolbar while the anchor is still valid.
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "r", ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await nextTick();
+  await sleep(120);
+  const shortcut = {
+    ...snapshot(),
+    focusedAction: layer.shadow.activeElement?.getAttribute?.("data-ws-recovery-action") ?? null,
+  };
+  capsule()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await nextTick();
+  await sleep(220);
+  const afterEscape = snapshot();
+
+  output.textContent = JSON.stringify({
+    mode,
+    initial,
+    clicks,
+    languages,
+    afterSwitch,
+    fallback,
+    redocked,
+    shortcut,
+    afterEscape,
+  });
+} catch (error) {
+  output.textContent = JSON.stringify({ mode, error: String(error?.stack ?? error) });
+}
+</script>
+</body>
+</html>

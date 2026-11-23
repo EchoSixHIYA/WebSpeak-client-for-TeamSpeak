@@ -83,6 +83,7 @@ export type SlotFailureReason =
   | "control-too-small"
   | "control-offscreen"
   | "covers-protected"
+  | "covers-host-control"
   | "hit-test";
 
 export interface SlotAnchorSnapshot {
@@ -109,6 +110,8 @@ export interface SlotEvaluationInput {
    * capsule is top layer, so it would block those controls for the pointer.
    */
   coversProtected?: boolean;
+  /** Footprints of other docked host controls this one must not cover. */
+  otherControls?: readonly HostPartRect[];
 }
 
 export type SlotEvaluation = { ok: true } | { ok: false; reason: SlotFailureReason };
@@ -163,6 +166,13 @@ export function evaluateSlottedControl(input: SlotEvaluationInput): SlotEvaluati
     return { ok: false, reason: "control-too-small" };
   }
   if (!fullyInsideViewport(controlRect, viewport)) return { ok: false, reason: "control-offscreen" };
+  // Two independently anchored recovery toolbars can converge on the same
+  // narrow anchor (for example at 320px). Covering a sibling host control
+  // would make one of the buttons unreachable, so that action returns to the
+  // visible floating capsule instead of pretending to be docked.
+  if (input.otherControls?.some((rect) => rectsOverlap(controlRect, rect))) {
+    return { ok: false, reason: "covers-host-control" };
+  }
   if (input.coversProtected) return { ok: false, reason: "covers-protected" };
   if (!hitTestOk) return { ok: false, reason: "hit-test" };
   return { ok: true };
@@ -332,6 +342,8 @@ export interface HostSlotBindingOptions {
   /** Called after each evaluation with the resulting docked state. */
   settle?: (slotted: boolean) => void;
   resolveAnchor?: (anchor: string | readonly string[]) => HTMLElement | null;
+  /** Live footprints of other docked host controls; overlaps force a fallback. */
+  otherControls?: () => readonly HostPartRect[];
   onModeChange?: (change: HostSlotModeChange) => void;
 }
 
@@ -512,6 +524,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       viewport,
       minHitTarget: tokens.hitTarget,
       coversProtected,
+      otherControls: options.otherControls?.(),
       hitTestOk: placement
         ? hitTestAt(placement.left, placement.top, { width: controlBox.width, height: controlBox.height })
         : false,

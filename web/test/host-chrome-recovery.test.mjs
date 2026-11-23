@@ -114,6 +114,9 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(slotPlacement, /querySelectorAll\("\.ws-skin-root"\)/);
   assert.match(slotPlacement, /isHostPartReachable\(/);
   assert.match(slotPlacement, /evaluateSlottedControl/);
+  // Two split recovery toolbars must not cover each other on a narrow screen.
+  assert.match(slotPlacement, /covers-host-control/);
+  assert.match(hostChrome, /otherControls:/);
   assert.match(hostChromeService, /export function activeHostSlot/);
   assert.match(hostChromeService, /HOST_SLOTTABLE_PART_IDS\.has\(part\)/);
   assert.match(hostChromeService, /isThirdPartySkinActive\(\)/);
@@ -619,6 +622,160 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
     assert.equal(entry.inViewport, true, JSON.stringify(entry.rect));
     assert.ok(entry.height >= 28, JSON.stringify(entry));
   }
+});
+
+test("real PluginPanel launcher is de-duplicated by group and split toolbars on desktop and a real 320px viewport", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const base = `http://127.0.0.1:${port}/test/fixtures`;
+  const run = async (mode, real320 = false) => {
+    // Headless Chrome clamps --window-size=320 to a 500px viewport. The
+    // wrapper opens the fixture inside a genuine 320px iframe so window.innerWidth,
+    // 100vw, flex-wrap and the slot viewport checks all see 320px.
+    const url = real320
+      ? `${base}/host-recovery-toolbar-viewport.html#${mode}`
+      : `${base}/host-recovery-toolbar-plugin-panel.html#${mode}`;
+    const dom = await dumpDom(url, ["--virtual-time-budget=30000", "--window-size=1280,800"]);
+    const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+    assert.ok(match, `${mode} @ ${real320 ? 320 : 1280}: the fixture did not emit a result block`);
+    return JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  };
+  const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
+    && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+  const observableButtons = (snapshot, context, count = 2) => {
+    const entries = snapshot.visibleActions;
+    assert.equal(entries.length, count, `${context}: expected ${count} visible buttons, got ${JSON.stringify(entries)}`);
+    for (let i = 0; i < entries.length; i += 1) {
+      for (let j = i + 1; j < entries.length; j += 1) {
+        assert.equal(overlaps(entries[i].rect, entries[j].rect), false, `${context}: buttons overlap each other`);
+      }
+    }
+    for (const entry of entries) {
+      assert.ok(entry.text && entry.text.length > 0, `${context}: button lost its label`);
+      assert.equal(entry.visible, true, `${context}: button is not visible`);
+      assert.equal(entry.inViewport, true, `${context}: button escaped the viewport: ${JSON.stringify(entry.rect)}`);
+      assert.ok(entry.height >= 28, `${context}: button fell below the host hit target (${entry.height})`);
+    }
+  };
+
+  const group = await run("group");
+  assert.equal(group.error, undefined, group.error);
+  assert.equal(group.initial.toolbarCount, 1);
+  assert.equal(group.initial.toolbars[0].open, true, "the group toolbar did not dock");
+  assert.deepEqual(group.initial.toolbars[0].labels, ["Integrierten Skin verwenden", "Anwendungsbibliothek"]);
+  assert.equal(group.initial.launcherPresent, false, "the real PluginPanel launcher was not suppressed");
+  assert.equal(group.initial.launcherCount, 0);
+  assert.equal(group.initial.inlineFlag, true);
+  assert.equal(group.initial.capsuleOpen, false);
+  assert.equal(group.initial.visibleLibraryEntries, 1);
+  observableButtons(group.initial, "group desktop");
+  assert.equal(group.clicks.builtIn, true);
+  assert.equal(group.clicks.library, true);
+  assert.equal(group.afterSwitch.toolbars[0].open, true, "the toolbar did not survive the page switch");
+  assert.equal(group.afterSwitch.insideVoiceAnchor, true);
+  assert.equal(group.afterSwitch.resolvedVoice, "voice-anchor");
+  assert.equal(group.fallback.toolbars[0].open, false, "the toolbar stayed docked with a broken anchor");
+  assert.equal(group.fallback.capsuleVisible, true);
+  assert.deepEqual(group.fallback.capsuleActions, ["built-in", "library"]);
+  assert.equal(group.fallback.launcherPresent, false, "the fallback added a second real library entry");
+  assert.equal(group.fallback.visibleLibraryEntries, 1);
+  assert.equal(group.redocked.toolbars[0].open, true);
+  assert.equal(group.shortcut.capsuleOpen, true);
+  assert.equal(group.shortcut.toolbars[0].open, false);
+  assert.equal(group.shortcut.focusedAction, "built-in");
+  assert.equal(group.afterEscape.capsuleOpen, false);
+  assert.equal(group.afterEscape.toolbars[0].open, true);
+  assert.equal(group.redocked.stable, true, "the docked toolbar flapped between the anchor and the capsule");
+
+  const split = await run("split");
+  assert.equal(split.error, undefined, split.error);
+  assert.equal(split.initial.toolbarCount, 2, "split mode must render two separately observable toolbars");
+  assert.deepEqual(split.initial.toolbars.map((bar) => bar.labels), [["Integrierten Skin verwenden"], ["Anwendungsbibliothek"]]);
+  assert.equal(split.initial.toolbars[0].open, true);
+  assert.equal(split.initial.toolbars[1].open, true);
+  assert.equal(split.initial.toolbarOverlap, false);
+  assert.equal(split.initial.launcherPresent, false, "the real launcher survived the split toolbar");
+  assert.equal(split.initial.visibleLibraryEntries, 1);
+  observableButtons(split.initial, "split desktop");
+  assert.equal(split.clicks.builtIn, true, "the built-in split toolbar button was not clickable");
+  assert.equal(split.clicks.library, true, "the library split toolbar button was not clickable");
+  assert.equal(split.afterSwitch.toolbars[0].open, true);
+  assert.equal(split.afterSwitch.toolbars[1].open, true);
+  assert.equal(split.afterSwitch.insideVoiceAnchor, true);
+  for (const lang of ["de", "ru", "ja"]) {
+    observableButtons({ visibleActions: split.languages[lang] }, `${lang} split desktop`);
+  }
+  assert.equal(split.fallback.toolbars.every((bar) => !bar.open), true);
+  assert.equal(split.fallback.capsuleVisible, true);
+  assert.deepEqual(split.fallback.capsuleActions, ["built-in", "library"]);
+  assert.equal(split.fallback.launcherPresent, false, "the bad-anchor fallback restored a second library entry");
+  assert.equal(split.fallback.visibleLibraryEntries, 1);
+  assert.equal(split.redocked.toolbars.filter((bar) => bar.open).length, 2);
+  assert.equal(split.redocked.stable, true, "split toolbars flapped between the anchor and the capsule");
+  assert.equal(split.shortcut.capsuleOpen, true);
+  assert.equal(split.shortcut.toolbars.every((bar) => !bar.open), true);
+  assert.equal(split.shortcut.focusedAction, "built-in");
+  assert.equal(split.afterEscape.capsuleOpen, false);
+  assert.equal(split.afterEscape.toolbars.filter((bar) => bar.open).length, 2);
+
+  // Legacy capsule mode is the control: the real launcher must be able to
+  // render at all, otherwise "suppressed" above would be a false positive.
+  const capsule = await run("capsule");
+  assert.equal(capsule.error, undefined, capsule.error);
+  assert.equal(capsule.initial.toolbarCount, 0);
+  assert.equal(capsule.initial.capsuleOpen, true);
+  assert.equal(capsule.initial.launcherPresent, true, "the real PluginPanel launcher never rendered");
+  assert.equal(capsule.initial.launcherVisible, true);
+  assert.equal(capsule.initial.launcherCount, 1);
+  assert.equal(capsule.initial.inlineFlag, false);
+
+  // Real 320px viewport: group labels wrap and stay tappable; split falls back
+  // to a visible capsule for the action that would cover its sibling toolbar.
+  const narrowGroup = await run("group", true);
+  assert.equal(narrowGroup.error, undefined, narrowGroup.error);
+  assert.equal(narrowGroup.initial.viewport, 320, "the iframe did not provide a real 320px viewport");
+  assert.equal(narrowGroup.initial.toolbars[0].open, true);
+  assert.equal(narrowGroup.initial.toolbarOverlap, false);
+  assert.equal(narrowGroup.initial.launcherPresent, false);
+  assert.equal(narrowGroup.initial.visibleLibraryEntries, 1);
+  observableButtons(narrowGroup.initial, "group 320px");
+  assert.equal(narrowGroup.clicks.builtIn, true);
+  assert.equal(narrowGroup.clicks.library, true);
+  for (const lang of ["de", "ru", "ja"]) {
+    observableButtons({ visibleActions: narrowGroup.languages[lang] }, `${lang} group 320px`);
+  }
+  assert.equal(narrowGroup.redocked.stable, true);
+
+  const narrowSplit = await run("split", true);
+  assert.equal(narrowSplit.error, undefined, narrowSplit.error);
+  assert.equal(narrowSplit.initial.viewport, 320, "the iframe did not provide a real 320px viewport");
+  assert.equal(narrowSplit.initial.toolbarCount, 2);
+  assert.equal(narrowSplit.initial.toolbarOverlap, false, "docked split toolbars still cover each other at 320px");
+  assert.equal(narrowSplit.initial.launcherPresent, false, "the real launcher reappeared at 320px");
+  assert.equal(narrowSplit.initial.visibleLibraryEntries, 1, "the narrow fallback added a duplicate library entry");
+  observableButtons(narrowSplit.initial, "split 320px");
+  assert.equal(narrowSplit.clicks.builtIn, true, "the docked split button was not clickable at 320px");
+  assert.equal(narrowSplit.clicks.library, true, "the fallback capsule button was not clickable at 320px");
+  for (const lang of ["de", "ru", "ja"]) {
+    observableButtons({ visibleActions: narrowSplit.languages[lang] }, `${lang} split 320px`);
+  }
+  assert.equal(narrowSplit.fallback.capsuleVisible, true);
+  assert.equal(narrowSplit.fallback.visibleLibraryEntries, 1);
+  assert.equal(narrowSplit.redocked.stable, true, "the narrow split fallback flapped between controls");
+  assert.equal(narrowSplit.shortcut.capsuleOpen, true);
+  assert.equal(narrowSplit.shortcut.toolbars.every((bar) => !bar.open), true);
+  assert.equal(narrowSplit.afterEscape.toolbars.filter((bar) => bar.open).length, 1);
+  assert.equal(narrowSplit.afterEscape.capsuleOpen, true, "the fallback entry vanished after Esc at 320px");
 });
 
 test("legacy slots without a mode still dock the capsule", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {

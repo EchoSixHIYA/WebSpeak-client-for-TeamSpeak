@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Real viewport wrapper for host recovery toolbar fixtures</title>
+<style>
+  html, body { margin: 0; background: #fff; }
+  /* Headless Chrome clamps --window-size=320 to a 500px viewport. A real
+     320px iframe is a genuine CSS viewport: window.innerWidth, 100vw,
+     flex-wrap and the host slot's viewport checks all see 320px. */
+  iframe { display: block; width: 320px; height: 640px; border: 0; }
+</style>
+</head>
+<body>
+<iframe id="frame" title="320px viewport fixture"></iframe>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script>
+  const mode = location.hash.slice(1) || "group";
+  const frame = document.getElementById("frame");
+  const output = document.getElementById("result");
+  frame.src = `/test/fixtures/host-recovery-toolbar-plugin-panel.html#${encodeURIComponent(mode)}`;
+  const poll = () => {
+    try {
+      const text = frame.contentDocument?.getElementById("result")?.textContent;
+      if (text && text !== "pending") {
+        output.textContent = text;
+        return;
+      }
+    } catch { /* same-origin fixture still loading */ }
+    setTimeout(poll, 100);
+  };
+  setTimeout(poll, 100);
+</script>
+</body>
+</html>

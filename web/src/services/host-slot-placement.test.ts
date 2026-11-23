@@ -161,6 +161,28 @@ test("a slotted capsule that would cover a protected control falls back", () => 
   assert.deepEqual(evaluateSlottedControl({ ...baseEvaluation, coversProtected: false }), { ok: true });
 });
 
+test("a toolbar that would cover another docked host control falls back", () => {
+  assert.deepEqual(
+    evaluateSlottedControl({
+      ...baseEvaluation,
+      otherControls: [rect(160, 105, 120, 30)],
+    }),
+    { ok: false, reason: "covers-host-control" },
+  );
+  // Edge contact is not a collision; both toolbars can still dock side by side.
+  assert.deepEqual(
+    evaluateSlottedControl({
+      ...baseEvaluation,
+      otherControls: [rect(60, 105, 120, 30)],
+    }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    evaluateSlottedControl({ ...baseEvaluation, otherControls: [] }),
+    { ok: true },
+  );
+});
+
 test("rect overlap ignores edge contact and sub-pixel slivers", () => {
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(50, 10, 100, 40)), true);
   assert.equal(rectsOverlap(rect(0, 0, 100, 40), rect(100, 0, 50, 40)), false);
