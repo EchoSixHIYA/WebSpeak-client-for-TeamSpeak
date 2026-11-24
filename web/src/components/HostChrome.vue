@@ -48,18 +48,42 @@
       <button
         type="button"
         class="ws-host-toolbar-action"
+        :class="{ 'ws-host-toolbar-action-icon': groupToolbarConfig.appearance === 'icon' }"
         data-ws-recovery-action="built-in"
+        :aria-label="copy.useBuiltIn"
         :title="copy.shortcut"
         @click="useBuiltInSkin"
-      >{{ copy.useBuiltIn }}</button>
+      >
+        <span v-if="groupToolbarConfig.appearance !== 'label'" class="ws-host-toolbar-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 2.2a5.8 5.8 0 1 0 0 11.6h.9a1.5 1.5 0 0 0 .7-2.83 1.2 1.2 0 0 1 .6-2.25H12A2 2 0 0 0 14 6.8C14 4.1 11.3 2.2 8 2.2Z"/>
+            <circle cx="5" cy="6" r=".7" fill="currentColor" stroke="none"/>
+            <circle cx="7.2" cy="4.6" r=".7" fill="currentColor" stroke="none"/>
+            <circle cx="10" cy="4.9" r=".7" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <span v-if="groupToolbarConfig.appearance !== 'icon'" class="ws-host-toolbar-label">{{ copy.useBuiltIn }}</span>
+      </button>
       <button
         v-if="pluginLibraryAvailable"
         type="button"
         class="ws-host-toolbar-action"
+        :class="{ 'ws-host-toolbar-action-icon': groupToolbarConfig.appearance === 'icon' }"
         data-ws-recovery-action="library"
+        :aria-label="copy.library"
         :title="copy.library"
         @click="openLibrary"
-      >{{ copy.library }}</button>
+      >
+        <span v-if="groupToolbarConfig.appearance !== 'label'" class="ws-host-toolbar-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <rect x="2.2" y="2.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="9.2" y="2.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="2.2" y="9.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="9.2" y="9.2" width="4.6" height="4.6" rx=".8"/>
+          </svg>
+        </span>
+        <span v-if="groupToolbarConfig.appearance !== 'icon'" class="ws-host-toolbar-label">{{ copy.library }}</span>
+      </button>
     </div>
 
     <!-- Per-action toolbar entries: each action has its own anchor. -->
@@ -75,10 +99,22 @@
       <button
         type="button"
         class="ws-host-toolbar-action"
+        :class="{ 'ws-host-toolbar-action-icon': builtInToolbarConfig.appearance === 'icon' }"
         data-ws-recovery-action="built-in"
+        :aria-label="copy.useBuiltIn"
         :title="copy.shortcut"
         @click="useBuiltInSkin"
-      >{{ copy.useBuiltIn }}</button>
+      >
+        <span v-if="builtInToolbarConfig.appearance !== 'label'" class="ws-host-toolbar-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 2.2a5.8 5.8 0 1 0 0 11.6h.9a1.5 1.5 0 0 0 .7-2.83 1.2 1.2 0 0 1 .6-2.25H12A2 2 0 0 0 14 6.8C14 4.1 11.3 2.2 8 2.2Z"/>
+            <circle cx="5" cy="6" r=".7" fill="currentColor" stroke="none"/>
+            <circle cx="7.2" cy="4.6" r=".7" fill="currentColor" stroke="none"/>
+            <circle cx="10" cy="4.9" r=".7" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <span v-if="builtInToolbarConfig.appearance !== 'icon'" class="ws-host-toolbar-label">{{ copy.useBuiltIn }}</span>
+      </button>
     </div>
 
     <div
@@ -93,10 +129,22 @@
       <button
         type="button"
         class="ws-host-toolbar-action"
+        :class="{ 'ws-host-toolbar-action-icon': libraryToolbarConfig.appearance === 'icon' }"
         data-ws-recovery-action="library"
+        :aria-label="copy.library"
         :title="copy.library"
         @click="openLibrary"
-      >{{ copy.library }}</button>
+      >
+        <span v-if="libraryToolbarConfig.appearance !== 'label'" class="ws-host-toolbar-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <rect x="2.2" y="2.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="9.2" y="2.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="2.2" y="9.2" width="4.6" height="4.6" rx=".8"/>
+            <rect x="9.2" y="9.2" width="4.6" height="4.6" rx=".8"/>
+          </svg>
+        </span>
+        <span v-if="libraryToolbarConfig.appearance !== 'icon'" class="ws-host-toolbar-label">{{ copy.library }}</span>
+      </button>
     </div>
 
     <div
@@ -254,7 +302,7 @@ const RECOVERY_LAYER_CSS = `
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--ws-toolbar-gap, 4px);
   max-width: calc(100vw - 8px);
   pointer-events: auto;
 }
@@ -263,6 +311,7 @@ const RECOVERY_LAYER_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   box-sizing: border-box;
   min-height: var(--ws-toolbar-min-height, var(--ws-control-hit, 28px));
   max-width: min(320px, calc(100vw - 8px));
@@ -281,10 +330,24 @@ const RECOVERY_LAYER_CSS = `
   cursor: pointer;
   touch-action: manipulation;
 }
-.ws-host-toolbar-action:hover { filter: brightness(.96); }
+.ws-host-toolbar-action:hover {
+  border-color: var(--ws-toolbar-hover-border, var(--ws-toolbar-border, #9db6b2));
+  background: var(--ws-toolbar-hover-background, var(--ws-toolbar-background, #fff));
+}
 .ws-host-toolbar-action:focus-visible {
   outline: 2px solid var(--ws-toolbar-focus, var(--ws-control-accent, #4c8f88));
   outline-offset: 2px;
+}
+.ws-host-toolbar-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: var(--ws-toolbar-icon-size, 16px);
+  height: var(--ws-toolbar-icon-size, 16px);
+}
+.ws-host-toolbar-icon svg { display: block; width: 100%; height: 100%; }
+.ws-host-toolbar-action-icon {
+  width: max(24px, calc(var(--ws-toolbar-icon-size, 16px) + 8px));
+  padding: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .ws-host-recovery, .ws-host-recovery button, .ws-host-toolbar-action { transition: none !important; }

@@ -486,6 +486,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 | `align` | 可选，`start`、`center` 或 `end`，默认 `end`；控件在锚点矩形内按此水平对齐，并垂直居中。 |
 | `compact` | 可选布尔值；为 `true` 时停靠后的胶囊折叠为 ◈ 标记，悬停或聚焦后展开。仅胶囊模式可用；`mode: "toolbar"` 与 `compact: true` 同时出现会被拒绝。 |
 | `mode` | 可选，`"capsule"` 或 `"toolbar"`。`host.recovery` 省略时保持历史默认 `"capsule"`（旧皮肤无需改动）；`host.recovery.built-in` / `host.recovery.library` 省略时为 `"toolbar"`，且显式写 `"capsule"` 会被拒绝。模式必须显式声明，宿主不会从 `compact` 或其他字段推断。 |
+| `appearance` | 可选，`"label"`（默认）、`"icon"` 或 `"icon-and-label"`，只接受 toolbar 模式。`label` 保持旧文字按钮；`icon` 使用宿主 16px 图标、24px 宽按钮和零内边距；`icon-and-label` 同时显示图标和本地化文字。三种形态都保留 `aria-label` / `title`。胶囊只接受 `label`；未知值或胶囊中的图标形态会以 `SKIN_CHROME_SLOT_INVALID` 拒绝。 |
 
 `anchor` 写的是宿主渲染后的完整部件名，而不是组件 id：
 
@@ -517,7 +518,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 #### 工具栏模式：把恢复按钮并进皮肤顶栏（`mode: "toolbar"`）
 
-默认的恢复入口是带胶囊壳的浮动/停靠胶囊。若皮肤顶栏已有自己的按钮风格，可以在 `chrome.json` 中显式声明 `mode: "toolbar"`，让宿主在锚点位置绘制**无胶囊壳的真实宿主按钮**。按钮仍由宿主创建、标注、聚焦和点击，位于闭合 Shadow DOM 的顶层；皮肤只提供锚点和 `--skin-recovery-toolbar-*` 令牌，不能替换文字、图标、顺序、点击处理或取得 DOM。`.ws-host-toolbar`、`data-ws-host-recovery-toolbar` 与 `data-ws-recovery-action` 都不是公开钩子，皮肤选择器引用它们会被拒绝。
+默认的恢复入口是带胶囊壳的浮动/停靠胶囊。若皮肤顶栏已有自己的按钮风格，可以在 `chrome.json` 中显式声明 `mode: "toolbar"`，让宿主在锚点位置绘制**无胶囊壳的真实宿主按钮**。按钮仍由宿主创建、标注、聚焦和点击，位于闭合 Shadow DOM 的顶层；皮肤只提供锚点、`appearance` 形态声明和 `--skin-recovery-toolbar-*` 令牌，不能替换宿主图标、文案、顺序、点击处理或取得 DOM。`.ws-host-toolbar`、`data-ws-host-recovery-toolbar` 与 `data-ws-recovery-action` 都不是公开钩子，皮肤选择器引用它们会被拒绝。
 
 两种声明方式互斥，同一份 `chrome.json` 只能选一种：
 
@@ -527,6 +528,7 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 "slots": {
   "host.recovery": {
     "mode": "toolbar",
+    "appearance": "icon",
     "anchor": ["home.header", "voice.header"],
     "align": "end"
   }
@@ -538,10 +540,14 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 ```json
 "slots": {
   "host.recovery.built-in": {
+    "mode": "toolbar",
+    "appearance": "icon-and-label",
     "anchor": ["home.header-tools", "voice.header-actions"],
     "align": "end"
   },
   "host.recovery.library": {
+    "mode": "toolbar",
+    "appearance": "icon",
     "anchor": ["home.header-tools", "voice.header-actions"],
     "align": "start"
   }
@@ -553,13 +559,14 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 规则：
 
 - `mode` 省略时，`host.recovery` 仍是 `capsule`，旧皮肤行为不变；独立按钮键省略时是 `toolbar`，显式写 `capsule` 会被拒绝。模式必须显式声明，宿主不会从 `compact` 或其他字段推断。
-- `compact` 只适用于胶囊；toolbar 配 `compact` 会被拒绝。toolbar 永远显示完整文字按钮，不会折叠成 ◈。
+- `compact` 只适用于胶囊；toolbar 配 `compact` 会被拒绝。toolbar 不会折叠成 ◈；`appearance` 省略时仍显示完整文字按钮。
+- `appearance: "icon"` 只改变 toolbar 的可见内容，不移除按钮的可访问名称。宿主图标为内联 SVG，`aria-hidden="true"`；按钮保留当前语言的 `aria-label`，`title` 仍说明动作/快捷键。`icon-and-label` 同时显示图标和文字。快捷键与失败回退始终使用完整文字胶囊，不受 toolbar 外观影响。
 - 组合式下「应用库」按钮只在应用库可用（已连接且插件会话就绪）时渲染；「使用内置皮肤」始终渲染。
 - 独立式下每个动作独立停靠：一个锚点失效只把该动作放回浮动胶囊，另一个仍留在工具栏；两个都失效时显示完整浮动胶囊。toolbar 模式下的胶囊永不折叠，因为它是兜底入口而不是设计目标。
 - 回退、抗抖动和复查节奏与胶囊相同：锚点失效立即回退；恢复后需连续 2 次检查通过才重新停靠；停靠时约 400 ms 复查，浮动时约 1 s。
 - 锚点候选数组按顺序取第一个可见项；页面切换、皮肤重载或锚点显隐后会重新解析，不要求重新绑定。
 - 快捷键 `Ctrl+Alt+Shift+R` / `⌘+⌥+⇧+R` 会隐藏工具栏并召唤完整胶囊；关闭（Escape 或焦点离开）后，锚点仍有效的 toolbar 自动恢复。快捷键仍在捕获阶段处理。
-- 按钮的最小命中高度、可见文字、焦点环和指针/键盘操作都由宿主保证；皮肤不能把 toolbar 变成图标按钮、空白按钮或零尺寸按钮。
+- 按钮的最小命中高度、可见图标/文字、焦点环和指针/键盘操作都由宿主保证；皮肤不能通过选择器隐藏 toolbar、移除可访问名称或把按钮变成零尺寸。`appearance` 只能选择宿主提供的三种形态。
 
 **应用库去重**：只要皮肤声明了 toolbar 形式的恢复入口（组合式的 `host.recovery`，或独立式的 `host.recovery.library`），并且应用库可用，宿主就把工具栏里的「应用库」按钮当作该页唯一的应用库入口，并隐藏普通的 `host.plugins.launcher`。即使锚点失效、入口退回浮动胶囊，启动器仍保持隐藏（胶囊继续提供应用库按钮），避免同一页出现两个入口；应用库不可用时启动器照常显示，工具栏也不渲染该按钮。这个去重只影响 toolbar 声明，不改变普通胶囊皮肤或内置皮肤。
 
@@ -567,17 +574,43 @@ Wasm 每轮最多读取一次输入并提交一个 UI 输出；首版宿主动�
 
 | 令牌 | 默认与规则 |
 | --- | --- |
-| `--skin-recovery-toolbar-background` | 按钮背景。省略时沿用已解析的胶囊底色（`--skin-recovery-background` / `--skin-host-background` / 宿主白色）。alpha 视为 1，宿主强制不透明。 |
-| `--skin-recovery-toolbar-foreground` | 文字色。与背景的对比度必须 ≥ 4.5；整组颜色不可读时，背景和文字一起回退到已解析的胶囊配色，而不是只改一项。 |
-| `--skin-recovery-toolbar-border` | 边框色。与背景的对比度必须 ≥ 3，否则使用已解析的胶囊边框。 |
+| `--skin-recovery-toolbar-background` | 按钮背景。省略时沿用已解析的胶囊底色（`--skin-recovery-background` / `--skin-host-background` / 宿主白色）。完全透明（`transparent` 或 alpha 0）会保留；非零 alpha 仍按旧规则转为不透明 RGB。 |
+| `--skin-recovery-toolbar-foreground` | 图标/文字色。与不透明按钮背景的对比度必须 ≥ 4.5；背景透明时改与 `surface` 令牌或宿主采样的锚点/祖先不透明底色比较。整组颜色不可读时，背景和文字一起回退到已解析的胶囊配色。 |
+| `--skin-recovery-toolbar-border` | 边框色。完全不透明时与有效背景的对比度必须 ≥ 3，否则使用已解析的胶囊边框；完全透明边框有效。 |
+| `--skin-recovery-toolbar-hover-background` | 悬停背景，默认使用正常背景；宿主独立检查悬停后的文字对比度，不合格时回退到正常背景。 |
+| `--skin-recovery-toolbar-hover-border` | 悬停边框，默认使用正常边框；校验颜色语法，允许 Classic 的 subtle `#b8cfe8` 边缘，不强制 3:1。 |
+| `--skin-recovery-toolbar-surface` | 可选的完全不透明底色，仅用于透明按钮/悬停背景的文字对比度检查，不绘制按钮本身。优先级为 per-part、global、锚点/祖先计算背景采样、宿主白色。渐变或图片顶栏应显式提供该令牌。 |
 | `--skin-recovery-toolbar-radius` | 圆角，px 长度，限制 0–24，默认 6；胶囊的 999px 不会带入 toolbar。 |
 | `--skin-recovery-toolbar-font` | 字体族列表，规则与胶囊相同：只接受已安装字体或通用族名，皮肤 `@font-face`（包括 `ws-` 前缀）整项忽略。 |
 | `--skin-recovery-toolbar-font-size` | 字号，px，默认沿用当前尺寸档位的宿主字号（≥ 11/12/13 px），限制 11–20 px；不能低于宿主下限。 |
-| `--skin-recovery-toolbar-padding` | 一个或两个 px 值（`上下 左右`，或一个值表示四边相同），默认 `6px 12px`，每个方向限制 0–48 px。 |
-| `--skin-recovery-toolbar-height` | 最小高度，px，默认当前尺寸档位的最小命中高度（28/32/36 px），限制不低于该值且不超过 72 px。 |
+| `--skin-recovery-toolbar-padding` | 一个或两个长度值（`上下 左右`，或一个值表示四边相同），默认 `6px 12px`，每个方向限制 0–48 px；接受 px 和无单位 `0`。`appearance: "icon"` 时宿主强制零内边距。 |
+| `--skin-recovery-toolbar-height` | 最小高度，px。省略时保持当前尺寸档位的 28/32/36 px；显式值限制 22–72 px，因此 Classic 22px 仅在 toolbar 生效。胶囊仍保持 28/32/36 px。 |
 | `--skin-recovery-toolbar-shadow` | `none` 或单个简单 `box-shadow`（2–4 个 px 偏移/尺寸加一个颜色，最长 160 字符），默认 `none`。`url()`、`var()`、多个阴影和额外声明一律忽略为 `none`，胶囊阴影不会带入。 |
+| `--skin-recovery-toolbar-gap` | 组合式两个宿主按钮之间的间距，px，默认 4，限制 0–16；Classic 可设 `1px`。独立式各自只有一个按钮。 |
+| `--skin-recovery-toolbar-icon-size` | 宿主图标边长，px，默认 16，限制 12–24。`appearance: "icon"` 时按钮宽度为 `max(24px, icon-size + 8px)`，16px 图标对应 Classic 24px 按钮。 |
 
-无效、透明或不可读的颜色、越界的字号/高度/内边距、皮肤字体和非法阴影都只会回退到可见的宿主默认值，不会隐藏按钮。toolbar 文字由宿主按当前界面语言本地化，长文本换行而不是裁掉；`prefers-reduced-motion` 下同样没有过渡。
+无效、不可读的颜色，越界的字号/高度/内边距/间距/图标尺寸，皮肤字体和非法阴影都只会回退到可见的宿主默认值，不会隐藏按钮。toolbar 文案由宿主按当前界面语言本地化，长文本换行而不是裁掉；`prefers-reduced-motion` 下同样没有过渡。
+
+**Classic 麦克风按钮对齐示例**（22px 高、透明底、1px 边框、2px 圆角、11px 字号、16px 图标、1px 组间距）：
+
+```css
+:root {
+  --skin-host-toolbar-background: transparent;
+  --skin-host-toolbar-foreground: #1a1a1a;
+  --skin-host-toolbar-border: transparent;
+  --skin-host-toolbar-hover-background: #eaf2fd;
+  --skin-host-toolbar-hover-border: #b8cfe8;
+  --skin-host-toolbar-radius: 2px;
+  --skin-host-toolbar-font-size: 11px;
+  --skin-host-toolbar-padding: 0 4px;
+  --skin-host-toolbar-height: 22px;
+  --skin-host-toolbar-gap: 1px;
+  --skin-host-toolbar-icon-size: 16px;
+  --skin-host-toolbar-surface: #ffffff;
+}
+```
+
+配合 `"appearance": "icon"` 使用。`surface` 只参与可读性计算；顶栏实际不是白色时应改成真实不透明底色。图标按钮的零内边距由宿主强制执行，`padding` 令牌仍用于 `label` / `icon-and-label`。
 
 **旧 slots 兼容**：旧包里的 `{ "anchor": ..., "align": ..., "compact": ... }` 没有 `mode`，仍按胶囊停靠，行为不变；`chrome.json` 的其它字段（`visibleParts`、`hiddenParts`、`icons`）不受影响。只有显式写 `mode: "toolbar"` 才会切换形态。
 
@@ -699,7 +732,7 @@ v3/v4 清单可增加可选字段 `"chrome": "chrome.json"`，文件位于包根
 | `visibleParts` | 可选，最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的宿主装饰名。`host.watermark`、`host.hint`、`host.voice-status-decoration` 默认隐藏；皮肤需在这里明确列出才会渲染。省略该字段时装饰保持隐藏，即使包内已有 `hiddenParts` 或 `icons`（宿主不再根据生成的 CSS 猜测旧包意图）。内置皮肤没有 `chrome.json`，因此始终不显示这些装饰。实例级 `hiddenParts` 与皮肤 `hiddenParts` 仍然优先。 |
 | `hiddenParts` | 最多 32 项，只能是本文档「可隐藏的装饰部件」白名单中的名字；编译成 `display:none` 并写入皮肤 CSS。可信控件、恢复入口与必要音频路径（如 `voice.audio-dock`、`voice.connection-status`、`home.footer.clear`）永不允许出现，皮肤 CSS 直接隐藏它们也会被拒绝。 |
 | `icons` | 最多 16 项；键必须是上表的图标槽名；值必须是包内 `assets/icons/<文件名>` 的位图相对路径。 |
-| `slots` | 可选，最多 8 项；键名只能是 `host.recovery`（整组）或 `host.recovery.built-in` / `host.recovery.library`（独立 toolbar 按钮），两种写法互斥。值只能包含 `anchor`、`align`、`compact`、`mode`；`anchor` 可以是单个部件名或最多 8 个候选名的数组。详见上文「将恢复入口停靠到皮肤布局」与「工具栏模式」。未知键、指向 `host.*` 或可信宿主部件的锚点、`toolbar` 配 `compact` 都会被拒绝。 |
+| `slots` | 可选，最多 8 项；键名只能是 `host.recovery`（整组）或 `host.recovery.built-in` / `host.recovery.library`（独立 toolbar 按钮），两种写法互斥。值只能包含 `anchor`、`align`、`compact`、`mode`、`appearance`；`anchor` 可以是单个部件名或最多 8 个候选名的数组。详见上文「将恢复入口停靠到皮肤布局」与「工具栏模式」。未知键、指向 `host.*` 或可信宿主部件的锚点、`toolbar` 配 `compact`、非法 `appearance` 或胶囊中的图标形态都会被拒绝。 |
 
 工具栏形态只需在 `host.recovery` 上写 `"mode": "toolbar"`（两个按钮共用一个锚点）：
 

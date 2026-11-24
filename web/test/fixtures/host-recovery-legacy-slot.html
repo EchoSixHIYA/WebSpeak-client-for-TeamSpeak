@@ -61,6 +61,7 @@ try {
   const anchorRect = document.getElementById("anchor").getBoundingClientRect();
   const capsuleRect = capsule.getBoundingClientRect();
   const button = capsule.querySelector('[data-ws-recovery-action="built-in"]');
+  const buttonStyle = getComputedStyle(button);
   const style = getComputedStyle(capsule);
   const isOpen = Boolean(capsule.matches(":popover-open")) || style.display !== "none";
   const before = hostBuiltInSkinRequests.value;
@@ -75,6 +76,10 @@ try {
       .map((entry) => entry.getAttribute("data-ws-recovery-action")),
     background: style.backgroundColor,
     foreground: style.color,
+    capsuleHeight: capsule.getBoundingClientRect().height,
+    builtInHeight: button.getBoundingClientRect().height,
+    builtInBackground: buttonStyle.backgroundColor,
+    builtInForeground: buttonStyle.color,
     clicked: hostBuiltInSkinRequests.value === before + 1,
   });
 } catch (error) {

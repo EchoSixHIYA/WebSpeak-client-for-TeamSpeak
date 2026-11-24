@@ -1,96 +1,76 @@
 /* Host chrome toolbar demo — v3 open skin (schemaVersion 3).
-   The only host integration is chrome.json: the trusted recovery entry is
-   declared as `mode: "toolbar"` and docked into the page header. The skin
-   supplies anchors and tokens; the host still owns the buttons and handlers.
-
-   Selectors stay inside :root, [data-ws-page] and [data-ws-part]. */
+   The host owns the recovery structure, icons, labels, focus and actions.
+   This package only declares an anchor, appearance and validated tokens. */
 
 :root {
-  --skin-demo-surface: #13263d;
-  --skin-demo-foreground: #eef7ff;
-  --skin-demo-border: #3a628c;
-  --skin-demo-accent: #47dcc4;
+  color-scheme: light;
+  --skin-demo-surface: #f4f7fb;
+  --skin-demo-foreground: #1a1a1a;
+  --skin-demo-border: #d5dee8;
+  --skin-demo-accent: #1d4ed8;
 
-  /* Host-owned recovery buttons (toolbar mode). Every value is validated by
-     the host; invalid or unreadable values fall back to a visible button. */
-  --skin-host-toolbar-background: #13263d;
-  --skin-host-toolbar-foreground: #eef7ff;
-  --skin-host-toolbar-border: #3a628c;
-  --skin-host-toolbar-radius: 8px;
+  /* Classic microphone-button geometry and colours. `surface` is the opaque
+     colour used to check text contrast behind the transparent toolbar. */
+  --skin-host-toolbar-background: transparent;
+  --skin-host-toolbar-foreground: #1a1a1a;
+  --skin-host-toolbar-border: transparent;
+  --skin-host-toolbar-hover-background: #eaf2fd;
+  --skin-host-toolbar-hover-border: #b8cfe8;
+  --skin-host-toolbar-surface: #f4f7fb;
+  --skin-host-toolbar-radius: 2px;
   --skin-host-toolbar-font: Tahoma, "Segoe UI", sans-serif;
-  --skin-host-toolbar-font-size: 12px;
-  --skin-host-toolbar-padding: 7px 14px;
-  --skin-host-toolbar-height: 34px;
+  --skin-host-toolbar-font-size: 11px;
+  --skin-host-toolbar-padding: 0 4px;
+  --skin-host-toolbar-height: 22px;
+  --skin-host-toolbar-gap: 1px;
+  --skin-host-toolbar-icon-size: 16px;
   --skin-host-toolbar-shadow: none;
 
-  /* The floating capsule is the fallback when an anchor disappears. Keep the
-     same palette so a failed toolbar does not turn into a white popup. */
-  --skin-recovery-background: #13263d;
-  --skin-recovery-foreground: #eef7ff;
-  --skin-recovery-border: #3a628c;
-  --skin-recovery-accent: #47dcc4;
+  /* The fallback and shortcut capsule remains opaque and full-text. */
+  --skin-recovery-background: #ffffff;
+  --skin-recovery-foreground: #1a1a1a;
+  --skin-recovery-border: #9db6b2;
+  --skin-recovery-accent: #1d4ed8;
+  --skin-recovery-radius: 8px;
 }
 
 [data-ws-page] {
-  color-scheme: dark;
-  color: #e8f0f8;
-  background: #09131f;
+  color: #1a1a1a;
+  background: #ffffff;
   font-family: Tahoma, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 
 [data-ws-part="home.header"],
 [data-ws-part="voice.header"] {
-  background: linear-gradient(180deg, #12253c, #0d1a2b);
-  border-bottom: 1px solid #2a4a6a;
-  color: #e8f0f8;
+  background: #f4f7fb;
+  border-bottom: 1px solid var(--skin-demo-border);
+  color: var(--skin-demo-foreground);
 }
 
-/* Voice page can carry a slightly darker value on its own anchor; the host
-   reads tokens from the anchor that actually docked the button. */
+/* Keep the two 24px icon buttons clear of ordinary header actions. */
+[data-ws-part="home.header"],
 [data-ws-part="voice.header"] {
-  --skin-recovery-toolbar-background: #0e2236;
-  --skin-recovery-toolbar-foreground: #f4fbff;
-  --skin-recovery-toolbar-border: #4f7fb0;
-}
-
-/* Reserve the right edge of the top bar for the host-owned toolbar. Without
-   this the docked buttons would sit on top of the header actions. */
-@media (min-width: 900px) {
-  [data-ws-part="home.header"],
-  [data-ws-part="voice.header"] {
-    padding-right: 320px;
-  }
+  padding-right: 72px;
 }
 
 [data-ws-part="home.join-card"],
-[data-ws-part="home.content"] {
-  color: #e8f0f8;
+[data-ws-part="home.content"],
+[data-ws-part="voice.workspace"],
+[data-ws-part="voice.content"] {
+  color: var(--skin-demo-foreground);
 }
 
 [data-ws-part="home.join-card"] {
-  background: #0f1f33;
-  border: 1px solid #2a4a6a;
-  border-radius: 16px;
-  box-shadow: 0 24px 60px #0008;
-}
-
-[data-ws-part="voice.workspace"] {
-  background: #09131f;
-}
-
-[data-ws-part="voice.content"] {
-  color: #e8f0f8;
+  background: #ffffff;
+  border: 1px solid var(--skin-demo-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px #10203012;
 }
 
 [data-ws-part="voice.audio-dock"] {
-  background: #0f1f33;
-  border-top: 1px solid #2a4a6a;
+  background: #f4f7fb;
+  border-top: 1px solid var(--skin-demo-border);
 }
 
-[data-ws-part="home.footer"] {
-  color: #9db5c8;
-}
-
-[data-ws-part="home.footer.clear"] {
-  color: var(--skin-demo-accent);
-}
+[data-ws-part="home.footer"] { color: #52606d; }
+[data-ws-part="home.footer.clear"] { color: var(--skin-demo-accent); }

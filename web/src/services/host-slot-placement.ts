@@ -21,12 +21,16 @@ import {
   RECOVERY_CONTROL_DEFAULTS,
   applyHostControlTokens,
   applyHostControlToolbarTokens,
+  compositeRgb,
   createHostControlProbe,
   findSkinRoot,
+  parseCssColorWithAlpha,
   resolveHostControlTokens,
   resolveHostControlToolbarTokens,
   type HostControlTokens,
   type HostControlProbe,
+  type RgbColor,
+  type RgbaColor,
 } from "./host-control-tokens.js";
 
 export interface SlotViewport {
@@ -226,6 +230,22 @@ function rectOf(rect: DOMRect | HostPartRect): HostPartRect {
   };
 }
 
+/** Composite the anchor and top-bar ancestor backgrounds over the page canvas. */
+export function sampleOpaqueSurface(element: Element | null, doc: Document = document): RgbColor {
+  const view = doc.defaultView;
+  const layers: RgbaColor[] = [];
+  for (let current: Element | null = element; current && view; current = current.parentElement) {
+    const color = parseCssColorWithAlpha(view.getComputedStyle(current).backgroundColor);
+    if (color && color.a > 0) layers.push(color);
+    if (color?.a === 1) break;
+  }
+  let surface: RgbColor = { r: 255, g: 255, b: 255 };
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    surface = compositeRgb(layers[index], surface);
+  }
+  return surface;
+}
+
 /** Overlap of two rects in CSS pixels on both axes (more than 1px each). */
 export function rectsOverlap(first: HostPartRect, second: HostPartRect): boolean {
   const width = Math.min(first.right, second.right) - Math.max(first.left, second.left);
@@ -327,9 +347,10 @@ export interface HostSlotBindingOptions {
   skinId?: string;
   align?: SkinChromeSlotAlign;
   /**
-   * `toolbar` also applies `--skin-recovery-toolbar-*` tokens (background,
-   * foreground, border, radius, font, font size, padding, min height, shadow).
-   * The capsule mode keeps the historical control tokens only.
+   * `toolbar` also applies `--skin-recovery-toolbar-*` / `--skin-host-toolbar-*`
+   * tokens for background, foreground, border, hover, radius, font, font size,
+   * padding, height, shadow, surface, gap and icon size. The capsule mode keeps
+   * the historical control tokens only.
    */
   presentation?: "capsule" | "toolbar";
   /**
@@ -451,22 +472,23 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     const tokenStyle = tokenSource ? win.getComputedStyle(tokenSource) : null;
     const tokens = readTokens(tokenStyle);
     applyHostControlTokens(control, tokenStyle ? tokens : null);
+    let toolbarMinHeight: number | undefined;
     if (options.presentation === "toolbar") {
       // Toolbar buttons get a second, independent token set so they can match
-      // a neighbouring top-bar button instead of the capsule palette. The
-      // resolver keeps the same contrast/font floors and falls back as a group.
-      applyHostControlToolbarTokens(
-        control,
-        tokenStyle
-          ? resolveHostControlToolbarTokens(
-            tokenStyle,
-            "host.recovery",
-            probe.probeColor,
-            RECOVERY_CONTROL_DEFAULTS,
-            probe.isWebFont,
-          )
-          : null,
-      );
+      // a neighbouring top-bar button instead of the capsule palette. A
+      // transparent button is checked against the surface behind its anchor.
+      const toolbarTokens = tokenStyle
+        ? resolveHostControlToolbarTokens(
+          tokenStyle,
+          "host.recovery",
+          probe.probeColor,
+          RECOVERY_CONTROL_DEFAULTS,
+          probe.isWebFont,
+          sampleOpaqueSurface(tokenSource, doc),
+        )
+        : null;
+      toolbarMinHeight = toolbarTokens?.minHeight;
+      applyHostControlToolbarTokens(control, toolbarTokens);
     }
 
     const controlBox = control.getBoundingClientRect();
@@ -522,7 +544,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       anchor: anchorSnapshot,
       controlRect: intendedRect,
       viewport,
-      minHitTarget: tokens.hitTarget,
+      minHitTarget: toolbarMinHeight ?? tokens.hitTarget,
       coversProtected,
       otherControls: options.otherControls?.(),
       hitTestOk: placement

@@ -13,14 +13,21 @@ import {
   PERMISSION_CONTROL_DEFAULTS,
   RECOVERY_CONTROL_DEFAULTS,
   SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS,
+  TOOLBAR_DEFAULT_GAP,
+  TOOLBAR_DEFAULT_ICON_SIZE,
   TOOLBAR_DEFAULT_PADDING_X,
   TOOLBAR_DEFAULT_PADDING_Y,
   TOOLBAR_DEFAULT_RADIUS,
   TOOLBAR_MAX_FONT_SIZE,
+  TOOLBAR_MAX_GAP,
   TOOLBAR_MAX_HEIGHT,
+  TOOLBAR_MAX_ICON_SIZE,
   TOOLBAR_MAX_PADDING,
+  TOOLBAR_MIN_HEIGHT,
+  TOOLBAR_MIN_ICON_SIZE,
   applyHostControlTokens,
   applyHostControlToolbarTokens,
+  compositeRgb,
   contrastRatio,
   fontFamilyNames,
   formatRgb,
@@ -30,6 +37,7 @@ import {
   hostControlTokenProperty,
   hostToolbarTokenProperty,
   parseCssColor,
+  parseCssColorWithAlpha,
   relativeLuminance,
   resolveHostControlTokens,
   resolveHostControlToolbarTokens,
@@ -265,6 +273,13 @@ test("CSS colours parse to RGB and ignore alpha for contrast", () => {
   }
 });
 
+test("alpha colours parse and composite over opaque toolbar surfaces", () => {
+  assert.deepEqual(parseCssColorWithAlpha("transparent"), { r: 0, g: 0, b: 0, a: 0 });
+  assert.deepEqual(parseCssColorWithAlpha("#10203080"), { r: 16, g: 32, b: 48, a: 128 / 255 });
+  assert.deepEqual(parseCssColorWithAlpha("rgb(255 0 0 / 50%)"), { r: 255, g: 0, b: 0, a: 0.5 });
+  assert.deepEqual(compositeRgb({ r: 0, g: 0, b: 0, a: 0.5 }, { r: 255, g: 255, b: 255 }), { r: 128, g: 128, b: 128 });
+});
+
 test("WCAG contrast follows the relative-luminance formula", () => {
   assert.equal(relativeLuminance({ r: 0, g: 0, b: 0 }), 0);
   assert.equal(relativeLuminance({ r: 255, g: 255, b: 255 }), 1);
@@ -293,12 +308,14 @@ test("host controls ignore fonts registered by a skin @font-face", () => {
   assert.equal(resolve("Tahoma, ws-community-evil-blank"), SKIN_LOAD_RECOVERY_CONTROL_DEFAULTS.font);
 });
 
-const resolveToolbar = (tokens: TokenMap = {}, global: TokenMap = {}) =>
+const resolveToolbar = (tokens: TokenMap = {}, global: TokenMap = {}, sampledSurface?: { r: number; g: number; b: number }) =>
   resolveHostControlToolbarTokens(
-    style({ ...prefixed("host", {}), ...tokens, ...global }),
+    style({ ...tokens, ...global }),
     "host.recovery",
     raw => raw,
     RECOVERY_CONTROL_DEFAULTS,
+    undefined,
+    sampledSurface,
   );
 
 test("toolbar tokens are independent of the capsule shell and keep host floors", () => {
@@ -341,16 +358,98 @@ test("toolbar tokens are independent of the capsule shell and keep host floors",
   assert.equal(global.foreground, "rgb(255, 255, 255)");
 });
 
-test("unreadable or invalid toolbar tokens fall back to a visible, readable button", () => {
-  // Transparent backgrounds are treated as opaque RGB by parseCssColor; the
-  // result is unreadable against the text and the whole pair reverts.
-  const transparent = resolveToolbar({
-    "--skin-recovery-toolbar-background": "rgba(0, 0, 0, 0)",
-    "--skin-recovery-toolbar-foreground": "#111111",
+test("toolbar colours preserve transparency and check text against an opaque surface", () => {
+  const classic = resolveToolbar({
+    "--skin-recovery-toolbar-background": "transparent",
+    "--skin-recovery-toolbar-foreground": "#1a1a1a",
+    "--skin-recovery-toolbar-border": "transparent",
+    "--skin-recovery-toolbar-hover-background": "#eaf2fd",
+    "--skin-recovery-toolbar-hover-border": "#b8cfe8",
+  }, {}, { r: 255, g: 255, b: 255 });
+  assert.equal(classic.background, "transparent");
+  assert.equal(classic.border, "transparent");
+  assert.equal(classic.foreground, "rgb(26, 26, 26)");
+  assert.equal(classic.hoverBackground, "rgb(234, 242, 253)");
+  assert.equal(classic.hoverBorder, "rgb(184, 207, 232)");
+
+  const explicitDarkSurface = resolveToolbar({
+    "--skin-recovery-toolbar-background": "#00000000",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+    "--skin-recovery-toolbar-surface": "#102030",
+  }, {}, { r: 255, g: 255, b: 255 });
+  assert.equal(explicitDarkSurface.background, "transparent");
+  assert.equal(explicitDarkSurface.foreground, "rgb(255, 255, 255)");
+
+  const sampledDarkSurface = resolveToolbar({
+    "--skin-recovery-toolbar-background": "transparent",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+  }, {}, { r: 16, g: 32, b: 48 });
+  assert.equal(sampledDarkSurface.background, "transparent");
+  assert.equal(sampledDarkSurface.foreground, "rgb(255, 255, 255)");
+
+  const globalSurface = resolveToolbar({
+    "--skin-recovery-toolbar-background": "transparent",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+  }, { "--skin-host-toolbar-surface": "#102030" }, { r: 255, g: 255, b: 255 });
+  assert.equal(globalSurface.foreground, "rgb(255, 255, 255)");
+});
+
+test("toolbar hover colours and Classic geometry are sanitized independently", () => {
+  const classic = resolveToolbar({
+    "--skin-recovery-toolbar-height": "22px",
+    "--skin-recovery-toolbar-padding": "0 4px",
+    "--skin-recovery-toolbar-radius": "2px",
+    "--skin-recovery-toolbar-font-size": "11px",
+    "--skin-recovery-toolbar-gap": "1px",
+    "--skin-recovery-toolbar-icon-size": "16px",
   });
-  assert.equal(transparent.background, "rgb(255, 255, 255)");
-  assert.equal(transparent.foreground, "rgb(49, 82, 79)");
-  assert.ok(contrastRatio(parseCssColor(transparent.foreground)!, parseCssColor(transparent.background)!) >= HOST_CONTROL_MIN_FOREGROUND_CONTRAST);
+  assert.equal(classic.minHeight, 22);
+  assert.equal(classic.paddingX, 4);
+  assert.equal(classic.paddingY, 0);
+  assert.equal(classic.radius, 2);
+  assert.equal(classic.fontSize, 11);
+  assert.equal(classic.gap, 1);
+  assert.equal(classic.iconSize, 16);
+
+  const unreadableHover = resolveToolbar({
+    "--skin-recovery-toolbar-background": "#ffffff",
+    "--skin-recovery-toolbar-foreground": "#757575",
+    "--skin-recovery-toolbar-hover-background": "#eeeeee",
+    "--skin-recovery-toolbar-hover-border": "not-a-colour",
+  });
+  assert.equal(unreadableHover.hoverBackground, "rgb(255, 255, 255)");
+  assert.equal(unreadableHover.hoverBorder, "rgb(157, 182, 178)");
+
+  const clamped = resolveToolbar({
+    "--skin-recovery-toolbar-gap": "100px",
+    "--skin-recovery-toolbar-icon-size": "2px",
+  });
+  assert.equal(clamped.gap, TOOLBAR_MAX_GAP);
+  assert.equal(clamped.iconSize, TOOLBAR_MIN_ICON_SIZE);
+  const oversized = resolveToolbar({ "--skin-recovery-toolbar-icon-size": "100px" });
+  assert.equal(oversized.iconSize, TOOLBAR_MAX_ICON_SIZE);
+  assert.equal(resolveToolbar().gap, TOOLBAR_DEFAULT_GAP);
+  assert.equal(resolveToolbar().iconSize, TOOLBAR_DEFAULT_ICON_SIZE);
+});
+
+test("capsule tokens keep their opaque palette and 28px hit target", () => {
+  const capsule = resolveHostControlTokens(style({
+    "--skin-recovery-background": "transparent",
+    "--skin-recovery-foreground": "#1a1a1a",
+    "--skin-recovery-toolbar-height": "22px",
+  }), "host.recovery", raw => raw, RECOVERY_CONTROL_DEFAULTS);
+  assert.equal(capsule.background, "rgb(255, 255, 255)");
+  assert.equal(capsule.hitTarget, 28);
+});
+
+test("unreadable or invalid toolbar tokens fall back to a visible, readable button", () => {
+  const transparentUnreadable = resolveToolbar({
+    "--skin-recovery-toolbar-background": "rgba(0, 0, 0, 0)",
+    "--skin-recovery-toolbar-foreground": "#ffffff",
+  }, {}, { r: 255, g: 255, b: 255 });
+  assert.equal(transparentUnreadable.background, "rgb(255, 255, 255)");
+  assert.equal(transparentUnreadable.foreground, "rgb(49, 82, 79)");
+  assert.ok(contrastRatio(parseCssColor(transparentUnreadable.foreground)!, parseCssColor(transparentUnreadable.background)!) >= HOST_CONTROL_MIN_FOREGROUND_CONTRAST);
 
   const lowContrast = resolveToolbar({
     "--skin-recovery-toolbar-background": "#777777",
@@ -377,7 +476,7 @@ test("unreadable or invalid toolbar tokens fall back to a visible, readable butt
   // A syntactically valid but oversized padding is clamped, not applied raw.
   assert.equal(invalid.paddingX, TOOLBAR_MAX_PADDING);
   assert.equal(invalid.paddingY, TOOLBAR_MAX_PADDING);
-  assert.equal(invalid.minHeight, HOST_CONTROL_MIN_HIT_TARGET);
+  assert.equal(invalid.minHeight, TOOLBAR_MIN_HEIGHT);
   assert.equal(invalid.shadow, "none");
 
   const oversized = resolveToolbar({
@@ -418,16 +517,24 @@ test("applying and clearing toolbar tokens writes only toolbar variables", () =>
     },
   } as unknown as HTMLElement;
   applyHostControlToolbarTokens(control, resolveToolbar({
-    "--skin-recovery-toolbar-background": "#102030",
-    "--skin-recovery-toolbar-foreground": "#ffffff",
+    "--skin-recovery-toolbar-background": "#ffffff",
+    "--skin-recovery-toolbar-foreground": "#1a1a1a",
     "--skin-recovery-toolbar-padding": "6px 14px",
     "--skin-recovery-toolbar-height": "36px",
+    "--skin-recovery-toolbar-hover-background": "#eaf2fd",
+    "--skin-recovery-toolbar-hover-border": "#b8cfe8",
+    "--skin-recovery-toolbar-gap": "1px",
+    "--skin-recovery-toolbar-icon-size": "16px",
   }));
-  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.background), "rgb(16, 32, 48)");
-  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.foreground), "rgb(255, 255, 255)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.background), "rgb(255, 255, 255)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.foreground), "rgb(26, 26, 26)");
   assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.paddingX), "14px");
   assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.paddingY), "6px");
   assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.minHeight), "36px");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.hoverBackground), "rgb(234, 242, 253)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.hoverBorder), "rgb(184, 207, 232)");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.gap), "1px");
+  assert.equal(values.get(HOST_TOOLBAR_APPLIED_VARIABLES.iconSize), "16px");
   applyHostControlToolbarTokens(control, null);
   assert.equal(values.size, 0);
 });

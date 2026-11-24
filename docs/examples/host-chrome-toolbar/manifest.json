@@ -3,10 +3,10 @@
   "packageType": "open-skin",
   "id": "community.host-chrome-toolbar",
   "name": "Host Chrome Toolbar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "WebSpeak Community",
   "license": "AGPL-3.0-only",
-  "description": "Minimal open skin that docks the trusted recovery actions as host-owned toolbar buttons.",
+  "description": "Minimal open skin that docks Classic-aligned host-owned recovery icons into the page header.",
   "entry": "skin.css",
   "chrome": "chrome.json",
   "minAppVersion": "0.3.2"

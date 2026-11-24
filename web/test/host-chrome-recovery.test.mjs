@@ -98,6 +98,14 @@ test("host chrome renders recovery and authorization in a closed-shadow top laye
   assert.match(hostChrome, /presentation: "toolbar"/);
   assert.match(hostChrome, /resolveHostRecoveryPresentation/);
   assert.match(hostChrome, /class="ws-host-toolbar-action"/);
+  assert.match(hostChrome, /:aria-label="copy\.useBuiltIn"/);
+  assert.match(hostChrome, /:aria-label="copy\.library"/);
+  assert.match(hostChrome, /class="ws-host-toolbar-icon" aria-hidden="true"/);
+  assert.match(hostChrome, /focusable="false"/);
+  assert.match(hostChrome, /--ws-toolbar-hover-background/);
+  assert.match(hostChrome, /--ws-toolbar-hover-border/);
+  assert.match(hostChrome, /--ws-toolbar-gap/);
+  assert.match(hostChrome, /--ws-toolbar-icon-size/);
   assert.match(hostChrome, /data-ws-recovery-action="built-in"[\s\S]*?@click="useBuiltInSkin"/);
   assert.match(hostChrome, /data-ws-recovery-action="library"[\s\S]*?@click="openLibrary"/);
   assert.match(hostChrome, /resolveHostRecoveryPresentation\(/);
@@ -528,6 +536,75 @@ test("host control tokens follow late skin CSS, resolve modern colours and refus
   assert.equal(byName["after-dispose"].inlineBackground, late.inlineBackground, "a disposed binding kept observing the document");
 });
 
+test("Classic toolbar icons keep 22px geometry, transparency, names and full-label shortcut recovery", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(
+    `http://127.0.0.1:${port}/test/fixtures/host-recovery-toolbar-classic.html`,
+    ["--virtual-time-budget=10000", "--window-size=1280,800"],
+  );
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the Classic toolbar fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+
+  const initial = payload.initial;
+  assert.equal(initial.toolbarOpen, true);
+  assert.equal(initial.capsuleOpen, false);
+  assert.equal(initial.actionCount, 2);
+  assert.equal(initial.height, 22);
+  assert.equal(initial.width, 24);
+  assert.equal(initial.minHeight, "22px");
+  assert.equal(initial.paddingTop, "0px");
+  assert.equal(initial.paddingRight, "0px");
+  assert.equal(initial.paddingBottom, "0px");
+  assert.equal(initial.paddingLeft, "0px");
+  assert.equal(initial.borderTopWidth, "1px");
+  assert.equal(initial.radius, "2px");
+  assert.equal(initial.fontSize, "11px");
+  assert.equal(initial.background, "rgba(0, 0, 0, 0)");
+  assert.equal(initial.foreground, "rgb(26, 26, 26)");
+  assert.equal(initial.gap, "1px");
+  assert.equal(initial.hoverBackground, "rgb(234, 242, 253)");
+  assert.equal(initial.hoverBorder, "rgb(184, 207, 232)");
+  assert.equal(initial.iconWidth, 16);
+  assert.equal(initial.iconHeight, 16);
+  assert.equal(initial.iconDisplay, "block");
+  assert.equal(initial.iconAriaHidden, "true");
+  assert.equal(initial.svgFocusable, "false");
+  assert.deepEqual(initial.visibleText, ["", ""]);
+  assert.deepEqual(initial.accessibleNames, ["Use built-in skin", "Application library"]);
+  assert.equal(initial.titles[0], "Restore the built-in skin (Ctrl+Alt+Shift+R, or ⌘+⌥+⇧+R on macOS)");
+  assert.equal(initial.titles[1], "Application library");
+  assert.equal(initial.groupName, "Restore built-in skin");
+  assert.equal(initial.hitIsLayerHost, true);
+  assert.equal(initial.builtInClicked, true);
+  assert.equal(initial.libraryClicked, true);
+
+  assert.equal(payload.shortcut.capsuleOpen, true);
+  assert.equal(payload.shortcut.toolbarOpen, false);
+  assert.deepEqual(payload.shortcut.labels, ["Use built-in skin", "Application library"]);
+  assert.ok(payload.shortcut.height >= 28);
+  assert.equal(payload.shortcut.builtInBackground, "rgb(255, 247, 237)");
+  assert.equal(payload.shortcut.builtInForeground, "rgb(124, 45, 18)");
+  assert.equal(payload.shortcut.focusedAction, "built-in");
+  assert.equal(payload.afterEscape.capsuleOpen, false);
+  assert.equal(payload.afterEscape.toolbarOpen, true);
+  assert.equal(payload.invalidTokens.background, "rgb(255, 255, 255)");
+  assert.equal(payload.invalidTokens.foreground, "rgb(49, 82, 79)");
+  assert.equal(payload.invalidTokens.visible, true);
+});
+
 test("toolbar-mode recovery docks plain host buttons, de-duplicates the library and falls back", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
   const server = await createServer({
     root: webRoot,
@@ -615,7 +692,7 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
 
   assert.equal(payload.invalidTokens.visible, true, "invalid toolbar tokens hid the button");
   assert.equal(payload.invalidTokens.inViewport, true);
-  assert.equal(payload.invalidTokens.background, "rgb(255, 255, 255)", "transparent background must fall back to a visible surface");
+  assert.equal(payload.invalidTokens.background, "rgb(255, 255, 255)", "unreadable transparent foreground must fall back to a visible surface");
   assert.equal(payload.invalidTokens.foreground, "rgb(49, 82, 79)");
   assert.equal(payload.invalidTokens.shadow, "none", "the invalid shadow token must not be applied");
 
@@ -832,5 +909,9 @@ test("legacy slots without a mode still dock the capsule", { skip: !CHROME && "g
   assert.deepEqual(payload.actions, ["built-in", "library"]);
   assert.equal(payload.background, "rgb(16, 32, 48)", "the capsule still reads --skin-recovery-* tokens");
   assert.equal(payload.foreground, "rgb(255, 255, 255)");
+  assert.ok(payload.capsuleHeight >= 28, "the legacy capsule lost its original size floor");
+  assert.ok(payload.builtInHeight >= 28, "the legacy capsule action lost its original size floor");
+  assert.equal(payload.builtInBackground, "rgb(255, 247, 237)", "the capsule built-in action must keep its fixed light background");
+  assert.equal(payload.builtInForeground, "rgb(124, 45, 18)");
   assert.equal(payload.clicked, true);
 });

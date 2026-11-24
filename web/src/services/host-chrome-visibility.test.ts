@@ -133,6 +133,7 @@ test("slot declarations are honoured for third-party skins only", () => {
       align: "end",
       compact: false,
       mode: "capsule",
+      appearance: "label",
     });
     // A part that is not slottable cannot be selected through chrome.json.
     assert.equal(activeHostSlot("host.permission"), undefined);

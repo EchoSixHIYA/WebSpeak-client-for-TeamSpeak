@@ -209,7 +209,7 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
   const explicit = parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
     slots: {
-      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true },
+      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true, appearance: "label" },
     },
   }));
   assert.deepEqual(explicit.slots?.["host.recovery"], {
@@ -217,6 +217,7 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
     align: "start",
     compact: true,
     mode: "capsule",
+    appearance: "label",
   });
 
   // Old slots without `mode` keep the docked capsule: the presentation is
@@ -232,6 +233,7 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
     align: "end",
     compact: false,
     mode: "capsule",
+    appearance: "label",
   });
   assert.doesNotThrow(() => parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
@@ -256,6 +258,9 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "Voice Audio Dock" } } }, /not a valid part name/],
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "" } } }, /at most 240 characters/],
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "float" } } }, /invalid mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "toolbar", appearance: "text" } } }, /invalid appearance/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", appearance: "icon" } } }, /appearance is only available in toolbar mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "capsule", appearance: "icon-and-label" } } }, /appearance is only available in toolbar mode/],
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "toolbar", compact: true } } }, /compact is only valid in capsule mode/],
     [{ schemaVersion: 1, slots: { "host.recovery.built-in": { anchor: "voice.audio-dock", mode: "capsule" } } }, /only supports toolbar mode/],
     [{ schemaVersion: 1, slots: { "host.recovery.built-in": { anchor: "voice.audio-dock", compact: true } } }, /compact is only valid in capsule mode/],
@@ -277,6 +282,7 @@ test("chrome.json toolbar slots support page candidates and separate action butt
           "skin.home.topbar.part-host-actions",
         ],
         align: "end",
+        appearance: "icon",
       },
     },
   }));
@@ -288,6 +294,7 @@ test("chrome.json toolbar slots support page candidates and separate action butt
     align: "end",
     compact: false,
     mode: "toolbar",
+    appearance: "icon",
   });
 
   const perAction = parseSkinChromeDocument(JSON.stringify({
@@ -297,6 +304,7 @@ test("chrome.json toolbar slots support page candidates and separate action butt
         mode: "toolbar",
         anchor: "skin.voice.topbar.part-built-in",
         align: "start",
+        appearance: "icon-and-label",
       },
       "host.recovery.library": {
         mode: "toolbar",
@@ -309,10 +317,12 @@ test("chrome.json toolbar slots support page candidates and separate action butt
     align: "start",
     compact: false,
     mode: "toolbar",
+    appearance: "icon-and-label",
   });
   // Single-action slots are toolbar-only and default to toolbar mode.
   assert.equal(perAction.slots?.["host.recovery.library"]?.mode, "toolbar");
   assert.equal(perAction.slots?.["host.recovery.library"]?.align, "end");
+  assert.equal(perAction.slots?.["host.recovery.library"]?.appearance, "label");
 
   const invalidDocuments: Array<[unknown, RegExp]> = [
     [{ schemaVersion: 1, slots: { "host.recovery": { mode: "toolbar", anchor: [] } } }, /between 1 and 8/],

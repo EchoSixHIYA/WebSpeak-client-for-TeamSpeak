@@ -246,7 +246,7 @@ try {
   // Invalid / unreadable toolbar tokens must not make the button invisible.
   const voiceAnchor = document.getElementById("voice-anchor");
   voiceAnchor.style.setProperty("--skin-recovery-toolbar-background", "rgba(0,0,0,0)");
-  voiceAnchor.style.setProperty("--skin-recovery-toolbar-foreground", "#111111");
+  voiceAnchor.style.setProperty("--skin-recovery-toolbar-foreground", "#ffffff");
   voiceAnchor.style.setProperty("--skin-recovery-toolbar-shadow", "url(https://example.invalid/pixel)");
   await sleep(700);
   const fallbackStyle = getComputedStyle(buttons()[0]);

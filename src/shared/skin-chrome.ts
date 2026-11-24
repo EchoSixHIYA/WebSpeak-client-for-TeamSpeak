@@ -86,6 +86,9 @@ export type SkinChromeSlotAlign = "start" | "center" | "end";
  */
 export type SkinChromeSlotMode = "capsule" | "toolbar";
 
+/** Toolbar buttons may show host-owned icons without losing their accessible names. */
+export type SkinChromeSlotAppearance = "label" | "icon" | "icon-and-label";
+
 /** One anchor name, or ordered candidates (for example one per page). */
 export type SkinChromeSlotAnchor = string | string[];
 
@@ -102,6 +105,8 @@ export interface SkinChromeSlot {
   compact: boolean;
   /** Explicit presentation; see `SkinChromeSlotMode`. */
   mode: SkinChromeSlotMode;
+  /** Toolbar-only label/icon shape; the host always supplies the icon and name. */
+  appearance: SkinChromeSlotAppearance;
 }
 
 export interface SkinChromeAssetInfo {
@@ -196,6 +201,10 @@ function isSlotAlign(value: unknown): value is SkinChromeSlotAlign {
   return value === "start" || value === "center" || value === "end";
 }
 
+function isSlotAppearance(value: unknown): value is SkinChromeSlotAppearance {
+  return value === "label" || value === "icon" || value === "icon-and-label";
+}
+
 export function parseSkinChromeDocument(source: string): SkinChromeDocument {
   const bytes = new TextEncoder().encode(source).byteLength;
   if (!bytes || bytes > SKIN_CHROME_MAX_BYTES) {
@@ -271,7 +280,7 @@ export function parseSkinChromeDocument(source: string): SkinChromeDocument {
         return reject(`Slot ${part} must be an object.`, "SKIN_CHROME_SLOT_INVALID");
       }
       for (const key of Object.keys(value)) {
-        if (key !== "anchor" && key !== "align" && key !== "compact" && key !== "mode") {
+        if (key !== "anchor" && key !== "align" && key !== "compact" && key !== "mode" && key !== "appearance") {
           return reject(`Slot ${part} contains an unsupported field: ${key}.`, "SKIN_CHROME_SLOT_INVALID");
         }
       }
@@ -299,7 +308,14 @@ export function parseSkinChromeDocument(source: string): SkinChromeDocument {
       if (mode === "toolbar" && compact) {
         return reject(`Slot ${part} compact is only valid in capsule mode.`, "SKIN_CHROME_SLOT_INVALID");
       }
-      slots[part] = { anchor, align, compact, mode };
+      const appearance = value.appearance === undefined ? "label" : value.appearance;
+      if (!isSlotAppearance(appearance)) {
+        return reject(`Slot ${part} has an invalid appearance value: ${String(appearance)}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      if (mode !== "toolbar" && appearance !== "label") {
+        return reject(`Slot ${part} appearance is only available in toolbar mode.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      slots[part] = { anchor, align, compact, mode, appearance };
     }
     const perAction = slots["host.recovery.built-in"] !== undefined || slots["host.recovery.library"] !== undefined;
     if (slots["host.recovery"] && perAction) {
