@@ -1048,6 +1048,10 @@ const {
   serverEvents,
   pokeNotifications,
   microphoneMuted,
+  backgroundCallEnabled,
+  backgroundCallActive,
+  backgroundCallInterrupted,
+  setBackgroundCallEnabled,
   noiseSuppressionEnabled,
   noiseSuppressionLevel,
   inputVolume,
@@ -1302,8 +1306,12 @@ function reconnectMobile(): void {
   reconnectNow();
 }
 const { toggleMicrophone, stopWhisperTalk } = audioControls;
-const audioDockState = { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionLevel, accompanimentActive };
+const audioDockState = { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionLevel, accompanimentActive, backgroundCallActive };
 const audioSettingsState = {
+  backgroundCallEnabled,
+  backgroundCallActive,
+  backgroundCallInterrupted,
+  setBackgroundCallEnabled,
   inputDevices,
   outputDevices,
   selectedInputDeviceId,

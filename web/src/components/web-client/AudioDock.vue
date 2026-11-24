@@ -47,15 +47,16 @@
             :value="inputVolume * 100"
             :style="rangeStyle(inputVolume, 1)"
             :aria-label="t('inputVolume')"
+            :disabled="backgroundCallActive"
             @input="onInputVolume"
           />
           <div class="dock-panel-divider"></div>
           <label class="dock-switch-row">
             <span><strong>{{ t("noiseSuppression") }}</strong></span>
-            <select class="noise-suppression-level" :value="noiseSuppressionLevel" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionChange">
+            <select class="noise-suppression-level" :value="backgroundCallActive && noiseSuppressionLevel === 'strong' ? 'standard' : noiseSuppressionLevel" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionChange">
               <option value="off">{{ t("noiseSuppressionOff") }}</option>
               <option value="standard">{{ t("noiseSuppressionStandard") }}</option>
-              <option value="strong">{{ t("noiseSuppressionStrong") }}</option>
+              <option value="strong" :disabled="backgroundCallActive">{{ t("noiseSuppressionStrong") }}</option>
             </select>
           </label>
         </div>
@@ -131,12 +132,12 @@ import type { useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientAudioControls } from "../../composables/useWebClientAudioControls.js";
 
 const props = defineProps<{
-  model: Pick<ReturnType<typeof useVoiceWebSocket>, "microphoneMuted" | "inputVolume" | "outputVolume" | "outputMuted" | "noiseSuppressionLevel" | "accompanimentActive">;
+  model: Pick<ReturnType<typeof useVoiceWebSocket>, "microphoneMuted" | "inputVolume" | "outputVolume" | "outputMuted" | "noiseSuppressionLevel" | "accompanimentActive" | "backgroundCallActive">;
   controls: Pick<ReturnType<typeof useWebClientAudioControls>, "toggleMicrophone" | "toggleNoiseSuppression" | "onInputVolume" | "onOutputVolume" | "onNoiseSuppressionChange" | "toggleAccompaniment">;
   t: (key: string) => string;
   rangeStyle: (value: number, max: number) => Record<string, string>;
 }>();
-const { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionLevel, accompanimentActive } = props.model;
+const { microphoneMuted, inputVolume, outputVolume, outputMuted, noiseSuppressionLevel, accompanimentActive, backgroundCallActive } = props.model;
 const { toggleMicrophone, onInputVolume, onOutputVolume, onNoiseSuppressionChange, toggleAccompaniment } = props.controls;
 const emit = defineEmits<{ settings: []; outputMute: [] }>();
 </script>

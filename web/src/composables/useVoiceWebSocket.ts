@@ -5,6 +5,8 @@ export type { MicrophoneProcessingSettings } from "../voice/microphone-capture.j
 import { createAudioSinkRouter } from "../voice/audio-sink.js";
 import { createAccompaniment, type AccompanimentErrorCode } from "../voice/accompaniment.js";
 import { createWebRtcTransport } from "../voice/webrtc-transport.js";
+import { createNativeMicrophoneCapture } from "../voice/native-microphone.js";
+import { createCallMediaSession } from "../services/call-media-session.js";
 import { createVoiceConnection } from "../voice/connection.js";
 import { createVoiceCommands } from "../voice/commands.js";
 import { createVoiceSessionState } from "../voice/session-state.js";
@@ -21,7 +23,7 @@ import type { ChatMessage } from "../../../src/shared/voice-models.js";
 import type { ClientCommandPayloads, ClientCommandType } from "../../../src/shared/client-commands.js";
 export type { ScreenShareStreamDescription as ScreenShareStream, ScreenShareViewerDescription as ScreenShareViewer, ScreenSharePeerSignal as ScreenShareSignal } from "../../../src/shared/screen-share.js";
 export type { ChannelMember, ChannelInfo, ChatMessage, ServerEvent, VoiceAudioBridgeStats } from "../../../src/shared/voice-models.js";
-import { computed, onBeforeUnmount, reactive, ref, shallowRef } from "vue";
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from "vue";
 import { loadLocalPreferences, saveLocalPreferences } from "../services/local-persistence.js";
 
 export interface VoiceState {
@@ -257,6 +259,11 @@ export function useVoiceWebSocket() {
   let micStream: MediaStream | null = null;
   const microphoneCaptureFactory = createMicrophoneCaptureFactory();
   let microphoneCapture: MicrophoneCapture | null = null;
+  let microphoneNative = false;
+  const backgroundCallEnabled = ref(false);
+  const backgroundCallActive = ref(false);
+  const backgroundCallInterrupted = ref(false);
+  let backgroundCallTouched = false;
   let pendingMicrophoneCapture: AbortController | null = null;
   const accompanimentActive = ref(false);
   const accompanimentSupported = ref(typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia));
@@ -345,7 +352,7 @@ export function useVoiceWebSocket() {
     stunServer: () => webRtcStunServer,
     prepareMicrophone: async () => {
       await ensureMicrophone();
-      return micStream ? { context: getAudioCtx(), stream: micStream,
+      return micStream ? { context: microphoneNative ? null : getAudioCtx(), stream: micStream,
         processedStream: microphoneCapture?.processedStream ?? micStream } : null;
     },
     stopPcm: stopCaptureGraph,
@@ -366,6 +373,7 @@ export function useVoiceWebSocket() {
     async onFallback(reason, isCurrent) {
       if (!isCurrent()) return;
       sessionTrace.record("webrtc.fallback", { code: safeClientErrorCode(reason) || "WEBRTC_UNAVAILABLE" });
+      backgroundCallActive.value = false;
       setAudioNotice("WEBRTC_FALLBACK", `实时语音（WebRTC）不可用（错误代码：${safeClientErrorCode(reason) || "WEBRTC_UNAVAILABLE"}），已切换为兼容传输：延迟与音质可能下降`);
       try { await startMicrophone(); }
       catch (error) { if (isCurrent()) setMicrophoneError(error); }
@@ -387,6 +395,38 @@ export function useVoiceWebSocket() {
       onPlaying: syncAudioContextNotice,
     },
   });
+  const callMediaSession = createCallMediaSession({
+    resume() {
+      // A media Play command resumes listening only. Unmuting needs an explicit
+      // microphone action, never a page visibility or system playback event.
+      outputMuted.value = false;
+      applyOutputVolume();
+      webrtc.resumePlayback();
+    },
+    pause() {
+      setMicrophoneMuted(true);
+      outputMuted.value = true;
+      applyOutputVolume();
+    },
+    toggleMicrophone: () => setMicrophoneMuted(!microphoneMuted.value),
+    hangup: () => disconnect(),
+  });
+  function syncCallMediaSession(): void {
+    callMediaSession.sync({ active: state.connected && backgroundCallActive.value,
+      muted: microphoneMuted.value, outputMuted: outputMuted.value, title: serverInfo.value?.name || "WebSpeak" });
+  }
+  watch([() => state.connected, backgroundCallActive, microphoneMuted, outputMuted, serverInfo], syncCallMediaSession);
+  const resumeVisibleCall = () => {
+    if (!state.connected || !backgroundCallActive.value || document.visibilityState !== "visible") return;
+    webrtc.resumePlayback();
+  };
+  document.addEventListener("visibilitychange", resumeVisibleCall);
+  window.addEventListener("pageshow", resumeVisibleCall);
+  onScopeDispose(() => {
+    callMediaSession.dispose();
+    document.removeEventListener("visibilitychange", resumeVisibleCall);
+    window.removeEventListener("pageshow", resumeVisibleCall);
+  });
   const audioDiagnostics = createAudioDiagnostics({
     source() {
       const socket = ws.value;
@@ -398,7 +438,7 @@ export function useVoiceWebSocket() {
     presentation({ peer }) {
       return {
         microphoneMuted: microphoneMuted.value,
-        microphoneReady: Boolean(micStream?.getAudioTracks().some(track => track.readyState === "live")),
+        microphoneReady: Boolean(micStream?.getAudioTracks().some(track => track.readyState === "live" && !track.muted)),
         microphonePermission: audioPermission.value,
         playbackState: peer
           ? webrtc.output ? webrtc.output.paused ? "paused" : "playing" : "unavailable"
@@ -414,6 +454,7 @@ export function useVoiceWebSocket() {
       preferredInputDeviceId: committedInputDeviceId,
       inputDeviceId: committedInputDeviceId,
       microphoneMuted: microphoneMuted.value,
+      backgroundCallEnabled: backgroundCallEnabled.value,
       noiseSuppressionEnabled: committedNoiseSuppressionLevel !== "off",
       noiseSuppressionLevel: committedNoiseSuppressionLevel,
       voxThreshold: voxThreshold.value,
@@ -433,6 +474,7 @@ export function useVoiceWebSocket() {
   }
 
   const audioPreferencesReady = loadLocalPreferences().then((preferences) => {
+    if (!backgroundCallTouched) backgroundCallEnabled.value = preferences.backgroundCallEnabled === true;
     if (!inputDeviceTouched) {
       if (!selectedInputDeviceId.value) selectedInputDeviceId.value = preferences.preferredInputDeviceId ?? preferences.inputDeviceId ?? "";
       committedInputDeviceId = selectedInputDeviceId.value;
@@ -549,7 +591,7 @@ export function useVoiceWebSocket() {
 
   /** A suspended AudioContext silently swallows capture: say so instead of pretending. */
   function syncAudioContextNotice(): void {
-    if (audioCtx && audioCtx.state === "suspended") {
+    if (!microphoneNative && audioCtx && audioCtx.state === "suspended") {
       setAudioNotice("AUDIO_CONTEXT_SUSPENDED", "浏览器的音频处理被暂停（需要一次页面交互），麦克风与扬声器可能无声：请点击页面任意位置后重试");
     } else {
       clearAudioNotice("AUDIO_CONTEXT_SUSPENDED");
@@ -702,9 +744,10 @@ export function useVoiceWebSocket() {
     pendingMicrophoneCapture?.abort();
     const controller = new AbortController();
     pendingMicrophoneCapture = controller;
-    const ctx = getAudioCtx();
+    const native = backgroundCallActive.value;
+    const ctx = native ? null : getAudioCtx();
     const assertCurrent = (): void => {
-      if (generation !== microphoneGeneration || audioCtx !== ctx || controller.signal.aborted) throw new CancelledMediaOperation();
+      if (generation !== microphoneGeneration || (ctx && audioCtx !== ctx) || controller.signal.aborted) throw new CancelledMediaOperation();
     };
     let nextStream: MediaStream | null = null;
     let nextCapture: MicrophoneCapture | null = null;
@@ -712,24 +755,35 @@ export function useVoiceWebSocket() {
     try {
       nextStream = await requestMediaBeforeAudioResume(
         () => navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints() }),
-        () => ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
+        () => ctx?.state === "suspended" ? ctx.resume() : Promise.resolve(),
       );
       assertCurrent();
       audioPermission.value = "granted";
-      factoryOwnsStream = true;
-      nextCapture = await microphoneCaptureFactory.prepare({
-        context: ctx, stream: nextStream, signal: controller.signal, assertCurrent,
-        rnnoiseEnabled: noiseSuppressionLevel.value === "strong", volume: inputVolume.value, onSamples: handleCaptureChunk,
-      });
+      if (native) {
+        nextCapture = createNativeMicrophoneCapture(nextStream);
+        factoryOwnsStream = true;
+      } else {
+        factoryOwnsStream = true;
+        nextCapture = await microphoneCaptureFactory.prepare({
+          context: ctx!, stream: nextStream, signal: controller.signal, assertCurrent,
+          rnnoiseEnabled: noiseSuppressionLevel.value === "strong", volume: inputVolume.value, onSamples: handleCaptureChunk,
+        });
+      }
       assertCurrent();
       // Commit only a complete graph. Permission and node failures leave the
       // previous stream, PCM route and WebRTC peer untouched.
       stopMicrophone(false);
       micStream = nextStream;
       microphoneCapture = nextCapture;
+      microphoneNative = native;
+      backgroundCallInterrupted.value = false;
+      sessionTrace.record("microphone.route", { native });
       const microphoneTrack = nextStream.getAudioTracks()[0];
       if (microphoneTrack) {
-        const recordTrack = (stateName: string) => sessionTrace.record("microphone.track", { state: stateName, muted: microphoneTrack.muted });
+        const recordTrack = (stateName: string) => {
+          sessionTrace.record("microphone.track", { state: stateName, muted: microphoneTrack.muted });
+          if (micStream === nextStream && native) backgroundCallInterrupted.value = microphoneTrack.muted || microphoneTrack.readyState !== "live";
+        };
         recordTrack(microphoneTrack.readyState);
         microphoneTrack.addEventListener("mute", () => recordTrack("mute"));
         microphoneTrack.addEventListener("unmute", () => recordTrack("unmute"));
@@ -759,8 +813,8 @@ export function useVoiceWebSocket() {
 
   // 导出给 WebClient：开麦前先 await 此函数完成真实采集，避免出现“假成功”
   async function ensureMicrophone(): Promise<void> {
-    if (microphoneStartPromise) return microphoneStartPromise;
-    if (micStream) return;
+    if (microphoneStartPromise) await microphoneStartPromise;
+    if (micStream && microphoneNative === backgroundCallActive.value) return;
     if (!microphoneStartPromise) {
       const generation = microphoneGeneration + 1;
       const pending = startMicrophone().then(async () => {
@@ -793,6 +847,10 @@ export function useVoiceWebSocket() {
   }
 
   async function startAccompaniment(): Promise<void> {
+    if (backgroundCallActive.value) {
+      accompanimentErrorCode.value = "backgroundMode";
+      throw new DOMException("Accompaniment is unavailable in native call mode", "NotSupportedError");
+    }
     await accompaniment.start();
   }
 
@@ -827,6 +885,8 @@ export function useVoiceWebSocket() {
     if (micStream) sessionTrace.record("microphone.track", { state: "released" });
     microphoneCapture?.dispose();
     microphoneCapture = null;
+    microphoneNative = false;
+    backgroundCallInterrupted.value = false;
     webrtc.releaseInput();
     micStream = null;
     if (closeContext) {
@@ -1067,6 +1127,8 @@ export function useVoiceWebSocket() {
     commands.clear(new Error("语音连接已关闭"));
     screenShare.stopTransport(sendScreenStop);
     webrtc.stop();
+    backgroundCallActive.value = false;
+    callMediaSession.dispose();
     remotePlayback.clearAll();
     stopMicrophone();
     clearSpeakingState();
@@ -1106,6 +1168,9 @@ export function useVoiceWebSocket() {
         sendCmd("setMicrophoneMuted", { muted: microphoneMuted.value });
         screenShare.setIceServers(msg.screenShareIceServers);
         webRtcStunServer = msg.webRtcStunServer ?? "";
+        backgroundCallActive.value = backgroundCallEnabled.value && msg.webrtcAvailable === true && typeof RTCPeerConnection !== "undefined";
+        sessionTrace.record("call.background", { requested: backgroundCallEnabled.value, native: backgroundCallActive.value });
+        syncCallMediaSession();
         sessionState.connected(msg);
         applyWhisperState(msg.whisperTargetIds, msg.whisperActive);
         if (typeof msg.identity === "string" && msg.identity.length <= 8192) {
@@ -1441,6 +1506,12 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
+  function setBackgroundCallEnabled(enabled: boolean): void {
+    backgroundCallTouched = true;
+    backgroundCallEnabled.value = enabled;
+    void saveAudioPreferences();
+  }
+
   async function setNoiseSuppressionLevel(level: "off" | "standard" | "strong"): Promise<void> {
     if (noiseSuppressionLevel.value === level) return;
     noiseSuppressionTouched = true;
@@ -1479,7 +1550,7 @@ export function useVoiceWebSocket() {
     void saveAudioPreferences();
   }
 
-  onBeforeUnmount(() => sessionTrace.dispose());
+  onScopeDispose(() => { disconnect(); sessionTrace.dispose(); });
 
   return {
     pluginSession,
@@ -1495,6 +1566,10 @@ export function useVoiceWebSocket() {
     serverEvents,
     pokeNotifications,
     microphoneMuted,
+    backgroundCallEnabled,
+    backgroundCallActive,
+    backgroundCallInterrupted,
+    setBackgroundCallEnabled,
     noiseSuppressionEnabled,
     noiseSuppressionLevel,
     inputVolume,

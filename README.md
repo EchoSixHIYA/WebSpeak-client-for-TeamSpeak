@@ -21,6 +21,8 @@
 
 当前版本 / Current version: **[v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
 
+dev 实验功能 / dev experiment: [锁屏通话 / Lock-screen calls](./docs/EXPERIMENTAL_BACKGROUND_CALLS.md)（默认关闭，尚未通过真机锁屏验收 / off by default; physical-device validation pending）。
+
 ## 关于 WebSpeak · Overview
 
 WebSpeak 将 TeamSpeak 3 / TeamSpeak 6 带到浏览器：无需安装桌面客户端，即可加入语音频道、发送消息和分享屏幕。你可以自行部署网关，并通过网页后台管理服务器、访问策略、皮肤和运行数据。

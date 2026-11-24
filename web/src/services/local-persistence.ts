@@ -145,6 +145,7 @@ export interface LocalPreferences {
   theme?: "system" | "light" | "dark";
   skinId?: string;
   microphoneMuted?: boolean;
+  backgroundCallEnabled?: boolean;
   noiseSuppressionEnabled?: boolean;
   noiseSuppressionLevel?: "off" | "standard" | "strong";
   voxThreshold?: number;

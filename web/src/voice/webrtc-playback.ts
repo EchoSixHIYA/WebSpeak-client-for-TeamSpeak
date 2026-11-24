@@ -58,7 +58,9 @@ export function createWebRtcPlayback(options: WebRtcPlaybackOptions) {
     const task = (async () => {
       const context = options.context();
       if (context?.state === "suspended") {
-        try { await context.resume(); } catch { /* a real user gesture may still be required */ }
+        // Capture may never resume while locked. Native remote playback must
+        // not wait on that independent graph, including on a retry gesture.
+        try { void context.resume().catch(() => undefined); } catch { /* retry on a user gesture */ }
       }
       if (!isCurrent(record)) return;
       try {
@@ -108,6 +110,7 @@ export function createWebRtcPlayback(options: WebRtcPlaybackOptions) {
 
   return {
     attach, stop,
+    resume(): void { if (current) void play(current); },
     get output(): SinkAudioElement | null { return current?.output ?? null; },
     setVolume(value: number): void { if (current) current.output.volume = value; },
   };

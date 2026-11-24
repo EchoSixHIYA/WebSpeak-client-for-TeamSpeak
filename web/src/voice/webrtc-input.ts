@@ -5,6 +5,23 @@ export interface WebRtcInput {
   dispose(): void;
 }
 
+/** The capture owner releases this stream; no Web Audio graph or clone owns it. */
+export function createNativeWebRtcInput(stream: MediaStream, volume: number): WebRtcInput {
+  const track = stream.getAudioTracks()[0];
+  if (!track || track.readyState !== "live") throw new Error("No live native microphone track");
+  let disposed = false;
+  const setVolume = (value: number) => { if (!disposed) track.enabled = value > 0; };
+  setVolume(volume);
+  return {
+    stream,
+    setVolume,
+    setAccompaniment(source) {
+      if (source) throw new DOMException("Native call input does not mix accompaniment", "NotSupportedError");
+    },
+    dispose() { disposed = true; },
+  };
+}
+
 // Own only the mixing nodes and their output. Capture controllers own the input
 // streams. Keep the sender track alive when accompaniment starts/stops/changes.
 export function createWebRtcInput(context: AudioContext, microphone: MediaStream, volume: number): WebRtcInput {

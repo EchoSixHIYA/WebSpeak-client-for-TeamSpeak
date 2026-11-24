@@ -1,4 +1,4 @@
-export type AccompanimentErrorCode = "" | "unsupported" | "needsWebRtc" | "noAudio" | "permission" | "audio";
+export type AccompanimentErrorCode = "" | "unsupported" | "needsWebRtc" | "noAudio" | "permission" | "audio" | "backgroundMode";
 
 interface AccompanimentTarget {
   setAccompaniment(stream: MediaStream | null): void;

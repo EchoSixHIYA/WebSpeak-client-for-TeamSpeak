@@ -166,7 +166,9 @@ export function useWebClientAudioControls({
       await startAccompaniment();
       if (accompanimentActive.value) showToast(t("accompanimentStarted"));
     } catch {
-      const messageKey = accompanimentErrorCode.value === "needsWebRtc"
+      const messageKey = accompanimentErrorCode.value === "backgroundMode"
+        ? "backgroundCallProcessingHint"
+        : accompanimentErrorCode.value === "needsWebRtc"
         ? "accompanimentNeedsWebRtc"
         : accompanimentErrorCode.value === "noAudio"
           ? "accompanimentNoAudio"

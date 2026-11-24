@@ -25,6 +25,15 @@
               :size="19" /></button></header
         ><div class="settings-content">
           <div class="settings-audio-card">
+          <section class="settings-section">
+            <label class="settings-form-row background-call-setting">
+              <span><strong>{{ t("backgroundCallTitle") }}</strong><small>{{ t("backgroundCallHint") }}</small></span>
+              <input type="checkbox" :checked="backgroundCallEnabled" @change="onBackgroundCallChange" />
+            </label>
+            <p v-if="backgroundCallActive" class="settings-hint background-call-note">{{ t("backgroundCallProcessingHint") }}</p>
+            <p v-if="backgroundCallActive && backgroundCallInterrupted" class="settings-error background-call-note">{{ t("backgroundCallInterrupted") }}</p>
+            <p v-else-if="!backgroundCallActive && backgroundCallEnabled" class="settings-hint background-call-note">{{ t("backgroundCallPending") }}</p>
+          </section>
           <section class="settings-section"
             ><h3
               ><Icon
@@ -78,10 +87,10 @@
               ></div
             ><label class="settings-form-row">
               <span><strong>{{ t("noiseSuppression") }}</strong><small>{{ t("noiseSuppressionHint") }}</small></span>
-              <select class="noise-suppression-level" :value="noiseSuppressionLevel" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionChange">
+              <select class="noise-suppression-level" :value="backgroundCallActive && noiseSuppressionLevel === 'strong' ? 'standard' : noiseSuppressionLevel" :aria-label="t('noiseSuppression')" @change="onNoiseSuppressionChange">
                 <option value="off">{{ t("noiseSuppressionOff") }}</option>
                 <option value="standard">{{ t("noiseSuppressionStandard") }}</option>
-                <option value="strong">{{ t("noiseSuppressionStrong") }}</option>
+                <option value="strong" :disabled="backgroundCallActive">{{ t("noiseSuppressionStrong") }}</option>
               </select>
             </label
               ><div class="settings-form-row settings-range-form-row"
@@ -97,6 +106,7 @@
                     :value="inputVolume * 100"
                     :style="rangeStyle(inputVolume, 1)"
                     :aria-label="t('inputVolume')"
+                    :disabled="backgroundCallActive"
                     @input="onInputVolume"
                   /></div
               ></div
@@ -113,12 +123,13 @@
                   :value="voxThreshold * 1000"
                   :style="rangeStyle(voxThreshold, 0.08)"
                   :aria-label="t('voxThreshold')"
+                  :disabled="backgroundCallActive"
                   @input="onVoxThreshold"
                 /></div
             ></div
             ><div class="audio-level-row"
               ><span>{{ t("micLevel") }}</span
-              ><strong>{{ Math.round(micLevel * 100) }}%</strong></div
+              ><strong>{{ backgroundCallActive ? t('backgroundCallNative') : `${Math.round(micLevel * 100)}%` }}</strong></div
             ><div class="audio-level-track"
               ><i :style="{ width: `${Math.round(micLevel * 100)}%` }"></i></div
             ><div class="mic-test"
@@ -214,7 +225,9 @@
             ><div class="audio-diagnostic"
               ><span>{{ t("audioStatus") }}</span
               ><strong>{{
-                audioContextState === "running"
+                backgroundCallActive && backgroundCallInterrupted
+                  ? t("audioSuspended")
+                  : backgroundCallActive || audioContextState === "running"
                   ? microphoneError
                     ? t("audioUnavailable")
                     : t("audioReady")
@@ -255,6 +268,10 @@ import type { useVoiceWebSocket } from "../../composables/useVoiceWebSocket.js";
 import type { useWebClientAudioControls } from "../../composables/useWebClientAudioControls.js";
 
 type AudioSettingsState = Pick<ReturnType<typeof useVoiceWebSocket>,
+  | "backgroundCallEnabled"
+  | "backgroundCallActive"
+  | "backgroundCallInterrupted"
+  | "setBackgroundCallEnabled"
   | "inputDevices"
   | "outputDevices"
   | "selectedInputDeviceId"
@@ -300,6 +317,10 @@ const { onDialogKeydown } = useDialogFocus(dialog, () => emit("close"));
 
 // The page owns the stable voice refs and audio controller; this dialog only presents them.
 const {
+  backgroundCallEnabled,
+  backgroundCallActive,
+  backgroundCallInterrupted,
+  setBackgroundCallEnabled,
   inputDevices,
   outputDevices,
   selectedInputDeviceId,
@@ -332,6 +353,10 @@ const {
   toggleMicrophone,
 } = props.controls;
 
+function onBackgroundCallChange(event: Event): void {
+  setBackgroundCallEnabled((event.target as HTMLInputElement).checked);
+}
+
 const inputDeviceOptions = computed(() => [
   { value: "", label: props.t("defaultMicrophone") },
   ...inputDevices.map((device, index) => ({
@@ -347,3 +372,12 @@ const outputDeviceOptions = computed(() => [
   })),
 ]);
 </script>
+
+<style scoped>
+.background-call-setting { display: flex; align-items: flex-start; gap: 16px; }
+.background-call-setting span { flex: 1; min-width: 0; }
+.background-call-setting strong, .background-call-setting small { display: block; }
+.background-call-setting small { margin-top: 6px; font-size: 12px; line-height: 1.65; color: var(--text-muted); }
+.background-call-setting input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
+.background-call-note { font-size: 12px; line-height: 1.65; }
+</style>

@@ -1,11 +1,11 @@
 import { isSessionDescription, type WebRtcClientMessage } from "../../../src/shared/webrtc.js";
-import { createWebRtcInput, type WebRtcInput } from "./webrtc-input.js";
+import { createNativeWebRtcInput, createWebRtcInput, type WebRtcInput } from "./webrtc-input.js";
 import { createMicrophoneMeter, type MicrophoneMeter } from "./microphone-meter.js";
 import { createWebRtcPlayback, type WebRtcPlaybackOptions } from "./webrtc-playback.js";
 import { addOpusFmtpParameters } from "../../../src/shared/opus-sdp.js";
 
 interface Microphone {
-  context: AudioContext;
+  context: AudioContext | null;
   stream: MediaStream;
   processedStream: MediaStream;
 }
@@ -134,7 +134,8 @@ export function createWebRtcTransport(options: TransportOptions) {
       const peer = new RTCPeerConnection({ iceServers: stunServer ? [{ urls: stunServer }] : [] });
       record.peer = peer;
       track.enabled = !options.muted();
-      const input = createWebRtcInput(context, processedStream, options.muted() ? 0 : options.inputVolume());
+      const volume = options.muted() ? 0 : options.inputVolume();
+      const input = context ? createWebRtcInput(context, processedStream, volume) : createNativeWebRtcInput(stream, volume);
       record.input = input;
       peer.addTrack(input.stream.getAudioTracks()[0]!, input.stream);
       peer.ontrack = event => {
@@ -142,7 +143,7 @@ export function createWebRtcTransport(options: TransportOptions) {
         try { playback.attach(event.streams[0] ?? new MediaStream([event.track])); }
         catch { void fail(record, "WEBRTC_PLAYBACK_FAILED"); }
       };
-      record.meter = createMicrophoneMeter(context, stream, rms => options.onLevel(rms, track));
+      if (context) record.meter = createMicrophoneMeter(context, stream, rms => options.onLevel(rms, track));
       peer.onconnectionstatechange = () => {
         options.onConnectionState?.(peer.connectionState);
         if (isCurrent(record) && peer.connectionState === "failed") void fail(record, "WEBRTC_CONNECTION_FAILED");
@@ -196,5 +197,6 @@ export function createWebRtcTransport(options: TransportOptions) {
     get active(): boolean { return current?.active ?? false; },
     get output() { return playback.output; },
     setOutputVolume: playback.setVolume,
+    resumePlayback: playback.resume,
   };
 }

@@ -156,6 +156,7 @@ let useWebClientChat;
 let useWebClientChannels;
 let webClientTranslations;
 let voice;
+let voiceScope;
 const savedGlobals = new Map();
 function replaceGlobal(name, value) {
   if (!savedGlobals.has(name)) savedGlobals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
@@ -224,12 +225,14 @@ beforeEach(() => {
     getUserMedia: async () => microphoneStream(),
     enumerateDevices: async () => [],
   } });
-  voice = useVoiceWebSocket();
+  voiceScope = effectScope();
+  voice = voiceScope.run(() => useVoiceWebSocket());
 });
 
 afterEach(() => {
   voice?.stopMicrophoneTest();
   voice?.disconnect();
+  voiceScope?.stop();
   for (const timer of browserTimers) clearTimeout(timer);
   browserTimers.clear();
 });
@@ -732,6 +735,165 @@ async function connectWebRtc() {
   assert.ok(socket.messages.some(message => message.type === "webrtcOffer"));
   return { socket, peer: TestPeer.instances.at(-1) };
 }
+
+test("experimental calls send the native mic without creating a Web Audio graph and preserve mute", async () => {
+  const stream = microphoneStream();
+  navigator.mediaDevices.getUserMedia = async () => stream;
+  assert.equal(voice.backgroundCallEnabled.value, false);
+  voice.setBackgroundCallEnabled(true);
+  const { peer, socket } = await connectWebRtc();
+  assert.equal(voice.backgroundCallActive.value, true);
+  assert.equal(peer.sender.track, stream.track);
+  assert.equal(AudioContextStub.instances.length, 0);
+  assert.equal(voice.microphoneProcessing.rnnoise, false);
+  voice.setMicrophoneMuted(true);
+  assert.equal(stream.track.enabled, false);
+  assert.ok(socket.messages.some(m => m.type === "setMicrophoneMuted" && m.payload.muted));
+  voice.setMicrophoneMuted(false);
+  assert.equal(stream.track.enabled, true);
+  await assert.rejects(voice.startAccompaniment(), /unavailable/);
+  assert.equal(voice.accompanimentErrorCode.value, "backgroundMode");
+  voice.disconnect();
+  assert.equal(stream.track.readyState, "ended");
+  assert.equal(peer.connectionState, "closed");
+  assert.equal(voice.backgroundCallActive.value, false);
+});
+
+test("changing the experiment applies only to the next connection", async () => {
+  await connectWebRtc();
+  voice.setBackgroundCallEnabled(true);
+  assert.equal(voice.backgroundCallActive.value, false);
+  const { peer } = await connectWebRtc();
+  const track = peer.sender.track;
+  voice.setBackgroundCallEnabled(false);
+  assert.equal(voice.backgroundCallActive.value, true);
+  assert.equal(track.readyState, "live");
+  await connectWebRtc();
+  assert.equal(voice.backgroundCallActive.value, false);
+});
+
+test("native input at zero gain stays silent and scope disposal releases the microphone", async () => {
+  voice.setBackgroundCallEnabled(true);
+  voice.setInputVolume(0);
+  const { peer } = await connectWebRtc();
+  assert.equal(peer.sender.track.enabled, false);
+  voice.setMicrophoneMuted(true);
+  voice.setMicrophoneMuted(false);
+  assert.equal(peer.sender.track.enabled, false, "unmute must preserve a zero input level");
+  voiceScope.stop();
+  assert.equal(peer.sender.track.readyState, "ended");
+  assert.equal(peer.connectionState, "closed");
+});
+
+test("native system microphone interruption is reported without changing user mute", async () => {
+  voice.setBackgroundCallEnabled(true);
+  const { peer } = await connectWebRtc();
+  const track = peer.sender.track;
+  track.muted = true;
+  track.dispatchEvent(new Event("mute"));
+  assert.equal(voice.backgroundCallInterrupted.value, true);
+  voice.setMicrophoneMuted(true);
+  track.muted = false;
+  track.dispatchEvent(new Event("unmute"));
+  assert.equal(voice.backgroundCallInterrupted.value, false);
+  assert.equal(voice.microphoneMuted.value, true);
+  assert.equal(track.enabled, false);
+});
+
+test("an experimental connection replaces a processing preview still waiting on permission", async () => {
+  const permission = deferred();
+  const preview = microphoneStream();
+  const native = microphoneStream();
+  let requests = 0;
+  navigator.mediaDevices.getUserMedia = () => ++requests === 1 ? permission.promise : Promise.resolve(native);
+  const preparation = voice.prepareInputDevices();
+  voice.setBackgroundCallEnabled(true);
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
+  permission.resolve(preview);
+  await preparation.catch(() => {});
+  await nextTurn();
+  assert.equal(preview.track.readyState, "ended");
+  assert.equal(TestPeer.instances.at(-1).sender.track, native.track);
+  assert.equal(voice.backgroundCallActive.value, true);
+});
+
+test("native mode falls back to processed PCM after WebRTC failure", async () => {
+  const streams = [];
+  navigator.mediaDevices.getUserMedia = async () => { const stream = microphoneStream(); streams.push(stream); return stream; };
+  voice.setBackgroundCallEnabled(true);
+  const { peer } = await connectWebRtc();
+  peer.connectionState = "failed";
+  peer.onconnectionstatechange();
+  await nextTurn();
+  assert.equal(voice.backgroundCallActive.value, false);
+  assert.equal(streams[0].track.readyState, "ended");
+  assert.equal(streams.at(-1).track.readyState, "live");
+  assert.ok(AudioContextStub.processors.length > 0);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
+});
+
+test("a gateway without WebRTC keeps compatibility capture with the experiment enabled", async () => {
+  voice.setBackgroundCallEnabled(true);
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1 });
+  await nextTurn();
+  assert.equal(voice.backgroundCallActive.value, false);
+  assert.ok(AudioContextStub.processors.length > 0);
+  assert.equal(TestPeer.instances.length, 0);
+});
+
+test("disconnect retires a pending native microphone permission request", async () => {
+  const pending = deferred();
+  navigator.mediaDevices.getUserMedia = () => pending.promise;
+  voice.setBackgroundCallEnabled(true);
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
+  await nextTurn();
+  voice.disconnect();
+  const stream = microphoneStream();
+  pending.resolve(stream);
+  await nextTurn();
+  assert.equal(stream.track.readyState, "ended");
+  assert.equal(TestPeer.instances.length, 0);
+  assert.equal(voice.backgroundCallActive.value, false);
+});
+
+test("native remote playback does not wait for a suspended capture context to resume", async () => {
+  const { peer } = await connectWebRtc();
+  const context = AudioContextStub.instances.at(-1);
+  context.state = "suspended";
+  context.resume = () => new Promise(() => {});
+  let plays = 0;
+  const output = new TestAudioElement();
+  output.play = async () => { plays++; };
+  document.createElement = () => output;
+  peer.ontrack({ streams: [microphoneStream()] });
+  await nextTurn();
+  assert.equal(plays, 1);
+});
+
+test("OS playback resume and page restoration never unmute a native call", async () => {
+  const handlers = new Map();
+  navigator.mediaSession = { metadata: null, playbackState: "none", setActionHandler: (action, handler) => handlers.set(action, handler) };
+  navigator.audioSession = { type: "auto" };
+  voice.setBackgroundCallEnabled(true);
+  const { peer } = await connectWebRtc();
+  handlers.get("pause")();
+  await nextTurn();
+  assert.equal(peer.sender.track.enabled, false);
+  handlers.get("play")();
+  document.visibilityState = "visible";
+  document.dispatchEvent(new Event("visibilitychange"));
+  await nextTurn();
+  assert.equal(voice.microphoneMuted.value, true);
+  assert.equal(peer.sender.track.enabled, false);
+  handlers.get("togglemicrophone")();
+  assert.equal(peer.sender.track.enabled, true);
+  handlers.get("hangup")();
+  assert.equal(peer.connectionState, "closed");
+  assert.equal(navigator.audioSession.type, "auto");
+});
 
 function enableMicrophoneMeter(t) {
   const analysers = [];
