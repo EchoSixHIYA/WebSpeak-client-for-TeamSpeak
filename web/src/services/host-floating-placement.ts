@@ -165,10 +165,13 @@ export interface FloatingChoice {
  * modal dialog's backdrop, a toast) and going back there would cover it.
  * `moveObstacles` (the user's pointer and focused control) only count against
  * positions the control would move to, so it never jumps under the cursor or
- * onto the field being typed in.
+ * onto the field being typed in. Set `currentEligible` false when an external
+ * hard exclusion removes the real current position; it must then be scored like
+ * every other candidate instead of being replaced by a synthetic current spot.
  */
 export function chooseFloatingPosition(input: {
   current: FloatingPosition;
+  currentEligible?: boolean;
   size: FloatingSize;
   viewport: FloatingViewport;
   margins: FloatingMargins;
@@ -179,17 +182,19 @@ export function chooseFloatingPosition(input: {
 }): FloatingChoice {
   const positions = input.positions ?? FLOATING_POSITIONS;
   const moveObstacles = input.moveObstacles ?? [];
+  const currentEligible = input.currentEligible ?? true;
   const scoreAt = (position: FloatingPosition) => {
     const footprint = floatingRect(position, input.size, input.viewport, input.margins);
     const score = floatingScore(footprint, input.obstacles);
-    return position === input.current || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
+    const keepCurrent = currentEligible && position === input.current;
+    return keepCurrent || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
   };
   const currentScore = scoreAt(input.current);
-  if (currentScore === 0) {
+  if (currentEligible && currentScore === 0) {
     if (input.home && input.home !== input.current && scoreAt(input.home) === 0) return { position: input.home, score: 0 };
     return { position: input.current, score: 0 };
   }
-  let best: FloatingChoice = { position: input.current, score: currentScore };
+  let best: FloatingChoice = { position: input.current, score: currentEligible ? currentScore : Number.POSITIVE_INFINITY };
   for (const position of positions) {
     if (position === input.current) continue;
     const score = scoreAt(position);
@@ -493,12 +498,12 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       floatingHitsAvoidRect(candidate, size, viewport, margins, avoid);
     const freePositions = FLOATING_POSITIONS.filter(candidate => !forbiddenAt(candidate));
     const positions = freePositions.length ? freePositions : FLOATING_POSITIONS;
-    const current = forbiddenAt(position) && freePositions.length ? freePositions[0] : position;
+    const currentEligible = !forbiddenAt(position);
     const park = forbiddenAt(defaultPosition) && freePositions.length ? freePositions[0] : defaultPosition;
     // Return home only after a screen change (see chooseFloatingPosition), and
     // only when the default corner is not one of the docked footprints.
     const home = urgent && !forbiddenAt(defaultPosition) ? defaultPosition : undefined;
-    const full = chooseFloatingPosition({ current, size, viewport, margins, obstacles, moveObstacles, positions, home });
+    const full = chooseFloatingPosition({ current: position, currentEligible, size, viewport, margins, obstacles, moveObstacles, positions, home });
     let next = full;
     let nextCompact = false;
     if (full.score > 0 && small && small.width > 0 && small.height > 0) {

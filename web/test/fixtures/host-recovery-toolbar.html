@@ -16,6 +16,7 @@
   #home-anchor { left: 20px; }
   #voice-anchor { left: 20px; display: none; }
   #dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; }
+  #blank { position: absolute; left: 20px; top: 100px; padding: 12px; background: #fff; }
 </style>
 </head>
 <body>
@@ -34,6 +35,7 @@
     <button type="button" data-ws-part="voice.audio-dock.microphone">Mic</button>
   </div>
   <button type="button" id="launcher" data-ws-part="host.plugins.launcher">Plugins</button>
+  <div id="blank" tabindex="-1">Blank area</div>
 </div>
 <div id="app"></div>
 <pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
@@ -209,7 +211,7 @@ try {
     capsuleActions: [...(capsule()?.querySelectorAll("[data-ws-recovery-action]") ?? [])]
       .map((button) => button.getAttribute("data-ws-recovery-action")),
   };
-  capsule().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  layer.shadow.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
   await nextTick();
   await sleep(150);
   const afterEscape = {
@@ -235,10 +237,41 @@ try {
     capsuleActions: [...(capsule()?.querySelectorAll("[data-ws-recovery-action]") ?? [])]
       .map((button) => button.getAttribute("data-ws-recovery-action")),
   };
-  capsule().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  layer.shadow.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
   await nextTick();
   await sleep(150);
   const afterMacEscape = {
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+  };
+
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "r", ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await nextTick();
+  await sleep(80);
+  document.getElementById("blank").focus();
+  await nextTick();
+  await sleep(150);
+  const afterFocusOut = {
+    focusedAction: layer.shadow.activeElement?.getAttribute?.("data-ws-recovery-action") ?? null,
+    activeId: document.activeElement?.id ?? null,
+    capsuleOpen: isOpen(capsule()),
+    toolbarOpen: isOpen(toolbar()),
+  };
+
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "r", ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await nextTick();
+  await sleep(80);
+  const blank = document.getElementById("blank");
+  blank.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true, pointerType: "mouse" }));
+  blank.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+  await nextTick();
+  await sleep(150);
+  const afterBlankClick = {
+    activeId: document.activeElement?.id ?? null,
     capsuleOpen: isOpen(capsule()),
     toolbarOpen: isOpen(toolbar()),
   };
@@ -270,6 +303,8 @@ try {
     afterEscape,
     macShortcut,
     afterMacEscape,
+    afterFocusOut,
+    afterBlankClick,
     invalidTokens,
   });
 } catch (error) {

@@ -358,6 +358,73 @@ test("a declared slot docks the capsule and falls back at runtime", { skip: !CHR
   assert.equal(byName.disposed.leftoverAccent, "");
 });
 
+test("a docked toolbar does not resize-observe its measurement-only fallback", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(
+    `http://127.0.0.1:${port}/test/fixtures/host-slot-observer-loop.html`,
+    ["--virtual-time-budget=5000", "--window-size=1280,800"],
+  );
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the observer fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  assert.equal(payload.initial.mode, "slotted");
+  assert.equal(payload.initial.open, true);
+  assert.ok(payload.initial.width >= 160 && payload.initial.height >= 28);
+  assert.ok(payload.initial.observed.includes("anchor"), "the docked toolbar stopped observing its anchor");
+  assert.ok(payload.initial.observed.includes("measurement-toolbar"), "the docked toolbar stopped observing its own rendered size");
+  assert.equal(payload.whileDockedButHidden.mode, "slotted");
+  assert.equal(payload.whileDockedButHidden.open, false);
+  assert.ok(payload.whileDockedButHidden.resizeCallbacks <= 4, `hiding a docked toolbar caused ${payload.whileDockedButHidden.resizeCallbacks} ResizeObserver callbacks`);
+  assert.ok(payload.whileDockedButHidden.frameCallbacks <= 4, `hiding a docked toolbar scheduled ${payload.whileDockedButHidden.frameCallbacks} animation frames`);
+  assert.equal(payload.whileDockedButHidden.observed.includes("measurement-toolbar"), false, "a hidden docked toolbar remained in its own ResizeObserver feedback path");
+  assert.equal(payload.afterAnchorRemoved.mode, "floating");
+  assert.equal(payload.afterAnchorRemoved.reason, "anchor-missing");
+  assert.equal(payload.afterAnchorRemoved.open, false);
+  assert.ok(payload.afterAnchorRemoved.resizeCallbacks <= 4, `measurement display changes caused ${payload.afterAnchorRemoved.resizeCallbacks} ResizeObserver callbacks`);
+  assert.ok(payload.afterAnchorRemoved.frameCallbacks <= 4, `measurement display changes scheduled ${payload.afterAnchorRemoved.frameCallbacks} animation frames`);
+  assert.equal(payload.afterAnchorRemoved.modeChanges, 1, "the fallback repeatedly changed presentation");
+  assert.equal(payload.afterAnchorRemoved.observed.includes("measurement-toolbar"), false, "the floating measurement-only toolbar remained in its own ResizeObserver feedback path");
+});
+
+test("docked-toolbar exclusion still scores pointer and focus obstacles", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
+  const server = await createServer({
+    root: webRoot,
+    configFile: path.join(webRoot, "vite.config.ts"),
+    logLevel: "silent",
+    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, ws: false },
+  });
+  t.after(() => server.close());
+  await server.listen();
+  const address = server.httpServer?.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  assert.ok(port, "Vite did not expose a listening port");
+
+  const dom = await dumpDom(
+    `http://127.0.0.1:${port}/test/fixtures/host-floating-avoid-pointer.html`,
+    ["--virtual-time-budget=5000", "--window-size=1280,800"],
+  );
+  const match = dom.match(/<pre id="result"[^>]*>([\s\S]*?)<\/pre>/);
+  assert.ok(match, "the floating avoidance fixture did not emit a result block");
+  const payload = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(payload.error, undefined, payload.error);
+  assert.notEqual(payload.position, "top-left", "the first toolbar-free candidate bypassed pointer avoidance");
+  assert.equal(payload.pointerHit, false, "the replacement position landed on the pointer");
+  assert.ok(payload.rect.left >= 0 && payload.rect.top >= 0);
+  assert.ok(payload.rect.left + payload.rect.width <= 1280 && payload.rect.top + payload.rect.height <= 800);
+});
+
 test("floating host controls move off skin controls at runtime", { skip: !CHROME && "google-chrome is not installed" }, async (t) => {
   const server = await createServer({
     root: webRoot,
@@ -689,6 +756,12 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
   assert.deepEqual(payload.macShortcut.capsuleActions, ["built-in", "library"]);
   assert.equal(payload.afterMacEscape.capsuleOpen, false);
   assert.equal(payload.afterMacEscape.toolbarOpen, true, "closing the macOS chord did not restore the docked toolbar");
+  assert.equal(payload.afterFocusOut.activeId, "blank", "focus did not leave the summoned capsule");
+  assert.equal(payload.afterFocusOut.focusedAction, null);
+  assert.equal(payload.afterFocusOut.capsuleOpen, false, "focusout left the full shortcut capsule open");
+  assert.equal(payload.afterFocusOut.toolbarOpen, true, "focusout did not restore the docked toolbar");
+  assert.equal(payload.afterBlankClick.capsuleOpen, false, "clicking blank space left the full shortcut capsule open");
+  assert.equal(payload.afterBlankClick.toolbarOpen, true, "clicking blank space did not restore the docked toolbar");
 
   assert.equal(payload.invalidTokens.visible, true, "invalid toolbar tokens hid the button");
   assert.equal(payload.invalidTokens.inViewport, true);

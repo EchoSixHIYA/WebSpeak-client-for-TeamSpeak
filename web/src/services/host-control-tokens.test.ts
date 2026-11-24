@@ -322,7 +322,8 @@ test("toolbar tokens are independent of the capsule shell and keep host floors",
   const defaults = resolveToolbar();
   assert.equal(defaults.background, "rgb(255, 255, 255)");
   assert.equal(defaults.foreground, "rgb(49, 82, 79)");
-  assert.equal(defaults.border, "rgb(157, 182, 178)");
+  assert.equal(defaults.border, "rgb(49, 82, 79)");
+  assert.ok(contrastRatio(parseCssColor(defaults.border)!, parseCssColor(defaults.background)!) >= HOST_CONTROL_MIN_BORDER_CONTRAST);
   assert.equal(defaults.radius, TOOLBAR_DEFAULT_RADIUS, "a capsule radius must not leak into toolbar mode");
   assert.equal(defaults.paddingX, TOOLBAR_DEFAULT_PADDING_X);
   assert.equal(defaults.paddingY, TOOLBAR_DEFAULT_PADDING_Y);
@@ -394,6 +395,31 @@ test("toolbar colours preserve transparency and check text against an opaque sur
   assert.equal(globalSurface.foreground, "rgb(255, 255, 255)");
 });
 
+test("toolbar border and focus colours are rechecked against the final surface", () => {
+  const palette = {
+    "--skin-recovery-background": "#000000",
+    "--skin-recovery-foreground": "#ffffff",
+    "--skin-recovery-border": "#ffffff",
+    "--skin-recovery-accent": "#ffffff",
+    "--skin-recovery-toolbar-foreground": "#000000",
+    "--skin-recovery-toolbar-surface": "#ffffff",
+  };
+  for (const background of ["#ffffff", "transparent"]) {
+    for (const border of [undefined, "#ffffff"]) {
+      const toolbar = resolveToolbar({
+        ...palette,
+        "--skin-recovery-toolbar-background": background,
+        ...(border ? { "--skin-recovery-toolbar-border": border } : {}),
+      });
+      const surface = parseCssColor(background === "transparent" ? palette["--skin-recovery-toolbar-surface"] : background)!;
+      assert.ok(contrastRatio(parseCssColor(toolbar.border)!, surface) >= HOST_CONTROL_MIN_BORDER_CONTRAST,
+        `${background} background with ${border ?? "inherited"} border produced ${toolbar.border}`);
+      assert.ok(contrastRatio(parseCssColor(toolbar.focus)!, surface) >= HOST_CONTROL_MIN_ACCENT_CONTRAST,
+        `${background} background produced ${toolbar.focus} focus ring`);
+    }
+  }
+});
+
 test("toolbar hover colours and Classic geometry are sanitized independently", () => {
   const classic = resolveToolbar({
     "--skin-recovery-toolbar-height": "22px",
@@ -418,7 +444,7 @@ test("toolbar hover colours and Classic geometry are sanitized independently", (
     "--skin-recovery-toolbar-hover-border": "not-a-colour",
   });
   assert.equal(unreadableHover.hoverBackground, "rgb(255, 255, 255)");
-  assert.equal(unreadableHover.hoverBorder, "rgb(157, 182, 178)");
+  assert.equal(unreadableHover.hoverBorder, "rgb(49, 82, 79)");
 
   const clamped = resolveToolbar({
     "--skin-recovery-toolbar-gap": "100px",

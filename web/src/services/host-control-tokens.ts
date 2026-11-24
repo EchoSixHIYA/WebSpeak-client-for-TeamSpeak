@@ -677,16 +677,26 @@ function resolveToolbarSurface(
   return sampledSurface ?? defaults.background;
 }
 
+function readableColorOn(candidates: readonly RgbColor[], background: RgbColor): RgbColor {
+  const readable = candidates.find((color) => contrastRatio(color, background) >= HOST_CONTROL_MIN_BORDER_CONTRAST);
+  if (readable) return readable;
+  return contrastRatio(ON_ACCENT_DARK, background) >= contrastRatio(ON_ACCENT_LIGHT, background)
+    ? ON_ACCENT_DARK
+    : ON_ACCENT_LIGHT;
+}
+
 function resolveToolbarBorder(
   raw: string | undefined,
   background: RgbColor,
-  fallback: string,
+  fallbacks: readonly RgbColor[],
   probeColor: ColorProbe,
 ): string {
   const color = parseToolbarColor(raw, probeColor);
-  if (!color) return fallback;
+  if (!color) return formatRgb(readableColorOn(fallbacks, background));
   if (color.a === 0) return "transparent";
-  return contrastRatio(color, background) >= HOST_CONTROL_MIN_BORDER_CONTRAST ? formatRgb(color) : fallback;
+  return contrastRatio(color, background) >= HOST_CONTROL_MIN_BORDER_CONTRAST
+    ? formatRgb(color)
+    : formatRgb(readableColorOn(fallbacks, background));
 }
 
 function resolveToolbarHoverBorder(raw: string | undefined, fallback: string, probeColor: ColorProbe): string {
@@ -723,6 +733,7 @@ export function resolveHostControlToolbarTokens(
   const baseBackground = parseCssColor(base.background) ?? defaults.background;
   const baseForeground = parseCssColor(base.foreground) ?? defaults.foreground;
   const baseBorder = parseCssColor(base.border) ?? defaults.border;
+  const baseAccent = parseCssColor(base.accent) ?? defaults.accent;
   const surface = resolveToolbarSurface(partTokens, globalTokens, probeColor, sampledSurface, defaults);
   let background = parseToolbarColor(merged.background, probeColor) ?? { ...baseBackground, a: 1 };
   let foreground = parseToolbarColor(merged.foreground, probeColor) ?? { ...baseForeground, a: 1 };
@@ -732,7 +743,7 @@ export function resolveHostControlToolbarTokens(
     foreground = { ...baseForeground, a: 1 };
     effectiveBackground = baseBackground;
   }
-  const border = resolveToolbarBorder(merged.border, effectiveBackground, base.border, probeColor);
+  const border = resolveToolbarBorder(merged.border, effectiveBackground, [baseBorder, baseForeground], probeColor);
 
   let hoverBackground = parseToolbarColor(merged["hover-background"], probeColor) ?? background;
   let effectiveHoverBackground = hoverBackground.a === 0 ? surface : hoverBackground;
@@ -763,7 +774,7 @@ export function resolveHostControlToolbarTokens(
       TOOLBAR_MIN_ICON_SIZE,
       TOOLBAR_MAX_ICON_SIZE,
     ),
-    focus: base.accent,
+    focus: formatRgb(readableColorOn([baseAccent, baseForeground], effectiveBackground)),
   };
 }
 

@@ -498,17 +498,20 @@ function onRecoveryEscape() {
   compactPinned.value = false;
 }
 
-/** Unpin when the pointer goes down anywhere outside the host layer. */
+/** Dismiss shortcut expansion and unpin on pointer down outside the host layer. */
 function onDocumentPointerDown(event: PointerEvent) {
-  if (!compactPinned.value || !layer) return;
+  if (!layer) return;
   // Events from inside the closed shadow root are retargeted to its host.
   if (event.composedPath().includes(layer.host)) return;
+  shortcutOpen.value = false;
+  shortcutExpanded.value = false;
   compactPinned.value = false;
 }
 
 function onRecoveryFocusOut(event: FocusEvent) {
   const next = event.relatedTarget;
   if (next instanceof Node && recoveryPopover.value?.contains(next)) return;
+  shortcutOpen.value = false;
   shortcutExpanded.value = false;
   compactPinned.value = false;
 }

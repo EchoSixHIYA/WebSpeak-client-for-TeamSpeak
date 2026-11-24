@@ -126,6 +126,21 @@ test("a move never lands on the pointer or the focused control, but the current 
   assert.equal(stay.position, "top-left");
 });
 
+test("an externally excluded current position is scored like every replacement candidate", () => {
+  const pointerAndFocus: FloatingObstacle = { rect: rect(84, 15, 32, 32), weight: FLOATING_WEIGHT_POINTER };
+  const choice = chooseFloatingPosition({
+    current: "bottom-left",
+    currentEligible: false,
+    size: capsule,
+    viewport,
+    margins,
+    obstacles: [],
+    moveObstacles: [pointerAndFocus],
+    positions: ["top-left", "top-right"],
+  });
+  assert.deepEqual(choice, { position: "top-right", score: 0 });
+});
+
 test("folding needs to free at least one control; a full-screen click-away layer does not fold the capsule", () => {
   const backdrop: FloatingObstacle[] = [{ rect: rect(0, 0, 1280, 800), weight: FLOATING_WEIGHT_CONTROL }];
   const full = chooseFloatingPosition({ current: "bottom-left", size: capsule, viewport, margins, obstacles: backdrop });

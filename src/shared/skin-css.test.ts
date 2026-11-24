@@ -124,6 +124,21 @@ test("host-owned layer attributes are not skin hooks", () => {
   assert.doesNotThrow(() => compile(':root [data-ws-part="home.header"] { color: teal; }'));
 });
 
+test("the host toolbar's private class is not a skin hook", () => {
+  for (const css of [
+    ':root .ws-host-toolbar { color: red; }',
+    ':root [data-ws-part="home.header"] .ws-host-toolbar { color: red; }',
+    '[data-ws-part="home.header"] .ws-host-toolbar { color: red; }',
+    '[data-ws-part="home.header"].ws-host-toolbar { color: red; }',
+    ':root .WS-HOST-TOOLBAR { color: red; }',
+    ':root .\\77 s-host-toolbar { color: red; }',
+  ]) {
+    assert.throws(() => compile(css), /private host class/i, css);
+  }
+  // Ordinary descendant classes remain available when a public hook anchors them.
+  assert.doesNotThrow(() => compile(':root [data-ws-part="home.header"] .skin-button { color: teal; }'));
+});
+
 test("trusted, permission, recovery and essential audio controls stay available even for v3 skins", () => {
   for (const part of [
     "voice.audio-dock",

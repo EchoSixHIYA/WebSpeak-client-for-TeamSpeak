@@ -397,6 +397,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   let state = INITIAL_SLOT_MODE_STATE;
   let lastReason: SlotFailureReason | undefined;
   let currentAnchor: HTMLElement | null = null;
+  let observingControl = false;
   let observer: ResizeObserver | null = null;
   const probe: HostControlProbe = createHostControlProbe(layer.shadow);
   let frame: number | undefined;
@@ -447,14 +448,17 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   }
 
   function observe(anchorElement: HTMLElement | null): void {
-    if (currentAnchor === anchorElement) return;
+    // Measurement-only display changes must not feed back into observer scheduling.
+    const watchControl = !options.prepare || (state.slotted && control.getClientRects().length > 0);
+    if (currentAnchor === anchorElement && observingControl === watchControl) return;
     currentAnchor = anchorElement;
+    observingControl = watchControl;
     if (!observer && typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => schedule());
     }
     if (!observer) return;
     observer.disconnect();
-    observer.observe(control);
+    if (watchControl) observer.observe(control);
     if (anchorElement) observer.observe(anchorElement);
   }
 
@@ -464,7 +468,6 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     // measurement. `settle` hides it again before paint on any failure.
     options.prepare?.();
     const anchorElement = resolveAnchor(anchorName);
-    observe(anchorElement);
     // The fallback keeps the skin palette: read tokens from the anchor, or
     // from the skin root when the anchor is missing or hidden.
     const tokenSource = anchorElement
@@ -565,6 +568,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       onModeChange?.({ mode, ...(reason ? { reason } : {}) });
     }
     options.settle?.(state.slotted);
+    observe(anchorElement);
   }
 
   /** Any unexpected error returns the capsule to the default corner. */
@@ -573,6 +577,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     state = nextSlotModeState(state, false);
     clearPlacement();
     options.settle?.(false);
+    observe(currentAnchor);
     if (wasSlotted) onModeChange?.({ mode: "floating" });
   }
 

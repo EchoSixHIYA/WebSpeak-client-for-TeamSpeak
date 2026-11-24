@@ -108,6 +108,7 @@ const FORBIDDEN_SCOPE_ATTRIBUTES = new Set([
   "data-ws-host-layer-content",
   "data-ws-recovery-action",
 ]);
+const FORBIDDEN_SCOPE_CLASSES = new Set(["ws-host-toolbar"]);
 /** CSS-wide keywords never name a keyframe and reset an animatable slot. */
 const CSS_WIDE_KEYWORDS = new Set(["initial", "inherit", "unset", "revert", "revert-layer"]);
 /** Shorthand keyword slots; a repeated category frees the word to be the name. */
@@ -456,6 +457,9 @@ function assertHostChromeSelector(selector: string, schemaVersion: SkinCssSchema
     }
     if (node.type === "attribute" && FORBIDDEN_SCOPE_ATTRIBUTES.has(node.attribute.toLowerCase())) {
       throw new SkinCssValidationError(`Skin selectors cannot reference the host attribute ${node.attribute}.`, "SKIN_CSS_SELECTOR");
+    }
+    if (node.type === "class" && FORBIDDEN_SCOPE_CLASSES.has(decodeCssEscapes(node.value).toLowerCase())) {
+      throw new SkinCssValidationError(`Skin selectors cannot reference the private host class .${node.value}.`, "SKIN_CSS_SELECTOR");
     }
     if (node.type === "attribute" && node.attribute.toLowerCase() === "data-ws-part" && node.value) {
       partNames.push(node.value.replace(/^['"]|['"]$/g, ""));
