@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setCodeSwapCopyForTests } from "./code-swap.js";
 import { runRestartPlan } from "./restart-runner.js";
 
 const sleep = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -27,13 +30,13 @@ async function waitFor(check: () => boolean, timeoutMs = 5_000): Promise<void> {
   }
 }
 
-function appScript(version: string, port: number, pidFile: string): string {
+function appScript(version: string, port: number, pidFile: string, status = "ok"): string {
   return `const http = require("node:http");
 const { writeFileSync } = require("node:fs");
 const server = http.createServer((request, response) => {
   if (request.url === "/api/health") {
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({ status: "ok", version: ${JSON.stringify(version)} }));
+    response.end(JSON.stringify({ status: ${JSON.stringify(status)}, version: ${JSON.stringify(version)} }));
     return;
   }
   response.statusCode = 404;
@@ -85,10 +88,10 @@ function runnerFixture(t: TestContext): RunnerFixture {
   };
 }
 
-function writePlan(fixture: RunnerFixture, port: number, pidFile: string, options: { targetVersion: string; reportedVersion: string; healthTimeoutMs?: number }) {
+function writePlan(fixture: RunnerFixture, port: number, pidFile: string, options: { targetVersion: string; reportedVersion: string; reportedStatus?: string; healthTimeoutMs?: number }) {
   mkdirSync(path.dirname(fixture.statePath), { recursive: true });
   writeFileSync(fixture.lockPath, JSON.stringify({ pid: process.pid, taskId: fixture.taskId, createdAt: new Date().toISOString() }));
-  writeFileSync(path.join(fixture.stagedRoot, "dist", "index.js"), appScript(options.reportedVersion, port, pidFile));
+  writeFileSync(path.join(fixture.stagedRoot, "dist", "index.js"), appScript(options.reportedVersion, port, pidFile, options.reportedStatus));
   writeFileSync(fixture.planPath, JSON.stringify({
     schemaVersion: 1,
     taskId: fixture.taskId,
@@ -146,6 +149,57 @@ test("a healthy target version completes the swap and leaves persistent state al
   assert.equal(existsSync(fixture.lockPath), false);
   assert.equal(existsSync(fixture.stagedRoot), false);
   await waitFor(() => existsSync(fixture.pidFile));
+});
+
+test("a failed in-process rollback is persisted as a rollback failure", { timeout: 20_000 }, async t => {
+  const fixture = runnerFixture(t);
+  const port = await availablePort();
+  writePlan(fixture, port, fixture.pidFile, { targetVersion: "2.0.0", reportedVersion: "2.0.0" });
+  const originalRename = fs.renameSync;
+  t.after(() => {
+    fs.renameSync = originalRename;
+    syncBuiltinESMExports();
+    setCodeSwapCopyForTests(null);
+  });
+  const exdev = () => Object.assign(new Error("cross-device link"), { code: "EXDEV" });
+  fs.renameSync = ((from, to) => {
+    if (from === path.join(fixture.rootDir, "dist") && to === path.join(fixture.backupDir, "dist")) throw exdev();
+    if (from === path.join(fixture.stagedRoot, "dist") && to === path.join(fixture.rootDir, "dist")) throw new Error("simulated staging failure");
+    if (from === path.join(fixture.backupDir, "dist") && to === path.join(fixture.rootDir, "dist")) throw exdev();
+    return originalRename(from, to);
+  }) as typeof fs.renameSync;
+  syncBuiltinESMExports();
+  let copies = 0;
+  setCodeSwapCopyForTests((from, to) => {
+    copies += 1;
+    if (copies === 2) throw new Error("simulated rollback copy failure");
+    fs.cpSync(from, to, { recursive: true });
+  });
+
+  assert.equal(await runRestartPlan(fixture.planPath), 1);
+  const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+  assert.equal(state.task.status, "failed");
+  assert.equal(state.task.rolledBack, false);
+  assert.equal(state.task.errorCode, "UPDATE_ROLLBACK_FAILED");
+  assert.equal(existsSync(path.join(fixture.rootDir, "dist", "index.js")), false);
+  assert.equal(existsSync(path.join(fixture.backupDir, "dist", "index.js")), true);
+});
+
+test("a target reporting the expected version with an error status is not accepted as healthy", { timeout: 20_000 }, async t => {
+  const fixture = runnerFixture(t);
+  const port = await availablePort();
+  writePlan(fixture, port, fixture.pidFile, {
+    targetVersion: "2.0.0", reportedVersion: "2.0.0", reportedStatus: "error", healthTimeoutMs: 500,
+  });
+  writeFileSync(path.join(fixture.rootDir, "dist", "index.js"), appScript("1.0.0", port, fixture.pidFile));
+  t.after(() => stopPidFile(fixture.pidFile));
+
+  assert.equal(await runRestartPlan(fixture.planPath), 1);
+  const state = JSON.parse(readFileSync(fixture.statePath, "utf8"));
+  assert.equal(state.task.status, "failed");
+  assert.equal(state.task.rolledBack, true);
+  assert.equal(state.task.errorCode, "UPDATE_HEALTH_CHECK_FAILED");
+  assert.match(readFileSync(path.join(fixture.rootDir, "dist", "index.js"), "utf8"), /version: "1\.0\.0"/);
 });
 
 test("a failed health check rolls back to the previous code and reports the failure", { timeout: 20_000 }, async t => {

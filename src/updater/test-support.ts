@@ -143,6 +143,7 @@ export function createPackageFiles(root: string, version: string, extra: Record<
   writeFileSync(path.join(root, "dist", "index.js"), "// package entry\n", "utf8");
   writeFileSync(path.join(root, "web", "dist", "index.html"), "<!doctype html>\n", "utf8");
   writeFileSync(path.join(root, "runtime", "node"), "#!/bin/sh\nexit 0\n", { encoding: "utf8", mode: 0o755 });
+  writeFileSync(path.join(root, "start-webspeak.sh"), "#!/bin/sh\nexit 0\n", { encoding: "utf8", mode: 0o755 });
   for (const [relative, contents] of Object.entries(extra)) {
     const target = path.join(root, relative);
     mkdirSync(path.dirname(target), { recursive: true });

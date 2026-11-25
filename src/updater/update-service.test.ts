@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { Writable } from "node:stream";
 import test, { type TestContext } from "node:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Logger } from "../logger.js";
 import { CHECKSUM_ASSET_NAME, OFFICIAL_REPOSITORY } from "./releases.js";
+import { swapCode } from "./code-swap.js";
 import { UpdateError, UpdateService, type UpdateErrorCode, type UpdateServiceOptions } from "./update-service.js";
 import { createPackageFiles, createTarGz, sha256Hex, type TarFixtureEntry } from "./test-support.js";
 import { acquireUpdateLock, readUpdateState, writeUpdateState } from "./update-state.js";
@@ -67,6 +71,7 @@ function packageArchive(version: string, extra: TarFixtureEntry[] = []): Buffer 
     { name: "webspeak/web/dist/index.html", data: "<!doctype html>\n" },
     { name: "webspeak/node_modules/.keep", data: "" },
     { name: "webspeak/runtime/node", data: "#!/bin/sh\nexit 0\n", mode: 0o755 },
+    { name: "webspeak/start-webspeak.sh", data: "#!/bin/sh\nexit 0\n", mode: 0o755 },
     ...extra,
   ]);
 }
@@ -269,6 +274,64 @@ test("unsafe archives are refused before any code is staged", async t => {
   assert.equal(state.task?.errorCode, "UPDATE_ARCHIVE_UNSAFE");
 });
 
+test("an asynchronous download write failure rejects the update without crashing the process", async t => {
+  const archive = packageArchive("0.4.0");
+  const checksums = Buffer.from(checksumText(ASSET_NAME, archive));
+  const release = releaseJson({
+    version: "0.4.0",
+    assets: [
+      { name: ASSET_NAME, data: archive },
+      { name: CHECKSUM_ASSET_NAME, data: checksums },
+    ],
+  });
+  const originalCreateWriteStream = fs.createWriteStream;
+  t.after(() => {
+    fs.createWriteStream = originalCreateWriteStream;
+    syncBuiltinESMExports();
+  });
+  fs.createWriteStream = (() => new Writable({
+    write(_chunk, _encoding, callback) {
+      setImmediate(() => callback(new Error("simulated ENOSPC")));
+    },
+  })) as unknown as typeof fs.createWriteStream;
+  syncBuiltinESMExports();
+  const stalledBody = () => new ReadableStream({
+    start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); },
+    pull() { return new Promise(() => {}); },
+  });
+  const fetch = (async (input: string | URL | Request) => {
+    if (String(input) === RELEASE_LIST_URL) return new Response(JSON.stringify([release]), { status: 200 });
+    return new Response(stalledBody(), { status: 200 });
+  }) as typeof globalThis.fetch;
+  const { service, launched } = createService(t, [], new Map(), { fetch });
+
+  await assert.rejects(service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_DOWNLOAD_FAILED"));
+  assert.equal(launched.length, 0);
+});
+
+test("a download redirected outside GitHub is refused before it is written", async t => {
+  const archive = packageArchive("0.4.0");
+  const checksums = Buffer.from(checksumText(ASSET_NAME, archive));
+  const release = releaseJson({
+    version: "0.4.0",
+    assets: [
+      { name: ASSET_NAME, data: archive },
+      { name: CHECKSUM_ASSET_NAME, data: checksums },
+    ],
+  });
+  const fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url === RELEASE_LIST_URL) return new Response(JSON.stringify([release]), { status: 200 });
+    const response = new Response(url.endsWith(ASSET_NAME) ? new Uint8Array(archive) : new Uint8Array(checksums), { status: 200 });
+    if (url.endsWith(ASSET_NAME)) Object.defineProperty(response, "url", { value: "https://example.invalid/package.tar.gz" });
+    return response;
+  }) as typeof globalThis.fetch;
+  const { service, launched } = createService(t, [], new Map(), { fetch });
+
+  await assert.rejects(service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_RELEASE_UNAVAILABLE"));
+  assert.equal(launched.length, 0);
+});
+
 test("a verified package is staged, persisted and handed to the restart runner", async t => {
   const archive = packageArchive("0.4.0");
   const checksums = Buffer.from(checksumText(ASSET_NAME, archive));
@@ -400,7 +463,7 @@ test("initialization restores the previous code from an interrupted swap backup"
   writeFileSync(lockPath, JSON.stringify({ pid: 0, taskId, createdAt: "2026-01-01T00:00:00.000Z" }));
 
   const restarted = new UpdateService({
-    rootDir: fixture.rootDir, dataDir: fixture.dataDir, currentVersion: "0.4.0", logger,
+    rootDir: fixture.rootDir, dataDir: fixture.dataDir, currentVersion: "0.3.2", logger,
     platform: "linux", architecture: "x64", env: {}, isDocker: false, fetch: fakeFetch([], new Map()),
     now: () => new Date("2026-01-01T00:10:00.000Z"),
   });
@@ -412,6 +475,39 @@ test("initialization restores the previous code from an interrupted swap backup"
   assert.equal(status.task?.status, "failed");
   assert.equal(status.task?.rolledBack, true);
   assert.equal(status.task?.errorCode, "UPDATE_INTERRUPTED");
+  assert.equal(existsSync(lockPath), false);
+});
+
+test("initialization keeps a complete target tree consistent with the running target version", t => {
+  const fixture = createService(t, [], new Map());
+  const taskId = "upd_complete_target";
+  const statePath = path.join(fixture.dataDir, "updates", "state.json");
+  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+  const backupDir = path.join(fixture.dataDir, "updates", "backups", taskId);
+  const stagedRoot = path.join(fixture.dataDir, "updates", "tasks", taskId, "staged");
+  createPackageFiles(stagedRoot, "0.4.0", { "dist/index.js": "// complete target code\n" });
+  swapCode(fixture.rootDir, stagedRoot, backupDir);
+  writeUpdateState(statePath, {
+    schemaVersion: 1,
+    task: {
+      id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+      startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+      errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+    },
+  });
+  writeFileSync(lockPath, JSON.stringify({ pid: 0, taskId, createdAt: "2026-01-01T00:00:00.000Z" }));
+
+  const restarted = new UpdateService({
+    rootDir: fixture.rootDir, dataDir: fixture.dataDir, currentVersion: "0.4.0", logger,
+    platform: "linux", architecture: "x64", env: {}, isDocker: false, fetch: fakeFetch([], new Map()),
+    now: () => new Date("2026-01-01T00:10:00.000Z"),
+  });
+  restarted.initialize();
+
+  assert.equal(readFileSync(path.join(fixture.rootDir, "dist", "index.js"), "utf8"), "// complete target code\n");
+  assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.4.0");
+  assert.equal(restarted.getStatus().task?.status, "succeeded");
+  assert.equal(restarted.getStatus().task?.rolledBack, false);
   assert.equal(existsSync(lockPath), false);
 });
 
