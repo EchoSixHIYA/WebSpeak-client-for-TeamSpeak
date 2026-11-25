@@ -93,6 +93,52 @@ const tsAdminOverview = object({
 });
 const savedTsAdminSettings = object({ ok: choice(true), settings: tsAdminSettings });
 const sessionStatus = object({ authenticated: boolean, mustChangePassword: optional(boolean), csrfToken: optional(text) });
+const updateStep = object({
+  name: text,
+  status: choice("running", "succeeded", "failed"),
+  at: text,
+  detail: optional(text),
+});
+const updateTask = object({
+  id: text,
+  status: choice("downloading", "verifying", "extracting", "staging", "restarting", "succeeded", "failed"),
+  fromVersion: text,
+  targetVersion: text,
+  startedAt: text,
+  updatedAt: text,
+  finishedAt: nullable(text),
+  errorCode: nullable(text),
+  errorMessage: nullable(text),
+  rolledBack: boolean,
+  steps: array(updateStep),
+});
+const updateDeployment = object({
+  mode: choice("docker", "release-package", "source"),
+  platform: text,
+  architecture: text,
+  applyAllowed: boolean,
+  reasonCode: nullable(text),
+  upgradePath: choice("docker-compose", "release-package", "source"),
+});
+const updateStatus = object({
+  currentVersion: text,
+  deployment: updateDeployment,
+  task: nullable(updateTask),
+});
+const updateRelease = object({
+  version: text,
+  tag: text,
+  publishedAt: text,
+  releaseUrl: text,
+  assetName: text,
+  assetSize: number,
+  assetAvailable: boolean,
+  hasChecksums: boolean,
+  digest: nullable(text),
+  canApply: boolean,
+  blockedReason: nullable(text),
+});
+const updateCheck = object({ currentVersion: text, releases: array(updateRelease) });
 
 export const adminResponses = {
   session(value: unknown) {
@@ -127,6 +173,9 @@ export const adminResponses = {
     latencyMs: number, serverName: nullable(text), requiresPassword: boolean,
     packetLossPercent: optional(number), attempts: optional(number), successfulAttempts: optional(number), errorCode: optional(text),
   }),
+  updateStatus,
+  updateCheck,
+  updateApplied: object({ ok: choice(true), task: updateTask }),
 };
 
 export type AdminSettings = ReturnType<typeof settings>;
@@ -135,3 +184,7 @@ export type AdminSession = ReturnType<typeof session>;
 export type ManagedInvite = ReturnType<typeof invite>;
 export type AdminLog = ReturnType<typeof logEntry>;
 export type AdminConnectionRecord = ReturnType<typeof connection>;
+export type AdminUpdateTask = ReturnType<typeof updateTask>;
+export type AdminUpdateStatus = ReturnType<typeof updateStatus>;
+export type AdminUpdateCheck = ReturnType<typeof updateCheck>;
+export type AdminUpdateRelease = ReturnType<typeof updateRelease>;

@@ -45,6 +45,7 @@ const defaults = path => ({
   "/session": { authenticated: true, mustChangePassword: false, csrfToken: "test-csrf" },
   "/server": settings(), "/overview": overview, "/sessions": { sessions: [] }, "/invites": { invites: [] },
   "/diagnostics": { gateway: { version: "test", node: "test", platform: "test", arch: "test" }, database: { schemaVersion: 1 }, sessions: { created: 0 } },
+  "/update": { currentVersion: "test", deployment: { mode: "source", platform: "test", architecture: "test", applyAllowed: false, reasonCode: "DEPLOYMENT_SOURCE", upgradePath: "source" }, task: null },
   "/logs?limit=100": { available: false, entries: [], sessions: [] }, "/audit?limit=50": { events: [] },
   "/skins": { skins: [], defaultSkinId: "builtin.light" },
   "/ts-admin/settings": tsSettings(), "/ts-admin/overview": tsOverview(),
@@ -453,6 +454,15 @@ test("store install submits the reviewed revision once and reloads the instance 
 });
 function manifestForStoreTest() { return { id: "store-test", name: "Fixture", version: "1.0.0", author: "Fixture", license: "MIT", minAppVersion: "0.2.8", installedAt: 1 }; }
 
+test("all update maintenance copy is explicit in each supported language", async () => {
+  const { adminOrganizationCopy } = await vite.ssrLoadModule("/src/i18n/admin-organization.ts");
+  const keys = Object.keys(adminOrganizationCopy.zh).filter(key => key.startsWith("update")).sort();
+  assert.ok(keys.length >= 30);
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    for (const key of keys) assert.ok(adminOrganizationCopy[language][key]?.trim(), `${language}.${key}`);
+  }
+});
+
 test("all store translations are explicit in each supported language", async () => {
   const { skinStoreCopy } = await vite.ssrLoadModule("/src/i18n/skin-store.ts");
   const keys = Object.keys(skinStoreCopy.zh).sort();
@@ -712,6 +722,19 @@ test("settings and operations render explicit localized sections with valid deep
     assert.ok(operationsHtml.includes(translations.adminBrowserSessionsLead));
     assert.ok(operationsHtml.includes('data-admin-section="maintenance"'));
     assert.ok(!operationsHtml.includes("undefined"));
+  }
+});
+
+test("update error codes resolve to their dedicated five-language labels", async () => {
+  const { adminOrganizationCopy } = await vite.ssrLoadModule("/src/i18n/admin-organization.ts");
+  await mount("/admin/server");
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    state.language = language;
+    const copy = adminOrganizationCopy[language];
+    assert.equal(state.i18n.errorText("UPDATE_LOCK_FAILED"), copy.updateErrorLockFailed);
+    assert.equal(state.i18n.errorText("UPDATE_UNAVAILABLE"), copy.updateErrorUnavailable);
+    assert.equal(state.i18n.errorText("UPDATE_RESTART_UNAVAILABLE"), copy.updateErrorUnavailable);
+    assert.notEqual(state.i18n.errorText("UPDATE_LOCK_FAILED"), copy.updateErrorGeneric);
   }
 });
 

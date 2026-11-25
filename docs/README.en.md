@@ -103,7 +103,7 @@ docker compose ps
 docker compose logs -f webspeak
 ```
 
-Upgrade:
+Upgrade from the host. The administration console can check for newer stable releases on Docker, but it cannot replace the container image from inside the container:
 
 ```bash
 git pull --ff-only
@@ -111,11 +111,13 @@ docker compose pull
 docker compose up -d
 ```
 
-Do not run `docker compose down -v`; it removes the database and administrator settings.
+Do not run `docker compose down -v`; it removes the `webspeak-data` volume, including the database and administrator settings.
 
 ### Release package
 
 Download the matching `windows-x64.zip`, `linux-x64.tar.gz`, or `linux-arm64.tar.gz` from [GitHub Releases](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest). Extract it and run the included launcher. Packages include the Node.js runtime and production dependencies. Docker images support amd64/arm64.
+
+Linux x64 release packages that match the official `build-release.yml` layout can be upgraded from the administration console. It checks the official GitHub Releases, refuses a package without a matching `SHA256SUMS.txt` entry, replaces only application code and restarts the process. `SHA256SUMS.txt` is an integrity checksum only, not a digital signature. `data/`, `config.json`, `certs/`, installed skins and plugins are preserved. Export a backup before starting. Windows release packages can check for versions, but console apply is disabled until it is verified on a real Windows install; download the new package and replace it manually. Linux arm64 packages can be checked, but console apply is disabled because the in-place swap has not been verified on real arm64 hardware; download the new package and replace it manually. Docker and source deployments cannot apply an update from the console.
 
 Android APKs for `arm64-v8a`, `armeabi-v7a`, and `x86_64` are also attached. They use debug signing for sideload testing; they are not Google Play packages, and real-device voice still needs validation.
 
@@ -133,6 +135,8 @@ npm start
 ```
 
 Building `@discordjs/opus` requires Python, Make, and a C/C++ toolchain.
+
+The administration console can check for newer stable versions when running from source, but one-click apply is unavailable because the tree has no bundled Node.js runtime. Pull the source and rebuild after reviewing the release notes. The console never downloads or swaps source-tree files.
 
 ### First-time setup
 

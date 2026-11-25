@@ -1,6 +1,7 @@
 import { adminResponses, type AdminResponseReader } from "../../../src/shared/admin-responses.js";
 import type { AdminSettingsInput, ManagedInviteInput, TsAdminSettingsInput, TsAdminActionRequest } from "../../../src/shared/admin-inputs.js";
 import type { SkinStoreInstallInput } from "../../../src/shared/skin-store.js";
+import type { UpdateApplyInput } from "../../../src/shared/update.js";
 import { pluginResponses, type PluginPackage, type PluginSettingsInput } from "../../../src/shared/plugins.js";
 
 export class AdminApiError extends Error {
@@ -128,6 +129,9 @@ export function createAdminApi(options: AdminApiOptions) {
     createInvite: (body: ManagedInviteInput, signal?: AbortSignal) => request("/invites", adminResponses.createdInvite, "POST", body, true, signal),
     revokeInvite: (id: string, signal?: AbortSignal) => request(`/invites/${encodeURIComponent(id)}/revoke`, adminResponses.ok, "POST", {}, true, signal),
     diagnostics: (signal?: AbortSignal) => request("/diagnostics", adminResponses.diagnostics, "GET", undefined, true, signal),
+    updateStatus: (signal?: AbortSignal) => request("/update", adminResponses.updateStatus, "GET", undefined, true, signal),
+    checkUpdates: (signal?: AbortSignal) => request("/update/check", adminResponses.updateCheck, "POST", {}, true, signal),
+    applyUpdate: (body: UpdateApplyInput, signal?: AbortSignal) => request("/update/apply", adminResponses.updateApplied, "POST", body, true, signal),
     logs: (signal?: AbortSignal) => request("/logs?limit=100", adminResponses.logs, "GET", undefined, true, signal),
     audit: (signal?: AbortSignal) => request("/audit?limit=50", adminResponses.audit, "GET", undefined, true, signal),
     skins: (signal?: AbortSignal) => request("/skins", adminResponses.skins, "GET", undefined, true, signal),

@@ -1,0 +1,183 @@
+import assert from "node:assert/strict";
+import test, { type TestContext } from "node:test";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import {
+  CodeSwapError, locatePackageRoot, restoreCode, setCodeSwapCopyForTests, swapCode, validateStagedPackage,
+} from "./code-swap.js";
+import { createPackageFiles } from "./test-support.js";
+
+function workspace(t: TestContext): string {
+  const directory = mkdtempSync(path.join(tmpdir(), "webspeak-swap-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  return directory;
+}
+
+function packageInvalid(error: unknown): boolean {
+  return error instanceof CodeSwapError && error.code === "UPDATE_PACKAGE_INVALID";
+}
+
+function persistentState(root: string): void {
+  writeFileSync(path.join(root, "config.json"), JSON.stringify({ siteName: "kept" }));
+  for (const [directory, file] of [["data", "webspeak.db"], ["certs", "cert.pem"], ["skins", "skin.json"], ["plugins", "plugin.json"]]) {
+    mkdirSync(path.join(root, directory), { recursive: true });
+    writeFileSync(path.join(root, directory, file), `${directory}-content`);
+  }
+}
+
+test("staged packages must be complete, regular files and version-matched", t => {
+  const root = workspace(t);
+  createPackageFiles(root, "0.4.0");
+  assert.doesNotThrow(() => validateStagedPackage(root, { version: "0.4.0", platform: "linux" }));
+  assert.throws(() => validateStagedPackage(root, { version: "0.4.1", platform: "linux" }), packageInvalid);
+
+  const missing = workspace(t);
+  createPackageFiles(missing, "0.4.0");
+  rmSync(path.join(missing, "runtime", "node"));
+  assert.throws(() => validateStagedPackage(missing, { version: "0.4.0", platform: "linux" }), packageInvalid);
+
+  const linked = workspace(t);
+  createPackageFiles(linked, "0.4.0");
+  rmSync(path.join(linked, "runtime", "node"));
+  symlinkSync(process.execPath, path.join(linked, "runtime", "node"));
+  assert.throws(() => validateStagedPackage(linked, { version: "0.4.0", platform: "linux" }), packageInvalid);
+});
+
+test("locatePackageRoot accepts both bare and single-wrapper layouts", t => {
+  const bare = workspace(t);
+  createPackageFiles(bare, "0.4.0");
+  assert.equal(locatePackageRoot(bare, "0.4.0", "linux"), bare);
+
+  const wrapped = workspace(t);
+  createPackageFiles(path.join(wrapped, "webspeak"), "0.4.0");
+  assert.equal(locatePackageRoot(wrapped, "0.4.0", "linux"), path.join(wrapped, "webspeak"));
+
+  const missing = workspace(t);
+  assert.throws(() => locatePackageRoot(missing, "0.4.0", "linux"), packageInvalid);
+});
+
+test("code swap replaces only code and preserves data, config, certs, skins and plugins", t => {
+  const root = workspace(t), staged = path.join(workspace(t), "staged"), backup = path.join(workspace(t), "backup");
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  mkdirSync(path.join(root, "node_modules"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  writeFileSync(path.join(root, "node_modules", "old.txt"), "old dependency");
+  persistentState(root);
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code", "node_modules/new.txt": "new dependency" });
+
+  swapCode(root, staged, backup);
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "new code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.4.0");
+  assert.equal(readFileSync(path.join(root, "node_modules", "new.txt"), "utf8"), "new dependency");
+  assert.equal(readFileSync(path.join(backup, "dist", "index.js"), "utf8"), "old code");
+  assert.equal(readFileSync(path.join(backup, "node_modules", "old.txt"), "utf8"), "old dependency");
+  for (const [directory, file, contents] of [
+    ["data", "webspeak.db", "data-content"], ["certs", "cert.pem", "certs-content"],
+    ["skins", "skin.json", "skins-content"], ["plugins", "plugin.json", "plugins-content"],
+  ]) {
+    assert.equal(readFileSync(path.join(root, directory, file), "utf8"), contents);
+    assert.equal(existsSync(path.join(backup, directory)), false);
+  }
+  assert.deepEqual(JSON.parse(readFileSync(path.join(root, "config.json"), "utf8")), { siteName: "kept" });
+  assert.equal(existsSync(path.join(backup, "config.json")), false);
+});
+
+test("code swap copies across filesystems when rename reports EXDEV", t => {
+  const shared = "/dev/shm";
+  if (!existsSync(shared)) {
+    t.skip("no separate filesystem available for the EXDEV test");
+    return;
+  }
+  const root = path.join(workspace(t), "root"), backup = path.join(workspace(t), "backup");
+  const stagedBase = mkdtempSync(path.join(shared, "webspeak-swap-xdev-"));
+  t.after(() => rmSync(stagedBase, { recursive: true, force: true }));
+  const staged = path.join(stagedBase, "staged");
+
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code", "node_modules/new.txt": "new dependency" });
+  if (statSync(root).dev === statSync(staged).dev) {
+    t.skip("tmp and /dev/shm share a device on this system");
+    return;
+  }
+
+  swapCode(root, staged, backup);
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "new code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.4.0");
+  assert.equal(readFileSync(path.join(root, "node_modules", "new.txt"), "utf8"), "new dependency");
+  assert.equal(readFileSync(path.join(backup, "dist", "index.js"), "utf8"), "old code");
+  // The copy fallback removes the source only after a successful copy.
+  assert.equal(existsSync(path.join(staged, "dist")), false);
+  assert.equal(existsSync(path.join(staged, "package.json")), false);
+});
+
+test("a cross-device copy that fails halfway leaves the complete previous tree in place", t => {
+  const shared = "/dev/shm";
+  if (!existsSync(shared)) {
+    t.skip("no separate filesystem available for the EXDEV test");
+    return;
+  }
+  const root = path.join(workspace(t), "root"), backup = path.join(workspace(t), "backup");
+  const stagedBase = mkdtempSync(path.join(shared, "webspeak-swap-fail-"));
+  t.after(() => {
+    setCodeSwapCopyForTests(null);
+    rmSync(stagedBase, { recursive: true, force: true });
+  });
+  const staged = path.join(stagedBase, "staged");
+
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  persistentState(root);
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code" });
+  if (statSync(root).dev === statSync(staged).dev) {
+    t.skip("tmp and /dev/shm share a device on this system");
+    return;
+  }
+
+  let copies = 0;
+  setCodeSwapCopyForTests((_from, to) => {
+    copies += 1;
+    // Simulate the fallback copy dying after it has written part of the
+    // entry, which is exactly the state that must never reach the root.
+    mkdirSync(to, { recursive: true });
+    writeFileSync(path.join(to, "index.js"), "half");
+    throw new Error("simulated copy failure");
+  });
+
+  assert.throws(() => swapCode(root, staged, backup), (error: unknown) =>
+    error instanceof CodeSwapError && error.code === "UPDATE_SWAP_FAILED");
+  assert.equal(copies, 1);
+
+  // The previous tree was restored completely, with no half-copied entry.
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "old code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.3.2");
+  assert.equal(readFileSync(path.join(root, "data", "webspeak.db"), "utf8"), "data-content");
+  assert.deepEqual(readdirSync(root).filter((entry) => entry.includes(".copy-")), []);
+  // The backup was not turned into a half-copied source for a later restore.
+  assert.equal(existsSync(path.join(backup, "dist", "index.js")), false);
+  // A failed copy leaves the staged package untouched for diagnosis/retry.
+  assert.equal(readFileSync(path.join(staged, "dist", "index.js"), "utf8"), "new code");
+});
+
+test("restoreCode returns the previous code and keeps rejected code for inspection", t => {
+  const root = workspace(t), staged = path.join(workspace(t), "staged"), backup = path.join(workspace(t), "backup");
+  mkdirSync(path.join(root, "dist"), { recursive: true });
+  writeFileSync(path.join(root, "dist", "index.js"), "old code");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ version: "0.3.2" }));
+  persistentState(root);
+  createPackageFiles(staged, "0.4.0", { "dist/index.js": "new code" });
+
+  swapCode(root, staged, backup);
+  restoreCode(root, backup);
+  assert.equal(readFileSync(path.join(root, "dist", "index.js"), "utf8"), "old code");
+  assert.equal(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version, "0.3.2");
+  assert.equal(readFileSync(path.join(backup, "rejected", "dist", "index.js"), "utf8"), "new code");
+  assert.equal(readFileSync(path.join(root, "data", "webspeak.db"), "utf8"), "data-content");
+
+  assert.throws(() => restoreCode(root, path.join(root, "absent-backup")), (error: unknown) =>
+    error instanceof CodeSwapError && error.code === "UPDATE_ROLLBACK_FAILED");
+});
