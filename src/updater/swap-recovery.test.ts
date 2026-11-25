@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { UpdateService } from "./update-service.js";
+import { CODE_ENTRIES } from "./code-swap.js";
 
 const SOURCE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SOURCE_DIR, "..", "..");
@@ -15,6 +16,40 @@ const RUNNER_SOURCE = path.join(SOURCE_DIR, "restart-runner.ts");
 const TASK_ID = "upd_sigkill_window";
 
 const logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
+
+// Exercise a kill after every old entry's rename, before the manifest is
+// updated. In particular the backup is still partial for the first entries.
+for (const entry of CODE_ENTRIES) {
+  test(`launcher recovers a SIGKILL immediately after moving old ${entry}`, { timeout: 30_000, skip: process.platform !== "linux" }, async t => {
+    const port = await availablePort();
+    const fixture = buildFixture(t, port, true);
+    // The Linux package need not contain the Windows launcher, but include it
+    // here so the entire code-entry list has a tested interruption point.
+    writeFileSync(path.join(fixture.rootDir, "start-webspeak.cmd"), "old launcher");
+    const runner = spawn(process.execPath, ["--import", "tsx", RUNNER_SOURCE, path.join(fixture.dataDir, "updates", "plan.json")], {
+      cwd: REPO_ROOT,
+      env: { ...process.env, WEBSPEAK_TEST_SWAP_BARRIER_DIR: fixture.barrierDir, WEBSPEAK_TEST_SWAP_BARRIER_AFTER_ENTRY: entry },
+      stdio: "ignore",
+    });
+    let app: ChildProcess | undefined;
+    t.after(() => { stop(app); stop(runner); });
+    await waitFor(() => existsSync(path.join(fixture.barrierDir, "swap-window-reached")), `runner never reached ${entry}`);
+    stop(runner);
+    await waitFor(() => !processAlive(runner.pid), "runner did not stop", 5_000);
+    app = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], {
+      cwd: fixture.rootDir, env: { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir }, stdio: "ignore",
+    });
+    await waitFor(() => healthVersion(port).then(version => version === "0.3.2"), `launcher failed after ${entry}`);
+    assert.equal(readFileSync(path.join(fixture.rootDir, "dist", "index.js"), "utf8"), appScript());
+    for (const [key, file] of Object.entries(fixture.markerFiles)) {
+      if (key !== "config") assert.equal(readFileSync(file, "utf8"), `${key} preserved`);
+    }
+    const stale = path.join(fixture.dataDir, "updates", "backups", "aaa_stale_backup", "package.json");
+    assert.equal(JSON.parse(readFileSync(stale, "utf8")).version, "0.1.0");
+    stop(app);
+    await waitFor(() => !processAlive(app?.pid), "app did not stop", 5_000);
+  });
+}
 
 const sleep = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 

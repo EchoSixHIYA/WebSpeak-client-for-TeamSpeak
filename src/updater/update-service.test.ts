@@ -10,7 +10,7 @@ import type { Logger } from "../logger.js";
 import { CHECKSUM_ASSET_NAME, OFFICIAL_REPOSITORY } from "./releases.js";
 import { UpdateError, UpdateService, type UpdateErrorCode, type UpdateServiceOptions } from "./update-service.js";
 import { createPackageFiles, createTarGz, sha256Hex, type TarFixtureEntry } from "./test-support.js";
-import { readUpdateState, writeUpdateState } from "./update-state.js";
+import { acquireUpdateLock, readUpdateState, writeUpdateState } from "./update-state.js";
 
 const logger: Logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
 const ASSET_NAME = "webspeak-webclient-v0.4.0-linux-x64.tar.gz";
@@ -102,6 +102,7 @@ function createService(
     architecture: "x64",
     env: {},
     isDocker: false,
+    isSupervised: false,
     fetch: fakeFetch(releases, downloads),
     now: () => new Date("2026-01-01T00:00:00.000Z"),
     launchRunner: async (planPath) => { launched.push(planPath); },
@@ -441,6 +442,37 @@ test("initialization keeps a live task but reconciles it once its process is gon
   restarted.initialize();
   assert.equal(restarted.getStatus().task?.status, "failed");
   assert.equal(restarted.getStatus().task?.errorCode, "UPDATE_INTERRUPTED");
+});
+
+test("a replacement app can update again after the runner finishes its cached task", async t => {
+  const fixture = createService(t, [], new Map());
+  const statePath = path.join(fixture.dataDir, "updates", "state.json");
+  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+  const task = {
+    id: "upd_completed_runner", status: "restarting" as const, fromVersion: "0.3.1", targetVersion: "0.3.2",
+    startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+    errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+  };
+  const release = acquireUpdateLock(lockPath, task.id);
+  t.after(release);
+  writeUpdateState(statePath, { schemaVersion: 1, task });
+  fixture.service.initialize();
+  assert.equal(fixture.service.getStatus().task?.status, "restarting");
+  writeUpdateState(statePath, { schemaVersion: 1, task: { ...task, status: "succeeded", finishedAt: "2026-01-01T00:01:00.000Z" } });
+  release();
+  assert.equal(fixture.service.getStatus().task?.status, "succeeded");
+  // It reaches release lookup instead of being rejected by a stale active task.
+  await assert.rejects(fixture.service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_VERSION_NOT_FOUND"));
+});
+
+test("supervised packages can check releases but cannot download or launch an update", async t => {
+  const fixture = createService(t, [{ version: "0.4.0", assets: [] }], new Map(), { isSupervised: true });
+  const checked = await fixture.service.checkForUpdates();
+  assert.equal(checked.releases[0]?.blockedReason, "DEPLOYMENT_SUPERVISED");
+  assert.equal(checked.releases[0]?.canApply, false);
+  await assert.rejects(fixture.service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_NOT_SUPPORTED"));
+  assert.deepEqual(fixture.launched, []);
+  assert.equal(fixture.service.getStatus().task, null);
 });
 
 test("initialization does not roll back a task whose lock belongs to another live process", async t => {

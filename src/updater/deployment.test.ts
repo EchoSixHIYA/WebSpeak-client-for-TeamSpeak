@@ -4,8 +4,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  assetKindFor, detectDeployment, isReleasePackageRoot, releaseAssetName, upgradePathFor,
+  assetKindFor, detectDeployment as detectRealDeployment, isReleasePackageRoot, releaseAssetName, runningUnderSupervisor, upgradePathFor,
 } from "./deployment.js";
+import type { DeploymentDetectionOptions } from "./deployment.js";
+
+// Tests may themselves run inside the CI runner's systemd service.
+function detectDeployment(options: DeploymentDetectionOptions) {
+  return detectRealDeployment({ isSupervised: false, ...options });
+}
 
 function temporary(t: test.TestContext): string {
   const directory = mkdtempSync(path.join(tmpdir(), "webspeak-deployment-"));
@@ -153,4 +159,24 @@ test("unsupported platforms are visible but cannot apply", t => {
   const darwin = detectDeployment({ rootDir: root, env: {}, isDocker: false, platform: "darwin", architecture: "arm64" });
   assert.equal(darwin.applyAllowed, false);
   assert.equal(darwin.reasonCode, "PLATFORM_UNSUPPORTED");
+});
+
+test("supervised packages cannot apply even with a release-package override", t => {
+  const root = releasePackageRoot(t);
+  for (const env of [{ INVOCATION_ID: "unit-invocation" }, { pm_id: "0" }, { SUPERVISOR_PROCESS_NAME: "webspeak" }]) {
+    assert.equal(runningUnderSupervisor(env, ""), true);
+    const deployment = detectDeployment({ rootDir: root, platform: "linux", architecture: "x64", isDocker: false,
+      isSupervised: undefined, env: { ...env, WEBSPEAK_DEPLOYMENT_MODE: "release-package" } });
+    assert.equal(deployment.mode, "release-package");
+    assert.equal(deployment.applyAllowed, false);
+    assert.equal(deployment.reasonCode, "DEPLOYMENT_SUPERVISED");
+    assert.equal(deployment.assetKind, "linux-x64");
+  }
+});
+
+test("service cgroups are detected without blocking interactive user scopes", () => {
+  assert.equal(runningUnderSupervisor({}, "0::/system.slice/webspeak.service\n"), true);
+  assert.equal(runningUnderSupervisor({}, "0::/user.slice/user-1000.slice/user@1000.service/app.slice/webspeak.service\n"), true);
+  assert.equal(runningUnderSupervisor({}, "0::/user.slice/user-1000.slice/user@1000.service/app.slice/terminal.scope\n"), false);
+  assert.equal(runningUnderSupervisor({}, "0::/\n"), false);
 });

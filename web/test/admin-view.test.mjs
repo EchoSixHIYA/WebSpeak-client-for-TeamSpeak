@@ -725,6 +725,35 @@ test("settings and operations render explicit localized sections with valid deep
   }
 });
 
+test("check-only deployments retain release checks and notes without install controls", async () => {
+  const { createSSRApp } = await import("vue");
+  const { renderToString } = await import("vue/server-renderer");
+  const { default: Operations } = await vite.ssrLoadModule("/src/components/admin/AdminOperations.vue");
+  await mount("/admin/operations?section=maintenance");
+  const model = reactive(state.adminOperations);
+  for (const [mode, reasonCode] of [["source", "DEPLOYMENT_SOURCE"], ["docker", "DEPLOYMENT_DOCKER"],
+    ["release-package", "WINDOWS_APPLY_UNVERIFIED"], ["release-package", "LINUX_ARM64_APPLY_UNVERIFIED"], ["release-package", "DEPLOYMENT_SUPERVISED"]]) {
+    model.operations.update.deployment = { mode, platform: "linux", architecture: "x64", applyAllowed: false, reasonCode, upgradePath: "release-package" };
+    let checked = false;
+    handler = path => {
+      assert.equal(path, "/update/check"); checked = true;
+      return Promise.resolve(json({ currentVersion: "0.3.2", releases: [{ version: "0.4.0", canApply: false, blockedReason: reasonCode,
+        tag: "v0.4.0", assetName: "webspeak-webclient-v0.4.0-linux-x64.tar.gz", assetSize: 100,
+        assetAvailable: true, hasChecksums: true, digest: null,
+        publishedAt: "2026-11-25T00:00:00.000Z", releaseUrl: "https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.4.0" }] }));
+    };
+    await model.checkForUpdates();
+    assert.equal(checked, true);
+    assert.equal(state.errorMessage, "");
+    const html = await renderToString(createSSRApp(Operations, { model: state.adminOperations, i18n: state.i18n, initialSection: "maintenance" }));
+    assert.ok(html.includes(state.i18n.tr("updateCheckAction")), reasonCode);
+    assert.ok(html.includes("/releases/tag/v0.4.0"), reasonCode);
+    assert.ok(html.includes('data-admin-update="check"'), reasonCode);
+    assert.ok(!html.includes('data-admin-update="apply"'), reasonCode);
+    if (reasonCode === "DEPLOYMENT_SUPERVISED") assert.ok(html.includes(state.i18n.tr("updateBlockedSupervised")));
+  }
+});
+
 test("update error codes resolve to their dedicated five-language labels", async () => {
   const { adminOrganizationCopy } = await vite.ssrLoadModule("/src/i18n/admin-organization.ts");
   await mount("/admin/server");

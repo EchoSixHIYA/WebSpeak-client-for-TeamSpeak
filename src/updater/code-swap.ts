@@ -125,9 +125,10 @@ export function setCodeSwapCopyForTests(copy: CopyEntry | null): void {
  */
 const SWAP_BARRIER_ENV = "WEBSPEAK_TEST_SWAP_BARRIER_DIR";
 
-function swapWindowBarrier(): void {
+function swapWindowBarrier(entry?: string): void {
   const directory = process.env[SWAP_BARRIER_ENV];
   if (!directory || !existsSync(directory)) return;
+  if ((process.env.WEBSPEAK_TEST_SWAP_BARRIER_AFTER_ENTRY ?? "") !== (entry ?? "")) return;
   writeFileSync(path.join(directory, "swap-window-reached"), String(process.pid));
   const resume = path.join(directory, "resume");
   const deadline = Date.now() + 30_000;
@@ -204,6 +205,7 @@ export function swapCode(rootDir: string, stagedRoot: string, backupDir: string)
       if (!existsSync(path.join(rootDir, entry))) continue;
       moveIfPresent(path.join(rootDir, entry), path.join(backupDir, entry));
       movedToBackup.push(entry);
+      swapWindowBarrier(entry);
       writeSwapManifest(backupDir, movedToBackup);
     }
     swapWindowBarrier();

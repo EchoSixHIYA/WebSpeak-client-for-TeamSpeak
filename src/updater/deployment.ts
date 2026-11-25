@@ -9,6 +9,8 @@ export interface DeploymentDetectionOptions {
   env?: NodeJS.ProcessEnv;
   /** Test seam; omitted means inspect the real container markers. */
   isDocker?: boolean;
+  /** Test seam; omitted means inspect service-manager environment and cgroups. */
+  isSupervised?: boolean;
 }
 
 export interface DeploymentInfo extends UpdateDeploymentView {
@@ -51,6 +53,12 @@ export function detectDeployment(options: DeploymentDetectionOptions): Deploymen
     // "unverified" is never rendered as "can apply" in the UI.
     applyAllowed = false;
     reasonCode = "LINUX_ARM64_APPLY_UNVERIFIED";
+  } else if (options.isSupervised ?? runningUnderSupervisor(env)) {
+    // A detached child stays inside its systemd cgroup, and other supervisors
+    // can restart the old app while the runner is swapping it. Until there is
+    // a supervisor-aware handoff, only foreground packages may apply updates.
+    applyAllowed = false;
+    reasonCode = "DEPLOYMENT_SUPERVISED";
   }
   return {
     mode,
@@ -61,6 +69,18 @@ export function detectDeployment(options: DeploymentDetectionOptions): Deploymen
     upgradePath: upgradePathFor(mode),
     assetKind,
   };
+}
+
+export function runningUnderSupervisor(env: NodeJS.ProcessEnv = process.env, cgroup?: string): boolean {
+  if (["INVOCATION_ID", "JOURNAL_STREAM", "NOTIFY_SOCKET", "SYSTEMD_EXEC_PID", "pm_id", "PM2_HOME", "SUPERVISOR_ENABLED", "SUPERVISOR_PROCESS_NAME"]
+    .some((name) => Boolean(env[name]?.trim()))) return true;
+  if (cgroup === undefined) {
+    try { cgroup = readFileSync("/proc/self/cgroup", "utf8"); }
+    catch { return false; }
+  }
+  // The user manager itself is not the app's supervisor: interactive shells
+  // also run below user@UID.service. App-specific services still count.
+  return cgroup.split(/[\n/]/).some((part) => part.endsWith(".service") && !/^user@\d+\.service$/.test(part));
 }
 
 export function runningInContainer(env: NodeJS.ProcessEnv = process.env): boolean {

@@ -16,7 +16,7 @@ backups="$data_dir/updates/backups"
 
 # Only executable code is swapped by the updater. data/, config.json, certs/,
 # identities, skins and plugins are deliberately never listed here.
-code_entries="dist web/dist node_modules runtime package.json package-lock.json README.md LICENSE config.example.json"
+code_entries="dist web/dist node_modules runtime package.json package-lock.json README.md LICENSE config.example.json start-webspeak.cmd"
 required_entries="dist/index.js web/dist/index.html node_modules package.json runtime/node"
 
 code_missing() {
@@ -34,6 +34,20 @@ backup_is_complete() {
   [ -f "$1/.webspeak-swap.json" ] || return 1
   for entry in $required_entries; do
     [ -e "$1/$entry" ] || return 1
+  done
+  return 0
+}
+
+# During the first phase of a swap, only some old entries have been moved.
+# The rest still live at the install root. The current task can be recovered
+# from that union, including a kill between rename and manifest persistence.
+# Never combine a stale task's partial backup with this install.
+task_backup_can_repair() {
+  [ -f "$1/.webspeak-swap.json" ] || return 1
+  for entry in $required_entries; do
+    if [ ! -e "$1/$entry" ] && [ ! -e "$entry" ]; then
+      return 1
+    fi
   done
   return 0
 }
@@ -85,7 +99,7 @@ if code_missing; then
   esac
   if [ -n "$task_id" ]; then
     candidate="$backups/$task_id"
-    if backup_is_complete "$candidate"; then
+    if task_backup_can_repair "$candidate"; then
       restore_backup="$candidate"
     fi
   fi

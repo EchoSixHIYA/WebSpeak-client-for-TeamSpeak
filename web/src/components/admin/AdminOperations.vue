@@ -293,30 +293,30 @@
         <div v-if="!canApplyUpdates" class="alert info system-notice">
           <Icon name="info" :size="16"/><span>{{ blockedUpdateText }}</span>
         </div>
-        <template v-else>
-          <p class="field-help">{{ tr('updateBackupHint') }}</p>
+        <div>
+          <p v-if="canApplyUpdates" class="field-help">{{ tr('updateBackupHint') }}</p>
           <div class="update-actions">
-            <button class="secondary-button" type="button" :disabled="updateChecking" @click="checkForUpdates">
+            <button class="secondary-button" type="button" data-admin-update="check" :disabled="updateChecking" @click="checkForUpdates">
               <span v-if="updateChecking" class="spinner small"></span><Icon v-else name="refresh" :size="17"/>
               {{ updateChecking ? tr('updateChecking') : tr('updateCheckAction') }}
             </button>
           </div>
           <div v-if="availableUpdates.length" class="update-release-list">
-            <strong>{{ tr('updateSelectRelease') }}</strong>
-            <p class="field-help">{{ tr('updateChecksumNotice') }}</p>
+            <strong v-if="canApplyUpdates">{{ tr('updateSelectRelease') }}</strong>
+            <p v-if="canApplyUpdates" class="field-help">{{ tr('updateChecksumNotice') }}</p>
             <label v-for="release in availableUpdates" :key="release.version" class="update-release-row">
-              <input v-model="selectedVersion" type="radio" :value="release.version" :disabled="!release.canApply || updateApplying" />
+              <input v-if="canApplyUpdates" v-model="selectedVersion" type="radio" :value="release.version" :disabled="!release.canApply || updateApplying" />
               <span><strong>v{{ release.version }}</strong> <small>{{ formatDate(release.publishedAt) }}</small></span>
               <a v-if="release.releaseUrl" :href="release.releaseUrl" target="_blank" rel="noreferrer">{{ tr('updateReleaseNotes') }}</a>
               <small v-if="!release.canApply" class="muted-label">{{ releaseBlockedText(release) }}</small>
             </label>
-            <button class="primary-button" type="button" :disabled="!selectedRelease || updateApplying" @click="applySelectedUpdate">
+            <button v-if="canApplyUpdates" class="primary-button" type="button" data-admin-update="apply" :disabled="!selectedRelease || updateApplying" @click="applySelectedUpdate">
               <span v-if="updateApplying" class="spinner small"></span>
               {{ updateApplying ? tr('updateApplying') : tr('updateApplyAction') }}
             </button>
           </div>
           <p v-else-if="updateChecked" class="field-help">{{ tr('updateUpToDate') }}</p>
-        </template>
+        </div>
       </article>
     </div>
   </section>
@@ -349,6 +349,7 @@ function blockedReasonText(code: string | null) {
   switch (code) {
     case 'DEPLOYMENT_DOCKER': return tr('updateBlockedDocker');
     case 'DEPLOYMENT_SOURCE': return tr('updateBlockedSource');
+    case 'DEPLOYMENT_SUPERVISED': return tr('updateBlockedSupervised');
     case 'PLATFORM_UNSUPPORTED': return tr('updateBlockedPlatform');
     case 'ARCH_UNSUPPORTED': return tr('updateBlockedArch');
     case 'WINDOWS_APPLY_UNVERIFIED': return tr('updateBlockedWindows');

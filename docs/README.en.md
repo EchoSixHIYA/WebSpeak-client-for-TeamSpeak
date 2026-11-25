@@ -119,6 +119,8 @@ Download the matching `windows-x64.zip`, `linux-x64.tar.gz`, or `linux-arm64.tar
 
 Linux x64 release packages that match the official `build-release.yml` layout can be upgraded from the administration console. It checks the official GitHub Releases, refuses a package without a matching `SHA256SUMS.txt` entry, replaces only application code and restarts the process. `SHA256SUMS.txt` is an integrity checksum only, not a digital signature. `data/`, `config.json`, `certs/`, installed skins and plugins are preserved. Export a backup before starting. Windows release packages can check for versions, but console apply is disabled until it is verified on a real Windows install; download the new package and replace it manually. Linux arm64 packages can be checked, but console apply is disabled because the in-place swap has not been verified on real arm64 hardware; download the new package and replace it manually. Docker and source deployments cannot apply an update from the console.
 
+Console installation is limited to foreground Linux x64 packages. Instances managed by systemd, PM2 or Supervisor can still check releases and open release notes, but cannot apply them in the console. Stop the service, replace application files from the new package, and start the service again; preserve `data/`, `config.json` and `certs/`. A detached updater is not independent of the service manager.
+
 Android APKs for `arm64-v8a`, `armeabi-v7a`, and `x86_64` are also attached. They use debug signing for sideload testing; they are not Google Play packages, and real-device voice still needs validation.
 
 ### From source

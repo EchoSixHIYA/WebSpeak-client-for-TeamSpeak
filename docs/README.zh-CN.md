@@ -136,6 +136,8 @@ docker compose up -d
 
 Linux x64 发布包（已按官方 `build-release.yml` 产物形态验证）可以在管理控制台直接升级：控制台只读取官方 GitHub Releases，缺少匹配的 `SHA256SUMS.txt` 条目时拒绝安装，校验通过后仅替换程序代码并重启进程。`SHA256SUMS.txt` 只是 SHA-256 校验和，不是数字签名。`data/`、`config.json`、`certs/`、已安装的皮肤和插件都会保留。开始前建议先导出备份。Windows 发布包可以检查版本，但控制台应用更新尚未经真实 Windows 环境验证，因此已禁用，请下载新包后手动替换。Linux arm64 发布包可以检查版本，但由于原地替换尚未在真实 arm64 硬件验证，控制台应用已禁用；请下载新版发布包后手动替换。Docker 和源码运行不能在控制台应用更新。
 
+控制台安装仅限前台运行的 Linux x64 发布包。通过 systemd、PM2 或 Supervisor 托管的实例仍可检查版本和查看发行说明，但不能在控制台直接安装。请停止服务，替换新发布包中的程序文件后再启动，并保留 `data/`、`config.json` 和 `certs/`。升级助手即使以独立子进程启动，也仍受服务管理器控制。
+
 Release 同时提供 Android `arm64-v8a`、`armeabi-v7a` 和 `x86_64` APK。它们使用 debug 签名，可手动侧载测试；不是 Google Play 发布包，Android 真机语音仍需验收。
 
 ### 源码运行

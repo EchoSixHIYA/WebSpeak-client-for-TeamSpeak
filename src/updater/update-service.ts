@@ -65,6 +65,7 @@ export interface UpdateServiceOptions {
   architecture?: string;
   env?: NodeJS.ProcessEnv;
   isDocker?: boolean;
+  isSupervised?: boolean;
   fetch?: typeof fetch;
   apiBaseUrl?: string;
   repository?: string;
@@ -139,6 +140,7 @@ export class UpdateService {
       architecture: options.architecture,
       env: options.env,
       isDocker: options.isDocker,
+      isSupervised: options.isSupervised,
     });
     this.source = new GitHubReleaseSource({
       fetch: options.fetch,
@@ -273,7 +275,14 @@ export class UpdateService {
     if (!isNewerVersion(version, this.options.currentVersion)) {
       throw new UpdateError("UPDATE_VERSION_NOT_NEWER", "The selected version is not newer than the running version.", 409);
     }
-    if (this.applying || (this.state.task && isActiveTaskStatus(this.state.task.status))) {
+    if (this.applying) {
+      throw new UpdateError("UPDATE_IN_PROGRESS", "Another update task is already running.", 409);
+    }
+    // The runner finishes after the replacement app has initialized. Its
+    // terminal state on disk must replace that app's cached "restarting"
+    // state before the next update; never reload during our own active apply.
+    this.state = readUpdateState(this.statePath);
+    if (this.state.task && isActiveTaskStatus(this.state.task.status)) {
       throw new UpdateError("UPDATE_IN_PROGRESS", "Another update task is already running.", 409);
     }
     this.applying = true;
