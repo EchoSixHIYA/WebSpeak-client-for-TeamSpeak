@@ -1,5 +1,5 @@
 import { onScopeDispose, reactive, ref, type Ref } from "vue";
-import type { AdminSession, ManagedInvite, AdminLog, AdminConnectionRecord } from "../../../src/shared/admin-responses.js";
+import type { AdminSession, ManagedInvite, AdminLog, AdminConnectionRecord, AdminUpdateRelease, AdminUpdateStatus } from "../../../src/shared/admin-responses.js";
 import type { copy } from "../i18n/admin.js";
 import { isAdminRequestCancelled, type AdminApi } from "../services/admin-api.js";
 import { createAdminRequests } from "../services/admin-requests.js";
@@ -12,19 +12,31 @@ interface Options {
   refreshOverview(): Promise<void>;
 }
 
+function emptyUpdateStatus(): AdminUpdateStatus {
+  return {
+    currentVersion: "",
+    deployment: { mode: "source", platform: "", architecture: "", applyAllowed: false, reasonCode: "UPDATE_UNAVAILABLE", upgradePath: "source" },
+    task: null,
+  };
+}
+
 export function useAdminOperations(options: Options) {
   const requests = createAdminRequests();
   const operationsLoading = ref(false), terminatingSession = ref(""), inviteSubmitting = ref(false);
+  const updateChecking = ref(false), updateApplying = ref(false), updateChecked = ref(false);
+  const availableUpdates = ref<AdminUpdateRelease[]>([]), selectedVersion = ref("");
   const revokingInvites = reactive(new Set<string>());
   const inviteForm = reactive({ channel: "", expiresInHours: 24, maxUses: 0 });
   const createdInvite = ref<{ token: string; link: string } | null>(null);
   const operations = reactive({ sessions: [] as AdminSession[], invites: [] as ManagedInvite[],
     diagnostics: { version: "", node: "", platform: "", arch: "", schemaVersion: 0, createdSessions: 0 },
+    update: emptyUpdateStatus(),
     logs: { available: false, entries: [] as AdminLog[], sessions: [] as AdminConnectionRecord[] }, audit: [] as Array<{ event: string; createdAt: string }> });
   let noticeTimer: number | undefined;
   function cancelRequests() {
     requests.reset();
     operationsLoading.value = false; terminatingSession.value = ""; inviteSubmitting.value = false;
+    updateChecking.value = false; updateApplying.value = false;
     revokingInvites.clear();
     if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
     noticeTimer = undefined;
@@ -35,6 +47,8 @@ export function useAdminOperations(options: Options) {
     operations.sessions = []; operations.invites = []; operations.audit = [];
     operations.logs = { available: false, entries: [], sessions: [] };
     operations.diagnostics = { version: "", node: "", platform: "", arch: "", schemaVersion: 0, createdSessions: 0 };
+    operations.update = emptyUpdateStatus();
+    availableUpdates.value = []; selectedVersion.value = ""; updateChecked.value = false;
     Object.assign(inviteForm, { channel: "", expiresInHours: 24, maxUses: 0 });
   }
   onScopeDispose(reset);
@@ -45,13 +59,15 @@ export function useAdminOperations(options: Options) {
     const request = requests.begin("load");
     operationsLoading.value = true;
     try {
-      const [sessions, invites, diagnostics, logs, audit] = await Promise.all([
-        options.api.sessions(request.signal), options.api.invites(request.signal), options.api.diagnostics(request.signal), options.api.logs(request.signal), options.api.audit(request.signal),
+      const [sessions, invites, diagnostics, update, logs, audit] = await Promise.all([
+        options.api.sessions(request.signal), options.api.invites(request.signal), options.api.diagnostics(request.signal),
+        options.api.updateStatus(request.signal), options.api.logs(request.signal), options.api.audit(request.signal),
       ]);
       if (!request.isCurrent()) return;
       operations.sessions = sessions.sessions;
       operations.invites = invites.invites;
       operations.diagnostics = { ...diagnostics.gateway, schemaVersion: diagnostics.database.schemaVersion, createdSessions: diagnostics.sessions.created };
+      operations.update = update;
       operations.logs = logs;
       operations.audit = audit.events;
     } catch (error) { if (request.isCurrent()) report(error); }
@@ -103,6 +119,31 @@ export function useAdminOperations(options: Options) {
     } catch (error) { if (request.isCurrent()) report(error); }
     finally { request.finish(); }
   }
+  async function checkForUpdates() {
+    if (updateChecking.value) return;
+    const request = requests.begin("update-check");
+    updateChecking.value = true; updateChecked.value = false; availableUpdates.value = []; options.errorMessage.value = "";
+    try {
+      const result = await options.api.checkUpdates(request.signal);
+      if (!request.isCurrent()) return;
+      availableUpdates.value = result.releases;
+      selectedVersion.value = result.releases.find(release => release.canApply)?.version ?? "";
+      updateChecked.value = true;
+    } catch (error) { if (request.isCurrent()) report(error); }
+    finally { if (request.isCurrent()) updateChecking.value = false; request.finish(); }
+  }
+  async function applyUpdate(release: AdminUpdateRelease) {
+    if (updateApplying.value) return;
+    if (!window.confirm(options.tr("updateConfirmApply", { version: release.version }))) return;
+    const request = requests.begin("update-apply");
+    updateApplying.value = true; options.errorMessage.value = "";
+    try {
+      const result = await options.api.applyUpdate({ version: release.version, confirmVersion: release.version }, request.signal);
+      if (!request.isCurrent()) return;
+      operations.update = { ...operations.update, task: result.task, deployment: { ...operations.update.deployment, applyAllowed: false } };
+    } catch (error) { if (request.isCurrent()) report(error); }
+    finally { if (request.isCurrent()) updateApplying.value = false; request.finish(); }
+  }
   async function downloadBackup() {
     const request = requests.begin("backup");
     try {
@@ -118,5 +159,7 @@ export function useAdminOperations(options: Options) {
     finally { request.finish(); }
   }
   return { operations, operationsLoading, terminatingSession, inviteSubmitting, revokingInvites, inviteForm, createdInvite,
-    loadOperations, terminateSession, createInvite, revokeInvite, copyInviteLink, downloadBackup, cancelRequests, reset };
+    updateChecking, updateApplying, updateChecked, availableUpdates, selectedVersion,
+    loadOperations, terminateSession, createInvite, revokeInvite, copyInviteLink, downloadBackup, checkForUpdates, applyUpdate,
+    cancelRequests, reset };
 }

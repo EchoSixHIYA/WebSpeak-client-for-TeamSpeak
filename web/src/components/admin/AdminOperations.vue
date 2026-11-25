@@ -273,7 +273,51 @@
           >{{ tr("exportBackup") }}</button
         ></article
       >
-      <div class="alert info system-notice"><Icon name="info" :size="16"/><span>{{ tr('updateNotice', {version: operations.diagnostics.version || '—'}) }}</span></div>
+      <article class="operation-card update-card" data-admin-update="version">
+        <header>
+          <div><h3>{{ tr('updateTitle') }}</h3><p>{{ tr('updateLead') }}</p></div>
+          <span :class="['state-pill', canApplyUpdates ? 'active' : '']">{{ canApplyUpdates ? tr('updateCanApply') : tr('updateCannotApply') }}</span>
+        </header>
+        <dl class="diagnostic-list">
+          <div><dt>{{ tr('updateCurrentVersion') }}</dt><dd>{{ operations.update.currentVersion || operations.diagnostics.version || '—' }}</dd></div>
+          <div><dt>{{ tr('updateDeploymentMode') }}</dt><dd>{{ deploymentLabel }}</dd></div>
+          <div><dt>{{ tr('updateArchitecture') }}</dt><dd>{{ operations.update.deployment.platform || '—' }} / {{ operations.update.deployment.architecture || '—' }}</dd></div>
+        </dl>
+        <div v-if="operations.update.task" class="update-task" data-admin-update-task>
+          <strong>{{ tr('updateTaskTitle') }}: {{ updateTaskStatusLabel }}</strong>
+          <small v-if="updateTaskErrorText">{{ updateTaskErrorText }}</small>
+          <small v-else-if="operations.update.task.status === 'succeeded'">{{ tr('updateRestartHint') }}</small>
+          <small v-if="operations.update.task.rolledBack">{{ tr('updateRolledBack') }}</small>
+          <small v-if="operations.update.task.finishedAt">{{ formatDate(operations.update.task.finishedAt) }}</small>
+        </div>
+        <div v-if="!canApplyUpdates" class="alert info system-notice">
+          <Icon name="info" :size="16"/><span>{{ blockedUpdateText }}</span>
+        </div>
+        <div>
+          <p v-if="canApplyUpdates" class="field-help">{{ tr('updateBackupHint') }}</p>
+          <div class="update-actions">
+            <button class="secondary-button" type="button" data-admin-update="check" :disabled="updateChecking" @click="checkForUpdates">
+              <span v-if="updateChecking" class="spinner small"></span><Icon v-else name="refresh" :size="17"/>
+              {{ updateChecking ? tr('updateChecking') : tr('updateCheckAction') }}
+            </button>
+          </div>
+          <div v-if="availableUpdates.length" class="update-release-list">
+            <strong v-if="canApplyUpdates">{{ tr('updateSelectRelease') }}</strong>
+            <p v-if="canApplyUpdates" class="field-help">{{ tr('updateChecksumNotice') }}</p>
+            <label v-for="release in availableUpdates" :key="release.version" class="update-release-row">
+              <input v-if="canApplyUpdates" v-model="selectedVersion" type="radio" :value="release.version" :disabled="!release.canApply || updateApplying" />
+              <span><strong>v{{ release.version }}</strong> <small>{{ formatDate(release.publishedAt) }}</small></span>
+              <a v-if="release.releaseUrl" :href="release.releaseUrl" target="_blank" rel="noreferrer">{{ tr('updateReleaseNotes') }}</a>
+              <small v-if="!release.canApply" class="muted-label">{{ releaseBlockedText(release) }}</small>
+            </label>
+            <button v-if="canApplyUpdates" class="primary-button" type="button" data-admin-update="apply" :disabled="!selectedRelease || updateApplying" @click="applySelectedUpdate">
+              <span v-if="updateApplying" class="spinner small"></span>
+              {{ updateApplying ? tr('updateApplying') : tr('updateApplyAction') }}
+            </button>
+          </div>
+          <p v-else-if="updateChecked" class="field-help">{{ tr('updateUpToDate') }}</p>
+        </div>
+      </article>
     </div>
   </section>
 </template>
@@ -288,13 +332,54 @@ import type { AdminConnectionRecord } from "../../../../src/shared/admin-respons
 const props = defineProps<{
   model: ReturnType<typeof useAdminOperations>;
   initialSection?: string;
-  i18n: Pick<ReturnType<typeof useAdminI18n>, "tr" | "formatDate" | "formatAge" | "sessionStateLabel" | "connectionStatusLabel" | "inviteStatusLabel" | "eventName" | "connectionFailureText">;
+  i18n: Pick<ReturnType<typeof useAdminI18n>, "tr" | "formatDate" | "formatAge" | "sessionStateLabel" | "connectionStatusLabel" | "inviteStatusLabel" | "eventName" | "connectionFailureText" | "errorText">;
 }>();
 // Request ownership, cancellation and drafts remain in the page's controller.
 const { operations, operationsLoading, terminatingSession, inviteSubmitting, revokingInvites, inviteForm, createdInvite,
-  loadOperations, terminateSession, createInvite, revokeInvite, copyInviteLink, downloadBackup } = props.model;
-const { tr, formatDate, formatAge, sessionStateLabel, connectionStatusLabel, inviteStatusLabel, eventName, connectionFailureText } = props.i18n;
+  loadOperations, terminateSession, createInvite, revokeInvite, copyInviteLink, downloadBackup,
+  updateChecking, updateApplying, updateChecked, availableUpdates, selectedVersion, checkForUpdates, applyUpdate } = props.model;
+const { tr, formatDate, formatAge, sessionStateLabel, connectionStatusLabel, inviteStatusLabel, eventName, connectionFailureText, errorText } = props.i18n;
 type OperationsSection = 'sessions' | 'invites' | 'logs' | 'audit' | 'maintenance';
+const canApplyUpdates = computed(() => operations.update.deployment.applyAllowed);
+const deploymentLabel = computed(() => {
+  const mode = operations.update.deployment.mode;
+  return mode === 'docker' ? tr('updateModeDocker') : mode === 'release-package' ? tr('updateModeReleasePackage') : tr('updateModeSource');
+});
+function blockedReasonText(code: string | null) {
+  switch (code) {
+    case 'DEPLOYMENT_DOCKER': return tr('updateBlockedDocker');
+    case 'DEPLOYMENT_SOURCE': return tr('updateBlockedSource');
+    case 'DEPLOYMENT_SUPERVISED': return tr('updateBlockedSupervised');
+    case 'PLATFORM_UNSUPPORTED': return tr('updateBlockedPlatform');
+    case 'ARCH_UNSUPPORTED': return tr('updateBlockedArch');
+    case 'WINDOWS_APPLY_UNVERIFIED': return tr('updateBlockedWindows');
+    case 'LINUX_ARM64_APPLY_UNVERIFIED': return tr('updateBlockedArm64');
+    case 'UPDATE_ASSET_UNAVAILABLE': return tr('updateAssetMissing');
+    case 'UPDATE_CHECKSUM_MISSING': return tr('updateChecksumMissing');
+    default: return tr('updateBlockedUnavailable');
+  }
+}
+const blockedUpdateText = computed(() => blockedReasonText(operations.update.deployment.reasonCode));
+const releaseBlockedText = (release: { blockedReason: string | null }) => blockedReasonText(release.blockedReason);
+function updateStatusText(status: string | undefined) {
+  switch (status) {
+    case 'downloading': return tr('updateStatusDownloading');
+    case 'verifying': return tr('updateStatusVerifying');
+    case 'extracting': return tr('updateStatusExtracting');
+    case 'staging': return tr('updateStatusStaging');
+    case 'restarting': return tr('updateStatusRestarting');
+    case 'succeeded': return tr('updateStatusSucceeded');
+    case 'failed': return tr('updateStatusFailed');
+    default: return '';
+  }
+}
+const updateTaskStatusLabel = computed(() => updateStatusText(operations.update.task?.status));
+const updateTaskErrorText = computed(() => operations.update.task?.errorCode ? errorText(operations.update.task.errorCode) : '');
+const selectedRelease = computed(() => availableUpdates.value.find(release => release.version === selectedVersion.value && release.canApply) ?? null);
+function applySelectedUpdate() {
+  const release = selectedRelease.value;
+  if (release) void applyUpdate(release);
+}
 const normalizeSection = (value?: string): OperationsSection => value === 'invites' || value === 'logs' || value === 'audit' || value === 'maintenance' ? value : 'sessions';
 const activeSection = ref<OperationsSection>(normalizeSection(props.initialSection));
 watch(() => props.initialSection, value => { activeSection.value = normalizeSection(value); });

@@ -182,12 +182,9 @@ jobs:
           cp "$runtime_root/bin/node" "$package_root/runtime/node"
           cp "$runtime_root/LICENSE" "$package_root/runtime/NODE-LICENSE"
           chmod 0755 "$package_root/runtime/node"
-          cat > "$package_root/start-webspeak.sh" <<'LAUNCHER'
-          #!/usr/bin/env sh
-          set -eu
-          cd -- "$(dirname -- "$0")"
-          exec "$PWD/runtime/node" "$PWD/dist/index.js"
-          LAUNCHER
+          # Ship the exact launcher the self-update installer and recovery
+          # tests use; never maintain a second launcher body in the workflow.
+          cp "$GITHUB_WORKSPACE/scripts/start-webspeak.sh" "$package_root/start-webspeak.sh"
           chmod 0755 "$package_root/start-webspeak.sh"
 
           smoke_root="$RUNNER_TEMP/${package_name}-smoke"

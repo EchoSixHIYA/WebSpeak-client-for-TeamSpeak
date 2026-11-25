@@ -22,6 +22,7 @@ import type { PluginRegistry } from "../plugins/registry.js";
 import { PluginRuntime } from "../plugins/runtime.js";
 import { createPluginRuntimeRouter } from "../plugins/runtime-router.js";
 import { parseHiddenHostParts } from "../shared/skin-chrome.js";
+import type { UpdateService } from "../updater/update-service.js";
 
 export interface WebServerOptions {
   port: number;
@@ -37,6 +38,8 @@ export interface WebServerOptions {
   logger: Logger;
   nextVisitorNumber?: () => number;
   visitorCount?: () => number;
+  updateService?: UpdateService;
+  restartAfterUpdate?: () => void;
 }
 
 export interface WebServer {
@@ -301,6 +304,8 @@ export function createWebServer(options: WebServerOptions): WebServer {
     skinRegistry: options.skinRegistry,
     pluginRegistry: options.pluginRegistry,
     pluginRuntime,
+    updateService: options.updateService,
+    restartAfterUpdate: options.restartAfterUpdate,
     version: options.version,
     logFile: options.logFile,
     startedAt,
