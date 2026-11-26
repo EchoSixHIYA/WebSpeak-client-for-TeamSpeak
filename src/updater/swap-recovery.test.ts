@@ -63,20 +63,24 @@ exec /bin/mv "$@"
     PATH: `${bin}${path.delimiter}${process.env.PATH}`, RECOVERY_TEST_BARRIER: fixture.barrierDir };
   const first = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], { cwd: fixture.rootDir, env, stdio: "ignore" });
   let second: ChildProcess | undefined;
-  t.after(() => { writeFileSync(path.join(fixture.barrierDir, "resume"), ""); stop(first); stop(second); });
-  await waitFor(() => existsSync(path.join(fixture.barrierDir, "entered")), "first launcher did not start restoring");
-  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
-  assert.equal(updateLockIsHeld(lockPath), true);
-  const owner = readFileSync(lockPath, "utf8");
-  second = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], { cwd: fixture.rootDir, env, stdio: "ignore" });
-  await waitFor(() => second!.exitCode !== null, "second launcher did not refuse concurrent recovery", 5_000);
-  assert.equal(second.exitCode, 75);
-  assert.equal(readFileSync(lockPath, "utf8"), owner);
-  writeFileSync(path.join(fixture.barrierDir, "resume"), "");
-  await waitFor(() => healthVersion(port).then(version => version === "0.3.2"), "first launcher did not finish recovery");
-  assert.equal(existsSync(lockPath), false);
-  stop(first);
-  await waitFor(() => !processAlive(first.pid), "recovered app did not stop", 5_000);
+  try {
+    await waitFor(() => existsSync(path.join(fixture.barrierDir, "entered")), "first launcher did not start restoring");
+    const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+    assert.equal(updateLockIsHeld(lockPath), true);
+    const owner = readFileSync(lockPath, "utf8");
+    second = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], { cwd: fixture.rootDir, env, stdio: "ignore" });
+    await waitFor(() => second!.exitCode !== null, "second launcher did not refuse concurrent recovery", 5_000);
+    assert.equal(second.exitCode, 75);
+    assert.equal(readFileSync(lockPath, "utf8"), owner);
+    writeFileSync(path.join(fixture.barrierDir, "resume"), "");
+    await waitFor(() => healthVersion(port).then(version => version === "0.3.2"), "first launcher did not finish recovery");
+    assert.equal(existsSync(lockPath), false);
+  } finally {
+    // Stop children before buildFixture's after hook removes their files.
+    writeFileSync(path.join(fixture.barrierDir, "resume"), "");
+    stop(first); stop(second);
+    await waitFor(() => !processAlive(first.pid) && !processAlive(second?.pid), "recovery processes did not stop", 5_000);
+  }
 });
 
 // Exercise a kill after every old entry's rename, before the manifest is
