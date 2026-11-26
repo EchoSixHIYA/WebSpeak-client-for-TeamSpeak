@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { UpdateService } from "./update-service.js";
 import { CODE_ENTRIES, swapCode } from "./code-swap.js";
+import { acquireUpdateLock, updateLockIsHeld } from "./update-state.js";
 
 const SOURCE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SOURCE_DIR, "..", "..");
@@ -16,6 +17,67 @@ const RUNNER_SOURCE = path.join(SOURCE_DIR, "restart-runner.ts");
 const TASK_ID = "upd_sigkill_window";
 
 const logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
+
+for (const lockKind of ["live", "unreadable"] as const) {
+  test(`launcher preserves a target while the update lock is ${lockKind}`, { timeout: 15_000, skip: process.platform !== "linux" }, async t => {
+    const fixture = buildFixture(t, await availablePort());
+    swapCode(fixture.rootDir, fixture.stagedRoot, fixture.backupDir);
+    const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+    if (lockKind === "live") {
+      const release = acquireUpdateLock(lockPath, TASK_ID);
+      t.after(release);
+      assert.equal(updateLockIsHeld(lockPath, TASK_ID), true);
+    } else {
+      writeFileSync(lockPath, "{invalid");
+    }
+    const before = readFileSync(lockPath, "utf8");
+    const app = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], {
+      cwd: fixture.rootDir, env: { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir }, stdio: "ignore",
+    });
+    t.after(() => stop(app));
+    await waitFor(() => app.exitCode !== null, "launcher did not refuse the held update lock", 5_000);
+    assert.equal(app.exitCode, 75);
+    assert.equal(readFileSync(lockPath, "utf8"), before);
+    assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.4.0");
+    assert.equal(JSON.parse(readFileSync(path.join(fixture.backupDir, "package.json"), "utf8")).version, "0.3.2");
+  });
+}
+
+test("concurrent launchers cannot restore the same interrupted tree together", { timeout: 20_000, skip: process.platform !== "linux" }, async t => {
+  const port = await availablePort();
+  const fixture = buildFixture(t, port);
+  swapCode(fixture.rootDir, fixture.stagedRoot, fixture.backupDir);
+  const bin = path.join(fixture.directory, "bin");
+  mkdirSync(bin);
+  // Pause the first real restore at mv, without adding a production test hook.
+  writeFileSync(path.join(bin, "mv"), `#!/bin/sh
+printf '%s' "$$" > "$RECOVERY_TEST_BARRIER/entered"
+attempt=0
+while [ ! -f "$RECOVERY_TEST_BARRIER/resume" ] && [ "$attempt" -lt 200 ]; do
+  sleep 0.05
+  attempt=$((attempt + 1))
+done
+exec /bin/mv "$@"
+`, { mode: 0o755 });
+  const env = { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir,
+    PATH: `${bin}${path.delimiter}${process.env.PATH}`, RECOVERY_TEST_BARRIER: fixture.barrierDir };
+  const first = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], { cwd: fixture.rootDir, env, stdio: "ignore" });
+  let second: ChildProcess | undefined;
+  t.after(() => { writeFileSync(path.join(fixture.barrierDir, "resume"), ""); stop(first); stop(second); });
+  await waitFor(() => existsSync(path.join(fixture.barrierDir, "entered")), "first launcher did not start restoring");
+  const lockPath = path.join(fixture.dataDir, "updates", "update.lock");
+  assert.equal(updateLockIsHeld(lockPath), true);
+  const owner = readFileSync(lockPath, "utf8");
+  second = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], { cwd: fixture.rootDir, env, stdio: "ignore" });
+  await waitFor(() => second!.exitCode !== null, "second launcher did not refuse concurrent recovery", 5_000);
+  assert.equal(second.exitCode, 75);
+  assert.equal(readFileSync(lockPath, "utf8"), owner);
+  writeFileSync(path.join(fixture.barrierDir, "resume"), "");
+  await waitFor(() => healthVersion(port).then(version => version === "0.3.2"), "first launcher did not finish recovery");
+  assert.equal(existsSync(lockPath), false);
+  stop(first);
+  await waitFor(() => !processAlive(first.pid), "recovered app did not stop", 5_000);
+});
 
 // Exercise a kill after every old entry's rename, before the manifest is
 // updated. In particular the backup is still partial for the first entries.

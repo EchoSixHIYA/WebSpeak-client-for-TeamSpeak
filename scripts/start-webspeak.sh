@@ -53,15 +53,71 @@ task_backup_can_repair() {
 }
 
 state_file="$data_dir/updates/state.json"
-task_id=""
-task_status=""
-if [ -f "$state_file" ]; then
-  task_id=$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$state_file" | head -n 1)
-  task_status=$(sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$state_file" | head -n 1)
-fi
-case "$task_id" in
-  ""|*[!A-Za-z0-9_-]*) task_id="" ;;
-esac
+lock_file="$data_dir/updates/update.lock"
+read_update_task() {
+  task_id=""
+  task_status=""
+  if [ -f "$state_file" ]; then
+    task_id=$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$state_file" | head -n 1)
+    task_status=$(sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$state_file" | head -n 1)
+  fi
+  case "$task_id" in
+    ""|*[!A-Za-z0-9_-]*) task_id="" ;;
+  esac
+}
+read_update_task
+
+process_start() {
+  # After the last ')' field 3 is first; starttime (field 22) is twentieth.
+  if [ -r "/proc/$1/stat" ]; then
+    sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'
+  fi
+}
+
+release_recovery_lock() {
+  if [ "${lock_owned:-0}" = 1 ] && [ "$(cat "$lock_file" 2>/dev/null)" = "$lock_payload" ]; then
+    rm -f -- "$lock_file"
+  fi
+  lock_owned=0
+}
+
+acquire_recovery_lock() {
+  # Share the updater's exclusive-create JSON lock. A distinct task id stops
+  # a delayed restart runner from taking this recovery lock over. Keep it for
+  # the entire restore, and only reclaim a proven-dead, unchanged owner.
+  mkdir -p "$data_dir/updates"
+  lock_owned=0
+  start=$(process_start "$$")
+  lock_payload="{\"pid\":$$,\"taskId\":\"recovery_$$\",\"createdAt\":\"\",\"processStart\":\"$start\"}"
+  for attempt in 1 2 3 4; do
+    if (umask 077; set -C; printf '%s\n' "$lock_payload" > "$lock_file") 2>/dev/null; then
+      lock_owned=1
+      trap 'release_recovery_lock' 0
+      trap 'exit 1' HUP INT TERM
+      return 0
+    fi
+    observed=$(cat "$lock_file" 2>/dev/null) || return 1
+    owner=$(printf '%s\n' "$observed" | sed -n 's/.*"pid"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*[,}].*/\1/p' | head -n 1)
+    owner_task=$(printf '%s\n' "$observed" | sed -n 's/.*"taskId"[[:space:]]*:[[:space:]]*"\([^"]\{1,\}\)".*/\1/p' | head -n 1)
+    case "$owner" in ""|*[!0-9]*) return 1 ;; esac
+    [ -n "$owner_task" ] || return 1
+    if [ "$owner" != 0 ]; then
+      if kill -0 "$owner" 2>/dev/null || [ -d "/proc/$owner" ]; then
+        saved_start=$(printf '%s\n' "$observed" | sed -n 's/.*"processStart"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+        current_start=$(process_start "$owner")
+        # Unknown markers and inaccessible processes are conservatively live.
+        if [ -z "$saved_start" ] || [ -z "$current_start" ] || [ "$saved_start" = "$current_start" ]; then
+          return 1
+        fi
+      elif [ ! -d /proc ]; then
+        return 1
+      fi
+    fi
+    [ "$(cat "$lock_file" 2>/dev/null)" = "$observed" ] || continue
+    rm -f -- "$lock_file" || return 1
+  done
+  return 1
+}
 
 recovery_needed() {
   if code_missing; then
@@ -105,6 +161,15 @@ restore_from_backup() {
 }
 
 if recovery_needed; then
+  if ! acquire_recovery_lock; then
+    echo "WebSpeak update or recovery is already running, or its lock cannot be verified; refusing to change application files." >&2
+    exit 75
+  fi
+  # The runner may have completed between the first state read and the lock.
+  read_update_task
+fi
+
+if [ "${lock_owned:-0}" = 1 ] && recovery_needed; then
   restore_backup=""
 
   # The interrupted task is the source of truth. Its backup may be partial
@@ -140,4 +205,5 @@ if recovery_needed; then
   fi
 fi
 
+release_recovery_lock
 exec "$PWD/runtime/node" "$PWD/dist/index.js"

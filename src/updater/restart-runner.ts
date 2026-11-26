@@ -273,8 +273,6 @@ export async function runRestartPlan(planPath: string): Promise<number> {
   const state = new StateWriter(plan);
   let swapped = false;
   let newApp: ChildProcess | undefined;
-  state.status("restarting");
-  state.step("restart", "running");
   // Take over the update lock before doing anything else. The parent process
   // is about to exit and its lock would otherwise have a dead pid, letting a
   // second instance starting in this window roll the healthy code back.
@@ -285,6 +283,8 @@ export async function runRestartPlan(planPath: string): Promise<number> {
     } catch (error) {
       throw new RunnerError("UPDATE_LOCK_FAILED", error instanceof Error ? error.message : "The update lock could not be taken over.");
     }
+    state.status("restarting");
+    state.step("restart", "running");
     await waitForParent(plan.waitForPid, plan.parentTimeoutMs);
     state.step("swap", "running");
     swapCode(plan.rootDir, plan.stagedRoot, plan.backupDir);
@@ -303,6 +303,9 @@ export async function runRestartPlan(planPath: string): Promise<number> {
     try { rmSync(plan.stagedRoot, { recursive: true, force: true }); } catch { /* Best effort. */ }
     return 0;
   } catch (error) {
+    // A recovery process or another update owns the tree. Without ownership
+    // this runner must not rewrite its state or start an app during recovery.
+    if (!releaseLock) return 1;
     await stopApp(newApp);
     const code = error instanceof RunnerError || error instanceof CodeSwapError
       ? error.code

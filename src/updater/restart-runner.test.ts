@@ -126,6 +126,21 @@ async function stopPidFile(pidFile: string): Promise<void> {
   }
 }
 
+test("a runner refused by another lock owner leaves its files and state untouched", async t => {
+  const fixture = runnerFixture(t);
+  writePlan(fixture, await availablePort(), fixture.pidFile, { targetVersion: "2.0.0", reportedVersion: "2.0.0" });
+  const owner = JSON.stringify({ pid: process.pid, taskId: "recovery_owner", createdAt: new Date().toISOString() });
+  writeFileSync(fixture.lockPath, owner);
+  writeFileSync(fixture.statePath, JSON.stringify({ schemaVersion: 1, task: null }));
+  const before = readFileSync(fixture.statePath, "utf8");
+  assert.equal(await runRestartPlan(fixture.planPath), 1);
+  assert.equal(readFileSync(fixture.statePath, "utf8"), before);
+  assert.equal(readFileSync(fixture.lockPath, "utf8"), owner);
+  assert.equal(existsSync(fixture.backupDir), false);
+  assert.equal(existsSync(fixture.pidFile), false);
+  assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "1.0.0");
+});
+
 test("a healthy target version completes the swap and leaves persistent state alone", { timeout: 20_000 }, async t => {
   const fixture = runnerFixture(t);
   const port = await availablePort();

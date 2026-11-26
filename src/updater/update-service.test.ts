@@ -295,18 +295,96 @@ test("an asynchronous download write failure rejects the update without crashing
     },
   })) as unknown as typeof fs.createWriteStream;
   syncBuiltinESMExports();
-  const stalledBody = () => new ReadableStream({
+  const cancelled = new Set<string>();
+  const responses: Response[] = [];
+  const signals: AbortSignal[] = [];
+  const stalledBody = (url: string) => new ReadableStream({
     start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); },
     pull() { return new Promise(() => {}); },
+    cancel() { cancelled.add(url); },
   });
-  const fetch = (async (input: string | URL | Request) => {
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (String(input) === RELEASE_LIST_URL) return new Response(JSON.stringify([release]), { status: 200 });
-    return new Response(stalledBody(), { status: 200 });
+    signals.push(init!.signal!);
+    const response = new Response(stalledBody(String(input)), { status: 200 });
+    responses.push(response);
+    return response;
   }) as typeof globalThis.fetch;
   const { service, launched } = createService(t, [], new Map(), { fetch });
 
   await assert.rejects(service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_DOWNLOAD_FAILED"));
   assert.equal(launched.length, 0);
+  assert.equal(cancelled.size, 2);
+  assert.ok(signals.every(signal => signal.aborted));
+  assert.ok(responses.every(response => !response.body!.locked));
+});
+
+test("a rejected asset aborts its stalled sibling before update cleanup returns", { timeout: 5_000 }, async t => {
+  const archive = packageArchive("0.4.0");
+  const checksums = Buffer.from(checksumText(ASSET_NAME, archive));
+  const release = releaseJson({ version: "0.4.0", assets: [{ name: ASSET_NAME, data: archive }, { name: CHECKSUM_ASSET_NAME, data: checksums }] });
+  const responses: Response[] = [], signals: AbortSignal[] = [];
+  let cancelled = 0;
+  const { service, dataDir } = createService(t, [], new Map(), { fetch: (async (input, init) => {
+    const url = String(input);
+    if (url === RELEASE_LIST_URL) return new Response(JSON.stringify([release]));
+    signals.push(init!.signal!);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array([1])); },
+      pull() { return new Promise(() => {}); },
+      cancel() { cancelled++; },
+    });
+    const response = new Response(body, { headers: url.endsWith(ASSET_NAME) ? { "content-length": String(513 * 1024 * 1024) } : {} });
+    responses.push(response);
+    return response;
+  }) as typeof fetch });
+  await assert.rejects(service.applyUpdate("0.4.0", "0.4.0"), updateErrorCode("UPDATE_DOWNLOAD_TOO_LARGE"));
+  assert.equal(cancelled, 2);
+  assert.ok(signals.every(signal => signal.aborted));
+  assert.ok(responses.every(response => !response.body!.locked));
+  assert.equal(existsSync(path.join(dataDir, "updates", "update.lock")), false);
+});
+
+test("download rejection cancels its body and releases the reader, including unread responses", async t => {
+  for (const declaredSize of [false, true]) {
+    let cancelled = false;
+    let signal: AbortSignal | null | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); },
+      cancel() { cancelled = true; },
+    });
+    const { service } = createService(t, [], new Map(), { fetch: (async (_input, init) => {
+      signal = init?.signal;
+      return new Response(body, { headers: declaredSize ? { "content-length": "3" } : {} });
+    }) as typeof fetch });
+    const target = path.join(workspace(t), "asset");
+    // A small injected byte limit exercises the production rejection path
+    // without allocating or writing a 512 MiB package in a regression test.
+    const download = service as unknown as { downloadAsset(asset: { name: string; url: string; size: number; digest: null }, destination: string, limit: number): Promise<unknown> };
+    await assert.rejects(download.downloadAsset({ name: ASSET_NAME,
+      url: `https://github.com/${OFFICIAL_REPOSITORY}/releases/download/v0.4.0/${ASSET_NAME}`, size: 3, digest: null }, target, 1),
+    updateErrorCode("UPDATE_DOWNLOAD_TOO_LARGE"));
+    assert.equal(cancelled, true);
+    assert.equal(body.locked, false);
+    assert.equal(signal?.aborted, true);
+    assert.equal(existsSync(target), false);
+    assert.equal(existsSync(`${target}.${process.pid}.tmp`), false);
+  }
+});
+
+test("a successful download releases its reader without aborting the request", async t => {
+  let signal: AbortSignal | null | undefined;
+  const response = new Response(new Uint8Array([1, 2, 3]));
+  const { service } = createService(t, [], new Map(), { fetch: (async (_input, init) => {
+    signal = init?.signal; return response;
+  }) as typeof fetch });
+  const target = path.join(workspace(t), "asset");
+  const download = service as unknown as { downloadAsset(asset: { name: string; url: string; size: number; digest: null }, destination: string, limit: number): Promise<unknown> };
+  await download.downloadAsset({ name: ASSET_NAME,
+    url: `https://github.com/${OFFICIAL_REPOSITORY}/releases/download/v0.4.0/${ASSET_NAME}`, size: 3, digest: null }, target, 4);
+  assert.deepEqual(readFileSync(target), Buffer.from([1, 2, 3]));
+  assert.equal(response.body!.locked, false);
+  assert.equal(signal?.aborted, false);
 });
 
 test("a download redirected outside GitHub is refused before it is written", async t => {

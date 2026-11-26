@@ -330,10 +330,22 @@ export class UpdateService {
       const archivePath = path.join(downloadDirectory, assetName);
       const checksumPath = path.join(downloadDirectory, CHECKSUM_ASSET_NAME);
       this.startStep(task, "download");
-      const [archive, checksumFile] = await Promise.all([
-        this.downloadAsset(asset, archivePath, DOWNLOAD_LIMIT),
-        this.downloadAsset(checksumAsset, checksumPath, CHECKSUM_LIMIT),
-      ]);
+      const downloadsController = new AbortController();
+      const downloads = [
+        this.downloadAsset(asset, archivePath, DOWNLOAD_LIMIT, downloadsController.signal),
+        this.downloadAsset(checksumAsset, checksumPath, CHECKSUM_LIMIT, downloadsController.signal),
+      ];
+      let archive: DownloadResult;
+      let checksumFile: DownloadResult;
+      try {
+        [archive, checksumFile] = await Promise.all(downloads);
+      } catch (error) {
+        downloadsController.abort();
+        // No sibling may still hold a response reader or write into the task
+        // directory when applyUpdate's failure cleanup removes that directory.
+        await Promise.allSettled(downloads);
+        throw error;
+      }
       this.finishStep(task, "download", "succeeded");
       this.updateTaskStatus(task, "verifying");
       this.startStep(task, "checksum");
@@ -476,37 +488,49 @@ export class UpdateService {
     if (value.toLowerCase() !== actual) throw new UpdateError("UPDATE_DIGEST_MISMATCH", "The package does not match the GitHub asset digest.", 422);
   }
 
-  private async downloadAsset(asset: ReleaseAsset, destination: string, limit: number): Promise<DownloadResult> {
+  private async downloadAsset(asset: ReleaseAsset, destination: string, limit: number, cancelSignal?: AbortSignal): Promise<DownloadResult> {
     try { assertOfficialDownloadUrl(asset.url, ...repositoryParts(this.options.repository)); }
     catch (error) { throw mapError(error); }
     let response: Response;
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(this.options.downloadTimeoutMs ?? 300_000), ...(cancelSignal ? [cancelSignal] : [])]);
     try {
       response = await this.fetcher(asset.url, {
         headers: { "user-agent": "WebSpeak-Console-Updater", accept: "application/octet-stream" },
-        signal: AbortSignal.timeout(this.options.downloadTimeoutMs ?? 300_000),
+        signal,
       });
     } catch (error) {
+      controller.abort();
       throw new UpdateError("UPDATE_DOWNLOAD_FAILED", error instanceof Error ? error.message : "The release asset could not be downloaded.", 502);
     }
-    if (response.url) {
-      try { assertOfficialDownloadUrl(response.url, ...repositoryParts(this.options.repository)); }
-      catch (error) { throw mapError(error); }
-    }
-    if (!response.ok || !response.body) throw new UpdateError("UPDATE_DOWNLOAD_FAILED", `The release asset returned HTTP ${response.status}.`, 502);
-    const declared = Number(response.headers.get("content-length") ?? "");
-    if (Number.isFinite(declared) && declared > limit) throw new UpdateError("UPDATE_DOWNLOAD_TOO_LARGE", "The release asset exceeds the download limit.", 422);
-    const temporary = `${destination}.${process.pid}.tmp`;
-    const hash = createHash("sha256");
-    const stream = createWriteStream(temporary, { mode: 0o600, flags: "wx" });
-    let bytes = 0;
-    let failStream!: (error: Error) => void;
-    const streamFailure = new Promise<Error>((resolve) => { failStream = resolve; });
-    stream.on("error", failStream);
-    const finished = new Promise<void>((resolve) => { stream.once("finish", resolve); });
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let stream: ReturnType<typeof createWriteStream> | undefined;
+    let temporary: string | undefined;
+    let onAbort: (() => void) | undefined;
     try {
-      const iterator = (response.body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+      if (response.url) {
+        try { assertOfficialDownloadUrl(response.url, ...repositoryParts(this.options.repository)); }
+        catch (error) { throw mapError(error); }
+      }
+      if (!response.ok || !response.body) throw new UpdateError("UPDATE_DOWNLOAD_FAILED", `The release asset returned HTTP ${response.status}.`, 502);
+      const declared = Number(response.headers.get("content-length") ?? "");
+      if (Number.isFinite(declared) && declared > limit) throw new UpdateError("UPDATE_DOWNLOAD_TOO_LARGE", "The release asset exceeds the download limit.", 422);
+      temporary = `${destination}.${process.pid}.tmp`;
+      const hash = createHash("sha256");
+      signal.throwIfAborted();
+      reader = response.body.getReader();
+      stream = createWriteStream(temporary, { mode: 0o600, flags: "wx" });
+      let bytes = 0;
+      let failStream!: (error: Error) => void;
+      const streamFailure = new Promise<Error>((resolve) => { failStream = resolve; });
+      stream.on("error", failStream);
+      onAbort = () => failStream(signal.reason instanceof Error ? signal.reason : new Error("Download aborted."));
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (signal.aborted) onAbort();
+      const writer = stream;
+      const finished = new Promise<void>((resolve) => { writer.once("finish", resolve); });
       while (true) {
-        const next = await Promise.race([iterator.next(), streamFailure]);
+        const next = await Promise.race([reader.read(), streamFailure]);
         if (next instanceof Error) throw next;
         if (next.done) break;
         const buffer = Buffer.from(next.value);
@@ -514,7 +538,7 @@ export class UpdateService {
         if (bytes > limit) throw new UpdateError("UPDATE_DOWNLOAD_TOO_LARGE", "The release asset exceeds the download limit.", 422);
         hash.update(buffer);
         if (!stream.write(buffer)) {
-          const drained = await Promise.race([streamFailure, new Promise<void>((resolve) => { stream.once("drain", resolve); })]);
+          const drained = await Promise.race([streamFailure, new Promise<void>((resolve) => { writer.once("drain", resolve); })]);
           if (drained instanceof Error) throw drained;
         }
       }
@@ -522,13 +546,18 @@ export class UpdateService {
       const streamError = await Promise.race([finished.then(() => null), streamFailure]);
       if (streamError) throw streamError;
       await rename(temporary, destination);
+      return { sha256: hash.digest("hex"), bytes };
     } catch (error) {
-      stream.destroy();
-      await rm(temporary, { force: true }).catch(() => undefined);
+      controller.abort();
+      await (reader ? reader.cancel() : response.body?.cancel())?.catch(() => undefined);
+      stream?.destroy();
+      if (temporary) await rm(temporary, { force: true }).catch(() => undefined);
       if (error instanceof UpdateError) throw error;
       throw new UpdateError("UPDATE_DOWNLOAD_FAILED", error instanceof Error ? error.message : "The release asset could not be saved.", 502);
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+      reader?.releaseLock();
     }
-    return { sha256: hash.digest("hex"), bytes };
   }
 
   /**
