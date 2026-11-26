@@ -214,18 +214,33 @@ jobs:
             grep -q '"status":"ok"' <<<"$health"
             grep -q "\"version\":\"$release_version\"" <<<"$health"
           )
-          tar -czf "$GITHUB_WORKSPACE/${package_name}.tar.gz" -C "$RUNNER_TEMP" "$package_name"
+          # Native rebuilds can leave hard-linked objects and Python/toolchain
+          # symlinks in scratch directories. Ship independent files and keep
+          # build-only scratch paths out of the portable runtime archive.
+          tar --hard-dereference \
+            --exclude='*/@discordjs/opus/build-tmp-*' \
+            --exclude='*/node_gyp_bins' \
+            -czf "$GITHUB_WORKSPACE/${package_name}.tar.gz" -C "$RUNNER_TEMP" "$package_name"
           # Verify the shipped tarball is accepted by the same extractor and
           # package validator used by console updates, including .bin links.
           node --input-type=module - "$GITHUB_WORKSPACE/${package_name}.tar.gz" "$RUNNER_TEMP/${package_name}-updater-check" "$release_version" <<'NODE'
           import path from 'node:path';
           import { rm } from 'node:fs/promises';
+          import { spawnSync } from 'node:child_process';
           import { extractReleaseArchive } from './dist/updater/archive.js';
           import { locatePackageRoot } from './dist/updater/code-swap.js';
           const [archive, destination, version] = process.argv.slice(2);
           try {
             await extractReleaseArchive(archive, destination, path.basename(archive));
-            locatePackageRoot(destination, version, 'linux');
+            const root = locatePackageRoot(destination, version, 'linux');
+            const nativeSmoke = spawnSync(path.join(root, 'runtime', 'node'), ['--input-type=commonjs', '-e', `
+              const { OpusEncoder } = require('@discordjs/opus');
+              const encoder = new OpusEncoder(48000, 2);
+              const packet = encoder.encode(Buffer.alloc(3840));
+              if (encoder.decode(packet).length !== 3840) throw new Error('Packaged Opus codec failed');
+            `], { cwd: root, encoding: 'utf8', timeout: 15000 });
+            if (nativeSmoke.error) throw nativeSmoke.error;
+            if (nativeSmoke.status !== 0) throw new Error(nativeSmoke.stderr || 'Packaged Opus runtime failed');
             console.log(`Console updater accepts ${path.basename(archive)}`);
           } finally {
             await rm(destination, { recursive: true, force: true });
