@@ -618,6 +618,30 @@ test("initialization keeps a live task but reconciles it once its process is gon
   assert.equal(restarted.getStatus().task?.errorCode, "UPDATE_INTERRUPTED");
 });
 
+test("initialization preserves an interrupted tree while a launcher recovery owns the lock", t => {
+  const fixture = createService(t, [], new Map());
+  const taskId = "upd_launcher_recovery";
+  const updates = path.join(fixture.dataDir, "updates");
+  const staged = path.join(updates, "tasks", taskId, "staged");
+  createPackageFiles(staged, "0.4.0");
+  const backup = path.join(updates, "backups", taskId);
+  swapCode(fixture.rootDir, staged, backup);
+  writeUpdateState(path.join(updates, "state.json"), { schemaVersion: 1, task: {
+    id: taskId, status: "restarting", fromVersion: "0.3.2", targetVersion: "0.4.0",
+    startedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", finishedAt: null,
+    errorCode: null, errorMessage: null, rolledBack: false, steps: [],
+  } });
+  const lockPath = path.join(updates, "update.lock");
+  const release = acquireUpdateLock(lockPath, "recovery_other_launcher");
+  t.after(release);
+  const owner = readFileSync(lockPath, "utf8");
+  fixture.service.initialize();
+  assert.equal(readFileSync(lockPath, "utf8"), owner);
+  assert.equal(fixture.service.getStatus().task?.status, "restarting");
+  assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.4.0");
+  assert.equal(JSON.parse(readFileSync(path.join(backup, "package.json"), "utf8")).version, "0.3.2");
+});
+
 test("a replacement app can update again after the runner finishes its cached task", async t => {
   const fixture = createService(t, [], new Map());
   const statePath = path.join(fixture.dataDir, "updates", "state.json");

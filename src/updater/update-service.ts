@@ -162,7 +162,7 @@ export class UpdateService {
     const task = this.state.task;
     // A live lock owner (for example a second process starting by mistake)
     // must not have its in-flight task reconciled as interrupted.
-    if (!task || !isActiveTaskStatus(task.status) || !updateLockIsHeld(this.lockPath, task.id)) {
+    if (!task || !isActiveTaskStatus(task.status) || !updateLockIsHeld(this.lockPath)) {
       const recovered = task && isActiveTaskStatus(task.status) ? this.recoverInterruptedSwap(task) : null;
       const changed = recovered !== null || reconcileInterruptedState(this.state, this.options.currentVersion, this.now().toISOString());
       if (changed) writeUpdateState(this.statePath, this.state);
