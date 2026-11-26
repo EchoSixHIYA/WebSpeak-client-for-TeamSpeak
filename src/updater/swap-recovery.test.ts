@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import test, { type TestContext } from "node:test";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { UpdateService } from "./update-service.js";
-import { CODE_ENTRIES } from "./code-swap.js";
+import { CODE_ENTRIES, swapCode } from "./code-swap.js";
 
 const SOURCE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SOURCE_DIR, "..", "..");
@@ -79,6 +79,11 @@ async function healthVersion(port: number): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function startedVersion(fixture: Fixture): string | null {
+  const { startedFile } = JSON.parse(readFileSync(fixture.markerFiles.config, "utf8")) as { startedFile: string };
+  return existsSync(startedFile) ? readFileSync(startedFile, "utf8") : null;
 }
 
 function processAlive(pid: number | undefined): boolean {
@@ -306,6 +311,83 @@ test(
     assert.equal(status.task?.status, "failed");
     assert.equal(status.task?.errorCode, "UPDATE_INTERRUPTED");
     assert.equal(status.task?.rolledBack, true);
+  },
+);
+
+test(
+  "launcher resumes a partial current backup instead of installing a stale complete backup",
+  { timeout: 20_000 },
+  async t => {
+    const port = await availablePort();
+    const fixture = buildFixture(t, port, true);
+    const staleDir = path.join(fixture.dataDir, "updates", "backups", "aaa_stale_backup");
+    mkdirSync(fixture.backupDir, { recursive: true });
+    renameSync(path.join(fixture.rootDir, "dist"), path.join(fixture.backupDir, "dist"));
+    writeFileSync(path.join(fixture.backupDir, ".webspeak-swap.json"), JSON.stringify({ schemaVersion: 1, entries: ["dist"] }));
+    let app: ChildProcess | undefined;
+    t.after(() => stop(app));
+
+    app = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], {
+      cwd: fixture.rootDir,
+      env: { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir },
+      stdio: "ignore",
+    });
+    await waitFor(() => startedVersion(fixture) !== null, "launcher did not resume the partial current backup");
+    assert.equal(startedVersion(fixture), "0.3.2");
+    assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.3.2");
+    assert.equal(JSON.parse(readFileSync(path.join(staleDir, "package.json"), "utf8")).version, "0.1.0");
+    assert.equal(existsSync(path.join(staleDir, "dist", "index.js")), true);
+  },
+);
+
+test(
+  "launcher resumes a rollback that already consumed part of the current backup",
+  { timeout: 20_000 },
+  async t => {
+    const port = await availablePort();
+    const fixture = buildFixture(t, port);
+    swapCode(fixture.rootDir, fixture.stagedRoot, fixture.backupDir);
+    for (const entry of ["runtime", "package.json"]) {
+      rmSync(path.join(fixture.rootDir, entry), { recursive: true, force: true });
+      renameSync(path.join(fixture.backupDir, entry), path.join(fixture.rootDir, entry));
+    }
+    mkdirSync(path.join(fixture.backupDir, "rejected"), { recursive: true });
+    renameSync(path.join(fixture.rootDir, "dist"), path.join(fixture.backupDir, "rejected", "dist"));
+    let app: ChildProcess | undefined;
+    t.after(() => stop(app));
+
+    app = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], {
+      cwd: fixture.rootDir,
+      env: { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir },
+      stdio: "ignore",
+    });
+    await waitFor(() => startedVersion(fixture) !== null, "launcher did not resume the interrupted rollback");
+    assert.equal(startedVersion(fixture), "0.3.2");
+    assert.equal(existsSync(path.join(fixture.rootDir, "dist", "index.js")), true);
+  },
+);
+
+test(
+  "launcher rolls back an active fully swapped tree before starting the target",
+  { timeout: 20_000 },
+  async t => {
+    const port = await availablePort();
+    const fixture = buildFixture(t, port);
+    writeFileSync(path.join(fixture.stagedRoot, "dist", "index.js"), appScript());
+    copyFileSync(process.execPath, path.join(fixture.stagedRoot, "runtime", "node"));
+    chmodSync(path.join(fixture.stagedRoot, "runtime", "node"), 0o755);
+    swapCode(fixture.rootDir, fixture.stagedRoot, fixture.backupDir);
+    let app: ChildProcess | undefined;
+    t.after(() => stop(app));
+
+    app = spawn(path.join(fixture.rootDir, "start-webspeak.sh"), [], {
+      cwd: fixture.rootDir,
+      env: { ...process.env, WEBSPEAK_DATA_DIR: fixture.dataDir },
+      stdio: "ignore",
+    });
+    await waitFor(() => startedVersion(fixture) !== null, "launcher did not resolve the active swapped tree");
+    assert.equal(startedVersion(fixture), "0.3.2");
+    assert.equal(JSON.parse(readFileSync(path.join(fixture.rootDir, "package.json"), "utf8")).version, "0.3.2");
   },
 );
 

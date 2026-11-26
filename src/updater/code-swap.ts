@@ -56,6 +56,7 @@ export function validateStagedPackage(root: string, options: StagedPackageOption
   requireEntry(root, "node_modules", "directory");
   requireEntry(root, "package.json", "file");
   requireEntry(root, options.platform === "win32" ? "runtime/node.exe" : "runtime/node", "file");
+  requireEntry(root, options.platform === "win32" ? "start-webspeak.cmd" : "start-webspeak.sh", "file");
   let manifest: unknown;
   try { manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")); }
   catch { throw new CodeSwapError("UPDATE_PACKAGE_INVALID", "Release package manifest is not valid JSON."); }
@@ -145,10 +146,10 @@ function moveIfPresent(from: string, to: string): void {
 }
 
 /**
- * Backups written by this version contain only atomically moved entries.
- * The manifest records which entries were moved completely, so a backup that
- * was partially written by an older implementation (or tampered with) can be
- * rejected instead of overwriting an intact install tree.
+ * Backups written by this version journal each entry before moving it. The
+ * journal may therefore contain an entry whose move never started, but it can
+ * never omit an entry that reached the backup. Recovery acts only on entries
+ * that actually exist in the backup, so a kill between journal and move is safe.
  */
 const SWAP_MANIFEST = ".webspeak-swap.json";
 
@@ -203,10 +204,10 @@ export function swapCode(rootDir: string, stagedRoot: string, backupDir: string)
     writeSwapManifest(backupDir, []);
     for (const entry of CODE_ENTRIES) {
       if (!existsSync(path.join(rootDir, entry))) continue;
-      moveIfPresent(path.join(rootDir, entry), path.join(backupDir, entry));
       movedToBackup.push(entry);
-      swapWindowBarrier(entry);
       writeSwapManifest(backupDir, movedToBackup);
+      moveIfPresent(path.join(rootDir, entry), path.join(backupDir, entry));
+      swapWindowBarrier(entry);
     }
     swapWindowBarrier();
     for (const entry of CODE_ENTRIES) {
@@ -216,7 +217,12 @@ export function swapCode(rootDir: string, stagedRoot: string, backupDir: string)
     }
   } catch (error) {
     try { restoreMovedEntries(rootDir, backupDir, movedToBackup, movedToRoot); }
-    catch { /* Report the original swap error; rollback failure is handled by the caller. */ }
+    catch (rollbackError) {
+      throw new CodeSwapError(
+        "UPDATE_ROLLBACK_FAILED",
+        `${error instanceof Error ? error.message : "Release package swap failed."} Code rollback also failed: ${rollbackError instanceof Error ? rollbackError.message : "unknown error"}`,
+      );
+    }
     if (error instanceof CodeSwapError) throw error;
     throw new CodeSwapError("UPDATE_SWAP_FAILED", error instanceof Error ? error.message : "Release package swap failed.");
   }

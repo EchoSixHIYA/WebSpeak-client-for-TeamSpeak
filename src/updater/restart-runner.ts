@@ -217,7 +217,7 @@ async function waitForVersion(plan: RestartPlan, version: string, timeoutMs: num
     if (last?.status === "ok" && last.version === version) return last;
     await sleep(plan.pollIntervalMs);
   }
-  return last?.version === version ? last : null;
+  return null;
 }
 
 function startApp(plan: RestartPlan): ChildProcess {
@@ -309,6 +309,12 @@ export async function runRestartPlan(planPath: string): Promise<number> {
       : "UPDATE_RESTART_FAILED";
     const message = error instanceof Error ? error.message : "The update could not be completed.";
     state.step("restart", "failed", message);
+    if (!swapped && code === "UPDATE_ROLLBACK_FAILED") {
+      state.rolledBack(false);
+      state.status("failed", { code, message });
+      releaseLock?.();
+      return 1;
+    }
     let rolledBack = !swapped;
     if (swapped) {
       state.step("rollback", "running");

@@ -37,6 +37,11 @@ test("staged packages must be complete, regular files and version-matched", t =>
   rmSync(path.join(missing, "runtime", "node"));
   assert.throws(() => validateStagedPackage(missing, { version: "0.4.0", platform: "linux" }), packageInvalid);
 
+  const missingLauncher = workspace(t);
+  createPackageFiles(missingLauncher, "0.4.0");
+  rmSync(path.join(missingLauncher, "start-webspeak.sh"));
+  assert.throws(() => validateStagedPackage(missingLauncher, { version: "0.4.0", platform: "linux" }), packageInvalid);
+
   const linked = workspace(t);
   createPackageFiles(linked, "0.4.0");
   rmSync(path.join(linked, "runtime", "node"));

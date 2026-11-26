@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import type { Logger } from "../logger.js";
 import type { UpdateCheckView, UpdateReleaseView, UpdateStatusView, UpdateTaskStatus, UpdateTaskView } from "../shared/update.js";
 import { ArchiveError, extractReleaseArchive } from "./archive.js";
-import { CodeSwapError, locatePackageRoot, restoreCode } from "./code-swap.js";
+import { CodeSwapError, locatePackageRoot, restoreCode, validateStagedPackage } from "./code-swap.js";
 import { detectDeployment, releaseAssetName, type DeploymentInfo } from "./deployment.js";
 import {
   assertOfficialDownloadUrl, CHECKSUM_ASSET_NAME, GitHubReleaseSource, ReleaseSourceError,
@@ -184,6 +184,15 @@ export class UpdateService {
   private recoverInterruptedSwap(task: NonNullable<PersistedUpdateState["task"]>): boolean | null {
     const backupDir = path.join(this.backupsDir, task.id);
     if (!existsSync(backupDir)) return null;
+    if (this.options.currentVersion === task.targetVersion) {
+      try {
+        validateStagedPackage(this.options.rootDir, { version: task.targetVersion, platform: this.options.platform });
+        return null;
+      } catch {
+        // A process can read the target version before every target entry is in
+        // place. Fall through to recovery when the on-disk tree is incomplete.
+      }
+    }
     const now = this.now().toISOString();
     let restored = false;
     try {
@@ -490,19 +499,28 @@ export class UpdateService {
     const hash = createHash("sha256");
     const stream = createWriteStream(temporary, { mode: 0o600, flags: "wx" });
     let bytes = 0;
+    let failStream!: (error: Error) => void;
+    const streamFailure = new Promise<Error>((resolve) => { failStream = resolve; });
+    stream.on("error", failStream);
+    const finished = new Promise<void>((resolve) => { stream.once("finish", resolve); });
     try {
-      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-        const buffer = Buffer.from(chunk);
+      const iterator = (response.body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+      while (true) {
+        const next = await Promise.race([iterator.next(), streamFailure]);
+        if (next instanceof Error) throw next;
+        if (next.done) break;
+        const buffer = Buffer.from(next.value);
         bytes += buffer.length;
         if (bytes > limit) throw new UpdateError("UPDATE_DOWNLOAD_TOO_LARGE", "The release asset exceeds the download limit.", 422);
         hash.update(buffer);
-        if (!stream.write(buffer)) await new Promise<void>((resolve) => stream.once("drain", resolve));
+        if (!stream.write(buffer)) {
+          const drained = await Promise.race([streamFailure, new Promise<void>((resolve) => { stream.once("drain", resolve); })]);
+          if (drained instanceof Error) throw drained;
+        }
       }
       stream.end();
-      await new Promise<void>((resolve, reject) => {
-        stream.once("finish", resolve);
-        stream.once("error", reject);
-      });
+      const streamError = await Promise.race([finished.then(() => null), streamFailure]);
+      if (streamError) throw streamError;
       await rename(temporary, destination);
     } catch (error) {
       stream.destroy();
