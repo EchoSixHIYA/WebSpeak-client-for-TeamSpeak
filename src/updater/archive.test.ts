@@ -67,7 +67,7 @@ test("official relative .bin symlinks are accepted and resolve inside the packag
   await extractReleaseArchive(archive, destination, "release.tar.gz");
   const link = path.join(destination, "webspeak/node_modules/.bin/nanoid");
   assert.equal(lstatSync(link).isSymbolicLink(), true);
-  assert.equal(readlinkSync(link), "../nanoid/bin/nanoid.cjs");
+  assert.equal(readlinkSync(link), path.normalize("../nanoid/bin/nanoid.cjs"));
   assert.equal(readFileSync(link, "utf8"), "#!/usr/bin/env node\nconsole.log('nanoid');\n");
 });
 

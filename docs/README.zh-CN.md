@@ -214,11 +214,13 @@ WebRTC 启用后端口范围会锁定。要修改端口，先关闭 WebRTC 并�
 
 在管理后台的 WebRTC 高级参数中可设置：
 
-- **公网媒体地址**：WebSpeak 网关可被 UDP 访问的 IP 或域名，不含协议、路径或端口。优先于网页入口推断；留空时按 `Origin`、`X-Forwarded-Host`、`Host` 推断。域名会解析为 IP 候选。反代域名不一定是媒体地址。
+- **公网媒体地址**：WebSpeak 网关可被 UDP 直达的 IP 或域名，不含协议、路径或端口。有公网 IP 时优先填它；Cloudflare Tunnel/纯 TCP 入口不要填 CF 代理域名。优先于网页入口推断；留空时按 `Origin`、`X-Forwarded-Host`、`Host` 推断，但 Cloudflare 请求不会再拿 CF 边缘 Host 当媒体地址。域名会解析为 IP 候选。
 - **启用 IPv6 候选**：默认关闭；开启后保留 IPv4，同时收集 IPv6。需确保 IPv6 路由及 UDP 防火墙放行。
 - **语音 STUN 服务**：可设置 `stun:turn.teamspeak.com:3478`，浏览器和网关使用同一服务发现公网映射。留空保留旧行为：werift 网关仍使用库内置 STUN，浏览器不配置 STUN。当前字段仅支持可通过 IPv4 访问的 UDP STUN 域名或 IPv4 地址，不接受 IPv6 字面量、TURN 或凭据；IPv6 媒体候选独立于 STUN 开关。
 
-保存后重新连接。网页和 WebSocket 经反代可达，不代表媒体 UDP 可达；STUN 仅发现地址，不中继音频，也不保证穿透所有 NAT。只有 TCP 隧道而无可用 UDP/IPv6 路径时，仍会回退兼容传输。应开放配置的整个 UDP 端口范围；静态端口转发需保持相同端口映射。
+保存后重新连接。网页和 WebSocket 经反代可达，不代表媒体 UDP 可达；STUN 仅发现地址，不中继音频，也不保证穿透所有 NAT。应开放配置的整个 UDP 端口范围；静态端口转发需保持相同端口映射。
+
+手机流量或 UDP 被拦时，可配置外部 TURN 作为可选后备：在管理台“服务器 → 语音”填写 TURN REST URL、共享密钥和有效期，或使用 `WEBSPEAK_TURN_REST_URLS`、`WEBSPEAK_TURN_REST_SECRET` 环境变量。控制台保存的配置优先，且不需要重启网关，对新连接生效。默认保持 `WEBSPEAK_VOICE_ICE_TRANSPORT_POLICY=all`，先试直连；只有确认 UDP 完全不可用时才用 `relay`。`WEBSPEAK_VOICE_PROFILE` 默认 `auto`：只有经过可信 Cloudflare 代理的请求才启用自适应 buffer，直连及其他请求继续使用旧 80ms/裸 PCM 行为；本机 Tunnel 连接默认可信，cloudflared 从其他地址连接时需配置 `WEBSPEAK_TRUSTED_PROXIES`。需要直连也启用时显式设 `adaptive`，也可在控制台“语音模式”覆盖。WebSocket Opus 默认关闭，可在“服务器 → 语音”或通过 `WEBSPEAK_VOICE_OPUS_WS=1` 启用，并需使用 `adaptive`。直连 UDP 与 TURN 都无法提供媒体路径时，会话报告 `NO_MEDIA_PATH` 并使用兼容传输。完整部署、验收和回滚见 [`CLOUDFLARE_TUNNEL_VOICE.md`](CLOUDFLARE_TUNNEL_VOICE.md)，模板见 `deploy/coturn/` 和 `deploy/cloudflared/`。
 
 ### 屏幕共享的 ICE 候选
 

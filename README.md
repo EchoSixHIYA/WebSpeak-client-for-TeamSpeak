@@ -82,6 +82,7 @@ docker compose up -d
 1. 打开 `http://127.0.0.1:3040/admin`，使用 `admin` / `admin` 登录并设置至少 12 位新密码。Open the console, sign in and replace the default password.
 2. 配置 TeamSpeak 目标和访问模式；公网使用 HTTPS。Set the TeamSpeak target and access mode; use HTTPS for public access.
 3. 启用 WebRTC 时放行配置的 UDP 范围，默认 `40000–40099`。Allow the configured UDP range when enabling WebRTC.
+4. Cloudflare Tunnel 或受限网络可在管理台“服务器 → 语音”配置 TURN 后备、语音模式和自适应音频，保存后对新的语音连接生效。Configure TURN fallback, voice mode, and adaptive audio under Admin → Voice; changes apply to new voice connections after saving.
 
 数据保存在 `webspeak-data` volume，升级时保留它。Docker 控制台只能检查版本；升级请在宿主机执行 `docker compose pull && docker compose up -d`，且不要执行 `docker compose down -v`。以上 Compose 使用主机网络；Windows 服务端可选择[发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest)。完整说明：[中文部署指南](./docs/README.zh-CN.md#deployment) · [English deployment guide](./docs/README.en.md#deployment)。
 
@@ -96,6 +97,8 @@ Data persists in the `webspeak-data` volume. On Docker, the console only checks 
 - [Deutsch](./docs/README.de.md)
 - [Русский](./docs/README.ru.md)
 - [日本語](./docs/README.ja.md)
+- [Cloudflare Tunnel 语音部署与排障](./docs/CLOUDFLARE_TUNNEL_VOICE.md)
+- [语音兼容性说明 / Voice compatibility notes](./docs/VOICE_FIX_REPORT.md)
 - [皮肤开发指南 / Skin development guide](./docs/SKIN_DEVELOPMENT.md)
 - [皮肤开发 Agent Skill / Skin Development Agent Skill](./.agents/skills/webspeak-skin-development/SKILL.md)
 

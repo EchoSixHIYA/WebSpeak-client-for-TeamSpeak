@@ -34,7 +34,7 @@ function fixture() {
   const transport = new SessionAudioTransport({
     audio, socket, client, logger, isCurrent: () => state.current, isReady: () => state.ready,
     selfId: () => 1, peer: () => state.peer, whisperTargets: () => state.targets,
-    sendJson: message => { notices.push(message); },
+    sendJson: message => { notices.push(message); }, pacing: false,
   }, encoder, () => state.now, () => state.now);
   const remote = (clientId = 513) => ({ clientId, codec: 4, data: Buffer.from([11, 12, 13]) });
   return { transport, audio, state, socket, client, encoder, packets, encoded, forwarded, notices, warnings, remote };
@@ -117,8 +117,8 @@ test("repeated malformed frames are counted in full but reported once per window
   assert.equal(f.audio.ingressDroppedFrames, 4, "every discarded frame still reaches the flow counters");
   assert.equal(f.notices.length, 2, "the browser sees one error per window, not one per frame");
   assert.deepEqual(f.warnings, [
-    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: 1_920, droppedFrames: 1 },
-    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: 1_920, droppedFrames: 4 },
+    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: "1920 or tagged", droppedFrames: 1 },
+    { code: "INVALID_AUDIO_FRAME", frameBytes: 1_919, expectedBytes: "1920 or tagged", droppedFrames: 4 },
   ], "operators get the same rate-limited view through the logger");
 });
 
@@ -129,6 +129,19 @@ test("an encoder failure and a malformed frame do not suppress each other", t =>
   f.transport.receivePcm(Buffer.alloc(1_920));
   assert.deepEqual(f.notices.map(message => message.type), ["error", "audioError"]);
   t.mock.restoreAll();
+});
+
+test("tagged PCM and pre-encoded Opus frames share the uplink without double encoding", () => {
+  const f = fixture();
+  f.transport.receivePcm(Buffer.concat([Buffer.from([1]), Buffer.alloc(1_920)]));
+  f.transport.receivePcm(Buffer.concat([Buffer.from([2]), Buffer.from([1, 2, 3])]));
+  assert.equal(f.encoded.length, 1);
+  assert.equal(f.audio.ingressPcmFrames, 1);
+  assert.equal(f.audio.ingressOpusFrames, 1);
+  assert.deepEqual(f.forwarded.map(({ data, codec }) => ({ data: [...data], codec })), [
+    { data: [9, 8, 7], codec: 4 },
+    { data: [1, 2, 3], codec: 4 },
+  ]);
 });
 
 test("WebRTC ingress excludes queued PCM and fallback re-enables PCM", () => {

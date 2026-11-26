@@ -228,12 +228,15 @@ function localizedMessage(message: string) {
 function localizedAudioNotice(code: string, message: string) {
   if (language.value === "zh") return message;
   const normalizedCode = visibleErrorCode(code || "AUDIO_NOTICE");
+  const webRtcReason = code === "WEBRTC_FAILED"
+    ? message.match(/错误代码：([A-Z0-9_-]{1,64})/)?.[1] ?? normalizedCode
+    : normalizedCode;
   const messages: Record<string, { en: string; de: string; ru: string; ja: string }> = {
-    WEBRTC_FALLBACK: {
-      en: `WebRTC realtime voice is unavailable (error code: ${normalizedCode}). Compatibility transport is active; latency and audio quality may be lower`,
-      de: `Echtzeitstimme über WebRTC ist nicht verfügbar (Fehlercode: ${normalizedCode}). Der Kompatibilitätstransport ist aktiv; Latenz und Audioqualität können schlechter sein`,
-      ru: `Голосовая связь WebRTC недоступна (код ошибки: ${normalizedCode}). Используется совместимый транспорт; задержка и качество звука могут быть ниже`,
-      ja: `WebRTC のリアルタイム音声は利用できません（エラーコード: ${normalizedCode}）。互換トランスポートを使用するため、遅延や音質が低下する場合があります`,
+    WEBRTC_FAILED: {
+      en: `WebRTC realtime voice is unavailable (error code: ${webRtcReason}). Compatibility audio (PCM/Opus over WebSocket) is active to keep this voice session working; use “Reconnect WebRTC” to try again`,
+      de: `Echtzeitstimme über WebRTC ist nicht verfügbar (Fehlercode: ${webRtcReason}). Der kompatible Audioweg (PCM/Opus über WebSocket) ist aktiv, damit diese Sprachsitzung bestehen bleibt; klicke auf „WebRTC neu verbinden“, um es erneut zu versuchen`,
+      ru: `Голосовая связь WebRTC недоступна (код ошибки: ${webRtcReason}). Включён совместимый аудиоканал (PCM/Opus через WebSocket), чтобы сохранить текущую голосовую сессию; нажмите «Переподключить WebRTC», чтобы повторить попытку`,
+      ja: `WebRTC のリアルタイム音声は利用できません（エラーコード: ${webRtcReason}）。現在のボイスセッションを維持するため、互換オーディオ（PCM/Opus over WebSocket）が有効です。「WebRTC を再接続」から再試行できます`,
     },
     PLAYBACK_BLOCKED: {
       en: "The browser blocked automatic audio playback. Click the page or allow audio playback for this site",

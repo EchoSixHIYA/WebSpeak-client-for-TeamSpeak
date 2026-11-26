@@ -1,4 +1,5 @@
 import { isSessionDescription, type WebRtcClientMessage } from "../../../src/shared/webrtc.js";
+import { hasVoiceTurnServer, type VoiceIceServer } from "../../../src/shared/voice-ice.js";
 import { createWebRtcInput, type WebRtcInput } from "./webrtc-input.js";
 import { createMicrophoneMeter, type MicrophoneMeter } from "./microphone-meter.js";
 import { createWebRtcPlayback, type WebRtcPlaybackOptions } from "./webrtc-playback.js";
@@ -18,7 +19,8 @@ interface Connection {
 interface TransportOptions {
   prepareMicrophone(): Promise<Microphone | null>;
   stunServer?(): string;
-  stopPcm(): void;
+  iceServers?(): VoiceIceServer[];
+  iceTransportPolicy?(): RTCIceTransportPolicy;
   muted(): boolean;
   inputVolume(): number;
   accompanimentActive(): boolean;
@@ -26,7 +28,8 @@ interface TransportOptions {
   onLevel(rms: number | null, track: MediaStreamTrack): void;
   onReady(): void;
   onConnectionState?(state: RTCPeerConnectionState): void;
-  onFallback(reason: string, isCurrent: () => boolean): Promise<void>;
+  onIceCandidateError?(errorCode: number, url?: string): void;
+  onFailure(reason: string, isCurrent: () => boolean): Promise<void>;
   playback: WebRtcPlaybackOptions;
 }
 
@@ -85,15 +88,14 @@ export function createWebRtcTransport(options: TransportOptions) {
     }
   }
 
-  async function fail(record: Attempt, reason: string): Promise<void> {
+  async function failAttempt(record: Attempt, reason: string): Promise<void> {
     if (!isCurrent(record)) return;
-    // Signaling is best-effort once the transport fails. It cannot prevent
-    // local teardown or compatibility capture when the socket send throws.
+    // Signaling is best-effort once the transport fails. It cannot prevent local teardown when the socket send throws.
     clean(() => record.connection.send({ type: "webrtcStop" }));
     stop();
-    const fallbackGeneration = generation;
-    const isFallbackCurrent = (): boolean => generation === fallbackGeneration && record.connection.isCurrent();
-    if (isFallbackCurrent()) await options.onFallback(reason, isFallbackCurrent);
+    const failureGeneration = generation;
+    const isFailureCurrent = (): boolean => generation === failureGeneration && record.connection.isCurrent();
+    if (isFailureCurrent()) await options.onFailure(reason, isFailureCurrent);
   }
 
   async function waitForIce(record: Attempt, peer: RTCPeerConnection): Promise<void> {
@@ -109,7 +111,7 @@ export function createWebRtcTransport(options: TransportOptions) {
         resolve();
       };
       const onStateChange = (): void => { if (peer.iceGatheringState === "complete") finish(); };
-      const timer = window.setTimeout(finish, 5_000);
+      const timer = window.setTimeout(finish, 6_000);
       record.cancelIce = finish;
       peer.addEventListener("icegatheringstatechange", onStateChange);
     });
@@ -129,10 +131,23 @@ export function createWebRtcTransport(options: TransportOptions) {
     if (!track || track.readyState !== "live") throw new Error("没有可用的麦克风音轨");
 
     try {
-      options.stopPcm();
       const stunServer = options.stunServer?.();
-      const peer = new RTCPeerConnection({ iceServers: stunServer ? [{ urls: stunServer }] : [] });
+      const configuredIceServers = options.iceServers?.() ?? [];
+      const iceServers = configuredIceServers.length ? configuredIceServers : (stunServer ? [{ urls: stunServer }] : []);
+      const iceTransportPolicy = options.iceTransportPolicy?.() ?? "all";
+      if (iceTransportPolicy === "relay" && !hasVoiceTurnServer(iceServers)) {
+        await failAttempt(record, "WEBRTC_NO_RELAY");
+        return;
+      }
+      const peer = new RTCPeerConnection({
+        iceServers,
+        iceTransportPolicy,
+        bundlePolicy: "max-bundle",
+      });
       record.peer = peer;
+      peer.onicecandidateerror = event => {
+        options.onIceCandidateError?.(event.errorCode, event.url);
+      };
       track.enabled = !options.muted();
       const input = createWebRtcInput(context, processedStream, options.muted() ? 0 : options.inputVolume());
       record.input = input;
@@ -140,12 +155,12 @@ export function createWebRtcTransport(options: TransportOptions) {
       peer.ontrack = event => {
         if (!isCurrent(record)) return;
         try { playback.attach(event.streams[0] ?? new MediaStream([event.track])); }
-        catch { void fail(record, "WEBRTC_PLAYBACK_FAILED"); }
+        catch { void failAttempt(record, "WEBRTC_PLAYBACK_FAILED"); }
       };
       record.meter = createMicrophoneMeter(context, stream, rms => options.onLevel(rms, track));
       peer.onconnectionstatechange = () => {
         options.onConnectionState?.(peer.connectionState);
-        if (isCurrent(record) && peer.connectionState === "failed") void fail(record, "WEBRTC_CONNECTION_FAILED");
+        if (isCurrent(record) && peer.connectionState === "failed") void failAttempt(record, "WEBRTC_CONNECTION_FAILED");
       };
       options.onConnectionState?.(peer.connectionState);
 
@@ -165,10 +180,10 @@ export function createWebRtcTransport(options: TransportOptions) {
       record.answerTimer = window.setTimeout(() => {
         if (!isCurrent(record)) return;
         record.answerTimer = null;
-        if (!peer.remoteDescription) void fail(record, "WEBRTC_ANSWER_TIMEOUT");
+        if (!peer.remoteDescription) void failAttempt(record, "WEBRTC_ANSWER_TIMEOUT");
       }, 8_000);
     } catch {
-      await fail(record, "WEBRTC_NEGOTIATION_FAILED");
+      await failAttempt(record, "WEBRTC_NEGOTIATION_FAILED");
     }
   }
 
@@ -183,14 +198,14 @@ export function createWebRtcTransport(options: TransportOptions) {
       record.answerTimer = null;
       record.active = true;
       options.onReady();
-    } catch { await fail(record, "WEBRTC_ANSWER_REJECTED"); }
+    } catch { await failAttempt(record, "WEBRTC_ANSWER_REJECTED"); }
   }
 
   return {
     start, stop, applyAnswer,
     get generation(): number { return generation; },
     releaseInput(): void { releaseInput(); },
-    async fallback(reason: string): Promise<void> { if (current) await fail(current, reason); },
+    async fail(reason: string): Promise<void> { if (current) await failAttempt(current, reason); },
     get peer(): RTCPeerConnection | null { return current?.peer ?? null; },
     get input(): WebRtcInput | null { return current?.input ?? null; },
     get active(): boolean { return current?.active ?? false; },

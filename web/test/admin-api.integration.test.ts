@@ -14,6 +14,7 @@ import { createAdminApi } from "../src/services/admin-api.js";
 import { adminResponses } from "../../src/shared/admin-responses.js";
 import type { QueryClient, QueryClientOptions } from "@honeybbq/teamspeak/query";
 import { decryptSecret } from "../../src/security/secret-crypto.js";
+import { DEFAULT_VOICE_ICE_CONFIG, type VoiceIceConfig } from "../../src/server/voice-ice-config.js";
 
 const logger: Logger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
 
@@ -23,7 +24,7 @@ test("schema 7 upgrades preserve the previously unused public host and initializ
   const original = new WebSpeakDatabase(filename);
   original.close();
   const legacy = new DatabaseSync(filename);
-  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; DROP TABLE workspace_invites; PRAGMA user_version = 7;");
+  legacy.exec("DROP TABLE ts_admin_settings; ALTER TABLE relay_nodes DROP COLUMN voice_endpoint; ALTER TABLE settings DROP COLUMN ts_target; ALTER TABLE managed_invites DROP COLUMN target_text; ALTER TABLE settings DROP COLUMN webrtc_ipv6_enabled; ALTER TABLE settings DROP COLUMN webrtc_stun_server; DROP TABLE workspace_invites; ALTER TABLE settings DROP COLUMN voice_profile; ALTER TABLE settings DROP COLUMN voice_turn_urls; ALTER TABLE settings DROP COLUMN voice_turn_secret_encrypted; ALTER TABLE settings DROP COLUMN voice_turn_ttl_seconds; ALTER TABLE settings DROP COLUMN voice_opus_ws; ALTER TABLE settings DROP COLUMN voice_jitter_max_ms; PRAGMA user_version = 7;");
   legacy.prepare("UPDATE settings SET webrtc_public_host = ?").run("media.example.com");
   legacy.close();
   const migrated = new WebSpeakDatabase(filename);
@@ -36,6 +37,45 @@ test("schema 7 upgrades preserve the previously unused public host and initializ
   assert.equal(migrated.getSettings().webRtcPublicHost, "media.example.com");
   assert.equal(migrated.getSettings().webRtcIpv6Enabled, false);
   assert.equal(migrated.getSettings().webRtcStunServer, "");
+});
+
+test("voice console overrides preserve environment inheritance until explicitly changed", t => {
+  const directory = mkdtempSync(join(tmpdir(), "webspeak-voice-admin-"));
+  const database = new WebSpeakDatabase(join(directory, "test.db"));
+  t.after(() => {
+    database.close();
+    assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+    assert.ok(directory.includes("webspeak-voice-admin-"));
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const defaults: VoiceIceConfig = {
+    ...DEFAULT_VOICE_ICE_CONFIG,
+    profile: "adaptive",
+    opusWebSocket: true,
+    jitterMaxMs: 180,
+    turnRest: { urls: ["turn:turn.example.com:3478"], secret: "environment-turn-secret", ttlSeconds: 3600 },
+  };
+  const service = new AdminService(database, Buffer.alloc(32, 7), logger, join(directory, "absent-config.json"), undefined, "test-version", undefined, defaults);
+  const view = service.getAdminSettings();
+  const base = { target: view.target, accessMode: view.accessMode, siteName: view.siteName, welcomeText: view.welcomeText, webRtcEnabled: view.webRtcEnabled };
+  service.updateSettings({ ...base, siteName: "Renamed" });
+  const inherited = database.getSettings();
+  assert.equal(inherited.voiceProfile, null);
+  assert.equal(inherited.voiceTurnUrls, null);
+  assert.equal(inherited.voiceTurnSecretEncrypted, null);
+  assert.equal(inherited.voiceTurnTtlSeconds, null);
+  assert.equal(inherited.voiceOpusWs, null);
+  assert.equal(inherited.voiceJitterMaxMs, null);
+  assert.deepEqual(service.getVoiceIceConfig(), defaults);
+
+  service.updateSettings({ ...base, voiceProfile: "legacy", voiceTurnUrls: "", voiceTurnSecretAction: "remove", voiceOpusWs: false, voiceJitterMaxMs: 80 });
+  const overridden = database.getSettings();
+  assert.equal(overridden.voiceProfile, "legacy");
+  assert.equal(overridden.voiceTurnUrls, "");
+  assert.equal(overridden.voiceTurnSecretEncrypted, "");
+  assert.equal(overridden.voiceOpusWs, false);
+  assert.equal(overridden.voiceJitterMaxMs, 80);
+  assert.equal(service.getVoiceIceConfig().turnRest, undefined);
 });
 
 test("browser admin API consumes the actual HTTP router and preserves keep/replace/remove secrets", async t => {
@@ -108,17 +148,35 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
   const tsAdminInitial = await api.tsAdminSettings();
   assert.deepEqual({ fixedMode: tsAdminInitial.fixedMode, enabled: tsAdminInitial.enabled, hasPassword: tsAdminInitial.hasPassword }, { fixedMode: true, enabled: false, hasPassword: false });
   const original = await api.settings();
+  const voiceKeys = new Set(["voiceProfile", "voiceTurnUrls", "hasVoiceTurnSecret", "voiceTurnTtlSeconds", "voiceOpusWs", "voiceJitterMaxMs"]);
+  const withoutVoiceSettings = (value: typeof original) => Object.fromEntries(Object.entries(value).filter(([key]) => !voiceKeys.has(key))) as typeof original;
   assert.equal(original.webRtcPublicHost, "");
   assert.equal(original.webRtcIpv6Enabled, false);
   assert.equal(original.webRtcStunServer, "");
+  assert.equal(original.voiceProfile, "auto");
+  assert.equal(original.voiceTurnUrls, "");
+  assert.equal(original.hasVoiceTurnSecret, false);
+  assert.equal(original.voiceTurnTtlSeconds, 21600);
+  assert.equal(original.voiceOpusWs, false);
+  assert.equal(original.voiceJitterMaxMs, 300);
   const network = { webRtcPublicHost: " MEDIA.example.com ", webRtcIpv6Enabled: true, webRtcStunServer: "stun:stun.example.com" };
-  const updated = await api.saveSettings({ ...original, ...network });
+  const updated = await api.saveSettings({ ...withoutVoiceSettings(original), ...network });
   assert.equal(updated.settings.webRtcPublicHost, "media.example.com");
   assert.equal(updated.settings.webRtcStunServer, "stun:stun.example.com:3478");
   assert.deepEqual(service.getWebRtcAudioOptions(), { enabled: false, publicHost: "media.example.com", ipv6Enabled: true, stunServer: "stun:stun.example.com:3478", udpPortRange: [40000, 40099] });
-  const { webRtcPublicHost, webRtcIpv6Enabled, webRtcStunServer, ...legacyInput } = original;
+  const legacyInput = withoutVoiceSettings(original);
+  delete (legacyInput as Partial<typeof original>).webRtcPublicHost;
+  delete (legacyInput as Partial<typeof original>).webRtcIpv6Enabled;
+  delete (legacyInput as Partial<typeof original>).webRtcStunServer;
   await api.saveSettings(legacyInput);
   assert.equal((await api.settings()).webRtcPublicHost, "media.example.com", "older clients must preserve the new settings");
+  const inheritedVoice = database.getSettings();
+  assert.equal(inheritedVoice.voiceProfile, null);
+  assert.equal(inheritedVoice.voiceTurnUrls, null);
+  assert.equal(inheritedVoice.voiceTurnSecretEncrypted, null);
+  assert.equal(inheritedVoice.voiceTurnTtlSeconds, null);
+  assert.equal(inheritedVoice.voiceOpusWs, null);
+  assert.equal(inheritedVoice.voiceJitterMaxMs, null);
   for (const [key, value, code] of [
     ["webRtcPublicHost", "https://media.example.com", "INVALID_WEBRTC_PUBLIC_HOST"],
     ["webRtcPublicHost", null, "INVALID_WEBRTC_PUBLIC_HOST"],
@@ -172,6 +230,41 @@ test("browser admin API consumes the actual HTTP router and preserves keep/repla
   assert.equal((await api.tsAdminSettings()).enabled, false, "switching to open mode disables the TeamSpeak admin panel");
   await assert.rejects(api.tsAdminOverview(), (error: any) => error.code === "TS_ADMIN_FIXED_MODE_REQUIRED");
   await assert.rejects(api.saveTsAdminSettings({ enabled: true, queryPort: 10022, username: "query-admin", hostKeyFingerprint: verifiedFingerprint }), (error: any) => error.code === "TS_ADMIN_FIXED_MODE_REQUIRED");
+  const voiceInput = {
+    ...(await api.settings()),
+    voiceProfile: "adaptive" as const,
+    voiceTurnUrls: "turn:turn.example.com:3478\nturns:turn.example.com:5349?transport=tcp",
+    voiceTurnSecret: "fixture-turn-shared-secret",
+    voiceTurnSecretAction: "replace" as const,
+    voiceTurnTtlSeconds: 3600,
+    voiceOpusWs: true,
+    voiceJitterMaxMs: 200,
+  };
+  const savedVoice = await api.saveSettings(voiceInput);
+  assert.equal(savedVoice.settings.voiceProfile, "adaptive");
+  assert.equal(savedVoice.settings.hasVoiceTurnSecret, true);
+  assert.equal(savedVoice.settings.voiceTurnTtlSeconds, 3600);
+  assert.equal(savedVoice.settings.voiceOpusWs, true);
+  assert.equal(savedVoice.settings.voiceJitterMaxMs, 200);
+  assert.equal(JSON.stringify(savedVoice).includes("fixture-turn-shared-secret"), false, "the TURN secret must never be returned");
+  const storedVoice = database.getSettings();
+  assert.ok(storedVoice.voiceTurnSecretEncrypted, "stored TURN secret must not be plaintext or empty");
+  assert.notEqual(storedVoice.voiceTurnSecretEncrypted, "fixture-turn-shared-secret");
+  assert.equal(decryptSecret(storedVoice.voiceTurnSecretEncrypted, Buffer.alloc(32, 7), "webspeak:voice-turn-rest-secret:v1"), "fixture-turn-shared-secret");
+  const voiceConfig = service.getVoiceIceConfig();
+  assert.equal(voiceConfig.profile, "adaptive");
+  assert.equal(voiceConfig.opusWebSocket, true);
+  assert.equal(voiceConfig.jitterMaxMs, 200);
+  assert.deepEqual(voiceConfig.turnRest, {
+    urls: ["turn:turn.example.com:3478", "turns:turn.example.com:5349?transport=tcp"],
+    secret: "fixture-turn-shared-secret",
+    ttlSeconds: 3600,
+  });
+  await assert.rejects(api.saveSettings({ ...voiceInput, voiceTurnUrls: "stun:stun.example.com:3478" }), (error: any) => error.code === "INVALID_VOICE_TURN_URLS");
+  await assert.rejects(api.saveSettings({ ...voiceInput, voiceTurnSecret: "short-secret", voiceTurnSecretAction: "replace" }), (error: any) => error.code === "INVALID_VOICE_TURN_SECRET");
+  const removedTurnSecret = await api.saveSettings({ ...(await api.settings()), voiceTurnSecretAction: "remove" });
+  assert.equal(removedTurnSecret.settings.hasVoiceTurnSecret, false);
+  assert.equal(service.getVoiceIceConfig().turnRest, undefined);
   const settings = service.getAdminSettings();
   assert.deepEqual(adminResponses.settings({ ...settings, passwordAction: "remove", serverPassword: "injected" }), settings);
   const created = await api.createInvite({ channel: "Lobby", expiresInHours: 1, maxUses: 1 });

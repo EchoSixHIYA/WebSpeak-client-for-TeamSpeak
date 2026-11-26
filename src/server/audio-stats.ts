@@ -3,6 +3,8 @@ import type { WebRtcAudioSession, WebRtcAudioStats } from "./webrtc-audio.js";
 
 export interface AudioFlowStats extends WebRtcAudioStats {
   ingressFrames: number;
+  ingressPcmFrames: number;
+  ingressOpusFrames: number;
   ingressDroppedFrames: number;
   ingressFirstAt: number | null;
   ingressLastAt: number | null;
@@ -13,6 +15,10 @@ export interface AudioFlowStats extends WebRtcAudioStats {
   tsSendLastAt: number | null;
   tsSendMaxGapMs: number;
   tsEncodeMaxMs: number;
+  uplinkQueueCurrentFrames: number;
+  uplinkQueuePeakFrames: number;
+  uplinkQueueDroppedFrames: number;
+  uplinkPacerLateTicks: number;
   tsReceiveFrames: number;
   tsReceiveFirstAt: number | null;
   tsReceiveLastAt: number | null;
@@ -38,6 +44,8 @@ export interface AudioStatsSource {
 export function createAudioFlowStats(): AudioFlowStats {
   return {
     ingressFrames: 0,
+    ingressPcmFrames: 0,
+    ingressOpusFrames: 0,
     ingressDroppedFrames: 0,
     ingressFirstAt: null,
     ingressLastAt: null,
@@ -48,6 +56,10 @@ export function createAudioFlowStats(): AudioFlowStats {
     tsSendLastAt: null,
     tsSendMaxGapMs: 0,
     tsEncodeMaxMs: 0,
+    uplinkQueueCurrentFrames: 0,
+    uplinkQueuePeakFrames: 0,
+    uplinkQueueDroppedFrames: 0,
+    uplinkPacerLateTicks: 0,
     tsReceiveFrames: 0,
     tsReceiveFirstAt: null,
     tsReceiveLastAt: null,
@@ -95,11 +107,16 @@ export function snapshotAudioStatus(entry: AudioStatsSource): VoiceAudioBridgeSt
   return {
     transport: entry.webrtc ? "webrtc" : "websocket",
     ingressFrames: stats.ingressFrames,
+    ingressPcmFrames: stats.ingressPcmFrames,
+    ingressOpusFrames: stats.ingressOpusFrames,
     ingressDroppedFrames: stats.ingressDroppedFrames,
     ingressMaxGapMs: stats.ingressMaxGapMs,
     tsSendFrames: stats.tsSendFrames,
     tsSendErrors: stats.tsSendErrors,
     tsSendMaxGapMs: stats.tsSendMaxGapMs,
+    uplinkQueuePeakFrames: stats.uplinkQueuePeakFrames,
+    uplinkQueueDroppedFrames: stats.uplinkQueueDroppedFrames,
+    uplinkPacerLateTicks: stats.uplinkPacerLateTicks,
     tsReceiveFrames: stats.tsReceiveFrames,
     tsReceiveMaxGapMs: stats.tsReceiveMaxGapMs,
     egressFrames: stats.egressFrames,

@@ -28,6 +28,15 @@ import { normalizeScreenShareIceServers, parseScreenShareMessage, type ScreenSha
 import { OpusEncoder } from "./opus-codec.js";
 import { avatarDataUrl } from "./directory-view.js";
 import type { PluginParticipant } from "../shared/plugins.js";
+import {
+  hasVoiceTurnServer,
+  normalizeVoiceIceServers,
+  normalizeVoiceIceTransportPolicy,
+  type VoiceIceServer,
+  type VoiceIceTransportPolicy,
+} from "../shared/voice-ice.js";
+import { resolveVoiceIceServers, type VoiceIceConfig } from "./voice-ice-config.js";
+import { resolveVoiceProfile, type VoiceProfile } from "../shared/voice-profile.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_MISSED_HEARTBEATS = 2;
@@ -54,6 +63,8 @@ export interface VoiceBridgeOptions {
   pluginRuntimeEnabled?: boolean;
   joinTickets: JoinTicketStore;
   webRtc?: WebRtcAudioOptions | (() => WebRtcAudioOptions);
+  /** TURN / ICE deployment configuration; resolved for each new connection. */
+  voiceIce?: VoiceIceConfig | (() => VoiceIceConfig);
   screenShareIceServers?: ScreenShareIceServer[] | (() => ScreenShareIceServer[]);
   acceleration?: ConfiguredAccelerationRelay[] | (() => ConfiguredAccelerationRelay[]);
   accelerationName?: string | (() => string | undefined);
@@ -97,6 +108,10 @@ interface WebClientEntry extends SessionDirectoryState {
   acceleration?: AccelerationRelayOptions;
   identityLeaseKey?: string;
   webrtcPublicHost?: string;
+  voiceProfile: VoiceProfile;
+  voiceIceServers: VoiceIceServer[];
+  voiceIceTransportPolicy: VoiceIceTransportPolicy;
+  voiceIceGatewayTransportPolicy: VoiceIceTransportPolicy;
   events: SessionEventCoordinator | null;
   eventLog: ServerEvent[];
   audioTransport: SessionAudioTransport | null;
@@ -178,7 +193,13 @@ export class VoiceBridge {
         return;
       }
       const clientIp = resolveClientIp(req, this.trustedProxies);
-      const webrtcPublicHost = resolveWebRtcPublicHost(req);
+      // Cloudflare Tunnel forwards the public hostname in `Host`, but that
+      // hostname points at Cloudflare's edge, not at this origin's UDP ports.
+      // Never advertise it as an ICE media address.
+      const cloudflareRequest = isCloudflareRequest(req, this.trustedProxies);
+      const webrtcPublicHost = resolveWebRtcPublicHost(req, { allowHostFallback: !cloudflareRequest });
+      const voiceIce = this.getVoiceIceConfig();
+      const voiceProfile = resolveVoiceProfile(voiceIce?.profile ?? "auto", cloudflareRequest);
       let identity;
       try {
         identity = connection.identity ? parseIdentity(connection.identity) : undefined;
@@ -190,6 +211,9 @@ export class VoiceBridge {
         return;
       }
       const entryId = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const voiceIceServers = this.buildVoiceIceServers(entryId, voiceIce);
+      const voiceIceTransportPolicy = normalizeVoiceIceTransportPolicy(voiceIce?.transportPolicy);
+      const voiceIceGatewayTransportPolicy = normalizeVoiceIceTransportPolicy(voiceIce?.gatewayTransportPolicy);
       let entry: WebClientEntry | null = null;
       const session = this.sessionManager.admit(entryId, async (reason) => {
         if (entry) await this.cleanupEntry(entry, reason);
@@ -247,6 +271,10 @@ export class VoiceBridge {
         ...(acceleration ? { acceleration } : {}),
         ...(identityLeaseKey ? { identityLeaseKey } : {}),
         ...(webrtcPublicHost ? { webrtcPublicHost } : {}),
+        voiceProfile,
+        voiceIceServers,
+        voiceIceTransportPolicy,
+        voiceIceGatewayTransportPolicy,
         channelTree: [],
         members: new Map(),
         avatarCache: new Map(),
@@ -281,6 +309,7 @@ export class VoiceBridge {
           peer: () => entry!.webrtc,
           whisperTargets: () => entry!.whisperActive ? [...entry!.whisperTargetIds] : null,
           sendJson: message => sendJson(message),
+          pacing: entry!.voiceProfile === "adaptive",
         }, this.dependencies.createEncoder?.() ?? new OpusEncoder(48000, 1));
       } catch (error: unknown) {
         this.logger.error({ err: error, entryId }, "Could not create Opus encoder");
@@ -328,6 +357,13 @@ export class VoiceBridge {
         }
         session.transition("connected");
         if (this.options.pluginRuntimeEnabled) entry!.pluginSession = randomBytes(32).toString("base64url");
+        const webRtc = this.getWebRtcOptions();
+        const hasDirectMediaPath = Boolean(webRtc?.publicHost || entry!.webrtcPublicHost);
+        const hasRelayMediaPath = hasVoiceTurnServer(entry!.voiceIceServers);
+        const webRtcAvailable = webRtc?.enabled === true && (hasDirectMediaPath || hasRelayMediaPath);
+        const webRtcUnavailableReason = webRtc?.enabled !== true
+          ? "DISABLED" as const
+          : webRtcAvailable ? undefined : "NO_MEDIA_PATH" as const;
         sendJson({
           type: "connected",
           tsClientId: events.selfId,
@@ -335,8 +371,19 @@ export class VoiceBridge {
           serverEventLog: entry!.eventLog,
           whisperTargetIds: [...entry!.whisperTargetIds],
           whisperActive: entry!.whisperActive,
-          webrtcAvailable: this.getWebRtcOptions()?.enabled === true,
-          webRtcStunServer: this.getWebRtcOptions()?.stunServer ?? "",
+          webrtcAvailable: webRtcAvailable,
+          ...(webRtcUnavailableReason ? { webrtcUnavailableReason: webRtcUnavailableReason } : {}),
+          webRtcStunServer: webRtc?.stunServer ?? "",
+          voiceProfile: entry!.voiceProfile,
+          voiceIceServers: entry!.voiceIceServers,
+          voiceIceTransportPolicy: entry!.voiceIceTransportPolicy,
+          ...(entry!.voiceProfile === "adaptive" ? {
+            audioFrameVersion: 2 as const,
+            audioUplinkCodecs: voiceIce?.opusWebSocket === true
+              ? ["pcm", "opus"] as ("pcm" | "opus")[]
+              : ["pcm"] as ("pcm" | "opus")[],
+            audioJitterMaxMs: voiceIce?.jitterMaxMs ?? 300,
+          } : {}),
           screenShareIceServers: this.getScreenShareIceServers(),
           accelerated: Boolean(entry!.acceleration),
           ...(entry!.pluginSession ? { pluginSession: entry!.pluginSession } : {}),
@@ -838,6 +885,18 @@ export class VoiceBridge {
     return typeof configured === "function" ? configured() : configured;
   }
 
+  private getVoiceIceConfig(): VoiceIceConfig | undefined {
+    const configured = this.options.voiceIce;
+    return typeof configured === "function" ? configured() : configured;
+  }
+
+  private buildVoiceIceServers(entryId: string, config = this.getVoiceIceConfig()): VoiceIceServer[] {
+    const servers = resolveVoiceIceServers(config, entryId);
+    const stunServer = this.getWebRtcOptions()?.stunServer;
+    if (stunServer) servers.push({ urls: stunServer });
+    return normalizeVoiceIceServers(servers);
+  }
+
   private getScreenShareIceServers(): ScreenShareIceServer[] {
     const configured = this.options.screenShareIceServers;
     const servers = typeof configured === "function" ? configured() : configured;
@@ -900,12 +959,25 @@ export class VoiceBridge {
     try {
       const publicAddresses = await resolveVoiceMediaAddresses(config.publicHost || entry.webrtcPublicHost, config.ipv6Enabled === true);
       if (!isCurrent()) return;
+      const iceServers = config.iceServers?.length ? config.iceServers : entry.voiceIceServers;
+      const configuredGatewayPolicy = config.iceTransportPolicy ?? entry.voiceIceGatewayTransportPolicy;
+      // Relay-only gathering without a TURN server would leave the gateway
+      // with no candidates at all. Fall back to direct gathering instead.
+      const gatewayPolicy = configuredGatewayPolicy === "relay" && !hasVoiceTurnServer(iceServers)
+        ? "all"
+        : configuredGatewayPolicy;
+      if (configuredGatewayPolicy === "relay" && gatewayPolicy === "all") {
+        this.logger.warn({ entryId: entry.id }, "Relay-only WebRTC gateway policy has no TURN server; using direct candidates");
+      }
       peer = this.createWebRtcSession({
         connectionId: entry.id,
         publicAddresses,
         ...(config.publicHost || entry.webrtcPublicHost ? { publicHost: config.publicHost || entry.webrtcPublicHost } : {}),
         ipv6Enabled: config.ipv6Enabled,
         stunServer: config.stunServer,
+        iceServers,
+        iceTransportPolicy: gatewayPolicy,
+        profile: entry.voiceProfile,
         udpPortRange: config.udpPortRange,
         logger: this.logger,
         microphoneMuted: muted,
@@ -938,7 +1010,28 @@ export class VoiceBridge {
   }
 }
 
-export function resolveWebRtcPublicHost(request: IncomingMessage): string | undefined {
+/**
+ * Headers Cloudflare adds to proxied requests (including Tunnel origins).
+ * Only a configured trusted proxy may assert that a request came through
+ * Cloudflare; otherwise a direct client could spoof the adaptive audio path
+ * and suppress the legacy Host-based ICE fallback.
+ */
+export function isCloudflareRequest(request: IncomingMessage, trustedProxies: BlockList): boolean {
+  const direct = normalizeClientIp(request.socket.remoteAddress);
+  if (!direct || !isTrustedProxy(direct, trustedProxies)) return false;
+  const cdnLoop = firstHeader(request.headers["cdn-loop"]);
+  return Boolean(
+    firstHeader(request.headers["cf-ray"])
+    || firstHeader(request.headers["cf-connecting-ip"])
+    || (cdnLoop && /\bcloudflare\b/i.test(cdnLoop))
+  );
+}
+
+export function resolveWebRtcPublicHost(
+  request: IncomingMessage,
+  options: { allowHostFallback?: boolean } = {},
+): string | undefined {
+  if (options.allowHostFallback === false) return undefined;
   const origin = firstHeader(request.headers.origin);
   const forwardedHost = firstHeader(request.headers["x-forwarded-host"]);
   const directHost = firstHeader(request.headers.host);

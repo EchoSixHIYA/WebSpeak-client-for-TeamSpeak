@@ -299,6 +299,53 @@
               ><small class="field-help">{{ tr("relayManagedHint") }}</small></section
             >
           </div></article>
+    <article v-show="activeSection === 'voice'" class="settings-card admin-setting-card admin-settings-section" data-admin-section="voice">
+      <header class="admin-card-heading"><h3>{{ tr('voiceSettings') }}</h3><p>{{ tr('voiceSettingsLead') }}</p></header>
+      <div class="advanced-settings-grid">
+        <section class="settings-subsection voice-profile-card">
+          <header class="settings-subsection-heading"><div><h4>{{ tr('voiceProfile') }}</h4><p class="card-help">{{ tr('voiceProfileLead') }}</p></div></header>
+          <div class="voice-profile-options">
+            <label class="choice" :class="{ selected: serverForm.voiceProfile === 'auto' }">
+              <input v-model="serverForm.voiceProfile" type="radio" value="auto" />
+              <span><strong>{{ tr('voiceProfileAuto') }}</strong><small>{{ tr('voiceProfileAutoLead') }}</small></span>
+            </label>
+            <label class="choice" :class="{ selected: serverForm.voiceProfile === 'legacy' }">
+              <input v-model="serverForm.voiceProfile" type="radio" value="legacy" />
+              <span><strong>{{ tr('voiceProfileLegacy') }}</strong><small>{{ tr('voiceProfileLegacyLead') }}</small></span>
+            </label>
+            <label class="choice" :class="{ selected: serverForm.voiceProfile === 'adaptive' }">
+              <input v-model="serverForm.voiceProfile" type="radio" value="adaptive" />
+              <span><strong>{{ tr('voiceProfileAdaptive') }}</strong><small>{{ tr('voiceProfileAdaptiveLead') }}</small></span>
+            </label>
+          </div>
+          <label class="choice toggle-choice" :class="{ selected: serverForm.voiceOpusWs }">
+            <input v-model="serverForm.voiceOpusWs" type="checkbox" :disabled="serverForm.voiceProfile === 'legacy'" />
+            <span><strong>{{ tr('voiceOpusWs') }}</strong><small>{{ tr('voiceOpusWsLead') }}</small></span>
+          </label>
+          <div class="voice-fields">
+            <label><span>{{ tr('voiceJitterMaxMs') }}</span><input v-model.number="serverForm.voiceJitterMaxMs" type="number" inputmode="numeric" min="80" max="500" :disabled="serverForm.voiceProfile === 'legacy'" /><small class="field-help">{{ tr('voiceJitterLead') }}</small></label>
+          </div>
+          <small class="field-help">{{ tr('voiceApplyHint') }}</small>
+        </section>
+        <section class="settings-subsection turn-card">
+          <header class="settings-subsection-heading"><div><h4>{{ tr('turnSettings') }}</h4><p class="card-help">{{ tr('turnLead') }}</p></div></header>
+          <label class="webrtc-network-field">
+            <span>{{ tr('turnUrls') }}</span>
+            <textarea v-model="serverForm.voiceTurnUrls" rows="3" maxlength="4096" spellcheck="false" autocomplete="off" placeholder="turn:turn.example.com:3478&#10;turns:turn.example.com:5349"></textarea>
+            <small class="field-help">{{ tr('turnUrlsLead') }}</small>
+          </label>
+          <div class="password-row">
+            <label><span>{{ tr('turnSecret') }}</span><input v-model="serverForm.voiceTurnSecret" type="password" autocomplete="off" :disabled="serverForm.voiceTurnSecretAction !== 'replace'" :placeholder="serverForm.hasVoiceTurnSecret ? tr('turnSecretConfigured') : tr('turnSecretPlaceholder')" /></label>
+            <div class="password-actions"><button type="button" :class="{ active: serverForm.voiceTurnSecretAction === 'replace' }" @click="serverForm.voiceTurnSecretAction = 'replace'">{{ tr('change') }}</button><button v-if="serverForm.hasVoiceTurnSecret" type="button" :class="{ danger: serverForm.voiceTurnSecretAction === 'remove' }" @click="serverForm.voiceTurnSecretAction = 'remove'">{{ tr('remove') }}</button></div>
+          </div>
+          <small class="field-help">{{ tr('turnSecretLead') }}</small>
+          <div class="voice-fields">
+            <label><span>{{ tr('turnTtl') }}</span><input v-model.number="serverForm.voiceTurnTtlSeconds" type="number" inputmode="numeric" min="300" max="86400" /><small class="field-help">{{ tr('turnTtlLead') }}</small></label>
+          </div>
+          <small class="field-help">{{ tr('turnApplyHint') }}</small>
+        </section>
+      </div>
+    </article>
     <p class="admin-save-scope"><Icon name="info" :size="15"/>{{ tr('adminSaveScope') }}</p>
   </section>
 </template>
@@ -323,14 +370,15 @@ const emit = defineEmits<{ webrtcToggle: [] }>();
 // The page owns one stable feature controller across route changes.
 const { serverForm, serverSaving, testing, testResult, saveServerSettings, testServerConnection, addRelayNode, removeRelayNode } = props.model;
 const { tr, formatDate, connectionFailureText } = props.i18n;
-type SettingsSection = 'access' | 'site' | 'network';
-const normalizeSection = (value?: string): SettingsSection => value === 'site' || value === 'network' ? value : 'access';
+type SettingsSection = 'access' | 'site' | 'network' | 'voice';
+const normalizeSection = (value?: string): SettingsSection => value === 'site' || value === 'network' || value === 'voice' ? value : 'access';
 const activeSection = ref<SettingsSection>(normalizeSection(props.initialSection));
 watch(() => props.initialSection, value => { activeSection.value = normalizeSection(value); });
 const sections = computed(() => [
   { id: 'access' as const, label: tr('adminAccessSection') },
   { id: 'site' as const, label: tr('adminSiteSection') },
   { id: 'network' as const, label: tr('adminNetworkSection') },
+  { id: 'voice' as const, label: tr('adminVoiceSection') },
 ]);
 
 function handleWebRtcToggle() { emit("webrtcToggle"); }

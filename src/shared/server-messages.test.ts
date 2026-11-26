@@ -60,12 +60,21 @@ test("every current gateway message survives JSON transport and shared validatio
   }
 });
 
+test("voice profile is optional and invalid values are rejected", () => {
+  const adaptive = parseServerMessage({ type: "connected", tsClientId: 1, voiceProfile: "adaptive" });
+  assert.equal(adaptive?.type === "connected" ? adaptive.voiceProfile : undefined, "adaptive");
+  const legacy = parseServerMessage({ type: "connected", tsClientId: 1, voiceProfile: "legacy" });
+  assert.equal(legacy?.type === "connected" ? legacy.voiceProfile : undefined, "legacy");
+  assert.equal(parseServerMessage({ type: "connected", tsClientId: 1, voiceProfile: "future" }), null);
+});
+
 test("malformed nested directory and event data is rejected before client state changes", () => {
   for (const message of [
     null, [], {}, { type: "toString" }, { type: "futureMessage" },
     { type: "connected", tsClientId: 1, members: [null] },
     { type: "connected", tsClientId: 1, members: [{ id: "1", nickname: "bad id" }] },
     { type: "connected", tsClientId: 1, serverEventLog: [{ id: "incomplete" }] },
+    { type: "connected", tsClientId: 1, voiceProfile: "future" },
     { type: "serverInfo", name: "TeamSpeak", icon: "https://example.com/icon.png" },
     { type: "serverInfo", name: "TeamSpeak", bannerUrl: "javascript:alert(1)" },
     { type: "serverInfo", name: "TeamSpeak", welcomeMessage: "x".repeat(4_097) },

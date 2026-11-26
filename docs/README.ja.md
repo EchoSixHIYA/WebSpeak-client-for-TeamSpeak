@@ -180,7 +180,11 @@ WebSpeak 管理画面と音声接続は、この機能に依存しません。�
 
 **IPv6 候補**は任意で、IPv4 も維持します。IPv6 の経路とファイアウォール許可が必要です。**音声 STUN** に `stun:turn.teamspeak.com:3478` を設定すると、ブラウザーとゲートウェイが同じサービスを使います。空欄では従来どおり、ゲートウェイのライブラリ内蔵 STUN を使い、ブラウザーには設定しません。IPv4 で到達可能な UDP STUN ドメイン・IPv4 アドレスに対応し、IPv6 リテラルや TURN 認証情報は指定できません。
 
-保存後に再接続してください。UDP 範囲全体を許可し、固定ポート転送では番号を維持します。STUN はアドレスを検出するだけで音声を中継しません。利用可能な UDP/IPv6 経路のない TCP Tunnel だけでは、互換転送に戻ります。
+保存後に再接続してください。ページと WebSocket に到達できても、UDP メディアが到達可能とは限りません。UDP 範囲全体を許可し、固定ポート転送では番号を維持します。STUN はアドレスを検出するだけで音声を中継せず、すべての NAT を通過できるわけでもありません。
+
+モバイル回線や UDP が遮断される環境では、**管理コンソール → サーバー → 音声**で外部 TURN を任意のフォールバックとして設定できます。TURN REST URL、共有シークレット、認証情報の有効期限を入力してください。対応する環境変数は `WEBSPEAK_TURN_REST_URLS` と `WEBSPEAK_TURN_REST_SECRET` です。コンソールの値が優先され、ゲートウェイの再起動なしで新しい接続に適用されます。`WEBSPEAK_VOICE_ICE_TRANSPORT_POLICY=all` ではまず直接 UDP を試します。
+
+`WEBSPEAK_VOICE_PROFILE` の初期値は `auto` です。信頼できる Cloudflare プロキシを経由した要求だけが適応バッファを使い、直接接続などの要求は従来の 80 ms / 生 PCM の動作を維持します。ローカルの Tunnel 接続は初期状態で信頼されます。cloudflared が別のアドレスから接続する場合は `WEBSPEAK_TRUSTED_PROXIES` を設定してください。直接接続でも適応モードを使うには `adaptive` を明示的に選ぶか、「音声」で指定します。WebSocket 経由の Opus は初期状態で無効で、適応モードが必要です。「音声」または `WEBSPEAK_VOICE_OPUS_WS=1` で有効にできます。直接 UDP と TURN のどちらもメディア経路を提供できない場合、セッションは `NO_MEDIA_PATH` を報告して互換トランスポートを使います。詳細は [`CLOUDFLARE_TUNNEL_VOICE.md`](CLOUDFLARE_TUNNEL_VOICE.md) を参照してください。
 
 ### 画面共有の ICE 候補
 

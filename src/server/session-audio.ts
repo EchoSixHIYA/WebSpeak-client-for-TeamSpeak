@@ -5,8 +5,19 @@ import type { ServerMessage } from "../shared/server-messages.js";
 import type { AudioFlowStats } from "./audio-stats.js";
 import type { TSClient, TSVoiceData } from "./ts-client.js";
 import type { WebRtcAudioSession } from "./webrtc-audio.js";
+import { AudioPacer } from "./audio-pacer.js";
+import {
+  VOICE_MAX_OPUS_FRAME_BYTES,
+  VOICE_OPUS_TAG,
+  VOICE_PCM_FRAME_BYTES,
+  VOICE_PCM_TAG,
+} from "../shared/voice-audio.js";
 
-const AUDIO_FRAME_BYTES = 1_920; // 20 ms of 48 kHz mono Int16 PCM.
+const AUDIO_FRAME_BYTES = VOICE_PCM_FRAME_BYTES;
+const TAGGED_PCM_FRAME_BYTES = AUDIO_FRAME_BYTES + 1;
+const PCM_FRAME_TAG = VOICE_PCM_TAG;
+const OPUS_FRAME_TAG = VOICE_OPUS_TAG;
+const MAX_OPUS_FRAME_BYTES = VOICE_MAX_OPUS_FRAME_BYTES;
 // Keep the established byte guard; the browser also bounds playback by time.
 const MAX_BUFFERED_BYTES = 4_096;
 // A client that keeps sending bad audio must not turn into one JSON error per
@@ -33,6 +44,8 @@ export interface SessionAudioOptions {
   peer(): Pick<WebRtcAudioSession, "pushTeamSpeakVoice"> | null;
   whisperTargets(): readonly number[] | null;
   sendJson(message: ServerMessage): void;
+  /** Tests that assert synchronous SDK calls can opt out; production keeps pacing. */
+  pacing?: boolean;
 }
 
 /** A session owns one encoder and one active audio route in each direction. */
@@ -42,6 +55,7 @@ export class SessionAudioTransport {
   /** Last report time per audio fault code; see `shouldReportAudioIssue`. */
   private readonly reportedAt = new Map<string, number>();
   private readonly logger: LoggerType | null;
+  private readonly pacer: AudioPacer | null;
   private pcmTokens = PCM_BURST_FRAMES;
   private pcmRefilledAt: number | null = null;
 
@@ -49,6 +63,18 @@ export class SessionAudioTransport {
     private readonly rateClock: () => number = performance.now.bind(performance)) {
     this.encoder = encoder;
     this.logger = options.logger ?? null;
+    this.pacer = options.pacing === false ? null : new AudioPacer(
+      (data, codec) => this.sendVoice(data, codec),
+      {
+        now: this.rateClock,
+        onStats: stats => {
+          options.audio.uplinkQueueCurrentFrames = stats.currentFrames;
+          options.audio.uplinkQueuePeakFrames = Math.max(options.audio.uplinkQueuePeakFrames, stats.peakFrames);
+          options.audio.uplinkQueueDroppedFrames = stats.droppedFrames;
+          options.audio.uplinkPacerLateTicks = stats.lateTicks;
+        },
+      },
+    );
   }
 
   private isCurrent(): boolean {
@@ -112,7 +138,7 @@ export class SessionAudioTransport {
     // logged anywhere, so without this an operator has no way to notice a client
     // that keeps sending malformed audio until the session is torn down.
     this.logger?.warn(
-      { code: "INVALID_AUDIO_FRAME", frameBytes: length, expectedBytes: AUDIO_FRAME_BYTES, droppedFrames: this.options.audio.ingressDroppedFrames },
+      { code: "INVALID_AUDIO_FRAME", frameBytes: length, expectedBytes: `${AUDIO_FRAME_BYTES} or tagged`, droppedFrames: this.options.audio.ingressDroppedFrames },
       "Discarded malformed browser audio frame",
     );
     try {
@@ -128,7 +154,11 @@ export class SessionAudioTransport {
     // misattribute the drop and raise a spurious client error in the browser.
     // Late TCP frames from before a WebRTC switch must not duplicate RTP audio.
     if (!this.options.isReady() || this.options.peer()) { stats.ingressDroppedFrames++; return; }
-    if (frame.length !== AUDIO_FRAME_BYTES) {
+    const legacyPcm = frame.length === AUDIO_FRAME_BYTES ? frame : null;
+    const taggedPcm = frame.length === TAGGED_PCM_FRAME_BYTES && frame[0] === PCM_FRAME_TAG ? frame.subarray(1) : null;
+    const opus = frame.length > 1 && frame.length <= MAX_OPUS_FRAME_BYTES + 1 && frame[0] === OPUS_FRAME_TAG
+      ? frame.subarray(1) : null;
+    if (!legacyPcm && !taggedPcm && !opus) {
       stats.ingressDroppedFrames++;
       this.reportInvalidFrame(frame.length);
       return;
@@ -141,17 +171,26 @@ export class SessionAudioTransport {
     if (this.pcmTokens < 1) {
       stats.ingressDroppedFrames++;
       if (this.shouldReportAudioIssue("AUDIO_RATE_EXCEEDED")) {
-        this.logger?.warn({ code: "AUDIO_RATE_EXCEEDED", droppedFrames: stats.ingressDroppedFrames }, "Discarded browser PCM above the real-time budget");
+        this.logger?.warn({ code: "AUDIO_RATE_EXCEEDED", droppedFrames: stats.ingressDroppedFrames }, "Discarded browser audio above the real-time budget");
       }
       return;
     }
     this.pcmTokens--;
     this.recordIngress();
+    if (opus) {
+      stats.ingressOpusFrames++;
+      // The pacer absorbs Cloudflare's bursty WebSocket delivery. Opus is
+      // already encoded, so this costs one buffer copy and no CPU-heavy encode.
+      if (this.pacer) this.pacer.push(opus, 4);
+      else this.sendVoice(opus, 4);
+      return;
+    }
+    stats.ingressPcmFrames++;
     const startedAt = this.clock();
     let encoded: Buffer;
     try {
       if (!this.encoder) throw new Error("Encoder unavailable");
-      encoded = this.encoder.encode(frame);
+      encoded = this.encoder.encode(taggedPcm ?? legacyPcm!);
       stats.tsEncodeMaxMs = Math.max(stats.tsEncodeMaxMs, this.clock() - startedAt);
     } catch {
       stats.tsSendErrors++;
@@ -159,7 +198,8 @@ export class SessionAudioTransport {
       this.reportEncoderFailure();
       return;
     }
-    this.sendVoice(encoded, 4);
+    this.pacer?.push(encoded, 4);
+    if (!this.pacer) this.sendVoice(encoded, 4);
   }
 
   receiveWebRtc(data: Buffer, codec: number): void {
@@ -214,6 +254,7 @@ export class SessionAudioTransport {
     if (this.closed) return;
     this.closed = true;
     this.reportedAt.clear();
+    this.pacer?.close();
     const encoder = this.encoder;
     this.encoder = null;
     try { encoder?.dispose(); } catch { /* other session resources must still be released */ }

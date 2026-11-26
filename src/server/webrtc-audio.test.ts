@@ -109,6 +109,89 @@ for (const scenario of ["silence gaps", "alternating speakers", "volume changes"
   });
 }
 
+test("WebRTC marks only the first audible RTP packet after a gap", () => {
+  const packets: RtpPacket[] = [];
+  const session = Object.assign(Object.create(WebRtcAudioSession.prototype), {
+    closed: false,
+    outgoingPayloadType: 111,
+    sequenceNumber: 0,
+    timestamp: 0,
+    ssrc: 7,
+    lastAudioRtpAt: null as number | null,
+    lastEgressRtpAt: null as number | null,
+    outgoingTrack: { writeRtp(packet: RtpPacket) { packets.push(packet); } },
+    stats: { webrtcEgressRtpFrames: 0, webrtcEgressRtpMaxGapMs: 0, webrtcEgressRtpFirstAt: null, webrtcEgressRtpLastAt: null },
+  }) as unknown as WebRtcAudioSession;
+  const send = (session as unknown as { sendRtpAudio(payload: Buffer, hasAudio: boolean): void }).sendRtpAudio.bind(session);
+  send(Buffer.from([1]), true);
+  send(Buffer.from([2]), true);
+  send(Buffer.from([3]), false);
+  assert.deepEqual(packets.map(packet => packet.header.marker), [true, false, false]);
+  (session as unknown as { lastAudioRtpAt: number | null }).lastAudioRtpAt = performance.now() - 50;
+  send(Buffer.from([4]), true);
+  send(Buffer.from([5]), true);
+  assert.deepEqual(packets.map(packet => packet.header.marker), [true, false, false, true, false]);
+});
+
+test("legacy RTP pacing keeps the original marker on every packet", () => {
+  const packets: RtpPacket[] = [];
+  const session = Object.assign(Object.create(WebRtcAudioSession.prototype), {
+    closed: false,
+    outgoingPayloadType: 111,
+    sequenceNumber: 0,
+    timestamp: 0,
+    ssrc: 7,
+    lastAudioRtpAt: null as number | null,
+    lastEgressRtpAt: null as number | null,
+    rtpMarkerAlways: true,
+    outgoingTrack: { writeRtp(packet: RtpPacket) { packets.push(packet); } },
+    stats: { webrtcEgressRtpFrames: 0, webrtcEgressRtpMaxGapMs: 0, webrtcEgressRtpFirstAt: null, webrtcEgressRtpLastAt: null },
+  }) as unknown as WebRtcAudioSession;
+  const send = (session as unknown as { sendRtpAudio(payload: Buffer, hasAudio: boolean): void }).sendRtpAudio.bind(session);
+  send(Buffer.from([1]), true);
+  send(Buffer.from([2]), false);
+  assert.deepEqual(packets.map(packet => packet.header.marker), [true, true]);
+});
+
+test("legacy WebRTC profile selects the original bounded mixer constants", async t => {
+  const session = new WebRtcAudioSession({ connectionId: "legacy-mixer", logger: pino({ enabled: false }), onVoiceFrame() {}, onVoiceActivity() {} });
+  t.after(() => session.close());
+  const internals = session as unknown as { mixerQueueFrames: number; maxMixerFrameAgeMs: number; mixerQueueAfterLateTick: number; rtpMarkerAlways: boolean };
+  assert.equal(internals.mixerQueueFrames, 4);
+  assert.equal(internals.maxMixerFrameAgeMs, 80);
+  assert.equal(internals.mixerQueueAfterLateTick, 1);
+  assert.equal(internals.rtpMarkerAlways, true);
+});
+
+test("adaptive WebRTC profile keeps the longer queue and corrected marker", async t => {
+  const session = new WebRtcAudioSession({ connectionId: "adaptive-mixer", profile: "adaptive", logger: pino({ enabled: false }), onVoiceFrame() {}, onVoiceActivity() {} });
+  t.after(() => session.close());
+  const internals = session as unknown as { mixerQueueFrames: number; maxMixerFrameAgeMs: number; mixerQueueAfterLateTick: number; rtpMarkerAlways: boolean };
+  assert.equal(internals.mixerQueueFrames, 6);
+  assert.equal(internals.maxMixerFrameAgeMs, 200);
+  assert.equal(internals.mixerQueueAfterLateTick, 2);
+  assert.equal(internals.rtpMarkerAlways, false);
+});
+
+test("late-tick trimming keeps legacy queue bounds and clears adaptive stale frames", () => {
+  for (const [profile, queueAfterLateTick, frameAgeMs, frameCount, expectedRemaining, expectedDropped] of [
+    ["legacy", 1, 0, 3, 1, 2],
+    ["legacy", 1, 100, 1, 0, 1],
+    ["adaptive", 2, 100, 3, 0, 3],
+  ] as const) {
+    const queue = Array.from({ length: frameCount }, () => ({ pcm: Buffer.alloc(4), receivedAt: performance.now() - frameAgeMs - 1 }));
+    const session = Object.assign(Object.create(WebRtcAudioSession.prototype), {
+      pendingFrames: new Map([["speaker", queue]]),
+      mixerQueueAfterLateTick: queueAfterLateTick,
+      maxMixerFrameAgeMs: 100,
+      stats: { webrtcQueueDroppedFrames: 0 },
+    }) as WebRtcAudioSession;
+    (session as unknown as { trimQueuesAfterLateTick(): void }).trimQueuesAfterLateTick();
+    assert.equal(queue.length, expectedRemaining, profile);
+    assert.equal((session as unknown as { stats: { webrtcQueueDroppedFrames: number } }).stats.webrtcQueueDroppedFrames, expectedDropped, profile);
+  }
+});
+
 function fixture() {
   const released: string[] = [];
   // Exercise the real close path with failures at codec/track/peer boundaries.

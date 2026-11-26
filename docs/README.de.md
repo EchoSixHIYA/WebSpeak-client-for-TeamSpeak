@@ -193,7 +193,11 @@ Unter **Server → Erweiterte Einstellungen** die **öffentliche Medienadresse**
 
 **IPv6-Kandidaten** sind optional und behalten IPv4 bei; IPv6-Routing und Firewall müssen passen. Als **Sprach-STUN** kann `stun:turn.teamspeak.com:3478` eingetragen werden. Browser und Gateway verwenden dann denselben Dienst. Leer behält das bisherige Verhalten bei: STUN des Gateway-SDKs, kein Browser-STUN. Zulässig sind IPv4-erreichbare UDP-STUN-Domains oder IPv4-Adressen, keine IPv6-Literale oder TURN-Zugangsdaten.
 
-Speichern und neu verbinden. Den gesamten UDP-Portbereich öffnen und bei statischer Weiterleitung die Portnummern erhalten. STUN findet Adressabbildungen, leitet aber keine Audiodaten weiter. Ein reiner TCP-Tunnel ohne nutzbaren UDP-/IPv6-Pfad führt weiter zum kompatiblen Transport.
+Speichern und neu verbinden. Erreichbare Webseiten und WebSockets bedeuten nicht, dass UDP-Medien erreichbar sind. Den gesamten UDP-Portbereich öffnen und bei statischer Weiterleitung die Portnummern erhalten. STUN findet Adressabbildungen, leitet aber keine Audiodaten weiter und überwindet nicht jedes NAT.
+
+Für Mobilfunk oder blockiertes UDP kann ein externer TURN-Dienst als optionales Fallback unter **Administration → Sprache** mit TURN-REST-URL, gemeinsamem Geheimnis und Gültigkeitsdauer eingerichtet werden; entsprechende Umgebungsvariablen sind `WEBSPEAK_TURN_REST_URLS` und `WEBSPEAK_TURN_REST_SECRET`. Konsolenwerte haben Vorrang und gelten ohne Neustart für neue Verbindungen. `WEBSPEAK_VOICE_ICE_TRANSPORT_POLICY=all` versucht zuerst direktes UDP.
+
+`WEBSPEAK_VOICE_PROFILE` ist standardmäßig `auto`: Nur Anfragen über einen vertrauenswürdigen Cloudflare-Proxy verwenden den adaptiven Puffer; direkte und andere Anfragen behalten das bisherige Verhalten mit 80 ms/Roh-PCM. Lokale Tunnel-Verbindungen sind standardmäßig vertrauenswürdig; wenn cloudflared von einer anderen Adresse verbindet, `WEBSPEAK_TRUSTED_PROXIES` konfigurieren. Für adaptive Nutzung auch bei direktem Zugriff explizit `adaptive` wählen oder unter Administration → Sprache festlegen. Opus über WebSocket ist standardmäßig aus und benötigt das adaptive Profil; es lässt sich unter Administration → Sprache oder mit `WEBSPEAK_VOICE_OPUS_WS=1` aktivieren. Ohne direktes UDP oder TURN meldet die Sitzung `NO_MEDIA_PATH` und verwendet den kompatiblen Transport. Details stehen in [`CLOUDFLARE_TUNNEL_VOICE.md`](CLOUDFLARE_TUNNEL_VOICE.md).
 
 ### ICE-Kandidaten für Bildschirmfreigabe
 

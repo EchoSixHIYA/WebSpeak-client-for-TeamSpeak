@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { before, after, beforeEach, afterEach, test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { createServer } from "vite";
 import { computed, effectScope, nextTick, ref } from "vue";
 
@@ -70,8 +71,29 @@ class RecorderStub {
 function decodedChunk() {
   return { sampleRate: 48000, numberOfChannels: 1, numberOfFrames: 960, closed: 0, copyTo() {}, close() { this.closed++; } };
 }
+let compatibilityAudioClientId = 7;
 function receiveAudio(socket, clientId = 7) {
   socket.onmessage({ data: new Uint8Array([4, clientId >> 8, clientId & 255, 1, 2, 3]).buffer });
+}
+function assertCompatibilityAudio(socket) {
+  const sentBefore = socket.messages.length;
+  for (const processor of AudioContextStub.processors) {
+    processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
+  }
+  assert.ok(socket.messages.slice(sentBefore).some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+  const decodersBefore = AudioDecoderStub.instances.length;
+  receiveAudio(socket, compatibilityAudioClientId++);
+  assert.equal(AudioDecoderStub.instances.length, decodersBefore + 1);
+}
+function assertNoCompatibilityAudio(socket) {
+  const sentBefore = socket.messages.length;
+  const decodersBefore = AudioDecoderStub.instances.length;
+  for (const processor of AudioContextStub.processors) {
+    processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
+  }
+  assert.equal(socket.messages.slice(sentBefore).some(message => message instanceof ArrayBuffer), false);
+  receiveAudio(socket);
+  assert.equal(AudioDecoderStub.instances.length, decodersBefore);
 }
 class AudioContextStub extends EventTarget {
   static instances = [];
@@ -181,6 +203,7 @@ before(async () => {
 });
 
 beforeEach(() => {
+  compatibilityAudioClientId = 7;
   TestSocket.instances.length = 0;
   TestPeer.instances.length = 0;
   AudioContextStub.processors.length = 0;
@@ -733,6 +756,39 @@ async function connectWebRtc() {
   return { socket, peer: TestPeer.instances.at(-1) };
 }
 
+test("an unadvertised WebRTC session stays on compatibility audio without a failure banner", async () => {
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: false, webrtcUnavailableReason: "NO_MEDIA_PATH" });
+  await nextTurn();
+  assert.equal(TestPeer.instances.length, 0);
+  assert.equal(voice.state.audioNoticeCode, "");
+  assert.equal(voice.state.webrtcReconnecting, false);
+  assertCompatibilityAudio(socket);
+  assert.equal((await audioSample(socket)).transport, "websocket");
+});
+
+test("the WebRTC failure banner compiles with a localized in-session reconnect action", async () => {
+  const source = await readFile(new URL("../src/views/WebClient.vue", import.meta.url), "utf8");
+  const { parse, compileTemplate } = await import("@vue/compiler-sfc");
+  const { descriptor, errors } = parse(source);
+  assert.deepEqual(errors, []);
+  const template = compileTemplate({ source: descriptor.template.content, filename: "WebClient.vue", id: "webrtc-reconnect-test" });
+  assert.deepEqual(template.errors, []);
+  assert.match(source, /data-action="reconnect-webrtc"/);
+  assert.match(source, /@click="reconnectWebRtc"/);
+  assert.match(source, /:disabled="voiceState\.webrtcReconnecting"/);
+  const notice = "实时语音（WebRTC）不可用（错误代码：WEBRTC_NO_RELAY）。已自动切换到兼容传输（PCM/Opus over WebSocket）保通话；你仍在当前语音会话中，可点击“重新连接 WebRTC”重试";
+  for (const language of ["zh", "en", "de", "ru", "ja"]) {
+    const translations = webClientTranslations[language];
+    assert.ok(translations.reconnectWebRtc);
+    assert.ok(translations.reconnectingWebRtc);
+    const localized = useWebClientI18n(ref(language)).localizedAudioNotice("WEBRTC_FAILED", notice);
+    assert.match(localized, /WEBRTC_NO_RELAY/);
+    assert.match(localized, language === "zh" ? /已自动切换到兼容传输/ : /PCM\/Opus/);
+  }
+  assert.equal(new Set(["zh", "en", "de", "ru", "ja"].map(language => webClientTranslations[language].reconnectWebRtc)).size, 5);
+});
+
 function enableMicrophoneMeter(t) {
   const analysers = [];
   const intervals = [];
@@ -1247,13 +1303,16 @@ test("an optional content hint failure does not abandon or fail accompaniment ca
   assert.equal(stream.track.readyState, "ended");
 });
 
-test("failed initial WebRTC input allocation releases partial nodes before PCM fallback", async t => {
+test("failed initial WebRTC input allocation releases partial nodes and restores PCM fallback", async t => {
   const createGain = AudioContextStub.prototype.createGain;
   let gainCalls = 0;
   t.mock.method(AudioContextStub.prototype, "createGain", function () {
     if (++gainCalls === 3) throw new Error("Mixed input gain unavailable");
     return createGain.call(this);
   });
+  const getUserMedia = navigator.mediaDevices.getUserMedia;
+  let microphoneRequests = 0;
+  navigator.mediaDevices.getUserMedia = async (...args) => { microphoneRequests++; return getUserMedia(...args); };
   const socket = await connect();
   socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
   await nextTurn();
@@ -1261,7 +1320,15 @@ test("failed initial WebRTC input allocation releases partial nodes before PCM f
   assert.equal(AudioContextStub.destinations[1].stream.track.readyState, "ended");
   assert.ok(AudioContextStub.mediaSources[1].disconnects > 0);
   assert.equal(voice.state.microphoneErrorCode, "");
-  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_NEGOTIATION_FAILED/);
+  assert.match(voice.state.audioNotice, /已自动切换到兼容传输/);
+  assert.equal(microphoneRequests, 1);
+  assert.equal(AudioContextStub.processors.length, 1);
+  assertCompatibilityAudio(socket);
+  assert.equal(voice.state.connected, true);
+  assert.equal(voice.state.tsClientId, 1);
+  assert.equal(TestSocket.instances.length, 1);
 });
 
 test("a failing mix-node disconnect cannot prevent peer and microphone cleanup", async t => {
@@ -1442,7 +1509,7 @@ test("microphone metering preserves its cadence and bounded level and stops on d
   assert.equal(meter.analysers[0].reads, reads);
 });
 
-test("a rejected old WebRTC answer cannot force the new peer into fallback", async () => {
+test("a rejected old WebRTC answer cannot force the new peer into failure", async () => {
   const first = await connectWebRtc();
   const answer = deferred();
   first.peer.setRemoteDescription = () => answer.promise;
@@ -1455,7 +1522,7 @@ test("a rejected old WebRTC answer cannot force the new peer into fallback", asy
   assert.equal(voice.state.audioNoticeCode, "");
 });
 
-test("a successful old WebRTC answer cannot activate WebRTC for a compatibility connection", async () => {
+test("a successful old WebRTC answer cannot activate WebRTC for a replacement compatibility session", async () => {
   const first = await connectWebRtc();
   const answer = deferred();
   first.peer.setRemoteDescription = () => answer.promise;
@@ -1467,6 +1534,140 @@ test("a successful old WebRTC answer cannot activate WebRTC for a compatibility 
   await nextTurn();
   voice.setVolume(9, 0.4);
   assert.equal(current.messages.some(message => message.type === "setMemberVolume"), false);
+  assert.equal(voice.state.audioNoticeCode, "");
+  AudioContextStub.processors.at(-1).onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
+  assert.ok(current.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+});
+
+test("reconnect WebRTC keeps compatibility audio until ready without reconnecting TeamSpeak", async () => {
+  const getUserMedia = navigator.mediaDevices.getUserMedia;
+  let microphoneRequests = 0;
+  navigator.mediaDevices.getUserMedia = async (...args) => { microphoneRequests++; return getUserMedia(...args); };
+  const { socket, peer } = await connectWebRtc();
+  socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "initial-answer" } } });
+  await nextTurn();
+  assertNoCompatibilityAudio(socket);
+  peer.connectionState = "failed";
+  peer.onconnectionstatechange();
+  await nextTurn();
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+  const pending = voice.reconnectWebRtc();
+  assert.equal(voice.state.webrtcReconnecting, true);
+  assert.equal(TestSocket.instances.length, 1);
+  assert.equal(voice.state.connected, true);
+  assert.equal(voice.state.tsClientId, 1);
+  await pending;
+  const current = TestPeer.instances.at(-1);
+  assert.notEqual(current, peer);
+  assert.notEqual(current.connectionState, "closed");
+  assert.equal(socket.messages.filter(message => message.type === "webrtcOffer").length, 2);
+  assert.equal(socket.messages.filter(message => message.type === "webrtcStop").length, 1);
+  assert.equal(microphoneRequests, 1);
+  assert.equal(voice.state.webrtcReconnecting, true);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+  socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "reconnected-answer" } } });
+  await nextTurn();
+  assert.equal(current.remoteDescription.sdp, "reconnected-answer");
+  assert.equal(voice.state.webrtcReconnecting, false);
+  assert.equal(voice.state.audioNoticeCode, "");
+  assert.equal(voice.state.connected, true);
+  assert.equal(voice.state.tsClientId, 1);
+  assert.equal(TestSocket.instances.length, 1);
+  assertNoCompatibilityAudio(socket);
+  assert.equal((await audioSample(socket)).transport, "webrtc");
+});
+
+test("a failed WebRTC reconnect keeps compatibility audio and the retry banner", async () => {
+  const { socket, peer } = await connectWebRtc();
+  peer.connectionState = "failed";
+  peer.onconnectionstatechange();
+  await nextTurn();
+  assertCompatibilityAudio(socket);
+  await voice.reconnectWebRtc();
+  const retry = TestPeer.instances.at(-1);
+  assert.equal(socket.messages.filter(message => message.type === "webrtcOffer").length, 2);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+  retry.connectionState = "failed";
+  retry.onconnectionstatechange();
+  await nextTurn();
+  assert.equal(retry.connectionState, "closed");
+  assert.equal(voice.state.webrtcReconnecting, false);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.equal(voice.state.connected, true);
+  assert.equal(TestSocket.instances.length, 1);
+  assert.equal(socket.messages.filter(message => message.type === "webrtcStop").length, 2);
+  assertCompatibilityAudio(socket);
+  await voice.reconnectWebRtc();
+  assert.equal(socket.messages.filter(message => message.type === "webrtcOffer").length, 3);
+  assert.equal(TestSocket.instances.length, 1);
+  assert.equal(voice.state.webrtcReconnecting, true);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+});
+
+test("a stale answer from a failed attempt cannot complete a WebRTC reconnect", async () => {
+  const first = await connectWebRtc();
+  const answer = deferred();
+  first.peer.setRemoteDescription = () => answer.promise;
+  first.socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "old-answer" } } });
+  first.peer.connectionState = "failed";
+  first.peer.onconnectionstatechange();
+  await nextTurn();
+  await voice.reconnectWebRtc();
+  const current = TestPeer.instances.at(-1);
+  answer.resolve();
+  await nextTurn();
+  assert.equal(current.remoteDescription, null);
+  assert.notEqual(current.connectionState, "closed");
+  assert.equal(voice.state.webrtcReconnecting, true);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.equal(first.socket.messages.filter(message => message.type === "webrtcStop").length, 1);
+  assert.equal(first.socket.messages.filter(message => message.type === "webrtcOffer").length, 2);
+  assertCompatibilityAudio(first.socket);
+  first.socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "current-answer" } } });
+  await nextTurn();
+  assert.equal(current.remoteDescription.sdp, "current-answer");
+  assert.equal(voice.state.webrtcReconnecting, false);
+  assert.equal(voice.state.audioNoticeCode, "");
+  assertNoCompatibilityAudio(first.socket);
+});
+
+test("a stale peer state event cannot fail a successful WebRTC reconnect", async () => {
+  const first = await connectWebRtc();
+  const staleStateChange = first.peer.onconnectionstatechange;
+  first.peer.connectionState = "failed";
+  first.peer.onconnectionstatechange();
+  await nextTurn();
+  await voice.reconnectWebRtc();
+  const current = TestPeer.instances.at(-1);
+  first.socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "current-answer" } } });
+  await nextTurn();
+  staleStateChange();
+  await nextTurn();
+  assert.notEqual(current.connectionState, "closed");
+  assert.equal(voice.state.audioNoticeCode, "");
+  assert.equal(first.socket.messages.filter(message => message.type === "webrtcStop").length, 1);
+  assertNoCompatibilityAudio(first.socket);
+});
+
+test("a stale peer failure cannot disable a replacement compatibility session", async () => {
+  const first = await connectWebRtc();
+  const staleStateChange = first.peer.onconnectionstatechange;
+  const current = await connect();
+  current.receive({ type: "connected", tsClientId: 2 });
+  await nextTurn();
+  first.peer.connectionState = "failed";
+  staleStateChange();
+  await nextTurn();
+  assert.equal(voice.state.audioNoticeCode, "");
+  assert.equal(current.messages.some(message => message.type === "webrtcStop"), false);
+  AudioContextStub.processors.at(-1).onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
+  assert.ok(current.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+  receiveAudio(current);
+  assert.equal(AudioDecoderStub.instances.length, 1);
 });
 
 test("a queued track event from a closed peer cannot replace current playback", async () => {
@@ -1531,9 +1732,11 @@ test("a playback setup failure releases its element and restores compatibility a
   await nextTurn();
   assert.equal(removed, true);
   assert.equal(peer.connectionState, "closed");
-  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_PLAYBACK_FAILED/);
   assert.equal(voice.state.microphoneErrorCode, "");
   assert.equal(socket.messages.filter(message => message.type === "webrtcStop").length, 1);
+  assertCompatibilityAudio(socket);
 });
 
 test("a queued old playback retry cannot play a replacement session", async t => {
@@ -1583,7 +1786,7 @@ test("overlapping playback retry gestures share one in-flight play attempt", asy
   assert.equal(voice.state.audioNoticeCode, "");
 });
 
-test("failed fallback signaling still releases WebRTC and resumes compatibility capture", async t => {
+test("failed WebRTC signaling still releases resources and restores compatibility capture", async t => {
   t.mock.method(TestPeer.prototype, "createOffer", async () => { throw new Error("Negotiation unavailable"); });
   const send = TestSocket.prototype.send;
   t.mock.method(TestSocket.prototype, "send", function (raw) {
@@ -1595,24 +1798,22 @@ test("failed fallback signaling still releases WebRTC and resumes compatibility 
   await nextTurn();
   assert.equal(TestPeer.instances[0].connectionState, "closed");
   assert.equal(voice.state.microphoneErrorCode, "");
-  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
-  AudioContextStub.processors.at(-1).onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
-  assert.ok(socket.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.equal(AudioContextStub.processors.length, 1);
+  assertCompatibilityAudio(socket);
 });
 
-test("an old fallback microphone failure cannot report into a replacement connection", async () => {
-  const { peer } = await connectWebRtc();
-  const permission = deferred();
-  navigator.mediaDevices.getUserMedia = () => permission.promise;
+test("a WebRTC failure does not request fallback microphone permission", async () => {
+  const { peer, socket } = await connectWebRtc();
+  const getUserMedia = navigator.mediaDevices.getUserMedia;
+  let microphoneRequests = 0;
+  navigator.mediaDevices.getUserMedia = async (...args) => { microphoneRequests++; return getUserMedia(...args); };
   peer.connectionState = "failed";
   peer.onconnectionstatechange();
   await nextTurn();
-  navigator.mediaDevices.getUserMedia = async () => microphoneStream();
-  await connectWebRtc();
-  permission.reject(new DOMException("Old permission rejected", "NotAllowedError"));
-  await nextTurn();
-  assert.equal(voice.state.microphoneErrorCode, "");
-  assert.equal(voice.state.audioNoticeCode, "");
+  assert.equal(microphoneRequests, 0);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
 });
 
 test("an old answer timeout cannot hide the replacement deadline from cleanup", async t => {
@@ -1715,7 +1916,7 @@ async function audioSample(socket, bridge = {}) {
   return pending;
 }
 
-test("diagnostic sample scopes follow peer replacement and fallback on one socket", async () => {
+test("diagnostic sample scopes follow peer replacement and WebRTC failure on one socket", async () => {
   const { socket } = await connectWebRtc();
   const first = await audioSample(socket);
   const next = await audioSample(socket);
@@ -1726,9 +1927,11 @@ test("diagnostic sample scopes follow peer replacement and fallback on one socke
   assert.notEqual(replaced.scopeId, first.scopeId);
   socket.receive({ type: "webrtcError", code: "WEBRTC_UNAVAILABLE" });
   await nextTurn();
-  const fallback = await audioSample(socket);
-  assert.notEqual(fallback.scopeId, replaced.scopeId);
-  assert.equal(fallback.transport, "websocket");
+  const failed = await audioSample(socket);
+  assert.notEqual(failed.scopeId, replaced.scopeId);
+  assert.equal(failed.transport, "websocket");
+  assert.match(voice.state.audioNotice, /WEBRTC_UNAVAILABLE/);
+  assertCompatibilityAudio(socket);
 });
 
 test("session recovery resets compatibility diagnostics without mutating old snapshots", async () => {
@@ -1746,7 +1949,10 @@ test("session recovery resets compatibility diagnostics without mutating old sna
   await nextTurn();
   const current = await audioSample(socket);
   assert.notEqual(current.scopeId, previous.scopeId);
-  assert.deepEqual(current.fallbackPlayback, { framesReceived: 0, framesDropped: 0, decodeErrors: 0 });
+  assert.deepEqual(current.fallbackPlayback, {
+    framesReceived: 0, framesDropped: 0, decodeErrors: 0,
+    bufferTargetMs: 0, bufferResets: 0, maxBufferAheadMs: 0,
+  });
   assert.equal(previous.fallbackPlayback.framesReceived, 2);
 });
 
@@ -1769,30 +1975,76 @@ test("disconnect clears the WebRTC answer deadline immediately", async () => {
   assert.equal(browserTimers.size, 0);
 });
 
-test("negotiation failure resumes bounded PCM capture without a false microphone error", async t => {
+test("negotiation failure keeps the session and starts PCM compatibility capture", async t => {
   t.mock.method(TestPeer.prototype, "createOffer", async () => { throw new Error("negotiation failed"); });
   const socket = await connect();
   socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
   await nextTurn();
   assert.equal(TestPeer.instances[0].connectionState, "closed");
-  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_NEGOTIATION_FAILED/);
   assert.equal(voice.state.microphoneErrorCode, "");
-  const capture = AudioContextStub.processors.at(-1);
-  capture.onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
-  assert.ok(socket.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+  assert.equal(AudioContextStub.processors.length, 1);
+  assertCompatibilityAudio(socket);
   assert.equal(socket.messages.filter(message => message.type === "webrtcStop").length, 1);
 });
 
-test("track setup failure also releases the peer and restores compatibility capture", async t => {
+test("track setup failure releases the peer and starts compatibility capture", async t => {
   t.mock.method(TestPeer.prototype, "addTrack", () => { throw new Error("track rejected"); });
   const socket = await connect();
   socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
   await nextTurn();
   assert.equal(TestPeer.instances[0].connectionState, "closed");
-  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FALLBACK");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
   assert.equal(voice.state.microphoneErrorCode, "");
-  AudioContextStub.processors.at(-1).onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(960).fill(0.2) } });
-  assert.ok(socket.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
+  assert.equal(AudioContextStub.processors.length, 1);
+  assertCompatibilityAudio(socket);
+});
+
+test("a relay-only WebRTC policy without TURN fails into compatibility capture", async () => {
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true, voiceIceTransportPolicy: "relay", voiceIceServers: [] });
+  await nextTurn();
+  assert.equal(TestPeer.instances.length, 0);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_NO_RELAY/);
+  assert.equal(AudioContextStub.processors.length, 1);
+  assertCompatibilityAudio(socket);
+});
+
+test("an answer timeout keeps the session and offers a WebRTC retry", async t => {
+  const deadlines = [];
+  const setTimer = window.setTimeout.bind(window);
+  t.mock.method(window, "setTimeout", (callback, ms) => {
+    if (ms === 8_000) deadlines.push(callback);
+    return setTimer(callback, ms);
+  });
+  const { socket, peer } = await connectWebRtc();
+  assert.equal(deadlines.length, 1);
+  deadlines[0]();
+  await nextTurn();
+  assert.equal(peer.connectionState, "closed");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_ANSWER_TIMEOUT/);
+  assert.equal(voice.state.connected, true);
+  assertCompatibilityAudio(socket);
+  await voice.reconnectWebRtc();
+  assert.equal(socket.messages.filter(message => message.type === "webrtcOffer").length, 2);
+  assert.equal(TestSocket.instances.length, 1);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+});
+
+test("a rejected current answer releases WebRTC and restores compatibility capture", async () => {
+  const { socket, peer } = await connectWebRtc();
+  peer.setRemoteDescription = async () => { throw new Error("Answer rejected"); };
+  socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "rejected-answer" } } });
+  await nextTurn();
+  assert.equal(peer.connectionState, "closed");
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assert.match(voice.state.audioNotice, /WEBRTC_ANSWER_REJECTED/);
+  assert.equal(socket.messages.filter(message => message.type === "webrtcStop").length, 1);
+  assertCompatibilityAudio(socket);
 });
 
 test("a current answer completes negotiation and removes its timeout", async () => {
@@ -1836,14 +2088,16 @@ test("an offer rejected after a new connection opens cannot report a microphone 
 });
 
 
-test("resetting an overloaded remote decoder disconnects its old gain", async () => {
+test("legacy playback overflow rebuilds the decoder instead of retaining an unbounded queue", async () => {
   const socket = await connect();
   receiveAudio(socket);
   const gain = AudioContextStub.gains.at(-1);
-  AudioDecoderStub.instances.at(-1).decodeQueueSize = 3;
+  const decoder = AudioDecoderStub.instances.at(-1);
+  decoder.decodeQueueSize = 3;
   receiveAudio(socket);
   assert.equal(gain.disconnects, 1);
   assert.equal(AudioDecoderStub.instances.length, 2);
+  assert.equal(decoder.closed, 1);
 });
 
 test("an old source ending cannot hide replacement playback from session cleanup", async () => {
@@ -1923,7 +2177,7 @@ test("a departing speaker releases only its own playback", async () => {
   assert.equal(currentSource.stopped, 0);
 });
 
-test("remote playback preserves member volume through output mute and decoder reset", async () => {
+test("remote playback preserves member volume through output mute and decoder overload", async () => {
   const socket = await connect();
   voice.setVolume(7, 0.4);
   voice.setOutputVolume(0.5);
@@ -1932,33 +2186,42 @@ test("remote playback preserves member volume through output mute and decoder re
   assert.deepEqual(AudioContextStub.gains.map(node => node.gain.value), [0.2, 0.5]);
   voice.toggleOutputMute();
   assert.deepEqual(AudioContextStub.gains.map(node => node.gain.value), [0, 0]);
-  const old = AudioDecoderStub.instances[0];
-  old.decodeQueueSize = 3;
+  const decoder = AudioDecoderStub.instances[0];
+  decoder.decodeQueueSize = 12;
   receiveAudio(socket, 7);
-  const replacement = AudioDecoderStub.instances.at(-1);
-  old.callbacks.error(new Error("stale decoder error"));
-  assert.equal(replacement.closed, 0);
-  assert.equal(AudioContextStub.gains.at(-1).gain.value, 0);
+  assert.equal(decoder.closed, 1);
+  assert.equal(AudioContextStub.gains[0].gain.value, 0);
   voice.toggleOutputMute();
   assert.equal(AudioContextStub.gains.at(-1).gain.value, 0.2);
   assert.equal(AudioContextStub.gains[1].gain.value, 0.5);
 });
 
-test("decoded audio stays within the 80 ms playback window and recovers after overflow", async () => {
+test("adaptive profile from connected switches playback without requiring CFT transport", async () => {
+  const socket = await connect();
+  socket.receive({ type: "connected", tsClientId: 1, voiceProfile: "adaptive", audioJitterMaxMs: 300, audioUplinkCodecs: ["pcm"] });
+  await nextTurn();
+  receiveAudio(socket);
+  const decoder = AudioDecoderStub.instances.at(-1);
+  const initialGain = AudioContextStub.gains.at(-1);
+  const chunks = Array.from({ length: 5 }, decodedChunk);
+  for (const chunk of chunks) decoder.callbacks.output(chunk);
+  assert.deepEqual(AudioContextStub.sources.map(source => Math.round(source.startedAt * 1_000)), [80, 100, 120, 140, 80]);
+  assert.equal(decoder.closed, 0);
+  assert.equal(initialGain.disconnects, 0);
+  assert.ok(chunks.every(chunk => chunk.closed === 1));
+});
+
+test("legacy playback stays within its 80 ms window and tears down the decoder on overflow", async () => {
   const socket = await connect();
   receiveAudio(socket);
   const decoder = AudioDecoderStub.instances[0];
+  const initialGain = AudioContextStub.gains.at(-1);
   const chunks = Array.from({ length: 5 }, decodedChunk);
   for (const chunk of chunks) decoder.callbacks.output(chunk);
-  assert.deepEqual(AudioContextStub.sources.map(source => source.startedAt), [0, 0.02, 0.04, 0.06]);
+  assert.deepEqual(AudioContextStub.sources.map(source => Math.round(source.startedAt * 1_000)), [0, 20, 40, 60]);
   assert.equal(decoder.closed, 1);
-  assert.ok(AudioContextStub.sources.every(source => source.stopped === 1));
+  assert.equal(initialGain.disconnects, 1);
   assert.ok(chunks.every(chunk => chunk.closed === 1));
-  receiveAudio(socket);
-  const replacement = AudioDecoderStub.instances.at(-1);
-  replacement.callbacks.output(decodedChunk());
-  assert.notEqual(replacement, decoder);
-  assert.equal(AudioContextStub.sources.at(-1).startedAt, 0);
 });
 
 test("old socket audio cannot create a decoder in a replacement session", async () => {

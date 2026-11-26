@@ -12,6 +12,8 @@ import { WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
 import { OpusEncoder } from "./opus-codec.js";
 import type { WebRtcSessionDescription } from "../shared/webrtc.js";
 import { addOpusFmtpParameters } from "../shared/opus-sdp.js";
+import type { VoiceIceServer, VoiceIceTransportPolicy } from "../shared/voice-ice.js";
+import type { VoiceProfile } from "../shared/voice-profile.js";
 export type { WebRtcSessionDescription } from "../shared/webrtc.js";
 
 export { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_RANGE } from "./webrtc-config.js";
@@ -23,9 +25,15 @@ const AUDIO_FRAME_BYTES = AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS * 2;
 const DEFAULT_WEBRTC_OPUS_PAYLOAD_TYPE = 111;
 const AUDIO_CLOCK_INTERVAL_MS = 20;
 const SPEAKER_ACTIVITY_INTERVAL_MS = 100;
-const MAX_MIXER_QUEUE_FRAMES = 4;
+const MAX_MIXER_QUEUE_FRAMES = 6;
 const MAX_MIXER_PACER_LAG_MS = AUDIO_CLOCK_INTERVAL_MS * 2;
-const MAX_MIXER_FRAME_AGE_MS = MAX_MIXER_QUEUE_FRAMES * AUDIO_CLOCK_INTERVAL_MS;
+const MAX_MIXER_FRAME_AGE_MS = 200;
+const MAX_MIXER_QUEUE_AFTER_LATE_TICK = 2;
+// The pre-CFT implementation used a 4-frame queue, an 80 ms age bound and one
+// retained frame after a late tick. Keep those values for direct deployments.
+const LEGACY_MAX_MIXER_QUEUE_FRAMES = 4;
+const LEGACY_MAX_MIXER_FRAME_AGE_MS = LEGACY_MAX_MIXER_QUEUE_FRAMES * AUDIO_CLOCK_INTERVAL_MS;
+const LEGACY_MAX_MIXER_QUEUE_AFTER_LATE_TICK = 1;
 const MIXER_UNDERRUN_WINDOW_MS = 200;
 // This threshold is used only for the speaking indicator. It must never decide
 // whether a media packet is forwarded or queued: quiet/comfort-noise Opus
@@ -40,6 +48,9 @@ export interface WebRtcAudioOptions {
   publicHost?: string;
   ipv6Enabled?: boolean;
   stunServer?: string;
+  /** Full ICE list, including TURN; takes precedence over `stunServer`. */
+  iceServers?: VoiceIceServer[];
+  iceTransportPolicy?: VoiceIceTransportPolicy;
   udpPortRange?: [number, number];
 }
 
@@ -51,6 +62,10 @@ export interface WebRtcAudioSessionOptions {
   publicAddresses?: string[];
   ipv6Enabled?: boolean;
   stunServer?: string;
+  iceServers?: VoiceIceServer[];
+  iceTransportPolicy?: VoiceIceTransportPolicy;
+  /** `legacy` preserves the direct-deployment mixer; `adaptive` is the CFT path. */
+  profile?: VoiceProfile;
   publicHost?: string;
   udpPortRange?: [number, number];
   logger: LoggerType;
@@ -122,7 +137,12 @@ export class WebRtcAudioSession {
   private nextAudioDeadline = 0;
   private lastIngressRtpAt: number | null = null;
   private lastEgressRtpAt: number | null = null;
+  private lastAudioRtpAt: number | null = null;
   private lastQueueEnqueuedAt: number | null = null;
+  private readonly mixerQueueFrames: number;
+  private readonly maxMixerFrameAgeMs: number;
+  private readonly mixerQueueAfterLateTick: number;
+  private readonly rtpMarkerAlways: boolean;
   private microphoneMuted: boolean;
   private accompanimentActive: boolean;
   private readonly stats: WebRtcAudioStats = {
@@ -150,19 +170,31 @@ export class WebRtcAudioSession {
     this.logger = options.logger.child({ component: "webrtc-audio", connectionId: options.connectionId });
     this.onVoiceFrame = options.onVoiceFrame;
     this.onVoiceActivity = options.onVoiceActivity;
+    const profile = options.profile ?? "legacy";
+    this.mixerQueueFrames = profile === "legacy" ? LEGACY_MAX_MIXER_QUEUE_FRAMES : MAX_MIXER_QUEUE_FRAMES;
+    this.maxMixerFrameAgeMs = profile === "legacy" ? LEGACY_MAX_MIXER_FRAME_AGE_MS : MAX_MIXER_FRAME_AGE_MS;
+    this.mixerQueueAfterLateTick = profile === "legacy" ? LEGACY_MAX_MIXER_QUEUE_AFTER_LATE_TICK : MAX_MIXER_QUEUE_AFTER_LATE_TICK;
+    this.rtpMarkerAlways = profile === "legacy";
     this.microphoneMuted = options.microphoneMuted === true;
     this.accompanimentActive = options.accompanimentActive === true;
     this.outgoingTrack = new MediaStreamTrack({ kind: "audio" });
 
     const iceAdditionalHostAddresses = options.publicAddresses ?? (options.publicHost ? [options.publicHost] : undefined);
     const udpPortRange = options.udpPortRange ?? WEBRTC_UDP_PORT_RANGE;
+    const iceServers = options.iceServers?.length
+      ? options.iceServers
+      : options.stunServer ? [{ urls: options.stunServer }] : [];
     this.peer = new RTCPeerConnection({
       // Both audio routes carry Opus; accepting PCMU would label Opus output
       // as another codec and silently discard the peer's incoming audio.
       codecs: { audio: [useOPUS()] },
-      iceServers: options.stunServer ? [{ urls: options.stunServer }] : [],
+      iceServers,
+      iceTransportPolicy: options.iceTransportPolicy ?? "all",
       iceUseIpv4: true,
       iceUseIpv6: options.ipv6Enabled === true,
+      // This controls ICE-TCP host candidates, not TURN control transport.
+      // werift parses `turns:` as a TLS TURN client independently; verified in
+      // peerConnection.ts createTransport() -> parseIceServers().
       iceUseTcp: false,
       icePortRange: [...udpPortRange] as [number, number],
       ...(iceAdditionalHostAddresses ? { iceAdditionalHostAddresses } : {}),
@@ -315,7 +347,7 @@ export class WebRtcAudioSession {
           queue = [];
           this.pendingFrames.set(data.clientId, queue);
         }
-        if (queue.length >= MAX_MIXER_QUEUE_FRAMES) {
+        if (queue.length >= this.mixerQueueFrames) {
           queue.shift();
           this.stats.webrtcQueueDroppedFrames++;
         }
@@ -398,6 +430,7 @@ export class WebRtcAudioSession {
       }
     }
     const mixed = new Int32Array(AUDIO_FRAME_SAMPLES * AUDIO_CHANNELS);
+    const hasAudio = this.pendingFrames.size > 0;
     for (const [clientId, queue] of this.pendingFrames) {
       const frame = queue.shift();
       if (queue.length === 0) this.pendingFrames.delete(clientId);
@@ -422,25 +455,30 @@ export class WebRtcAudioSession {
     }
     try {
       const encoded = this.encoder.encode(pcm);
-      this.sendRtpAudio(encoded);
+      this.sendRtpAudio(encoded, hasAudio);
     } catch {
       // A peer closing concurrently may reject a packet; teardown owns the
       // session lifecycle and no per-frame error needs to reach the logs.
     }
   }
 
-  private sendRtpAudio(encoded: Buffer): void {
+  private sendRtpAudio(encoded: Buffer, hasAudio: boolean): void {
+    const now = performance.now();
+    const marker = this.rtpMarkerAlways
+      ? true
+      : hasAudio && (this.lastAudioRtpAt === null || now - this.lastAudioRtpAt > 40);
     const packet = new RtpPacket(new RtpHeader({
       payloadType: this.outgoingPayloadType,
       sequenceNumber: this.sequenceNumber,
       timestamp: this.timestamp,
       ssrc: this.ssrc,
-      marker: true,
+      marker,
     }), encoded);
     this.sequenceNumber = (this.sequenceNumber + 1) & 0xffff;
     this.timestamp = (this.timestamp + AUDIO_FRAME_SAMPLES) >>> 0;
     this.outgoingTrack.writeRtp(packet);
     const sentAt = performance.now();
+    if (hasAudio) this.lastAudioRtpAt = sentAt;
     if (this.lastEgressRtpAt !== null) this.stats.webrtcEgressRtpMaxGapMs = Math.max(this.stats.webrtcEgressRtpMaxGapMs, Math.round(sentAt - this.lastEgressRtpAt));
     this.lastEgressRtpAt = sentAt;
     this.stats.webrtcEgressRtpFirstAt ??= Date.now();
@@ -497,11 +535,11 @@ export class WebRtcAudioSession {
   private trimQueuesAfterLateTick(): void {
     const now = performance.now();
     for (const [clientId, queue] of this.pendingFrames) {
-      while (queue.length > 1) {
+      while (queue.length > this.mixerQueueAfterLateTick) {
         queue.shift();
         this.stats.webrtcQueueDroppedFrames++;
       }
-      if (queue[0] && now - queue[0].receivedAt > MAX_MIXER_FRAME_AGE_MS) {
+      while (queue[0] && now - queue[0].receivedAt > this.maxMixerFrameAgeMs) {
         queue.shift();
         this.stats.webrtcQueueDroppedFrames++;
       }

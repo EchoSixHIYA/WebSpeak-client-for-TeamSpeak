@@ -595,6 +595,17 @@
             ><span>{{
               localizedAudioNotice(voiceState.audioNoticeCode, voiceState.audioNotice)
             }}</span></div
+          ><div
+            v-if="voiceState.audioNoticeCode === 'WEBRTC_FAILED'"
+            class="reconnect-actions"
+            ><button
+              type="button"
+              class="secondary-button"
+              data-action="reconnect-webrtc"
+              :disabled="voiceState.webrtcReconnecting"
+              @click="reconnectWebRtc"
+              >{{ voiceState.webrtcReconnecting ? t("reconnectingWebRtc") : t("reconnectWebRtc") }}</button
+            ></div
           ></div
         >
         <div
@@ -1086,6 +1097,7 @@ const {
   playNotification,
   connect,
   reconnectNow,
+  reconnectWebRtc,
   disconnect,
   switchChannel,
   moveClient,

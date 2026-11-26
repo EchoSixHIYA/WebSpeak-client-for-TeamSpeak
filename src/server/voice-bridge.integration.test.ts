@@ -11,7 +11,8 @@ import { OpusEncoder } from "./opus-codec.js";
 import { normalizeTeamSpeakKickedReason } from "../errors.js";
 import type { TSClient, TSClientAvatar, TSDirectorySnapshot } from "./ts-client.js";
 import type { AudioFlowStats } from "./audio-stats.js";
-import type { WebRtcAudioSession } from "./webrtc-audio.js";
+import type { WebRtcAudioSession, WebRtcAudioOptions } from "./webrtc-audio.js";
+import type { VoiceBridgeOptions } from "./voice-bridge.js";
 
 // Real loopback HTTP/WebSocket and native codec, with only the external SDK
 // replaced. This validates gateway wiring, not a connection to TeamSpeak.
@@ -52,11 +53,19 @@ async function fixture(t: TestContext, overrides: {
   waitForFirstMessage?: boolean;
   createWorkspaceInvite?: import("./voice-bridge.js").VoiceBridgeOptions["createWorkspaceInvite"];
   connection?: Partial<import("./join-ticket.js").JoinTicketPayload>;
+  webRtc?: WebRtcAudioOptions;
+  voiceIce?: VoiceBridgeOptions["voiceIce"];
+  headers?: Record<string, string>;
 } = {}) {
   const sdk = new TeamSpeakStub();
   overrides.configureSdk?.(sdk);
   const tickets = new JoinTicketStore();
-  const bridge = new VoiceBridge({ joinTickets: tickets, createWorkspaceInvite: overrides.createWorkspaceInvite }, pino({ enabled: false }), undefined, {
+  const bridge = new VoiceBridge({
+    joinTickets: tickets,
+    createWorkspaceInvite: overrides.createWorkspaceInvite,
+    ...(overrides.webRtc ? { webRtc: overrides.webRtc } : {}),
+    ...(overrides.voiceIce ? { voiceIce: overrides.voiceIce } : {}),
+  }, pino({ enabled: false }), undefined, {
     createTeamSpeakClient: overrides.createTeamSpeakClient ?? (() => sdk as unknown as TSClient),
     ...(overrides.createEncoder ? { createEncoder: overrides.createEncoder } : {}),
   });
@@ -68,7 +77,7 @@ async function fixture(t: TestContext, overrides: {
   const address = server.address();
   assert.ok(address && typeof address !== "string");
   const ticket = tickets.create({ target: { host: "voice.example.invalid", port: 9987 }, nickname: "Test", serverPassword: "", ...overrides.connection });
-  const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws/voice?ticket=${ticket}`);
+  const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws/voice?ticket=${ticket}`, overrides.headers ? { headers: overrides.headers } : undefined);
   const messages: Array<{ data: Buffer; binary: boolean }> = [];
   socket.on("message", (data, binary) => messages.push({ data: data as Buffer, binary }));
   const first = once(socket, "message");
@@ -105,6 +114,18 @@ function waitForMessage<T extends Record<string, unknown>>(socket: WebSocket, ty
       if (message.type === type) resolve(message as unknown as T);
     });
   });
+}
+
+async function waitForBufferedMessage<T extends Record<string, unknown>>(
+  messages: Array<{ data: Buffer; binary: boolean }>,
+  type: string,
+): Promise<T> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const found = messages.find(message => !message.binary && (JSON.parse(message.data.toString()) as { type?: string }).type === type);
+    if (found) return JSON.parse(found.data.toString()) as T;
+    await nextTurn();
+  }
+  throw new Error(`message ${type} was not published`);
 }
 
 // The native Opus codec is unavailable in some environments. These tests only
@@ -152,6 +173,96 @@ test("server identity lookup waits until the directory sync publishes the connec
   assert.equal(f.sdk.serverPresentationCalls, 1);
   assert.ok(f.bridge.getActiveCount() > 0);
 });
+
+test("a direct connection keeps the legacy audio profile and the original media path", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, {
+    webRtc: { enabled: true, stunServer: "stun:stun.example.invalid:3478" },
+    voiceIce: {
+      servers: [],
+      transportPolicy: "all",
+      gatewayTransportPolicy: "all",
+      profile: "auto",
+      opusWebSocket: false,
+      jitterMaxMs: 300,
+    },
+  });
+  const connected = await waitForBufferedMessage<Record<string, unknown>>(f.messages, "connected");
+  assert.equal(connected.voiceProfile, "legacy");
+  assert.equal(connected.webrtcAvailable, true);
+  assert.equal(connected.webrtcUnavailableReason, undefined);
+  assert.equal(connected.audioFrameVersion, undefined);
+  assert.equal(connected.audioUplinkCodecs, undefined);
+  assert.equal(connected.audioJitterMaxMs, undefined);
+  assert.equal(connected.voiceIceTransportPolicy, "all");
+  assert.deepEqual(connected.voiceIceServers, [{ urls: "stun:stun.example.invalid:3478" }]);
+});
+
+test("an explicit adaptive profile enables the new audio path on a direct connection", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, {
+    webRtc: { enabled: true },
+    voiceIce: {
+      servers: [],
+      transportPolicy: "all",
+      gatewayTransportPolicy: "all",
+      profile: "adaptive",
+      opusWebSocket: true,
+      jitterMaxMs: 300,
+    },
+  });
+  const connected = await waitForBufferedMessage<Record<string, unknown>>(f.messages, "connected");
+  assert.equal(connected.voiceProfile, "adaptive");
+  assert.equal(connected.webrtcAvailable, true);
+  assert.equal(connected.audioFrameVersion, 2);
+  assert.deepEqual(connected.audioUplinkCodecs, ["pcm", "opus"]);
+  assert.equal(connected.audioJitterMaxMs, 300);
+});
+
+test("a Cloudflare request opts into adaptive audio without inventing an ICE host", { timeout: 5_000 }, async t => {
+  const f = await fixture(t, {
+    webRtc: { enabled: true },
+    voiceIce: {
+      servers: [],
+      transportPolicy: "all",
+      gatewayTransportPolicy: "all",
+      profile: "auto",
+      opusWebSocket: false,
+      jitterMaxMs: 300,
+    },
+    headers: { "cf-ray": "test-ray" },
+  });
+  const connected = await waitForBufferedMessage<Record<string, unknown>>(f.messages, "connected");
+  assert.equal(connected.voiceProfile, "adaptive");
+  assert.equal(connected.webrtcAvailable, false);
+  assert.equal(connected.webrtcUnavailableReason, "NO_MEDIA_PATH");
+  assert.equal(connected.audioFrameVersion, 2);
+  assert.deepEqual(connected.audioUplinkCodecs, ["pcm"]);
+  assert.equal(connected.audioJitterMaxMs, 300);
+  assert.deepEqual(connected.voiceIceServers, []);
+});
+
+
+test("a voice ICE getter is resolved when a new connection is accepted", { timeout: 5_000 }, async t => {
+  let calls = 0;
+  const f = await fixture(t, {
+    webRtc: { enabled: true },
+    voiceIce: () => {
+      calls++;
+      return {
+        servers: [],
+        transportPolicy: "all",
+        gatewayTransportPolicy: "all",
+        profile: "auto",
+        opusWebSocket: false,
+        jitterMaxMs: 300,
+      };
+    },
+    headers: { "cf-ray": "console-refresh-ray" },
+  });
+  const connected = await waitForBufferedMessage<Record<string, unknown>>(f.messages, "connected");
+  assert.equal(calls, 1);
+  assert.equal(connected.voiceProfile, "adaptive");
+});
+
 
 test("a TeamSpeak drop before the directory sync fails the connection instead of stalling", { timeout: 5_000 }, async t => {
   const f = await fixture(t, {

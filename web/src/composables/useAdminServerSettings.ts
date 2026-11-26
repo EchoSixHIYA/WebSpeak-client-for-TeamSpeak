@@ -1,6 +1,7 @@
 import { onScopeDispose, reactive, ref, watch, type Ref } from "vue";
 import { DEFAULT_WELCOME_TEXTS } from "../../../src/site-copy.js";
 import type { AdminSettings } from "../../../src/shared/admin-responses.js";
+import type { AdminSettingsInput } from "../../../src/shared/admin-inputs.js";
 import { isAdminRequestCancelled, type AdminApi } from "../services/admin-api.js";
 import { createAdminRequests } from "../services/admin-requests.js";
 import { combineTeamSpeakTarget, splitTeamSpeakTarget, suggestedTeamSpeakPort } from "../services/teamspeak-target.js";
@@ -14,10 +15,12 @@ function emptyForm() {
   return { address: "", port: "9987", serverPassword: "", passwordAction: "keep" as SecretAction, hasPassword: false,
     accessMode: "fixed" as "fixed" | "open", siteName: "WebSpeak", welcomeText: "", welcomeTextEn: "", welcomeTextDe: "", welcomeTextRu: "", welcomeTextJa: "",
     welcomeDefaults: { ...DEFAULT_WELCOME_TEXTS }, webRtcPublicHost: "", webRtcIpv6Enabled: false, webRtcStunServer: "", webRtcEnabled: false, webRtcUdpStart: 40000, webRtcUdpEnd: 40099,
+    voiceProfile: "auto" as "auto" | "legacy" | "adaptive", voiceTurnUrls: "", voiceTurnSecret: "", voiceTurnSecretAction: "keep" as SecretAction,
+    hasVoiceTurnSecret: false, voiceTurnTtlSeconds: 21600, voiceOpusWs: false, voiceJitterMaxMs: 300,
     relayNodes: [] as RelayNodeForm[], lastTestAt: null as string | null, lastTestLatencyMs: null as number | null };
 }
 type ServerForm = ReturnType<typeof emptyForm>;
-const editable = ["address", "port", "accessMode", "siteName", "welcomeText", "welcomeTextEn", "welcomeTextDe", "welcomeTextRu", "welcomeTextJa", "webRtcEnabled", "webRtcPublicHost", "webRtcIpv6Enabled", "webRtcStunServer", "webRtcUdpStart", "webRtcUdpEnd"] as const;
+const editable = ["address", "port", "accessMode", "siteName", "welcomeText", "welcomeTextEn", "welcomeTextDe", "welcomeTextRu", "welcomeTextJa", "webRtcEnabled", "webRtcPublicHost", "webRtcIpv6Enabled", "webRtcStunServer", "webRtcUdpStart", "webRtcUdpEnd", "voiceProfile", "voiceTurnUrls", "voiceTurnTtlSeconds", "voiceOpusWs", "voiceJitterMaxMs"] as const;
 const snapshot = (form: ServerForm): ServerForm => JSON.parse(JSON.stringify(form));
 
 export function useAdminServerSettings(options: Options) {
@@ -73,6 +76,11 @@ export function useAdminServerSettings(options: Options) {
         serverForm.passwordAction = "keep";
       }
       serverForm.hasPassword = next.hasPassword;
+      if (serverForm.voiceTurnSecret === baseline.voiceTurnSecret && serverForm.voiceTurnSecretAction === baseline.voiceTurnSecretAction) {
+        serverForm.voiceTurnSecret = "";
+        serverForm.voiceTurnSecretAction = "keep";
+      }
+      serverForm.hasVoiceTurnSecret = next.hasVoiceTurnSecret;
       serverForm.welcomeDefaults = next.welcomeDefaults;
       if (applyProbeMetadata && serverForm.address === next.address && serverForm.port === next.port) {
         serverForm.lastTestAt = next.lastTestAt;
@@ -99,13 +107,24 @@ export function useAdminServerSettings(options: Options) {
     } finally { applyingSettings = false; }
   }
 
-  function serverPayload() {
-    return { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined,
+  function serverPayload(): AdminSettingsInput {
+    const payload: AdminSettingsInput = { target: combineTeamSpeakTarget(serverForm.address, serverForm.port), serverPassword: serverForm.passwordAction === "replace" ? serverForm.serverPassword : undefined,
       passwordAction: serverForm.passwordAction, accessMode: serverForm.accessMode, siteName: serverForm.siteName,
       welcomeText: serverForm.welcomeText, welcomeTextEn: serverForm.welcomeTextEn, welcomeTextDe: serverForm.welcomeTextDe, welcomeTextRu: serverForm.welcomeTextRu, welcomeTextJa: serverForm.welcomeTextJa,
       webRtcPublicHost: serverForm.webRtcPublicHost, webRtcIpv6Enabled: serverForm.webRtcIpv6Enabled, webRtcStunServer: serverForm.webRtcStunServer,
       webRtcEnabled: serverForm.webRtcEnabled, webRtcUdpStart: serverForm.webRtcUdpStart, webRtcUdpEnd: serverForm.webRtcUdpEnd,
       relayNodes: serverForm.relayNodes.map(node => ({ id: node.id, name: node.name, target: node.target, voiceEndpoint: node.voiceEndpoint, enabled: node.enabled, tokenAction: node.tokenAction, ...(node.tokenAction === "replace" ? { token: node.token } : {}) })) };
+    const saved = savedSettings.value;
+    if (saved) {
+      for (const key of ["voiceProfile", "voiceTurnUrls", "voiceTurnTtlSeconds", "voiceOpusWs", "voiceJitterMaxMs"] as const) {
+        if (serverForm[key] !== saved[key]) Object.assign(payload, { [key]: serverForm[key] });
+      }
+    }
+    if (serverForm.voiceTurnSecretAction !== "keep") {
+      payload.voiceTurnSecretAction = serverForm.voiceTurnSecretAction;
+      if (serverForm.voiceTurnSecretAction === "replace") payload.voiceTurnSecret = serverForm.voiceTurnSecret;
+    }
+    return payload;
   }
   function report(error: unknown) {
     if (!isAdminRequestCancelled(error)) options.errorMessage.value = options.errorText((error as { code?: string }).code);
