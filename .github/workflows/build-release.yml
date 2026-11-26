@@ -9,7 +9,7 @@ on:
       version:
         description: Release version without the v prefix
         required: true
-        default: 0.3.2
+        default: 0.3.3
         type: string
 
 permissions:
@@ -215,6 +215,22 @@ jobs:
             grep -q "\"version\":\"$release_version\"" <<<"$health"
           )
           tar -czf "$GITHUB_WORKSPACE/${package_name}.tar.gz" -C "$RUNNER_TEMP" "$package_name"
+          # Verify the shipped tarball is accepted by the same extractor and
+          # package validator used by console updates, including .bin links.
+          node --input-type=module - "$GITHUB_WORKSPACE/${package_name}.tar.gz" "$RUNNER_TEMP/${package_name}-updater-check" "$release_version" <<'NODE'
+          import path from 'node:path';
+          import { rm } from 'node:fs/promises';
+          import { extractReleaseArchive } from './dist/updater/archive.js';
+          import { locatePackageRoot } from './dist/updater/code-swap.js';
+          const [archive, destination, version] = process.argv.slice(2);
+          try {
+            await extractReleaseArchive(archive, destination, path.basename(archive));
+            locatePackageRoot(destination, version, 'linux');
+            console.log(`Console updater accepts ${path.basename(archive)}`);
+          } finally {
+            await rm(destination, { recursive: true, force: true });
+          }
+          NODE
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}

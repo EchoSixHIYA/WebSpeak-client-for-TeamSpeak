@@ -13,7 +13,7 @@
 
 WebSpeak is a self-hosted browser client and voice gateway for TeamSpeak 3 and TeamSpeak 6. Visitors join voice, chat and screen sharing in a browser; operators manage target servers, access policy and data through the administration console.
 
-Stable release: [v0.3.2 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Skin recovery, app library layouts, and plugin settings forms.
+Stable release: [v0.3.3 notes](#latest-release-notes) · [Download packages](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Console updates, reliable recovery, and skin compatibility improvements.
 
 
 
@@ -346,6 +346,20 @@ Functional plugins are independent applications using standard browser capabilit
 ## Changelog
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.3) · 2026-11-26
+
+**Highlight: stable-release checks and one-click updates in the administration console.**
+
+- Administrators can check official GitHub Releases, select a version and confirm installation. Packages must pass SHA-256 verification. Installation initially supports official Linux x64 packages running in the foreground. Windows, Linux arm64, Docker, source installs and instances managed by systemd, PM2 or Supervisor retain version checks and release-note links; installation follows their manual deployment procedure.
+- Updates replace application files while preserving `data/`, `config.json`, `certs/`, installed skins and plugins. Installation restarts the process and briefly disconnects voice sessions and the console. SHA256SUMS.txt is an integrity checksum, not a digital signature.
+- Hardened health checks, rollback and startup recovery after interrupted updates. Recovery shares the update lock, preventing a duplicate launch from rolling back a live update. Size-limit errors, disk-write failures and cancellation abort requests, release response readers and clean up sibling downloads.
+- Skins can place recovery controls in declared slots and style host controls through protected tokens, with default placement and colours when unusable. Improved floating-control avoidance, hit-testing through toasts, late skin loading and animation compatibility; recovery shortcuts remain available.
+- Includes #60, #61, #62 and follow-up maintenance fixes, plus updated skin development documentation and examples. Thanks to OddTurtleHead.
+
+**Upgrading:** manually upgrade v0.3.2 or earlier to v0.3.3 first. Supported installs can then use the console for future stable releases. Back up data before upgrading. Docker uses `docker compose pull && docker compose up -d` with the data volume preserved. Stop managed services before replacing application files, then start them again.
+
+Validation: 1,102 automated tests, frontend/backend builds and the Docker startup health check passed.
 
 ### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
 

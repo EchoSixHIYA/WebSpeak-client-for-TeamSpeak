@@ -13,7 +13,7 @@
 
 WebSpeak ist ein selbst gehosteter Browserclient und ein Sprach-Gateway für TeamSpeak 3 und TeamSpeak 6. Nutzer verwenden Sprache, Chat und Bildschirmfreigabe im Browser; Betreiber verwalten Zielserver, Zugriff und Daten über die Webkonsole.
 
-Stabile Version: [Hinweise zu v0.3.2](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Skin-Wiederherstellung, App-Bibliothek und Plugin-Formulare.
+Stabile Version: [Hinweise zu v0.3.3](#latest-release-notes) · [Pakete herunterladen](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · Konsolen-Updates, Wiederherstellung und bessere Skin-Kompatibilität.
 
 
 
@@ -340,6 +340,20 @@ Funktionale Plugins sind unabhängige Anwendungen mit Browserfunktionen und opti
 ## Änderungsprotokoll
 
 <a id="latest-release-notes"></a>
+
+### [v0.3.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.3) · 2026-11-26
+
+**Schwerpunkt: stabile Versionen prüfen und Updates direkt in der Verwaltung installieren.**
+
+- Die Konsole prüft offizielle GitHub Releases; Administratoren wählen eine Version und bestätigen die Installation nach SHA-256-Prüfung. Die Installation unterstützt zunächst offizielle Linux-x64-Pakete im Vordergrund. Windows, Linux arm64, Docker, Quellinstallationen und von systemd, PM2 oder Supervisor verwaltete Instanzen können Versionen und Versionshinweise prüfen; die Installation bleibt manuell.
+- Nur Programmdateien werden ersetzt. `data/`, `config.json`, `certs/`, installierte Skins und Plugins bleiben erhalten. Der Prozessneustart trennt Sprachsitzungen und Konsole kurzzeitig. SHA256SUMS.txt ist eine Integritätsprüfsumme, keine digitale Signatur.
+- Gesundheitsprüfung, Rollback und Startwiederherstellung nach Unterbrechungen wurden gehärtet. Wiederherstellung und Update verwenden dieselbe Sperre. Größenlimits, Schreibfehler und Abbruch beenden Anfragen, geben Leser frei und bereinigen parallele Downloads.
+- Skins können Wiederherstellungsbedienelemente über deklarierte Slots platzieren und Host-Bedienelemente über geschützte Variablen gestalten. Bei unbrauchbaren Werten greifen Standardlayout und -farben. Verbesserte Vermeidung verdeckter Elemente, Toast-Hit-Tests sowie Kompatibilität mit verzögertem Skin-Laden und Animationen; Wiederherstellungskürzel bleiben verfügbar.
+- Enthält #60, #61, #62 und nachfolgende Korrekturen sowie aktualisierte Skin-Anleitungen und Beispiele. Danke an OddTurtleHead.
+
+**Upgrade:** v0.3.2 und ältere Versionen zuerst manuell auf v0.3.3 aktualisieren. Danach sind Konsolen-Updates für künftige stabile Versionen auf unterstützten Installationen verfügbar. Daten vorher sichern. Docker: `docker compose pull && docker compose up -d` unter Beibehaltung des Datenvolumes. Verwaltete Dienste vor dem Dateiaustausch stoppen und anschließend neu starten.
+
+Prüfung: 1102 automatisierte Tests, Frontend-/Backend-Builds und Docker-Startprüfung bestanden.
 
 ### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
 

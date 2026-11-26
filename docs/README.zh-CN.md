@@ -13,7 +13,7 @@
 
 WebSpeak 是可自行部署的 TeamSpeak 3 / TeamSpeak 6 网页客户端与语音网关。用户通过浏览器加入语音、聊天和屏幕共享；部署者通过管理员控制台管理目标服务器、访问策略和数据。
 
-稳定版：[v0.3.2 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · 皮肤恢复入口、应用库布局和插件配置表单。
+稳定版：[v0.3.3 更新日志](#latest-release-notes) · [下载发布包](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/latest) · 控制台一键更新、升级恢复与皮肤兼容性改进。
 
 
 
@@ -366,11 +366,25 @@ relay.example.com {
 
 ## 更新日志
 
-<a id="live-update-2026-11-13"></a>
-
 <a id="latest-release-notes"></a>
 
+### [v0.3.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.3) · 2026-11-26
+
+**本次重点：管理员控制台新增正式版本检查与一键更新。**
+
+- 管理员可检查官方 GitHub Releases，选择版本并确认安装；下载包必须通过 SHA-256 校验。首期自动安装支持前台运行的 Linux x64 官方发布包。Windows、Linux arm64、Docker、源码，以及 systemd、PM2、Supervisor 托管实例均保留版本检查和发行说明入口，安装仍按各部署方式手动完成。
+- 更新仅替换程序文件，保留 `data/`、`config.json`、`certs/` 及已安装的皮肤和插件。安装会重启进程，语音会话和管理页面会短暂断开。SHA256SUMS.txt 是完整性校验和，不是数字签名。
+- 加固升级健康检查、失败回滚和断电/进程中断后的启动恢复；恢复流程与更新进程共享锁，防止正常更新被重复启动误回滚。下载超限、写盘失败或取消时会中止请求、释放响应流，并清理并行下载。
+- 皮肤可通过声明的布局槽位和受保护样式变量调整恢复入口与宿主控件的外观；不可读或不可用时回退到默认布局和样式。改进浮动入口的遮挡避让、提示消息穿透判断、皮肤延迟加载和动画兼容性，保留恢复快捷键。
+- 纳入 #60、#61、#62 及后续维护修复，更新皮肤开发文档和示例。感谢 OddTurtleHead 的贡献。
+
+**升级说明：** v0.3.2 及更早版本请先手动升级到 v0.3.3；之后可在支持的部署中使用控制台安装后续正式版。升级前请备份数据。Docker 使用 `docker compose pull && docker compose up -d` 并保留数据卷；服务托管实例请停止服务、替换程序文件后再启动。
+
+验证：1102 项自动化测试通过，前后端构建及 Docker 启动健康检查通过。
+
 ### [v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2) · 2026-11-14
+
+<a id="live-update-2026-11-13"></a>
 
 - 第三方皮肤可以为宿主装饰添加样式。恢复入口和授权弹窗由宿主管理，应用皮肤后仍能切回内置皮肤。感谢 ph1gros 对 TS3 版本识别及兼容性文档的贡献（#46），以及 OddTurtleHead 对宿主装饰和皮肤恢复的贡献（#57）。
 - 日间、夜间和 ILLUSIA 的应用库在顶部工具栏展开。KAAK 3.1.134 将应用库放入最左侧图标栏，按钮与相邻控件对齐。固定应用排在列表前面。

@@ -19,7 +19,7 @@
   </p>
 </div>
 
-当前版本 / Current version: **[v0.3.2](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.2)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
+当前版本 / Current version: **[v0.3.3](https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak/releases/tag/v0.3.3)** · [更新内容 / Release notes](./docs/README.zh-CN.md#latest-release-notes)
 
 ## 关于 WebSpeak · Overview
 
