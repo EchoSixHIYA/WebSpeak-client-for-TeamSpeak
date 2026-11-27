@@ -58,11 +58,16 @@ export interface ServerEvent {
 export interface VoiceAudioBridgeStats {
   transport: "webrtc" | "websocket";
   ingressFrames: number;
+  ingressPcmFrames?: number;
+  ingressOpusFrames?: number;
   ingressDroppedFrames: number;
   ingressMaxGapMs: number;
   tsSendFrames: number;
   tsSendErrors: number;
   tsSendMaxGapMs: number;
+  uplinkQueuePeakFrames?: number;
+  uplinkQueueDroppedFrames?: number;
+  uplinkPacerLateTicks?: number;
   tsReceiveFrames: number;
   tsReceiveMaxGapMs: number;
   egressFrames: number;

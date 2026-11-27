@@ -33,6 +33,12 @@ const settings = object({
   webRtcPublicHost: value => value === undefined ? "" : text(value),
   webRtcIpv6Enabled: value => value === undefined ? false : boolean(value),
   webRtcStunServer: value => value === undefined ? "" : text(value),
+  voiceProfile: value => value === undefined ? "auto" as const : choice("auto", "legacy", "adaptive")(value),
+  voiceTurnUrls: value => value === undefined ? "" : text(value),
+  hasVoiceTurnSecret: value => value === undefined ? false : boolean(value),
+  voiceTurnTtlSeconds: value => value === undefined ? 21600 : number(value),
+  voiceOpusWs: value => value === undefined ? false : boolean(value),
+  voiceJitterMaxMs: value => value === undefined ? 300 : number(value),
   relayConfigured: boolean, relayEnabled: boolean, relayName: text, relayTarget: text, hasRelayToken: boolean,
   relayNodes: array(relayNode), internalPort: number, updatedAt: text,
 });

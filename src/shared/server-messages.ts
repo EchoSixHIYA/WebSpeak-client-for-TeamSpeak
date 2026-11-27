@@ -1,8 +1,9 @@
 import type { ChannelMember, ChannelInfo, ServerEvent, VoiceAudioBridgeStats } from "./voice-models.js";
 import { normalizeScreenShareIceServers, parseScreenShareSignal, SCREEN_SHARE_LEGACY_AVATAR_BUDGET, type ScreenShareIceServer, type ScreenSharePeerSignal, type ScreenShareStreamDescription, type ScreenShareViewerDescription } from "./screen-share.js";
 
-import { normalizeVoiceStunServer } from "./voice-ice.js";
+import { normalizeVoiceIceServers, normalizeVoiceIceTransportPolicy, normalizeVoiceStunServer, type VoiceIceServer } from "./voice-ice.js";
 import { isSessionDescription, type SessionDescription } from "./webrtc.js";
+import { isVoiceProfile, type VoiceProfile } from "./voice-profile.js";
 export type { SessionDescription } from "./webrtc.js";
 
 type Message<T extends string, Fields = object> = { type: T } & Fields;
@@ -13,7 +14,7 @@ type ChatFields = { invokerId?: number; invokerName?: string; message: string; t
 /** Public JSON messages. Internal sockets, SDK clients and media objects stay out. */
 export type ServerMessage =
   | Message<"inviteCreated", Request & { token: string; expiresAt: number }>
-  | Message<"connected", { tsClientId: number; pluginSession?: string; members?: ChannelMember[]; serverEventLog?: ServerEvent[]; identity?: string; webrtcAvailable?: boolean; webRtcStunServer?: string; whisperTargetIds?: number[]; whisperActive?: boolean; screenShareIceServers?: ScreenShareIceServer[]; accelerated?: boolean }>
+  | Message<"connected", { tsClientId: number; pluginSession?: string; members?: ChannelMember[]; serverEventLog?: ServerEvent[]; identity?: string; webrtcAvailable?: boolean; webrtcUnavailableReason?: "DISABLED" | "NO_MEDIA_PATH"; webRtcStunServer?: string; voiceProfile?: VoiceProfile; voiceIceServers?: VoiceIceServer[]; voiceIceTransportPolicy?: "all" | "relay"; audioFrameVersion?: 2; audioUplinkCodecs?: ("pcm" | "opus")[]; audioJitterMaxMs?: number; whisperTargetIds?: number[]; whisperActive?: boolean; screenShareIceServers?: ScreenShareIceServer[]; accelerated?: boolean }>
   | Message<"serverInfo", { name: string; icon?: string | null; bannerUrl?: string | null; welcomeMessage?: string }>
   | Message<"memberEnter", ChannelMember>
   | Message<"memberLeave", { id: number }>
@@ -88,8 +89,11 @@ export function parseVoiceAudioBridgeStats(value: unknown): VoiceAudioBridgeStat
   const count = (key: string): number => finite(value[key]) && value[key] >= 0 ? value[key] : 0;
   return {
     transport: value.transport === "webrtc" ? "webrtc" : "websocket",
-    ingressFrames: count("ingressFrames"), ingressDroppedFrames: count("ingressDroppedFrames"), ingressMaxGapMs: count("ingressMaxGapMs"),
+    ingressFrames: count("ingressFrames"), ingressPcmFrames: count("ingressPcmFrames"), ingressOpusFrames: count("ingressOpusFrames"),
+    ingressDroppedFrames: count("ingressDroppedFrames"), ingressMaxGapMs: count("ingressMaxGapMs"),
     tsSendFrames: count("tsSendFrames"), tsSendErrors: count("tsSendErrors"), tsSendMaxGapMs: count("tsSendMaxGapMs"),
+    uplinkQueuePeakFrames: count("uplinkQueuePeakFrames"), uplinkQueueDroppedFrames: count("uplinkQueueDroppedFrames"),
+    uplinkPacerLateTicks: count("uplinkPacerLateTicks"),
     tsReceiveFrames: count("tsReceiveFrames"), tsReceiveMaxGapMs: count("tsReceiveMaxGapMs"),
     egressFrames: count("egressFrames"), egressDroppedFrames: count("egressDroppedFrames"), egressMaxGapMs: count("egressMaxGapMs"),
     webrtcIngressRtpFrames: count("webrtcIngressRtpFrames"), webrtcIngressRtpMaxGapMs: count("webrtcIngressRtpMaxGapMs"),
@@ -138,6 +142,13 @@ export function parseScreenShareStream(value: unknown): ScreenShareStreamDescrip
 const valid: Record<ServerMessage["type"], (message: RecordValue) => boolean> = {
   connected: m => optional(m.pluginSession, v => text(v) && /^[A-Za-z0-9_-]{43}$/.test(v)) && clientId(m.tsClientId) && optional(m.members, v => arrayOf(v, member)) && optional(m.serverEventLog, v => arrayOf(v, event))
     && optional(m.identity, v => text(v) && v.length <= 8192) && optional(m.webrtcAvailable, boolean) && optional(m.webRtcStunServer, v => normalizeVoiceStunServer(v) !== null)
+    && optional(m.webrtcUnavailableReason, v => v === "DISABLED" || v === "NO_MEDIA_PATH")
+    && optional(m.voiceProfile, isVoiceProfile)
+    && optional(m.voiceIceServers, v => Array.isArray(v) && normalizeVoiceIceServers(v).length === v.length)
+    && optional(m.voiceIceTransportPolicy, v => v === "all" || v === "relay")
+    && optional(m.audioFrameVersion, v => v === 2)
+    && optional(m.audioUplinkCodecs, v => Array.isArray(v) && v.length > 0 && v.every(codec => codec === "pcm" || codec === "opus"))
+    && optional(m.audioJitterMaxMs, v => finite(v) && Number.isInteger(v) && v >= 80 && v <= 500)
     && optional(m.whisperTargetIds, v => arrayOf(v, clientId)) && optional(m.whisperActive, boolean) && optional(m.accelerated, boolean),
   serverInfo: m => text(m.name) && m.name.length <= 256
     && optional(m.icon, v => v === null || (text(v) && v.length <= 180_000
@@ -191,6 +202,8 @@ export function parseServerMessage(value: unknown): ServerMessage | null {
   let result = value;
   if (value.type === "connected") {
     result = { ...value, ...(value.webRtcStunServer === undefined ? {} : { webRtcStunServer: normalizeVoiceStunServer(value.webRtcStunServer)! }), screenShareIceServers: normalizeScreenShareIceServers(Array.isArray(value.screenShareIceServers) ? value.screenShareIceServers : undefined) };
+    if (Array.isArray(value.voiceIceServers)) result = { ...result, voiceIceServers: normalizeVoiceIceServers(value.voiceIceServers) };
+    if (value.voiceIceTransportPolicy !== undefined) result = { ...result, voiceIceTransportPolicy: normalizeVoiceIceTransportPolicy(value.voiceIceTransportPolicy) };
   } else if (value.type === "audioStats") {
     result = { ...value, stats: parseVoiceAudioBridgeStats(value.stats) };
   } else if (value.type === "screenShareList") {

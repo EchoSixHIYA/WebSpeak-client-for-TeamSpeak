@@ -1,0 +1,12 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: webspeak-cloudflared
+    restart: unless-stopped
+    # Linux only. On Docker Desktop for Windows/macOS, run cloudflared on the
+    # host and use http://127.0.0.1:3040 instead.
+    network_mode: host
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./config.yml:/etc/cloudflared/config.yml:ro
+      - ./REPLACE_WITH_TUNNEL_UUID.json:/etc/cloudflared/REPLACE_WITH_TUNNEL_UUID.json:ro

@@ -1570,6 +1570,29 @@
   margin-top: 16px;
 }
 
+:deep(.voice-profile-options) {
+  display: grid;
+  gap: 10px;
+}
+
+:deep(.voice-fields) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+
+:deep(.voice-fields .field-help) {
+  margin-top: 6px;
+}
+
+:deep(.turn-card textarea) {
+  min-height: 76px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 :deep(.toggle-choice) {
   margin: 0;
 }

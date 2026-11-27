@@ -5,8 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import type { AdminCredential } from "../security/admin-password.js";
 import type { TeamSpeakProtocol } from "../server/teamspeak-adapter.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE } from "../server/webrtc-config.js";
+import type { VoiceProfileSetting } from "../shared/voice-profile.js";
 
-export const DATABASE_SCHEMA_VERSION = 13;
+export const DATABASE_SCHEMA_VERSION = 14;
 export type AccessMode = "fixed" | "open";
 
 export interface PersistedSettings {
@@ -31,6 +32,13 @@ export interface PersistedSettings {
   webRtcStunServer: string;
   webRtcUdpStart: number;
   webRtcUdpEnd: number;
+  /** Console-owned overrides; null inherits the environment baseline. */
+  voiceProfile: VoiceProfileSetting | null;
+  voiceTurnUrls: string | null;
+  voiceTurnSecretEncrypted: string | null;
+  voiceTurnTtlSeconds: number | null;
+  voiceOpusWs: boolean | null;
+  voiceJitterMaxMs: number | null;
   relayConfigured: boolean;
   relayEnabled: boolean;
   relayName: string;
@@ -58,6 +66,12 @@ export interface SettingsUpdate {
   webRtcStunServer?: string;
   webRtcUdpStart?: number;
   webRtcUdpEnd?: number;
+  voiceProfile?: VoiceProfileSetting | null;
+  voiceTurnUrls?: string | null;
+  voiceTurnSecretEncrypted?: string | null;
+  voiceTurnTtlSeconds?: number | null;
+  voiceOpusWs?: boolean | null;
+  voiceJitterMaxMs?: number | null;
   relayConfigured: boolean;
   relayEnabled: boolean;
   relayName: string;
@@ -144,6 +158,12 @@ interface SettingsRow extends Record<string, unknown> {
   webrtc_stun_server: string;
   webrtc_udp_start: number;
   webrtc_udp_end: number;
+  voice_profile: string | null;
+  voice_turn_urls: string | null;
+  voice_turn_secret_encrypted: string | null;
+  voice_turn_ttl_seconds: number | null;
+  voice_opus_ws: number | null;
+  voice_jitter_max_ms: number | null;
   relay_configured: number;
   relay_enabled: number;
   relay_name: string;
@@ -269,6 +289,12 @@ export class WebSpeakDatabase {
       webRtcStunServer: row.webrtc_stun_server,
       webRtcUdpStart: row.webrtc_udp_start,
       webRtcUdpEnd: row.webrtc_udp_end,
+      voiceProfile: row.voice_profile === "legacy" || row.voice_profile === "adaptive" || row.voice_profile === "auto" ? row.voice_profile : null,
+      voiceTurnUrls: row.voice_turn_urls,
+      voiceTurnSecretEncrypted: row.voice_turn_secret_encrypted,
+      voiceTurnTtlSeconds: row.voice_turn_ttl_seconds,
+      voiceOpusWs: row.voice_opus_ws === null ? null : row.voice_opus_ws === 1,
+      voiceJitterMaxMs: row.voice_jitter_max_ms,
       relayConfigured: row.relay_configured === 1,
       relayEnabled: row.relay_enabled === 1,
       relayName: row.relay_name,
@@ -754,6 +780,23 @@ export class WebSpeakDatabase {
         ); CREATE INDEX workspace_invites_expiry ON workspace_invites(expires_at);
         PRAGMA user_version = 13;`);
       });
+      version = 13;
+    }
+    if (version === 13) {
+      this.transaction(() => {
+        this.database.exec(`
+          -- Console-managed voice deployment overrides. NULL keeps the
+          -- environment baseline; an empty TURN URL or secret explicitly
+          -- disables the corresponding environment value.
+          ALTER TABLE settings ADD COLUMN voice_profile TEXT CHECK (voice_profile IS NULL OR voice_profile IN ('auto', 'legacy', 'adaptive'));
+          ALTER TABLE settings ADD COLUMN voice_turn_urls TEXT;
+          ALTER TABLE settings ADD COLUMN voice_turn_secret_encrypted TEXT;
+          ALTER TABLE settings ADD COLUMN voice_turn_ttl_seconds INTEGER CHECK (voice_turn_ttl_seconds IS NULL OR voice_turn_ttl_seconds BETWEEN 300 AND 86400);
+          ALTER TABLE settings ADD COLUMN voice_opus_ws INTEGER CHECK (voice_opus_ws IS NULL OR voice_opus_ws IN (0, 1));
+          ALTER TABLE settings ADD COLUMN voice_jitter_max_ms INTEGER CHECK (voice_jitter_max_ms IS NULL OR voice_jitter_max_ms BETWEEN 80 AND 500);
+          PRAGMA user_version = 14;
+        `);
+      });
     }
   }
 
@@ -762,7 +805,8 @@ export class WebSpeakDatabase {
       `UPDATE settings SET
          site_name = ?, welcome_text = ?, welcome_text_en = ?, welcome_text_de = ?, welcome_text_ru = ?, welcome_text_ja = ?, access_mode = ?, ts_host = ?, ts_port = ?, ts_target = ?,
          ts_password_encrypted = ?, webrtc_enabled = ?, webrtc_public_host = ?, webrtc_ipv6_enabled = ?, webrtc_stun_server = ?, webrtc_udp_start = ?,
-         webrtc_udp_end = ?, relay_configured = ?, relay_enabled = ?, relay_name = ?,
+         webrtc_udp_end = ?, voice_profile = ?, voice_turn_urls = ?, voice_turn_secret_encrypted = ?, voice_turn_ttl_seconds = ?, voice_opus_ws = ?, voice_jitter_max_ms = ?,
+         relay_configured = ?, relay_enabled = ?, relay_name = ?,
          relay_host = ?, relay_port = ?, relay_token_encrypted = ?, updated_at = ?
        WHERE id = 1`,
     ).run(
@@ -783,6 +827,12 @@ export class WebSpeakDatabase {
       settings.webRtcStunServer ?? "",
       settings.webRtcUdpStart ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[0],
       settings.webRtcUdpEnd ?? DEFAULT_WEBRTC_UDP_PORT_RANGE[1],
+      settings.voiceProfile ?? null,
+      settings.voiceTurnUrls ?? null,
+      settings.voiceTurnSecretEncrypted ?? null,
+      settings.voiceTurnTtlSeconds ?? null,
+      settings.voiceOpusWs == null ? null : settings.voiceOpusWs ? 1 : 0,
+      settings.voiceJitterMaxMs ?? null,
       settings.relayConfigured ? 1 : 0,
       settings.relayEnabled ? 1 : 0,
       settings.relayName,

@@ -15,6 +15,13 @@ export interface AdminSettingsInput {
   webRtcStunServer?: string;
   webRtcUdpStart?: number;
   webRtcUdpEnd?: number;
+  voiceProfile?: "auto" | "legacy" | "adaptive";
+  voiceTurnUrls?: string;
+  voiceTurnSecret?: string;
+  voiceTurnSecretAction?: "keep" | "replace" | "remove";
+  voiceTurnTtlSeconds?: number;
+  voiceOpusWs?: boolean;
+  voiceJitterMaxMs?: number;
   relaySettingsAction?: "keep" | "replace" | "remove";
   relayEnabled?: boolean;
   relayName?: string;

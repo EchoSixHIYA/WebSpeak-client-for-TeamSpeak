@@ -27,6 +27,7 @@ const settings = (extra = {}) => ({
   welcomeDefaults: { zh: "", en: "", de: "", ru: "", ja: "" },
   lastTestAt: null, lastTestLatencyMs: null, lastTestError: null,
   webRtcEnabled: false, webRtcUdpStart: 40000, webRtcUdpEnd: 40099,
+  voiceProfile: "auto", voiceTurnUrls: "", hasVoiceTurnSecret: false, voiceTurnTtlSeconds: 21600, voiceOpusWs: false, voiceJitterMaxMs: 300,
   relayConfigured: false, relayEnabled: false, relayName: "", relayTarget: "", hasRelayToken: false,
   relayNodes: [], internalPort: 3040, updatedAt: "2026-10-01T00:00:00Z", ...extra,
 });
@@ -228,6 +229,60 @@ test("ICE settings load, submit and preserve edits made during a pending save", 
   assert.equal(serverModel.serverForm.webRtcPublicHost, "new-media.example.com");
   assert.equal(serverModel.serverForm.webRtcIpv6Enabled, false);
   assert.equal(serverModel.serverForm.webRtcStunServer, "");
+});
+
+test("an unrelated settings save omits untouched voice overrides", async () => {
+  await mount();
+  const inheritedVoice = { voiceProfile: "adaptive", voiceTurnUrls: "turn:turn.example.com:3478", hasVoiceTurnSecret: true,
+    voiceTurnTtlSeconds: 3600, voiceOpusWs: true, voiceJitterMaxMs: 200 };
+  handler = path => Promise.resolve(json(path === "/server" ? settings(inheritedVoice) : defaults(path)));
+  await serverModel.loadServerSettings();
+  serverModel.serverForm.siteName = "Renamed";
+  handler = (path, init) => {
+    if (path !== "/server" || init.method !== "PUT") return Promise.resolve(json(defaults(path)));
+    const submitted = JSON.parse(init.body);
+    assert.equal(submitted.siteName, "Renamed");
+    for (const key of ["voiceProfile", "voiceTurnUrls", "voiceTurnSecret", "voiceTurnSecretAction", "voiceTurnTtlSeconds", "voiceOpusWs", "voiceJitterMaxMs"]) {
+      assert.equal(Object.hasOwn(submitted, key), false, `${key} must remain inherited when untouched`);
+    }
+    return Promise.resolve(json({ ok: true, settings: settings({ ...inheritedVoice, siteName: "Renamed" }) }));
+  };
+  await serverModel.saveServerSettings();
+  assert.equal(state.errorMessage, "");
+});
+
+test("voice settings load, submit secrets once, and preserve edits made during a pending save", async () => {
+  await mount();
+  const voice = { voiceProfile: "adaptive", voiceTurnUrls: "turn:turn.example.com:3478", hasVoiceTurnSecret: true,
+    voiceTurnTtlSeconds: 3600, voiceOpusWs: true, voiceJitterMaxMs: 200 };
+  handler = path => Promise.resolve(json(path === "/server" ? settings(voice) : defaults(path)));
+  await serverModel.loadServerSettings();
+  for (const [key, value] of Object.entries(voice)) assert.equal(serverModel.serverForm[key], value);
+  Object.assign(serverModel.serverForm, {
+    voiceProfile: "legacy", voiceTurnUrls: "turn:changed.example.com:3478", voiceTurnTtlSeconds: 7200,
+    voiceOpusWs: false, voiceJitterMaxMs: 240, voiceTurnSecret: "fixture-turn-shared-secret", voiceTurnSecretAction: "replace",
+  });
+  const save = deferred();
+  handler = (path, init) => {
+    if (path !== "/server" || init.method !== "PUT") return Promise.resolve(json(defaults(path)));
+    const submitted = JSON.parse(init.body);
+    assert.equal(submitted.voiceProfile, "legacy");
+    assert.equal(submitted.voiceTurnUrls, "turn:changed.example.com:3478");
+    assert.equal(submitted.voiceTurnSecret, "fixture-turn-shared-secret");
+    assert.equal(submitted.voiceTurnSecretAction, "replace");
+    assert.equal(submitted.voiceTurnTtlSeconds, 7200);
+    assert.equal(submitted.voiceOpusWs, false);
+    assert.equal(submitted.voiceJitterMaxMs, 240);
+    return save.promise;
+  };
+  const pending = serverModel.saveServerSettings();
+  serverModel.serverForm.voiceTurnUrls = "turn:new-turn.example.com:3478";
+  save.resolve(json({ ok: true, settings: settings(voice) }));
+  await pending;
+  assert.equal(serverModel.serverForm.voiceTurnUrls, "turn:new-turn.example.com:3478");
+  assert.equal(serverModel.serverForm.voiceTurnSecret, "");
+  assert.equal(serverModel.serverForm.voiceTurnSecretAction, "keep");
+  assert.equal(serverModel.serverForm.hasVoiceTurnSecret, true);
 });
 
 test("settings saves preserve relay edits, removals and additions made while awaiting the server", async () => {
@@ -717,6 +772,9 @@ test("settings and operations render explicit localized sections with valid deep
     const settingsHtml = await renderToString(createSSRApp(Settings, { model: state.serverSettings, i18n: state.i18n, initialSection: "site", welcomeLanguage: "zh" }));
     assert.ok(settingsHtml.includes(translations.adminSiteAnnouncement));
     assert.ok(settingsHtml.includes('data-admin-section="site"'));
+    assert.ok(settingsHtml.includes('data-admin-section="voice"'));
+    assert.ok(settingsHtml.includes(state.i18n.tr("voiceSettings")));
+    assert.ok(settingsHtml.includes(state.i18n.tr("turnSettings")));
     assert.ok(!settingsHtml.includes("undefined"));
     const operationsHtml = await renderToString(createSSRApp(Operations, { model: state.adminOperations, i18n: state.i18n, initialSection: "maintenance" }));
     assert.ok(operationsHtml.includes(translations.adminBrowserSessionsLead));

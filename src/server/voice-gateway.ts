@@ -6,6 +6,7 @@ import { parseDelegatedVoiceSession, VoiceGatewayRequestVerifier } from "./voice
 import type { Logger } from "../logger.js";
 import type { WebRtcAudioOptions } from "./webrtc-audio.js";
 import type { ScreenShareIceServer } from "./screen-share.js";
+import type { VoiceIceConfig } from "./voice-ice-config.js";
 
 export interface VoiceGatewayServerOptions {
   workspaceInvites?: import("./workspace-invites.js").WorkspaceInvites;
@@ -14,6 +15,7 @@ export interface VoiceGatewayServerOptions {
   sharedToken: string;
   logger: Logger;
   webRtc: WebRtcAudioOptions;
+  voiceIce?: VoiceIceConfig;
   screenShareIceServers?: ScreenShareIceServer[];
   trustedProxies?: readonly string[];
 }
@@ -33,6 +35,7 @@ export function createVoiceGatewayServer(options: VoiceGatewayServerOptions): Vo
     joinTickets: tickets,
     ...(options.workspaceInvites ? { createWorkspaceInvite: (credentials, minutes) => options.workspaceInvites!.create(credentials, minutes) } : {}),
     webRtc: options.webRtc,
+    voiceIce: options.voiceIce,
     screenShareIceServers: options.screenShareIceServers,
     trustedProxies: options.trustedProxies,
   };

@@ -15,8 +15,10 @@ import { hashAdminPassword, validateAdminPassword, verifyAdminPassword } from ".
 import { decryptSecret, encryptSecret } from "../security/secret-crypto.js";
 import { probeTeamSpeak, TeamSpeakProbeError } from "../server/teamspeak-probe.js";
 import { pingTeamSpeakHost } from "../server/network-probe.js";
-import { normalizeVoiceMediaHost, normalizeVoiceStunServer } from "../shared/voice-ice.js";
+import { normalizeVoiceMediaHost, normalizeVoiceStunServer, normalizeVoiceTurnRestUrls, VOICE_JITTER_MAX_MS, VOICE_JITTER_MIN_MS, VOICE_TURN_MIN_SECRET_LENGTH, VOICE_TURN_TTL_DEFAULT_SECONDS, VOICE_TURN_TTL_MAX_SECONDS, VOICE_TURN_TTL_MIN_SECONDS } from "../shared/voice-ice.js";
 import type { WebRtcAudioOptions } from "../server/webrtc-audio.js";
+import { DEFAULT_VOICE_ICE_CONFIG, type VoiceIceConfig } from "../server/voice-ice-config.js";
+import { isVoiceProfileSetting } from "../shared/voice-profile.js";
 import { DEFAULT_ACCELERATION_RELAY_PORT, type ConfiguredAccelerationRelay } from "../server/acceleration-relay.js";
 import { DEFAULT_WEBRTC_UDP_PORT_RANGE, WEBRTC_UDP_PORT_MAX, WEBRTC_UDP_PORT_MIN } from "../server/webrtc-config.js";
 import { DEFAULT_WELCOME_TEXTS, resolveWelcomeTexts } from "../site-copy.js";
@@ -43,6 +45,7 @@ export interface ManagedInviteView {
 }
 
 type ProbeFunction = typeof probeTeamSpeak;
+const VOICE_TURN_SECRET_PURPOSE = "webspeak:voice-turn-rest-secret:v1";
 
 export class AdminService {
   private readonly tsAdmin: TsAdminService;
@@ -56,6 +59,8 @@ export class AdminService {
     private readonly probe: ProbeFunction = probeTeamSpeak,
     private readonly version = "0.1.0",
     tsAdminClientFactory?: TsAdminQueryClientFactory,
+    /** Environment baseline; console values override it without requiring a restart. */
+    private readonly voiceIceDefaults: VoiceIceConfig = DEFAULT_VOICE_ICE_CONFIG,
   ) {
     this.tsAdmin = new TsAdminService(database, masterSecret, logger, () => {
       const settings = database.getSettings();
@@ -124,6 +129,7 @@ export class AdminService {
 
   getAdminSettings(): AdminSettings {
     const settings = this.database.getSettings();
+    const turn = this.resolveVoiceTurnSettings(settings);
     return {
       target: settingsTarget(settings),
       hasPassword: Boolean(settings.tsPasswordEncrypted),
@@ -144,6 +150,12 @@ export class AdminService {
       webRtcStunServer: settings.webRtcStunServer,
       webRtcUdpStart: settings.webRtcUdpStart,
       webRtcUdpEnd: settings.webRtcUdpEnd,
+      voiceProfile: settings.voiceProfile ?? this.voiceIceDefaults.profile,
+      voiceTurnUrls: turn.urls.join("\n"),
+      hasVoiceTurnSecret: turn.secret.length > 0,
+      voiceTurnTtlSeconds: turn.ttlSeconds,
+      voiceOpusWs: settings.voiceOpusWs ?? this.voiceIceDefaults.opusWebSocket,
+      voiceJitterMaxMs: settings.voiceJitterMaxMs ?? this.voiceIceDefaults.jitterMaxMs,
       relayConfigured: settings.relayConfigured,
       relayEnabled: settings.relayEnabled,
       relayName: settings.relayName,
@@ -164,6 +176,43 @@ export class AdminService {
       stunServer: settings.webRtcStunServer,
       udpPortRange: [settings.webRtcUdpStart, settings.webRtcUdpEnd],
     };
+  }
+
+  /** Resolve environment defaults plus console overrides for every new voice connection. */
+  getVoiceIceConfig(): VoiceIceConfig {
+    const settings = this.database.getSettings();
+    const turn = this.resolveVoiceTurnSettings(settings);
+    const turnRest = turn.urls.length > 0 && turn.secret.length >= VOICE_TURN_MIN_SECRET_LENGTH
+      ? { urls: turn.urls, secret: turn.secret, ttlSeconds: turn.ttlSeconds }
+      : undefined;
+    return {
+      servers: [...this.voiceIceDefaults.servers],
+      ...(turnRest ? { turnRest } : {}),
+      transportPolicy: this.voiceIceDefaults.transportPolicy,
+      gatewayTransportPolicy: this.voiceIceDefaults.gatewayTransportPolicy,
+      profile: settings.voiceProfile ?? this.voiceIceDefaults.profile,
+      opusWebSocket: settings.voiceOpusWs ?? this.voiceIceDefaults.opusWebSocket,
+      jitterMaxMs: settings.voiceJitterMaxMs ?? this.voiceIceDefaults.jitterMaxMs,
+    };
+  }
+
+  private resolveVoiceTurnSettings(settings: ReturnType<WebSpeakDatabase["getSettings"]>): { urls: string[]; secret: string; ttlSeconds: number } {
+    const baseline = this.voiceIceDefaults.turnRest;
+    const urls = settings.voiceTurnUrls === null
+      ? baseline?.urls ?? []
+      : normalizeVoiceTurnRestUrls(settings.voiceTurnUrls) ?? [];
+    const ttlSeconds = settings.voiceTurnTtlSeconds ?? baseline?.ttlSeconds ?? VOICE_TURN_TTL_DEFAULT_SECONDS;
+    let secret = "";
+    if (settings.voiceTurnSecretEncrypted === null) {
+      secret = baseline?.secret ?? "";
+    } else if (settings.voiceTurnSecretEncrypted !== "") {
+      try {
+        secret = decryptSecret(settings.voiceTurnSecretEncrypted, this.masterSecret, VOICE_TURN_SECRET_PURPOSE);
+      } catch (error: unknown) {
+        this.logger.error({ err: error instanceof Error ? error.message : String(error) }, "Stored TURN shared secret could not be decrypted");
+      }
+    }
+    return { urls, secret, ttlSeconds };
   }
 
   getAccelerationRelayOptions(): ConfiguredAccelerationRelay[] {
@@ -420,6 +469,60 @@ export class AdminService {
       throw new AdminInputError("WEBRTC_PORT_LOCKED", "Disable WebRTC and save before changing its UDP port range");
     }
 
+    const voiceProfile = input.voiceProfile === undefined ? current.voiceProfile : input.voiceProfile;
+    if (voiceProfile !== null && !isVoiceProfileSetting(voiceProfile)) {
+      throw new AdminInputError("INVALID_VOICE_PROFILE", "Voice profile must be auto, legacy or adaptive");
+    }
+    let voiceTurnUrls = current.voiceTurnUrls;
+    let requestedTurnUrls = current.voiceTurnUrls === null
+      ? this.voiceIceDefaults.turnRest?.urls ?? []
+      : normalizeVoiceTurnRestUrls(current.voiceTurnUrls) ?? [];
+    if (input.voiceTurnUrls !== undefined) {
+      const normalized = normalizeVoiceTurnRestUrls(input.voiceTurnUrls);
+      if (normalized === null) throw new AdminInputError("INVALID_VOICE_TURN_URLS", "Use one turn:/turns: URL per entry, at most eight");
+      voiceTurnUrls = normalized.join("\n");
+      requestedTurnUrls = normalized;
+    }
+    let voiceTurnSecretEncrypted = current.voiceTurnSecretEncrypted;
+    const voiceTurnSecretAction = input.voiceTurnSecretAction ?? (input.voiceTurnSecret === undefined ? "keep" : "replace");
+    if (voiceTurnSecretAction === "remove") {
+      voiceTurnSecretEncrypted = "";
+      voiceTurnUrls = "";
+      requestedTurnUrls = [];
+    }
+    if (voiceTurnSecretAction === "replace") {
+      const secret = input.voiceTurnSecret?.trim() ?? "";
+      if (secret && secret.length < VOICE_TURN_MIN_SECRET_LENGTH) {
+        throw new AdminInputError("INVALID_VOICE_TURN_SECRET", `The TURN shared secret must contain at least ${VOICE_TURN_MIN_SECRET_LENGTH} characters`);
+      }
+      voiceTurnSecretEncrypted = secret ? encryptSecret(secret, this.masterSecret, VOICE_TURN_SECRET_PURPOSE) : "";
+    }
+    const voiceTurnTtlSeconds = input.voiceTurnTtlSeconds === undefined ? current.voiceTurnTtlSeconds : input.voiceTurnTtlSeconds;
+    if (voiceTurnTtlSeconds !== null && (!Number.isInteger(voiceTurnTtlSeconds) || voiceTurnTtlSeconds < VOICE_TURN_TTL_MIN_SECONDS || voiceTurnTtlSeconds > VOICE_TURN_TTL_MAX_SECONDS)) {
+      throw new AdminInputError("INVALID_VOICE_TURN_TTL", `TURN credential lifetime must be between ${VOICE_TURN_TTL_MIN_SECONDS} and ${VOICE_TURN_TTL_MAX_SECONDS} seconds`);
+    }
+    const voiceOpusWs = input.voiceOpusWs === undefined ? current.voiceOpusWs : input.voiceOpusWs;
+    if (voiceOpusWs !== null && typeof voiceOpusWs !== "boolean") {
+      throw new AdminInputError("INVALID_VOICE_OPUS", "Opus over WebSocket must be a boolean");
+    }
+    const voiceJitterMaxMs = input.voiceJitterMaxMs === undefined ? current.voiceJitterMaxMs : input.voiceJitterMaxMs;
+    if (voiceJitterMaxMs !== null && (!Number.isInteger(voiceJitterMaxMs) || voiceJitterMaxMs < VOICE_JITTER_MIN_MS || voiceJitterMaxMs > VOICE_JITTER_MAX_MS)) {
+      throw new AdminInputError("INVALID_VOICE_JITTER_MAX", `Adaptive jitter limit must be between ${VOICE_JITTER_MIN_MS} and ${VOICE_JITTER_MAX_MS} ms`);
+    }
+    let turnSecret = "";
+    if (voiceTurnSecretEncrypted === null) {
+      turnSecret = this.voiceIceDefaults.turnRest?.secret ?? "";
+    } else if (voiceTurnSecretEncrypted !== "") {
+      try {
+        turnSecret = decryptSecret(voiceTurnSecretEncrypted, this.masterSecret, VOICE_TURN_SECRET_PURPOSE);
+      } catch {
+        throw new AdminInputError("INVALID_VOICE_TURN_SECRET", "The stored TURN shared secret cannot be decrypted; enter it again");
+      }
+    }
+    if (requestedTurnUrls.length > 0 && turnSecret.length < VOICE_TURN_MIN_SECRET_LENGTH) {
+      throw new AdminInputError("INVALID_VOICE_TURN_SECRET", `Configure a TURN shared secret of at least ${VOICE_TURN_MIN_SECRET_LENGTH} characters for the TURN URLs`);
+    }
+
     let encryptedPassword = current.tsPasswordEncrypted;
     const action = input.passwordAction ?? (input.serverPassword === undefined ? "keep" : "replace");
     if (action === "remove") encryptedPassword = null;
@@ -489,6 +592,12 @@ export class AdminService {
       webRtcPublicHost, webRtcIpv6Enabled, webRtcStunServer,
       webRtcUdpStart,
       webRtcUdpEnd,
+      voiceProfile,
+      voiceTurnUrls,
+      voiceTurnSecretEncrypted,
+      voiceTurnTtlSeconds,
+      voiceOpusWs,
+      voiceJitterMaxMs,
       relayConfigured,
       relayEnabled,
       relayName,
@@ -615,6 +724,12 @@ export class AdminService {
       webRtcStunServer: settings.webRtcStunServer,
       webRtcUdpStart: settings.webRtcUdpStart,
       webRtcUdpEnd: settings.webRtcUdpEnd,
+      voiceProfile: settings.voiceProfile,
+      voiceTurnUrls: settings.voiceTurnUrls,
+      voiceTurnSecretEncrypted: settings.voiceTurnSecretEncrypted,
+      voiceTurnTtlSeconds: settings.voiceTurnTtlSeconds,
+      voiceOpusWs: settings.voiceOpusWs,
+      voiceJitterMaxMs: settings.voiceJitterMaxMs,
       relayConfigured: settings.relayConfigured,
       relayEnabled: settings.relayEnabled,
       relayName: settings.relayName,
@@ -647,6 +762,12 @@ export class AdminService {
         webRtcStunServer: current.webRtcStunServer,
         webRtcUdpStart: current.webRtcUdpStart,
         webRtcUdpEnd: current.webRtcUdpEnd,
+        voiceProfile: current.voiceProfile,
+        voiceTurnUrls: current.voiceTurnUrls,
+        voiceTurnSecretEncrypted: current.voiceTurnSecretEncrypted,
+        voiceTurnTtlSeconds: current.voiceTurnTtlSeconds,
+        voiceOpusWs: current.voiceOpusWs,
+        voiceJitterMaxMs: current.voiceJitterMaxMs,
         relayConfigured: current.relayConfigured,
         relayEnabled: current.relayEnabled,
         relayName: current.relayName,

@@ -1,4 +1,5 @@
 import type { VoiceAudioBridgeStats } from "../../../src/shared/voice-models.js";
+import type { FallbackPlaybackStats } from "./remote-playback.js";
 
 export type AudioPermission = "unknown" | "granted" | "denied";
 
@@ -28,7 +29,7 @@ export interface VoiceAudioStatusSample {
   playbackState: "playing" | "paused" | "unavailable" | null;
   bridge: VoiceAudioBridgeStats;
   browser: BrowserVoiceAudioStats | null;
-  fallbackPlayback: { framesReceived: number; framesDropped: number; decodeErrors: number };
+  fallbackPlayback: { framesReceived: number; framesDropped: number; decodeErrors: number } & FallbackPlaybackStats;
 }
 
 interface DiagnosticSource {
@@ -44,6 +45,7 @@ interface DiagnosticOptions {
   presentation(source: DiagnosticSource): Pick<VoiceAudioStatusSample,
     "microphoneMuted" | "microphoneReady" | "microphonePermission" | "playbackState">;
   send(source: DiagnosticSource, sequence: string): void;
+  bufferStats?(): FallbackPlaybackStats;
 }
 
 async function browserStats(peer: RTCPeerConnection | null): Promise<BrowserVoiceAudioStats | null> {
@@ -105,6 +107,7 @@ function sameSource(left: DiagnosticSource | null, right: DiagnosticSource | nul
 export function createAudioDiagnostics(options: DiagnosticOptions) {
   const pending = new Map<string, { receive(bridge: VoiceAudioBridgeStats): void; finish(sample: VoiceAudioStatusSample | null): void }>();
   const fallback = { framesReceived: 0, framesDropped: 0, decodeErrors: 0 };
+  const emptyBuffer: FallbackPlaybackStats = { bufferTargetMs: 0, bufferResets: 0, maxBufferAheadMs: 0 };
   let sequence = 0;
   let scopeId = 0;
   let previousSource: DiagnosticSource | null = null;
@@ -142,7 +145,8 @@ export function createAudioDiagnostics(options: DiagnosticOptions) {
             finish({
               scopeId: scope, sampledAt: performance.now(), transport: source.transport,
               connectionState: source.peer?.connectionState ?? null,
-              ...options.presentation(source), bridge, browser: stats, fallbackPlayback: { ...fallback },
+              ...options.presentation(source), bridge, browser: stats,
+              fallbackPlayback: { ...fallback, ...(options.bufferStats?.() ?? emptyBuffer) },
             });
           });
         },

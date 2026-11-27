@@ -59,20 +59,23 @@ export function createMicrophoneCaptureFactory() {
     let worklet: AudioWorkletNode | null = null;
     let script: ScriptProcessorNode | null = null;
     let active = false;
+    let captureConnected = false;
     let disposed = false;
     const clean = (operation: () => void) => { try { operation(); } catch { /* release the other resources too */ } };
     function stopCapture() {
       active = false;
-      if (worklet) { clean(() => worklet!.port.close()); clean(() => worklet!.disconnect()); }
+      if (!captureConnected) return;
+      if (worklet) clean(() => worklet!.disconnect());
       if (script) clean(() => script!.disconnect());
       if (gain) clean(() => gain!.disconnect());
       if (silent) clean(() => silent!.disconnect());
-      worklet = null; script = null; gain = null; silent = null;
+      captureConnected = false;
     }
     function dispose() {
       if (disposed) return;
       disposed = true;
       stopCapture();
+      if (worklet) clean(() => worklet!.port.close());
       if (denoiser) { clean(() => denoiser!.destroy()); clean(() => denoiser!.disconnect()); }
       if (source) clean(() => source!.disconnect());
       if (destination) {
@@ -140,6 +143,7 @@ export function createMicrophoneCaptureFactory() {
       gain.connect(capture);
       capture.connect(silent);
       silent.connect(ctx.destination);
+      captureConnected = true;
       assertCurrent();
       if (track.readyState !== "live") throw new DOMException("Microphone track ended", "NotReadableError");
       return {
@@ -150,7 +154,17 @@ export function createMicrophoneCaptureFactory() {
           autoGainControl: typeof settings.autoGainControl === "boolean" ? settings.autoGainControl : null,
           rnnoise: Boolean(denoiser),
         },
-        activate() { if (!disposed && (worklet || script)) active = true; },
+        activate() {
+          if (disposed || !(worklet || script)) return;
+          if (!captureConnected) {
+            processedSource.connect(gain!);
+            gain!.connect(capture);
+            capture.connect(silent!);
+            silent!.connect(ctx.destination);
+            captureConnected = true;
+          }
+          active = true;
+        },
         setVolume(value) { if (gain) gain.gain.value = value; },
         stopCapture,
         dispose,

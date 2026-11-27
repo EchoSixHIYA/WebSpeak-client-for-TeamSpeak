@@ -3,6 +3,7 @@ import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createAccelerationRelayServer } from "./server/acceleration-relay.js";
 import { normalizeScreenShareIceServers, type ScreenShareIceServer } from "./server/screen-share.js";
+import { readVoiceIceConfig } from "./server/voice-ice-config.js";
 import { SkinRegistry } from "./admin/skin-registry.js";
 import { PluginRegistry } from "./plugins/registry.js";
 import { UpdateService } from "./updater/update-service.js";
@@ -18,6 +19,7 @@ const LOG_DIR = path.join(DATA_DIR, "logs");
 const STATIC_DIR = path.join(ROOT_DIR, "web", "dist");
 const APP_VERSION = readPackageVersion();
 const SCREEN_SHARE_ICE_SERVERS = readScreenShareIceServers(process.env.WEBSPEAK_SCREEN_SHARE_ICE_SERVERS);
+const VOICE_ICE_CONFIG = readVoiceIceConfig(process.env);
 
 async function main() {
   if (process.env.WEBSPEAK_MODE?.trim().toLowerCase() === "relay") {
@@ -43,6 +45,8 @@ async function main() {
     CONFIG_PATH,
     undefined,
     APP_VERSION,
+    undefined,
+    VOICE_ICE_CONFIG,
   );
   await adminService.initialize();
   removeObsoleteBootstrapFile();
@@ -93,6 +97,8 @@ async function main() {
       joinTickets,
       trustedProxies: readTrustedProxies(process.env.WEBSPEAK_TRUSTED_PROXIES),
       webRtc: () => adminService.getWebRtcAudioOptions(),
+      // Read per new connection so console changes apply without a process restart.
+      voiceIce: () => adminService.getVoiceIceConfig(),
       screenShareIceServers: () => SCREEN_SHARE_ICE_SERVERS,
       // The public gateway only uses the relay configuration explicitly
       // saved in the admin console. Environment variables belong to the
@@ -163,6 +169,7 @@ async function runRelayMode(): Promise<void> {
         : {}),
       udpPortRange: [webRtcUdpStart, webRtcUdpEnd] as [number, number],
     },
+    voiceIce: VOICE_ICE_CONFIG,
     screenShareIceServers: SCREEN_SHARE_ICE_SERVERS,
     trustedProxies: readTrustedProxies(process.env.WEBSPEAK_TRUSTED_PROXIES),
   });

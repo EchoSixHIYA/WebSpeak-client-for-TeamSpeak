@@ -3,7 +3,7 @@ import test from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { IncomingMessage } from "node:http";
 import pino from "pino";
-import { VoiceBridge, createTrustedProxies, resolveClientIp, resolveWebRtcPublicHost } from "./voice-bridge.js";
+import { VoiceBridge, createTrustedProxies, isCloudflareRequest, resolveClientIp, resolveWebRtcPublicHost } from "./voice-bridge.js";
 import { JoinTicketStore } from "./join-ticket.js";
 import { createAudioFlowStats } from "./audio-stats.js";
 import { SessionAudioTransport } from "./session-audio.js";
@@ -40,6 +40,8 @@ function fixture(webRtc = { enabled: true } as import("./webrtc-audio.js").WebRt
     tsClient: { isConnected: () => true, setInputMuted: async (_muted: boolean) => {}, setAccompanimentActive: async (_active: boolean) => {}, sendVoice: () => { forwarded++; }, sendWhisper: () => { forwarded++; } },
     whisperActive: false, whisperTargetIds: new Set<number>(), audio: createAudioFlowStats(),
     audioTransport: null as SessionAudioTransport | null,
+    voiceIceServers: [], voiceIceTransportPolicy: "all" as const, voiceIceGatewayTransportPolicy: "all" as const,
+    voiceProfile: "legacy" as const,
   };
   let forwarded = 0;
   let configurePeer = (_peer: PeerStub): void => {};
@@ -62,6 +64,7 @@ function fixture(webRtc = { enabled: true } as import("./webrtc-audio.js").WebRt
     isCurrent: () => bridge.entries.get(entry.id) === entry,
     isReady: () => entry.session.state === "connected", selfId: () => 1,
     peer: () => entry.webrtc, whisperTargets: () => null, sendJson: message => messages.push(message),
+    pacing: false,
   }, { encode: frame => frame, dispose() {} });
   const offer = (sdp: string) => bridge.handleWebRtcOffer(entry, { type: "offer", sdp }, message => messages.push(message));
   return { bridge, entry, peers, messages, offer, forwarded: () => forwarded, configure: (callback: typeof configurePeer) => { configurePeer = callback; } };
@@ -174,6 +177,27 @@ test("WebRTC candidates use the voice gateway host when the page Origin belongs 
   assert.equal(resolveWebRtcPublicHost(request), "voice-relay.example.com");
 });
 
+test("Cloudflare headers only classify a request from a trusted proxy", () => {
+  const trusted = createTrustedProxies(["127.0.0.1", "198.51.100.0/24"]);
+  const headers = { "cf-ray": "abc123-SJC", "cf-connecting-ip": "203.0.113.10" };
+  assert.equal(isCloudflareRequest(ipRequest("192.0.2.7", headers), trusted), false);
+  assert.equal(isCloudflareRequest(ipRequest("127.0.0.1", headers), trusted), true);
+  assert.equal(isCloudflareRequest(ipRequest("198.51.100.8", { "cdn-loop": "one, cloudflare two" }), trusted), true);
+  assert.equal(isCloudflareRequest(ipRequest("198.51.100.8", { "cdn-loop": "one, other two" }), trusted), false);
+});
+
+test("a Cloudflare-proxied request never falls back to the edge hostname for ICE", () => {
+  const request = {
+    headers: {
+      host: "voice.example.com",
+      "cf-ray": "abc123-SJC",
+      "cf-connecting-ip": "203.0.113.10",
+    },
+  } as unknown as IncomingMessage;
+  assert.equal(resolveWebRtcPublicHost(request, { allowHostFallback: false }), undefined);
+  assert.equal(resolveWebRtcPublicHost(request), "voice.example.com");
+});
+
 test("initial accompaniment updates TeamSpeak before creating a muted mixer and resets on stop", async () => {
   const f = fixture();
   const inputs: Array<[string, boolean]> = [];
@@ -232,6 +256,18 @@ test("an unset media override still uses a literal request host", async () => {
   Object.assign(f.entry, { webrtcPublicHost: "192.0.2.10" });
   await f.offer("legacy");
   assert.deepEqual(f.peers[0].options.publicAddresses, ["192.0.2.10"]);
+});
+
+test("TURN servers are passed to werift while direct-first remains the default policy", async () => {
+  const f = fixture({ enabled: true, publicHost: "192.0.2.20" });
+  Object.assign(f.entry, {
+    webrtcPublicHost: "192.0.2.20",
+    voiceIceServers: [{ urls: "turns:turn.example.com:443?transport=tcp", username: "u", credential: "c" }],
+    voiceIceGatewayTransportPolicy: "all" as const,
+  });
+  await f.offer("turn");
+  assert.deepEqual(f.peers[0].options.iceServers, f.entry.voiceIceServers);
+  assert.equal(f.peers[0].options.iceTransportPolicy, "all");
 });
 
 function ipRequest(remoteAddress: string | undefined, headers: Record<string, string> = {}): IncomingMessage {
