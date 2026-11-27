@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-ws-route="webclient" data-ws-page="voice" data-ws-host-skin="community.classic-toolbar-fixture">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Classic recovery toolbar fixture</title>
+<script>
+  try { localStorage.setItem("webspeak:instance-authorization:v1", JSON.stringify({ schemaVersion: 1, allowed: true })); } catch {}
+</script>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; font: 12px/1.5 system-ui, sans-serif; }
+  .ws-skin-root { position: relative; width: 100vw; height: 100vh; background: #f4f7fb; }
+  #topbar { position: absolute; left: 0; top: 0; right: 0; height: 32px; background: #f4f7fb; }
+  #anchor { position: absolute; left: 40px; top: 5px; width: 320px; height: 22px; }
+</style>
+</head>
+<body>
+<div class="ws-skin-root" data-ws-skin="community.classic-toolbar-fixture" data-ws-page="voice" data-ws-part="app">
+  <div id="topbar" data-ws-part="voice.header">
+    <span id="anchor" data-ws-part="skin.voice.topbar.part-host-actions"
+      style="--skin-recovery-toolbar-background:transparent;--skin-recovery-toolbar-foreground:#1a1a1a;--skin-recovery-toolbar-border:transparent;--skin-recovery-toolbar-hover-background:#eaf2fd;--skin-recovery-toolbar-hover-border:#b8cfe8;--skin-recovery-toolbar-radius:2px;--skin-recovery-toolbar-font-size:11px;--skin-recovery-toolbar-padding:0 4px;--skin-recovery-toolbar-height:22px;--skin-recovery-toolbar-gap:1px;--skin-recovery-toolbar-icon-size:16px"></span>
+  </div>
+</div>
+<div id="app"></div>
+<pre id="result" style="position:relative;z-index:5;background:#fff">pending</pre>
+<script type="module">
+import { createApp, h, nextTick } from "vue";
+import HostChrome from "/src/components/HostChrome.vue";
+import {
+  hostBuiltInSkinRequests,
+  pluginLibraryRequests,
+  setHostChromeActiveSkin,
+  setSkinHostChromeParts,
+} from "/src/services/host-chrome.ts";
+import { parseSkinChromeDocument } from "../../../src/shared/skin-chrome.ts";
+import { hostOwnedLayers } from "/src/services/host-owned-layer.ts";
+
+const output = document.getElementById("result");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isOpen = (element) => Boolean(element?.matches?.(":popover-open"))
+  || (element ? getComputedStyle(element).display !== "none" : false);
+
+try {
+  setSkinHostChromeParts(parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": {
+        mode: "toolbar",
+        appearance: "icon",
+        anchor: "skin.voice.topbar.part-host-actions",
+        align: "start",
+      },
+    },
+  })));
+  setHostChromeActiveSkin("community.classic-toolbar-fixture");
+  createApp({
+    render: () => h(HostChrome, { language: "en", connected: true, pluginLibraryAvailable: true }),
+  }).mount("#app");
+
+  await nextTick();
+  await sleep(300);
+
+  const layer = hostOwnedLayers().find((entry) => entry.name === "recovery");
+  if (!layer) throw new Error("recovery layer was not created");
+  const toolbar = layer.container.querySelector("[data-ws-host-recovery-toolbar]");
+  const capsule = layer.container.querySelector("[data-ws-host-recovery]");
+  const actions = [...toolbar.querySelectorAll("[data-ws-recovery-action]")];
+  if (actions.length !== 2) throw new Error("expected two toolbar actions");
+  const first = actions[0];
+  const style = getComputedStyle(first);
+  const icon = first.querySelector(".ws-host-toolbar-icon");
+  const iconStyle = getComputedStyle(icon);
+  const firstRect = first.getBoundingClientRect();
+  const hit = document.elementFromPoint(firstRect.left + firstRect.width / 2, firstRect.top + firstRect.height / 2);
+  const builtInBefore = hostBuiltInSkinRequests.value;
+  const libraryBefore = pluginLibraryRequests.value;
+  first.click();
+  actions[1].click();
+
+  const initial = {
+    toolbarOpen: isOpen(toolbar),
+    capsuleOpen: isOpen(capsule),
+    actionCount: actions.length,
+    height: firstRect.height,
+    width: firstRect.width,
+    minHeight: style.minHeight,
+    paddingTop: style.paddingTop,
+    paddingRight: style.paddingRight,
+    paddingBottom: style.paddingBottom,
+    paddingLeft: style.paddingLeft,
+    borderTopWidth: style.borderTopWidth,
+    radius: style.borderTopLeftRadius,
+    fontSize: style.fontSize,
+    background: style.backgroundColor,
+    foreground: style.color,
+    gap: getComputedStyle(toolbar).columnGap,
+    hoverBackground: toolbar.style.getPropertyValue("--ws-toolbar-hover-background"),
+    hoverBorder: toolbar.style.getPropertyValue("--ws-toolbar-hover-border"),
+    iconWidth: icon.getBoundingClientRect().width,
+    iconHeight: icon.getBoundingClientRect().height,
+    iconDisplay: iconStyle.display,
+    iconAriaHidden: icon.getAttribute("aria-hidden"),
+    svgFocusable: icon.querySelector("svg").getAttribute("focusable"),
+    visibleText: actions.map((button) => button.textContent.trim()),
+    accessibleNames: actions.map((button) => button.getAttribute("aria-label")),
+    titles: actions.map((button) => button.getAttribute("title")),
+    groupName: toolbar.getAttribute("aria-label"),
+    hitIsLayerHost: hit === layer.host,
+    builtInClicked: hostBuiltInSkinRequests.value === builtInBefore + 1,
+    libraryClicked: pluginLibraryRequests.value === libraryBefore + 1,
+  };
+
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "r", code: "KeyR", ctrlKey: true, altKey: true, shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await nextTick();
+  await sleep(100);
+  const capsuleButtons = [...capsule.querySelectorAll("[data-ws-recovery-action]")];
+  const builtInCapsuleStyle = getComputedStyle(capsuleButtons[0]);
+  const shortcut = {
+    capsuleOpen: isOpen(capsule),
+    toolbarOpen: isOpen(toolbar),
+    labels: capsuleButtons.map((button) => button.textContent.trim()),
+    height: capsuleButtons[0].getBoundingClientRect().height,
+    builtInBackground: builtInCapsuleStyle.backgroundColor,
+    builtInForeground: builtInCapsuleStyle.color,
+    focusedAction: layer.shadow.activeElement?.getAttribute?.("data-ws-recovery-action") ?? null,
+  };
+  capsule.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await nextTick();
+  await sleep(150);
+  const afterEscape = { capsuleOpen: isOpen(capsule), toolbarOpen: isOpen(toolbar) };
+
+  const anchor = document.getElementById("anchor");
+  anchor.style.setProperty("--skin-recovery-toolbar-foreground", "#ffffff");
+  await sleep(700);
+  const invalidStyle = getComputedStyle(first);
+  const invalidTokens = {
+    background: invalidStyle.backgroundColor,
+    foreground: invalidStyle.color,
+    visible: invalidStyle.display !== "none" && invalidStyle.visibility !== "hidden",
+  };
+
+  output.textContent = JSON.stringify({ initial, shortcut, afterEscape, invalidTokens });
+} catch (error) {
+  output.textContent = JSON.stringify({ error: String(error?.stack ?? error) });
+}
+</script>
+</body>
+</html>

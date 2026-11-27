@@ -108,17 +108,35 @@ test("host-owned layer attributes are not skin hooks", () => {
   for (const attribute of [
     "data-ws-host-layer",
     "data-ws-host-recovery",
+    "data-ws-host-recovery-toolbar",
     "data-ws-host-layer-content",
     "data-ws-recovery-action",
   ]) {
     // A public hook in the same selector gets past the "must use a public hook"
     // check, so the attribute-name rejection is what stops the selector.
     assert.throws(() => compile(`:root [${attribute}] { display: none; }`), /host attribute/, attribute);
+    // A :root-prefixed mixed selector with a public part hook must also fail.
+    assert.throws(() => compile(`:root [data-ws-part="home.header"] [${attribute}] { color: red; }`), /host attribute/, attribute);
     assert.throws(() => compile(`[data-ws-part="home.header"] [${attribute}] { color: red; }`), /host attribute/, attribute);
     assert.throws(() => compile(`[data-ws-part="home.header"] [${attribute}="x"] { color: red; }`), /host attribute/, attribute);
   }
   // Normal descendant theming of a public part remains accepted.
   assert.doesNotThrow(() => compile(':root [data-ws-part="home.header"] { color: teal; }'));
+});
+
+test("the host toolbar's private class is not a skin hook", () => {
+  for (const css of [
+    ':root .ws-host-toolbar { color: red; }',
+    ':root [data-ws-part="home.header"] .ws-host-toolbar { color: red; }',
+    '[data-ws-part="home.header"] .ws-host-toolbar { color: red; }',
+    '[data-ws-part="home.header"].ws-host-toolbar { color: red; }',
+    ':root .WS-HOST-TOOLBAR { color: red; }',
+    ':root .\\77 s-host-toolbar { color: red; }',
+  ]) {
+    assert.throws(() => compile(css), /private host class/i, css);
+  }
+  // Ordinary descendant classes remain available when a public hook anchors them.
+  assert.doesNotThrow(() => compile(':root [data-ws-part="home.header"] .skin-button { color: teal; }'));
 });
 
 test("trusted, permission, recovery and essential audio controls stay available even for v3 skins", () => {
@@ -197,22 +215,28 @@ test("chrome.json declares hidden parts and icon bitmaps, with path and size val
 });
 
 test("chrome.json slots accept skin-owned anchors and reject trusted host UI", () => {
-  assert.deepEqual([...HOST_SLOTTABLE_PART_IDS], ["host.recovery"]);
+  assert.deepEqual([...HOST_SLOTTABLE_PART_IDS], [
+    "host.recovery",
+    "host.recovery.built-in",
+    "host.recovery.library",
+  ]);
 
   const explicit = parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
     slots: {
-      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true },
+      "host.recovery": { anchor: "voice.audio-dock", align: "start", compact: true, appearance: "label" },
     },
   }));
   assert.deepEqual(explicit.slots?.["host.recovery"], {
     anchor: "voice.audio-dock",
     align: "start",
     compact: true,
+    mode: "capsule",
+    appearance: "label",
   });
 
-  // Defaults: align "end", compact off. Component and runtime-plugin parts are
-  // ordinary anchors; only host/trusted parts are off limits.
+  // Old slots without `mode` keep the docked capsule: the presentation is
+  // explicit, never inferred from compact or any other field.
   const defaults = parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
     slots: {
@@ -223,6 +247,8 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
     anchor: "skin.voice.harbor-dock.part-anchor",
     align: "end",
     compact: false,
+    mode: "capsule",
+    appearance: "label",
   });
   assert.doesNotThrow(() => parseSkinChromeDocument(JSON.stringify({
     schemaVersion: 1,
@@ -246,6 +272,78 @@ test("chrome.json slots accept skin-owned anchors and reject trusted host UI", (
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "../escape" } } }, /not a valid part name/],
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "Voice Audio Dock" } } }, /not a valid part name/],
     [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "" } } }, /at most 240 characters/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "float" } } }, /invalid mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "toolbar", appearance: "text" } } }, /invalid appearance/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", appearance: "icon" } } }, /appearance is only available in toolbar mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "capsule", appearance: "icon-and-label" } } }, /appearance is only available in toolbar mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { anchor: "voice.audio-dock", mode: "toolbar", compact: true } } }, /compact is only valid in capsule mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery.built-in": { anchor: "voice.audio-dock", mode: "capsule" } } }, /only supports toolbar mode/],
+    [{ schemaVersion: 1, slots: { "host.recovery.built-in": { anchor: "voice.audio-dock", compact: true } } }, /compact is only valid in capsule mode/],
+  ];
+  for (const [value, message] of invalidDocuments) {
+    assert.throws(() => parseSkinChromeDocument(JSON.stringify(value)), message, JSON.stringify(value));
+  }
+});
+
+test("chrome.json toolbar slots support page candidates and separate action buttons", () => {
+  const toolbar = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery": {
+        mode: "toolbar",
+        anchor: [
+          "skin.home.topbar.part-host-actions",
+          "skin.voice.topbar.part-host-actions",
+          "skin.home.topbar.part-host-actions",
+        ],
+        align: "end",
+        appearance: "icon",
+      },
+    },
+  }));
+  assert.deepEqual(toolbar.slots?.["host.recovery"], {
+    anchor: [
+      "skin.home.topbar.part-host-actions",
+      "skin.voice.topbar.part-host-actions",
+    ],
+    align: "end",
+    compact: false,
+    mode: "toolbar",
+    appearance: "icon",
+  });
+
+  const perAction = parseSkinChromeDocument(JSON.stringify({
+    schemaVersion: 1,
+    slots: {
+      "host.recovery.built-in": {
+        mode: "toolbar",
+        anchor: "skin.voice.topbar.part-built-in",
+        align: "start",
+        appearance: "icon-and-label",
+      },
+      "host.recovery.library": {
+        mode: "toolbar",
+        anchor: "skin.voice.topbar.part-library",
+      },
+    },
+  }));
+  assert.deepEqual(perAction.slots?.["host.recovery.built-in"], {
+    anchor: "skin.voice.topbar.part-built-in",
+    align: "start",
+    compact: false,
+    mode: "toolbar",
+    appearance: "icon-and-label",
+  });
+  // Single-action slots are toolbar-only and default to toolbar mode.
+  assert.equal(perAction.slots?.["host.recovery.library"]?.mode, "toolbar");
+  assert.equal(perAction.slots?.["host.recovery.library"]?.align, "end");
+  assert.equal(perAction.slots?.["host.recovery.library"]?.appearance, "label");
+
+  const invalidDocuments: Array<[unknown, RegExp]> = [
+    [{ schemaVersion: 1, slots: { "host.recovery": { mode: "toolbar", anchor: [] } } }, /between 1 and 8/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { mode: "toolbar", anchor: Array.from({ length: 9 }, (_, index) => `part-${index}`) } } }, /between 1 and 8/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { mode: "toolbar", anchor: ["voice.audio-dock", "host.plugins.launcher"] } } }, /trusted host UI/],
+    [{ schemaVersion: 1, slots: { "host.recovery": { mode: "toolbar", anchor: "voice.audio-dock" }, "host.recovery.built-in": { mode: "toolbar", anchor: "voice.audio-dock" } } }, /either host.recovery or its per-action slots/],
   ];
   for (const [value, message] of invalidDocuments) {
     assert.throws(() => parseSkinChromeDocument(JSON.stringify(value)), message, JSON.stringify(value));

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "slots": {
+    "host.recovery": {
+      "mode": "toolbar",
+      "appearance": "icon",
+      "anchor": ["home.header", "voice.header"],
+      "align": "end"
+    }
+  }
+}

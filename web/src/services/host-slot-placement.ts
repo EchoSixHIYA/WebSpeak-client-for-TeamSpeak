@@ -20,11 +20,17 @@ import { PROTECTED_PART_IDS } from "../../../src/shared/skin-visual-parts.js";
 import {
   RECOVERY_CONTROL_DEFAULTS,
   applyHostControlTokens,
+  applyHostControlToolbarTokens,
+  compositeRgb,
   createHostControlProbe,
   findSkinRoot,
+  parseCssColorWithAlpha,
   resolveHostControlTokens,
+  resolveHostControlToolbarTokens,
   type HostControlTokens,
   type HostControlProbe,
+  type RgbColor,
+  type RgbaColor,
 } from "./host-control-tokens.js";
 
 export interface SlotViewport {
@@ -81,6 +87,7 @@ export type SlotFailureReason =
   | "control-too-small"
   | "control-offscreen"
   | "covers-protected"
+  | "covers-host-control"
   | "hit-test";
 
 export interface SlotAnchorSnapshot {
@@ -107,6 +114,8 @@ export interface SlotEvaluationInput {
    * capsule is top layer, so it would block those controls for the pointer.
    */
   coversProtected?: boolean;
+  /** Footprints of other docked host controls this one must not cover. */
+  otherControls?: readonly HostPartRect[];
 }
 
 export type SlotEvaluation = { ok: true } | { ok: false; reason: SlotFailureReason };
@@ -161,6 +170,13 @@ export function evaluateSlottedControl(input: SlotEvaluationInput): SlotEvaluati
     return { ok: false, reason: "control-too-small" };
   }
   if (!fullyInsideViewport(controlRect, viewport)) return { ok: false, reason: "control-offscreen" };
+  // Two independently anchored recovery toolbars can converge on the same
+  // narrow anchor (for example at 320px). Covering a sibling host control
+  // would make one of the buttons unreachable, so that action returns to the
+  // visible floating capsule instead of pretending to be docked.
+  if (input.otherControls?.some((rect) => rectsOverlap(controlRect, rect))) {
+    return { ok: false, reason: "covers-host-control" };
+  }
   if (input.coversProtected) return { ok: false, reason: "covers-protected" };
   if (!hitTestOk) return { ok: false, reason: "hit-test" };
   return { ok: true };
@@ -212,6 +228,22 @@ function rectOf(rect: DOMRect | HostPartRect): HostPartRect {
     right: rect.right,
     bottom: rect.bottom,
   };
+}
+
+/** Composite the anchor and top-bar ancestor backgrounds over the page canvas. */
+export function sampleOpaqueSurface(element: Element | null, doc: Document = document): RgbColor {
+  const view = doc.defaultView;
+  const layers: RgbaColor[] = [];
+  for (let current: Element | null = element; current && view; current = current.parentElement) {
+    const color = parseCssColorWithAlpha(view.getComputedStyle(current).backgroundColor);
+    if (color && color.a > 0) layers.push(color);
+    if (color?.a === 1) break;
+  }
+  let surface: RgbColor = { r: 255, g: 255, b: 255 };
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    surface = compositeRgb(layers[index], surface);
+  }
+  return surface;
 }
 
 /** Overlap of two rects in CSS pixels on both axes (more than 1px each). */
@@ -271,22 +303,31 @@ function isVisibleAnchor(element: HTMLElement): boolean {
 }
 
 /**
- * Resolve the first visible `[data-ws-part="<anchor>"]` inside the active
- * skin's DOM. Plugin and surface hosts render inside `.ws-skin-root` too
+ * Resolve the first visible candidate `[data-ws-part="<anchor>"]` inside the
+ * active skin's DOM. Plugin and surface hosts render inside `.ws-skin-root` too
  * (runtime plugins may Teleport to a `data-ws-skin-mount` slot, but every
  * mount slot is part of the skin root), so a skin cannot point the recovery
  * control at host chrome outside its own subtree.
+ *
+ * A candidate list lets one declaration cover several pages: the home and
+ * voice surfaces render different prefixed parts, but only one page is visible
+ * at a time, so the first visible candidate is the deterministic one. The
+ * binding re-resolves on every check, which is what makes a page switch (or a
+ * skin reload) fall back and re-dock without a rebind.
  */
 export function resolveSkinAnchor(
-  anchor: string,
+  anchor: string | readonly string[],
   doc: Document = document,
   skinId?: string,
 ): HTMLElement | null {
-  const selector = `[data-ws-part="${anchor}"]`;
-  for (const root of doc.querySelectorAll(".ws-skin-root")) {
-    if (skinId && root.getAttribute("data-ws-skin") !== skinId) continue;
-    for (const element of root.querySelectorAll<HTMLElement>(selector)) {
-      if (isVisibleAnchor(element)) return element;
+  const anchors = typeof anchor === "string" ? [anchor] : anchor;
+  for (const candidate of anchors) {
+    const selector = `[data-ws-part="${candidate}"]`;
+    for (const root of doc.querySelectorAll(".ws-skin-root")) {
+      if (skinId && root.getAttribute("data-ws-skin") !== skinId) continue;
+      for (const element of root.querySelectorAll<HTMLElement>(selector)) {
+        if (isVisibleAnchor(element)) return element;
+      }
     }
   }
   return null;
@@ -300,11 +341,30 @@ export interface HostSlotModeChange {
 export interface HostSlotBindingOptions {
   layer: HostOwnedLayer;
   control: HTMLElement;
-  anchor: string;
+  /** One anchor name, or ordered candidates (first visible one wins). */
+  anchor: string | readonly string[];
   /** Restricts anchor resolution and token fallback to this active skin. */
   skinId?: string;
   align?: SkinChromeSlotAlign;
-  resolveAnchor?: (anchor: string) => HTMLElement | null;
+  /**
+   * `toolbar` also applies `--skin-recovery-toolbar-*` / `--skin-host-toolbar-*`
+   * tokens for background, foreground, border, hover, radius, font, font size,
+   * padding, height, shadow, surface, gap and icon size. The capsule mode keeps
+   * the historical control tokens only.
+   */
+  presentation?: "capsule" | "toolbar";
+  /**
+   * Called before measuring. A toolbar popover is closed while it floats, so
+   * its box would be 0×0 and the control could never re-dock after a fallback.
+   * The callback shows it for the synchronous check; `settle` hides it again
+   * in the same task when the anchor is still unusable, so nothing paints.
+   */
+  prepare?: () => void;
+  /** Called after each evaluation with the resulting docked state. */
+  settle?: (slotted: boolean) => void;
+  resolveAnchor?: (anchor: string | readonly string[]) => HTMLElement | null;
+  /** Live footprints of other docked host controls; overlaps force a fallback. */
+  otherControls?: () => readonly HostPartRect[];
   onModeChange?: (change: HostSlotModeChange) => void;
 }
 
@@ -332,11 +392,12 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   if (!view) return NOOP_BINDING;
   const win = view;
   const resolveAnchor = options.resolveAnchor
-    ?? ((name: string) => resolveSkinAnchor(name, doc, options.skinId));
+    ?? ((name: string | readonly string[]) => resolveSkinAnchor(name, doc, options.skinId));
 
   let state = INITIAL_SLOT_MODE_STATE;
   let lastReason: SlotFailureReason | undefined;
   let currentAnchor: HTMLElement | null = null;
+  let observingControl = false;
   let observer: ResizeObserver | null = null;
   const probe: HostControlProbe = createHostControlProbe(layer.shadow);
   let frame: number | undefined;
@@ -348,9 +409,9 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   const requestFrame = (callback: FrameRequestCallback): number => win.requestAnimationFrame(callback);
   const cancelFrame = (handle: number): void => win.cancelAnimationFrame(handle);
 
-  function readTokens(source: Element | null): HostControlTokens {
+  function readTokens(style: CSSStyleDeclaration | null): HostControlTokens {
     return resolveHostControlTokens(
-      source ? win.getComputedStyle(source) : null,
+      style,
       "host.recovery",
       probe.probeColor,
       RECOVERY_CONTROL_DEFAULTS,
@@ -387,27 +448,51 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
   }
 
   function observe(anchorElement: HTMLElement | null): void {
-    if (currentAnchor === anchorElement) return;
+    // Measurement-only display changes must not feed back into observer scheduling.
+    const watchControl = !options.prepare || (state.slotted && control.getClientRects().length > 0);
+    if (currentAnchor === anchorElement && observingControl === watchControl) return;
     currentAnchor = anchorElement;
+    observingControl = watchControl;
     if (!observer && typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => schedule());
     }
     if (!observer) return;
     observer.disconnect();
-    observer.observe(control);
+    if (watchControl) observer.observe(control);
     if (anchorElement) observer.observe(anchorElement);
   }
 
   function evaluate(): void {
     if (disposed) return;
+    // A floating toolbar popover is closed; show it for this synchronous
+    // measurement. `settle` hides it again before paint on any failure.
+    options.prepare?.();
     const anchorElement = resolveAnchor(anchorName);
-    observe(anchorElement);
     // The fallback keeps the skin palette: read tokens from the anchor, or
     // from the skin root when the anchor is missing or hidden.
     const tokenSource = anchorElement
       ?? (options.skinId ? findSkinRoot(options.skinId, doc) : null);
-    const tokens = readTokens(tokenSource);
-    applyHostControlTokens(control, tokenSource ? tokens : null);
+    const tokenStyle = tokenSource ? win.getComputedStyle(tokenSource) : null;
+    const tokens = readTokens(tokenStyle);
+    applyHostControlTokens(control, tokenStyle ? tokens : null);
+    let toolbarMinHeight: number | undefined;
+    if (options.presentation === "toolbar") {
+      // Toolbar buttons get a second, independent token set so they can match
+      // a neighbouring top-bar button instead of the capsule palette. A
+      // transparent button is checked against the surface behind its anchor.
+      const toolbarTokens = tokenStyle
+        ? resolveHostControlToolbarTokens(
+          tokenStyle,
+          "host.recovery",
+          probe.probeColor,
+          RECOVERY_CONTROL_DEFAULTS,
+          probe.isWebFont,
+          sampleOpaqueSurface(tokenSource, doc),
+        )
+        : null;
+      toolbarMinHeight = toolbarTokens?.minHeight;
+      applyHostControlToolbarTokens(control, toolbarTokens);
+    }
 
     const controlBox = control.getBoundingClientRect();
     maxSize = {
@@ -462,8 +547,9 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       anchor: anchorSnapshot,
       controlRect: intendedRect,
       viewport,
-      minHitTarget: tokens.hitTarget,
+      minHitTarget: toolbarMinHeight ?? tokens.hitTarget,
       coversProtected,
+      otherControls: options.otherControls?.(),
       hitTestOk: placement
         ? hitTestAt(placement.left, placement.top, { width: controlBox.width, height: controlBox.height })
         : false,
@@ -481,6 +567,8 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       lastReason = reason;
       onModeChange?.({ mode, ...(reason ? { reason } : {}) });
     }
+    options.settle?.(state.slotted);
+    observe(anchorElement);
   }
 
   /** Any unexpected error returns the capsule to the default corner. */
@@ -488,6 +576,8 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
     const wasSlotted = state.slotted;
     state = nextSlotModeState(state, false);
     clearPlacement();
+    options.settle?.(false);
+    observe(currentAnchor);
     if (wasSlotted) onModeChange?.({ mode: "floating" });
   }
 
@@ -535,6 +625,7 @@ export function bindHostSlot(options: HostSlotBindingOptions): HostSlotBinding {
       win.removeEventListener("scroll", schedule, { capture: true });
       clearPlacement();
       applyHostControlTokens(control, null);
+      applyHostControlToolbarTokens(control, null);
       probe.dispose();
     },
   };

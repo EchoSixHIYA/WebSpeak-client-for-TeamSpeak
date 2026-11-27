@@ -165,10 +165,13 @@ export interface FloatingChoice {
  * modal dialog's backdrop, a toast) and going back there would cover it.
  * `moveObstacles` (the user's pointer and focused control) only count against
  * positions the control would move to, so it never jumps under the cursor or
- * onto the field being typed in.
+ * onto the field being typed in. Set `currentEligible` false when an external
+ * hard exclusion removes the real current position; it must then be scored like
+ * every other candidate instead of being replaced by a synthetic current spot.
  */
 export function chooseFloatingPosition(input: {
   current: FloatingPosition;
+  currentEligible?: boolean;
   size: FloatingSize;
   viewport: FloatingViewport;
   margins: FloatingMargins;
@@ -179,17 +182,19 @@ export function chooseFloatingPosition(input: {
 }): FloatingChoice {
   const positions = input.positions ?? FLOATING_POSITIONS;
   const moveObstacles = input.moveObstacles ?? [];
+  const currentEligible = input.currentEligible ?? true;
   const scoreAt = (position: FloatingPosition) => {
     const footprint = floatingRect(position, input.size, input.viewport, input.margins);
     const score = floatingScore(footprint, input.obstacles);
-    return position === input.current || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
+    const keepCurrent = currentEligible && position === input.current;
+    return keepCurrent || !moveObstacles.length ? score : score + floatingScore(footprint, moveObstacles);
   };
   const currentScore = scoreAt(input.current);
-  if (currentScore === 0) {
+  if (currentEligible && currentScore === 0) {
     if (input.home && input.home !== input.current && scoreAt(input.home) === 0) return { position: input.home, score: 0 };
     return { position: input.current, score: 0 };
   }
-  let best: FloatingChoice = { position: input.current, score: currentScore };
+  let best: FloatingChoice = { position: input.current, score: currentEligible ? currentScore : Number.POSITIVE_INFINITY };
   for (const position of positions) {
     if (position === input.current) continue;
     const score = scoreAt(position);
@@ -226,6 +231,22 @@ export function readSafeAreaInsets(parent: Node & ParentNode): FloatingMargins {
 
 function rectsIntersect(first: HostPartRect, second: HostPartRect): boolean {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
+/**
+ * Whether a candidate corner would put the control on top of a docked host
+ * control. Used to exclude such spots outright; scoring alone can still pick
+ * one when the other corners cover skin controls.
+ */
+export function floatingHitsAvoidRect(
+  position: FloatingPosition,
+  size: FloatingSize,
+  viewport: FloatingViewport,
+  margins: FloatingMargins,
+  avoidRects: readonly HostPartRect[],
+): boolean {
+  const footprint = floatingRect(position, size, viewport, margins);
+  return avoidRects.some(rect => rectsIntersect(footprint, rect));
 }
 
 /* ------------------------------------------------------------------ *
@@ -358,6 +379,14 @@ export interface FloatingAvoidanceOptions {
   onCompactChange?: (compact: boolean) => void;
   /** Skip re-evaluation (hovered, focused, slotted, drawer open…). */
   paused?: () => boolean;
+  /**
+   * Footprints of host controls that are docked in the top layer. They are
+   * invisible to `collectFloatingObstacles` (which scans the light DOM), but a
+   * floating fallback must never sit on them: a covered button loses its
+   * label and its click lands on the wrong action. Positions that intersect
+   * one of these rects are skipped whenever any free position exists.
+   */
+  avoidRects?: () => readonly HostPartRect[];
 }
 
 export interface FloatingAvoidance {
@@ -457,13 +486,28 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
     }
     const now = Date.now();
     const urgent = now < urgentUntil;
-    // Return home only after a screen change (see chooseFloatingPosition).
-    const home = urgent ? defaultPosition : undefined;
-    const full = chooseFloatingPosition({ current: position, size, viewport, margins, obstacles, moveObstacles, home });
+    // Docked recovery toolbars live in the closed shadow root, so the light-DOM
+    // obstacle scan above cannot see them. Exclude their footprints outright:
+    // scoring alone could still park the fallback where a docked button sits
+    // (GUI reproduced this at 320px: the library capsule covered the built-in
+    // toolbar and its centre click hit the built-in action). If every corner
+    // is docked, fall back to scoring over all positions rather than trapping
+    // the capsule off-screen.
+    const avoid = options.avoidRects?.() ?? [];
+    const forbiddenAt = (candidate: FloatingPosition) =>
+      floatingHitsAvoidRect(candidate, size, viewport, margins, avoid);
+    const freePositions = FLOATING_POSITIONS.filter(candidate => !forbiddenAt(candidate));
+    const positions = freePositions.length ? freePositions : FLOATING_POSITIONS;
+    const currentEligible = !forbiddenAt(position);
+    const park = forbiddenAt(defaultPosition) && freePositions.length ? freePositions[0] : defaultPosition;
+    // Return home only after a screen change (see chooseFloatingPosition), and
+    // only when the default corner is not one of the docked footprints.
+    const home = urgent && !forbiddenAt(defaultPosition) ? defaultPosition : undefined;
+    const full = chooseFloatingPosition({ current: position, currentEligible, size, viewport, margins, obstacles, moveObstacles, positions, home });
     let next = full;
     let nextCompact = false;
     if (full.score > 0 && small && small.width > 0 && small.height > 0) {
-      const reduced = chooseFloatingPosition({ current: full.position, size: small, viewport, margins, obstacles, moveObstacles });
+      const reduced = chooseFloatingPosition({ current: full.position, size: small, viewport, margins, obstacles, moveObstacles, positions });
       if (shouldFold(full, reduced)) {
         next = reduced;
         nextCompact = true;
@@ -514,8 +558,8 @@ export function bindFloatingAvoidance(options: FloatingAvoidanceOptions): Floati
       moveTimes = [];
       frozenUntil = now + HOST_FLOATING_FLAP_FREEZE_MS;
       frozenEscaped = false;
-      if (position !== defaultPosition) {
-        position = defaultPosition;
+      if (position !== park) {
+        position = park;
         apply(position);
       }
       setCompact(false);

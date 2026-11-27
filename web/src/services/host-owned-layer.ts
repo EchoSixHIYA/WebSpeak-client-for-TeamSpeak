@@ -103,17 +103,21 @@ const popoverFallbacks = new WeakSet<HTMLElement>();
  * assigning `display`. The same path is used when the Popover API is missing
  * or when top-layer promotion throws (for example in a constrained embed).
  */
-export function syncRecoveryPopover(element: HTMLElement | null | undefined, visible: boolean): void {
+export function syncRecoveryPopover(
+  element: HTMLElement | null | undefined,
+  visible: boolean,
+  display: "flex" | "inline-flex" = "flex",
+): void {
   if (!element) return;
 
   const enterFallback = (): void => {
     popoverFallbacks.add(element);
     element.removeAttribute("popover");
-    element.style.display = visible ? "flex" : "none";
+    element.style.display = visible ? display : "none";
   };
 
   if (popoverFallbacks.has(element)) {
-    element.style.display = visible ? "flex" : "none";
+    element.style.display = visible ? display : "none";
     return;
   }
 

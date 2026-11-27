@@ -47,11 +47,18 @@ export const HOST_TRUSTED_PART_IDS: ReadonlySet<string> = new Set([
  * Trusted host controls that an open skin may fold into its own layout through
  * `chrome.json#slots`. The key names the protected part, not a CSS hook: the
  * skin only declares an anchor rectangle, the host still owns, paints and
- * hit-tests the control. Extend this set (for example with `host.permission`)
- * when another protected control learns the same runtime placement.
+ * hit-tests the control.
+ *
+ * `host.recovery` is the historical capsule group. The two action keys only
+ * exist for `mode: "toolbar"` and let a skin dock the "use built-in skin" and
+ * "application library" host buttons separately; they are still host-owned
+ * buttons, never DOM hooks. Extend this set when another protected control
+ * learns the same runtime placement.
  */
 export const HOST_SLOTTABLE_PART_IDS: ReadonlySet<string> = new Set([
   "host.recovery",
+  "host.recovery.built-in",
+  "host.recovery.library",
 ]);
 
 /** All host-owned parts (used by the part registry and documentation). */

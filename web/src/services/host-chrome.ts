@@ -105,6 +105,23 @@ export function openPluginLibrary(): void {
 }
 
 /**
+ * True while a toolbar-mode recovery slot provides the application library.
+ * PluginPanel then hides its ordinary `host.plugins.launcher` so the same page
+ * has exactly one application-library entry. The state is host-only: a skin
+ * can request the slot through chrome.json, but cannot set this flag or click
+ * the host button.
+ */
+const inlineLibraryEntry = ref(false);
+
+export function setInlineLibraryEntryVisible(visible: boolean): void {
+  inlineLibraryEntry.value = visible;
+}
+
+export function isInlineLibraryEntryVisible(): boolean {
+  return inlineLibraryEntry.value;
+}
+
+/**
  * Recovery's guaranteed escape hatch: reset to the built-in Day/Night skin.
  * `usePublicSkin` watches this counter, so it works even when the skinnable
  * plugin overlay is `display: none`.
@@ -116,16 +133,18 @@ export function requestBuiltInSkin(): void {
   builtInSkinRequests.value += 1;
 }
 
-type RecoveryShortcutEvent = Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "key">;
+type RecoveryShortcutEvent = Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "key" | "code">;
 
 /**
  * The documented recovery shortcut: Ctrl+Alt+Shift+R, or ⌘+⌥+⇧+R on macOS.
- * The letter is matched case-insensitively, but every modifier is required so
- * ordinary app shortcuts (Ctrl+R, Alt+R, Ctrl+Shift+R) keep their meaning.
+ * On macOS, Option/Shift turn the letter key into a derived character (US
+ * layout: ®), so `event.key` is not "r". Match the physical `code` as well;
+ * every modifier is still required so ordinary app shortcuts (Ctrl+R, Alt+R,
+ * Ctrl+Shift+R) keep their meaning.
  */
 export function isRecoveryShortcut(event: RecoveryShortcutEvent): boolean {
   return (event.ctrlKey || event.metaKey)
     && event.altKey
     && event.shiftKey
-    && event.key.toLowerCase() === "r";
+    && (event.key?.toLowerCase() === "r" || event.code === "KeyR");
 }

@@ -5,6 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import { importSkinPack, resolveSkinCssAssets, SkinPackError } from "./skin-pack.js";
 import { scopeBuiltinThemeForCustomSkin } from "./skin-cascade.js";
 import { BUILTIN_SKIN_CATALOG } from "./skin-catalog.js";
+import { APP_VERSION } from "./app-version.js";
 import type { SkinPluginDocument, SkinPluginNode } from "../../../src/shared/skin-plugin.js";
 import { createSkinExtensionWasmPrefixByteImmediateProbe } from "../../test/skin-extension-wasm-fixture.js";
 
@@ -481,6 +482,26 @@ test("a v4 surface cannot compete with a v3 surface on the same public page", as
     importSkinPack(new File([archive.slice().buffer as ArrayBuffer], "competing-surfaces.wskin")),
     (error: unknown) => error instanceof SkinPackError && error.code === "SKIN_PLUGIN_SURFACE_DUPLICATE",
   );
+});
+
+test("the distributable host chrome toolbar declares its first compatible runtime", async () => {
+  const archive = await readFile(new URL("../../../docs/examples/host-chrome-toolbar.wskin", import.meta.url));
+  const bundledArchive = await readFile(new URL("../../public/host-chrome-toolbar.wskin", import.meta.url));
+  assert.deepEqual(bundledArchive, archive, "the downloadable example and bundled skin stay in sync");
+  const skin = await importSkinPack(new File([archive], "host-chrome-toolbar.wskin", { type: "application/octet-stream" }));
+  assert.equal(skin.id, "community.host-chrome-toolbar");
+  assert.equal(skin.minAppVersion, "0.3.3", "mode, appearance and anchor arrays are unavailable in WebSpeak 0.3.2");
+  assert.equal(skin.version, "1.1.1");
+  assert.equal(APP_VERSION, skin.minAppVersion, "the running build must satisfy the example's declared minimum");
+  assert.equal(skin.schemaVersion, 3);
+  assert.equal(skin.packageType, "open-skin");
+  assert.deepEqual(skin.chromeData?.slots?.["host.recovery"], {
+    mode: "toolbar",
+    appearance: "icon",
+    anchor: ["home.header", "voice.header"],
+    align: "end",
+    compact: false,
+  });
 });
 
 test("the distributable KAAK package provides full home and voice surfaces", async () => {

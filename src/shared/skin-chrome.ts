@@ -18,7 +18,8 @@ import {
  *  - `icons`: bitmap overrides for stable icon slots, keyed by part name.
  *  - `slots`: declarative anchors for trusted host controls. A skin never
  *    receives the control; it only names a part it already renders so the
- *    host can position its own top-layer capsule there and fall back to the
+ *    host can position its own top-layer capsule (or, with an explicit
+ *    `mode: "toolbar"`, chrome-less host buttons) there and fall back to the
  *    default corner when the anchor stops being usable.
  *
  * Both the browser importer and the server-side registry parse the exact same
@@ -29,6 +30,7 @@ export const SKIN_CHROME_MAX_BYTES = 32 * 1024;
 export const SKIN_CHROME_MAX_HIDDEN_PARTS = 32;
 export const SKIN_CHROME_MAX_ICONS = 16;
 export const SKIN_CHROME_MAX_SLOTS = 8;
+export const SKIN_CHROME_MAX_SLOT_ANCHORS = 8;
 export const SKIN_ICON_MAX_BYTES = 64 * 1024;
 export const SKIN_ICONS_MAX_TOTAL_BYTES = 512 * 1024;
 export const SKIN_ICON_DIRECTORY = "assets/icons/";
@@ -72,13 +74,39 @@ export interface SkinChromeDocument {
 
 export type SkinChromeSlotAlign = "start" | "center" | "end";
 
+/**
+ * How a slotted recovery control is presented:
+ *  - `capsule` (default): the existing rounded host capsule with its own shell.
+ *  - `toolbar`: independent, chrome-less host buttons that can match a skin's
+ *    top bar. The host still creates the buttons, their labels, focus and
+ *    click handlers; the skin only names anchors and style tokens.
+ *
+ * The mode is explicit and never inferred from `compact`: an old slot without
+ * `mode` keeps docking the capsule exactly as before.
+ */
+export type SkinChromeSlotMode = "capsule" | "toolbar";
+
+/** Toolbar buttons may show host-owned icons without losing their accessible names. */
+export type SkinChromeSlotAppearance = "label" | "icon" | "icon-and-label";
+
+/** One anchor name, or ordered candidates (for example one per page). */
+export type SkinChromeSlotAnchor = string | string[];
+
 export interface SkinChromeSlot {
-  /** Existing `data-ws-part` inside `.ws-skin-root` used as the anchor box. */
-  anchor: string;
+  /**
+   * Existing `data-ws-part` inside `.ws-skin-root` used as the anchor box.
+   * A list lists page/component candidates: the host takes the first visible
+   * one, so one slot can cover both the home and the voice page.
+   */
+  anchor: SkinChromeSlotAnchor;
   /** Horizontal alignment inside the anchor; the control is vertically centred. */
   align: SkinChromeSlotAlign;
-  /** Collapse to the mark only until hovered or focused. */
+  /** Collapse to the mark only until hovered or focused (capsule mode only). */
   compact: boolean;
+  /** Explicit presentation; see `SkinChromeSlotMode`. */
+  mode: SkinChromeSlotMode;
+  /** Toolbar-only label/icon shape; the host always supplies the icon and name. */
+  appearance: SkinChromeSlotAppearance;
 }
 
 export interface SkinChromeAssetInfo {
@@ -147,8 +175,34 @@ function normalizeSlotAnchor(raw: unknown): string {
   return raw;
 }
 
+/**
+ * A slot may name one anchor or an ordered candidate list (one per page or
+ * per component variant). Candidates are validated exactly like a single
+ * anchor; duplicates are removed so a page cannot be tried twice per check.
+ */
+function normalizeSlotAnchors(raw: unknown): SkinChromeSlotAnchor {
+  if (!Array.isArray(raw)) return normalizeSlotAnchor(raw);
+  if (!raw.length || raw.length > SKIN_CHROME_MAX_SLOT_ANCHORS) {
+    return reject(`A slot anchor list must contain between 1 and ${SKIN_CHROME_MAX_SLOT_ANCHORS} part names.`, "SKIN_CHROME_SLOT_INVALID");
+  }
+  const anchors: string[] = [];
+  for (const entry of raw) {
+    const anchor = normalizeSlotAnchor(entry);
+    if (!anchors.includes(anchor)) anchors.push(anchor);
+  }
+  return anchors;
+}
+
+function isSlotMode(value: unknown): value is SkinChromeSlotMode {
+  return value === "capsule" || value === "toolbar";
+}
+
 function isSlotAlign(value: unknown): value is SkinChromeSlotAlign {
   return value === "start" || value === "center" || value === "end";
+}
+
+function isSlotAppearance(value: unknown): value is SkinChromeSlotAppearance {
+  return value === "label" || value === "icon" || value === "icon-and-label";
 }
 
 export function parseSkinChromeDocument(source: string): SkinChromeDocument {
@@ -226,20 +280,49 @@ export function parseSkinChromeDocument(source: string): SkinChromeDocument {
         return reject(`Slot ${part} must be an object.`, "SKIN_CHROME_SLOT_INVALID");
       }
       for (const key of Object.keys(value)) {
-        if (key !== "anchor" && key !== "align" && key !== "compact") {
+        if (key !== "anchor" && key !== "align" && key !== "compact" && key !== "mode" && key !== "appearance") {
           return reject(`Slot ${part} contains an unsupported field: ${key}.`, "SKIN_CHROME_SLOT_INVALID");
         }
       }
-      const anchor = normalizeSlotAnchor(value.anchor);
+      const anchor = normalizeSlotAnchors(value.anchor);
       const align = value.align === undefined ? "end" : value.align;
       if (!isSlotAlign(align)) {
         return reject(`Slot ${part} has an invalid align value: ${String(align)}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      // The group slot keeps the historical capsule default. The two
+      // single-action slots only exist for toolbar presentation; a one-button
+      // capsule would be a new, ambiguous surface with no product need.
+      const mode = value.mode === undefined
+        ? (part === "host.recovery" ? "capsule" : "toolbar")
+        : value.mode;
+      if (!isSlotMode(mode)) {
+        return reject(`Slot ${part} has an invalid mode value: ${String(mode)}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      if (part !== "host.recovery" && mode !== "toolbar") {
+        return reject(`Slot ${part} only supports toolbar mode.`, "SKIN_CHROME_SLOT_INVALID");
       }
       const compact = value.compact === undefined ? false : value.compact;
       if (typeof compact !== "boolean") {
         return reject(`Slot ${part} compact must be a boolean.`, "SKIN_CHROME_SLOT_INVALID");
       }
-      slots[part] = { anchor, align, compact };
+      if (mode === "toolbar" && compact) {
+        return reject(`Slot ${part} compact is only valid in capsule mode.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      const appearance = value.appearance === undefined ? "label" : value.appearance;
+      if (!isSlotAppearance(appearance)) {
+        return reject(`Slot ${part} has an invalid appearance value: ${String(appearance)}.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      if (mode !== "toolbar" && appearance !== "label") {
+        return reject(`Slot ${part} appearance is only available in toolbar mode.`, "SKIN_CHROME_SLOT_INVALID");
+      }
+      slots[part] = { anchor, align, compact, mode, appearance };
+    }
+    const perAction = slots["host.recovery.built-in"] !== undefined || slots["host.recovery.library"] !== undefined;
+    if (slots["host.recovery"] && perAction) {
+      return reject(
+        "Declare either host.recovery or its per-action slots (host.recovery.built-in / host.recovery.library), not both.",
+        "SKIN_CHROME_SLOT_INVALID",
+      );
     }
   }
 

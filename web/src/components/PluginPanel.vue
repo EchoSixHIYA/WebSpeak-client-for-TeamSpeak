@@ -1,7 +1,7 @@
 <template>
   <Teleport :to="toolbarTarget ?? 'body'">
     <div v-if="thirdPartyAllowed && connected && sessionToken" ref="toolbar" class="ws-plugin-toolbar" :class="{ 'ws-plugin-toolbar-fallback': !toolbarTarget }" :data-ws-float="toolbarTarget ? undefined : fallbackPosition" data-ws-part="voice.plugin-launcher" :data-presentation="presentation" :data-theme="theme" @keydown.esc="dismissDrawer">
-      <button v-if="!isHostPartHidden('host.plugins.launcher')" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="presentation === 'dialog' ? visible : drawerOpen" :aria-controls="drawerOpen ? drawerId : undefined" @click="toggle">
+      <button v-if="!isHostPartHidden('host.plugins.launcher') && !inlineLibraryEntry" ref="launcher" class="header-action ws-plugin-toolbar-trigger" data-ws-part="host.plugins.launcher" type="button" :title="tr('title')" :aria-label="tr('title')" :aria-expanded="presentation === 'dialog' ? visible : drawerOpen" :aria-controls="drawerOpen ? drawerId : undefined" @click="toggle">
         <svg viewBox="0 0 24 24" data-ws-icon-slot="host.plugins.launcher" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
         <span v-if="presentation === 'drawer-side'">{{ tr('title') }}</span>
       </button>
@@ -68,7 +68,7 @@ import { pluginTranslations, type PluginTextKey } from '../i18n/plugins.js';
 import { pluginWindowTranslations } from '../i18n/plugin-window.js';
 import type { SiteLanguage } from '../../../src/site-copy.js';
 import { thirdPartyAllowed } from '../services/instance-authorization.js';
-import { isHostPartHidden, isHostPartVisuallyReachable, pluginLibraryRequests } from '../services/host-chrome.js';
+import { isHostPartHidden, isHostPartVisuallyReachable, isInlineLibraryEntryVisible, pluginLibraryRequests } from '../services/host-chrome.js';
 import type { SkinPluginWidgetOptions } from '../../../src/shared/skin-plugin.js';
 import { bindFloatingAvoidance, type FloatingAvoidance, type FloatingPosition } from '../services/host-floating-placement.js';
 const props = defineProps<{ sessionToken: string; gatewayUrl: string; connected: boolean; language: SiteLanguage; toolbarTarget: HTMLElement | null; presentation: NonNullable<SkinPluginWidgetOptions['pluginPresentation']> }>();
@@ -77,6 +77,9 @@ const ui = computed(() => pluginWindowTranslations[props.language]);
 const windowElement = ref<HTMLElement | null>(null), launcher = ref<HTMLButtonElement | null>(null), frame = ref<HTMLIFrameElement | null>(null);
 const available = shallowRef<AvailablePluginApp[]>([]), current = shallowRef<PluginAppLaunch | null>(null);
 const toolbar = ref<HTMLElement | null>(null);
+// A toolbar-mode recovery slot already renders the host-owned application
+// library button; do not render a second launcher on the same page.
+const inlineLibraryEntry = computed(() => isInlineLibraryEntryVisible());
 // The fallback toolbar floats in a viewport corner the skin knows nothing
 // about; move it off any skin control it would cover (runtime only).
 const fallbackPosition = ref<FloatingPosition>('bottom-right');

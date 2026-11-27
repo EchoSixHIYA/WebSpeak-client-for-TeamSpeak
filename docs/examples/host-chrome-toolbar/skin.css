@@ -1,0 +1,76 @@
+/* Host chrome toolbar demo — v3 open skin (schemaVersion 3).
+   The host owns the recovery structure, icons, labels, focus and actions.
+   This package only declares an anchor, appearance and validated tokens. */
+
+:root {
+  color-scheme: light;
+  --skin-demo-surface: #f4f7fb;
+  --skin-demo-foreground: #1a1a1a;
+  --skin-demo-border: #d5dee8;
+  --skin-demo-accent: #1d4ed8;
+
+  /* Classic microphone-button geometry and colours. `surface` is the opaque
+     colour used to check text contrast behind the transparent toolbar. */
+  --skin-host-toolbar-background: transparent;
+  --skin-host-toolbar-foreground: #1a1a1a;
+  --skin-host-toolbar-border: transparent;
+  --skin-host-toolbar-hover-background: #eaf2fd;
+  --skin-host-toolbar-hover-border: #b8cfe8;
+  --skin-host-toolbar-surface: #f4f7fb;
+  --skin-host-toolbar-radius: 2px;
+  --skin-host-toolbar-font: Tahoma, "Segoe UI", sans-serif;
+  --skin-host-toolbar-font-size: 11px;
+  --skin-host-toolbar-padding: 0 4px;
+  --skin-host-toolbar-height: 22px;
+  --skin-host-toolbar-gap: 1px;
+  --skin-host-toolbar-icon-size: 16px;
+  --skin-host-toolbar-shadow: none;
+
+  /* The fallback and shortcut capsule remains opaque and full-text. */
+  --skin-recovery-background: #ffffff;
+  --skin-recovery-foreground: #1a1a1a;
+  --skin-recovery-border: #9db6b2;
+  --skin-recovery-accent: #1d4ed8;
+  --skin-recovery-radius: 8px;
+}
+
+[data-ws-page] {
+  color: #1a1a1a;
+  background: #ffffff;
+  font-family: Tahoma, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+[data-ws-part="home.header"],
+[data-ws-part="voice.header"] {
+  background: #f4f7fb;
+  border-bottom: 1px solid var(--skin-demo-border);
+  color: var(--skin-demo-foreground);
+}
+
+/* Keep the two 24px icon buttons clear of ordinary header actions. */
+[data-ws-part="home.header"],
+[data-ws-part="voice.header"] {
+  padding-right: 72px;
+}
+
+[data-ws-part="home.join-card"],
+[data-ws-part="home.content"],
+[data-ws-part="voice.workspace"],
+[data-ws-part="voice.content"] {
+  color: var(--skin-demo-foreground);
+}
+
+[data-ws-part="home.join-card"] {
+  background: #ffffff;
+  border: 1px solid var(--skin-demo-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px #10203012;
+}
+
+[data-ws-part="voice.audio-dock"] {
+  background: #f4f7fb;
+  border-top: 1px solid var(--skin-demo-border);
+}
+
+[data-ws-part="home.footer"] { color: #52606d; }
+[data-ws-part="home.footer.clear"] { color: var(--skin-demo-accent); }

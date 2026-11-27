@@ -3,8 +3,11 @@ import { deflateSync } from "node:zlib";
 import { zipSync, strToU8 } from "fflate";
 
 const source = new URL("../../docs/examples/host-chrome-demo/", import.meta.url);
+const toolbarSource = new URL("../../docs/examples/host-chrome-toolbar/", import.meta.url);
 const examples = new URL("../../docs/examples/", import.meta.url);
 const publicDir = new URL("../public/", import.meta.url);
+// Keep rebuilt archives byte-stable when their inputs do not change.
+const archiveMtime = new Date(2026, 10, 15, 16, 33, 0);
 
 const crcTable = (() => {
   const table = new Uint32Array(256);
@@ -66,11 +69,19 @@ const icons = {
   "assets/icons/status.png": iconPng([150, 60, 90], [84, 28, 52]),
 };
 
-const [manifestText, cssText, chromeText] = await Promise.all([
+const [manifestText, cssText, chromeText, toolbarManifestText, toolbarCssText, toolbarChromeText] = await Promise.all([
   readFile(new URL("manifest.json", source), "utf8"),
   readFile(new URL("skin.css", source)),
   readFile(new URL("chrome.json", source), "utf8"),
+  readFile(new URL("manifest.json", toolbarSource), "utf8"),
+  readFile(new URL("skin.css", toolbarSource)),
+  readFile(new URL("chrome.json", toolbarSource), "utf8"),
 ]);
+
+const toolbarManifest = JSON.parse(toolbarManifestText);
+if (toolbarManifest.author !== "WebSpeak Community") {
+  throw new Error("host-chrome-toolbar manifest author must be WebSpeak Community");
+}
 
 const chrome = JSON.parse(chromeText);
 const sharedFiles = {
@@ -85,20 +96,30 @@ const themed = zipSync({
   "manifest.json": strToU8(themedManifest),
   "chrome.json": strToU8(themedChrome),
   ...sharedFiles,
-}, { level: 9 });
+}, { level: 9, mtime: archiveMtime });
 
 // Variant B: the same package plus declarative hiding of non-critical chrome.
 const hidden = zipSync({
   "manifest.json": strToU8(manifestText),
   "chrome.json": strToU8(chromeText),
   ...sharedFiles,
-}, { level: 9 });
+}, { level: 9, mtime: archiveMtime });
+
+// Minimal toolbar-mode sample: host-owned recovery buttons docked into the
+// header, with page-wide anchor candidates and toolbar tokens.
+const toolbar = zipSync({
+  "manifest.json": strToU8(toolbarManifestText),
+  "chrome.json": strToU8(toolbarChromeText),
+  "skin.css": new Uint8Array(toolbarCssText),
+}, { level: 9, mtime: archiveMtime });
 
 await Promise.all([
   writeFile(new URL("host-chrome-themed.wskin", examples), themed),
   writeFile(new URL("host-chrome-demo.wskin", examples), hidden),
+  writeFile(new URL("host-chrome-toolbar.wskin", examples), toolbar),
   writeFile(new URL("host-chrome-themed.wskin", publicDir), themed),
   writeFile(new URL("host-chrome-demo.wskin", publicDir), hidden),
+  writeFile(new URL("host-chrome-toolbar.wskin", publicDir), toolbar),
 ]);
 
-console.log(`Built host chrome demo skins (${themed.byteLength} / ${hidden.byteLength} bytes) into docs/examples and web/public.`);
+console.log(`Built host chrome demo skins (${themed.byteLength} / ${hidden.byteLength} / ${toolbar.byteLength} bytes) into docs/examples and web/public.`);

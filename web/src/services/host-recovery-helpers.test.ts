@@ -9,6 +9,7 @@ type ShortcutEvent = {
   altKey: boolean;
   shiftKey: boolean;
   key: string;
+  code: string;
 };
 
 const shortcut = (overrides: Partial<ShortcutEvent> = {}): ShortcutEvent => ({
@@ -17,6 +18,7 @@ const shortcut = (overrides: Partial<ShortcutEvent> = {}): ShortcutEvent => ({
   altKey: false,
   shiftKey: false,
   key: "",
+  code: "",
   ...overrides,
 });
 
@@ -24,16 +26,28 @@ test("the recovery shortcut requires the full Ctrl/Cmd+Alt+Shift+R chord", () =>
   assert.equal(isRecoveryShortcut(shortcut({ ctrlKey: true, altKey: true, shiftKey: true, key: "r" })), true);
   // macOS uses the Meta/Command key in place of Ctrl.
   assert.equal(isRecoveryShortcut(shortcut({ metaKey: true, altKey: true, shiftKey: true, key: "R" })), true);
+  // Option/Shift turn the letter into a derived character (US layout: ®) on
+  // macOS; the physical key code must still match.
+  assert.equal(isRecoveryShortcut(shortcut({
+    metaKey: true, altKey: true, shiftKey: true, key: "®", code: "KeyR",
+  })), true);
+  assert.equal(isRecoveryShortcut(shortcut({
+    ctrlKey: true, altKey: true, shiftKey: true, key: "®", code: "KeyR",
+  })), true);
 
   for (const rejected of [
     shortcut({ ctrlKey: true, altKey: true, shiftKey: true, key: "x" }),
     shortcut({ ctrlKey: true, altKey: true, shiftKey: true, key: "Enter" }),
+    // A derived character alone is not enough: the physical key must be R.
+    shortcut({ metaKey: true, altKey: true, shiftKey: true, key: "®", code: "KeyX" }),
     // Ordinary app/browser shortcuts must stay available.
     shortcut({ ctrlKey: true, key: "r" }),
     shortcut({ altKey: true, key: "r" }),
     shortcut({ ctrlKey: true, shiftKey: true, key: "r" }),
     shortcut({ ctrlKey: true, altKey: true, key: "r" }),
     shortcut({ ctrlKey: false, altKey: true, shiftKey: true, key: "r" }),
+    // Incomplete modifiers stay rejected even when the physical code matches.
+    shortcut({ ctrlKey: true, altKey: true, key: "®", code: "KeyR" }),
   ]) {
     assert.equal(isRecoveryShortcut(rejected), false, JSON.stringify(rejected));
   }
