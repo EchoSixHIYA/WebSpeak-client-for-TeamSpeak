@@ -18,6 +18,7 @@ function deferred() {
 }
 
 class PeerStub {
+  isConnected = true;
   closed = false;
   closeResult = Promise.resolve();
   answerResult = Promise.resolve();

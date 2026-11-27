@@ -8,7 +8,7 @@ import type { TSVoiceData } from "./ts-client.js";
 
 function fixture() {
   const state = { current: true, ready: true, now: 0, targets: null as number[] | null, disposed: 0,
-    peer: null as { pushTeamSpeakVoice(data: TSVoiceData): void } | null };
+    peer: null as { isConnected: boolean; pushTeamSpeakVoice(data: TSVoiceData): void } | null };
   const audio = createAudioFlowStats();
   const packets: Buffer[] = [];
   const encoded: Buffer[] = [];
@@ -146,7 +146,7 @@ test("tagged PCM and pre-encoded Opus frames share the uplink without double enc
 
 test("WebRTC ingress excludes queued PCM and fallback re-enables PCM", () => {
   const f = fixture();
-  f.state.peer = { pushTeamSpeakVoice() {} };
+  f.state.peer = { isConnected: true, pushTeamSpeakVoice() {} };
   f.transport.receivePcm(Buffer.alloc(1_920));
   const opus = Buffer.from([3, 2, 1]);
   f.transport.receiveWebRtc(opus, 5);
@@ -188,7 +188,7 @@ test("backpressure drops bursts above 4096 bytes and resumes without a retained 
 test("WebRTC downlink owns egress without a duplicate WebSocket packet", () => {
   const f = fixture();
   const received: TSVoiceData[] = [];
-  f.state.peer = { pushTeamSpeakVoice: data => { received.push(data); } };
+  f.state.peer = { isConnected: true, pushTeamSpeakVoice: data => { received.push(data); } };
   f.transport.receiveTeamSpeak(f.remote());
   assert.equal(received.length, 1);
   assert.equal(f.packets.length, 0);
@@ -196,6 +196,28 @@ test("WebRTC downlink owns egress without a duplicate WebSocket packet", () => {
   f.transport.receiveTeamSpeak(f.remote());
   assert.equal(received.length, 1);
   assert.equal(f.packets.length, 1);
+});
+
+test("negotiating WebRTC keeps both compatibility directions until the media path connects", () => {
+  const f = fixture();
+  const received: TSVoiceData[] = [];
+  f.state.peer = { isConnected: false, pushTeamSpeakVoice: data => received.push(data) };
+  f.transport.receivePcm(Buffer.alloc(1920));
+  f.transport.receiveTeamSpeak(f.remote());
+  assert.equal(f.forwarded.length, 1);
+  assert.equal(f.packets.length, 1);
+  assert.equal(received.length, 0);
+  f.state.peer.isConnected = true;
+  f.transport.receivePcm(Buffer.alloc(1920));
+  f.transport.receiveTeamSpeak(f.remote());
+  assert.equal(f.forwarded.length, 1);
+  assert.equal(f.packets.length, 1);
+  assert.equal(received.length, 1);
+  f.state.peer.isConnected = false;
+  f.transport.receivePcm(Buffer.alloc(1920));
+  f.transport.receiveTeamSpeak(f.remote());
+  assert.equal(f.forwarded.length, 2);
+  assert.equal(f.packets.length, 2);
 });
 
 test("encoding failures are counted and reported at most once per five seconds", t => {
@@ -220,7 +242,7 @@ test("SDK and downlink failures cannot escape the audio callbacks", t => {
   assert.equal(f.notices.length, 0, "SDK failure must not be reported as an encoder failure");
   t.mock.method(f.socket, "send", () => { throw new Error("Socket closed"); });
   f.transport.receiveTeamSpeak(f.remote());
-  f.state.peer = { pushTeamSpeakVoice() { throw new Error("Peer closed"); } };
+  f.state.peer = { isConnected: true, pushTeamSpeakVoice() { throw new Error("Peer closed"); } };
   f.transport.receiveTeamSpeak(f.remote());
   assert.equal(f.audio.egressDroppedFrames, 2);
 });

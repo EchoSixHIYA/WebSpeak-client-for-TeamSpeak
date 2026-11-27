@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><pre id="result">pending</pre>
+<script type="module">
+import { createOpusUplink } from "/src/voice/opus-uplink.ts";
+const fallback = [];
+const sent = [];
+let encoder;
+const uplink = createOpusUplink({
+  createEncoder(output, error) { encoder = new AudioEncoder({ output, error }); return encoder; },
+  send(frame) { sent.push(frame.length); return true; },
+  onDrop() {},
+  onFallback(reason) { fallback.push(reason); },
+});
+try {
+  const initialized = await uplink.init();
+  uplink.push(new Float32Array(960));
+  await encoder.flush();
+  const before = { active: uplink.active, frames: sent.length };
+  uplink.resetStream();
+  uplink.push(new Float32Array(960));
+  await encoder.flush();
+  document.querySelector("#result").textContent = JSON.stringify({
+    initialized, before, after: { active: uplink.active, frames: sent.length }, fallback,
+  });
+} catch (error) {
+  document.querySelector("#result").textContent = JSON.stringify({ error: String(error) });
+} finally { uplink.close(); }
+</script>

@@ -146,6 +146,7 @@ function deferred() {
 
 class TestPeer extends EventTarget {
   static instances = [];
+  static connectOnAnswer = true;
   iceGatheringState = "complete";
   connectionState = "new";
   localDescription = null;
@@ -156,7 +157,13 @@ class TestPeer extends EventTarget {
   getSenders() { return [this.sender]; }
   async createOffer() { return { type: "offer", sdp: "test-offer" }; }
   async setLocalDescription(description) { this.localDescription = description; }
-  async setRemoteDescription(description) { this.remoteDescription = description; }
+  async setRemoteDescription(description) {
+    this.remoteDescription = description;
+    if (TestPeer.connectOnAnswer) {
+      this.connectionState = "connected";
+      this.onconnectionstatechange?.();
+    }
+  }
   close() { this.connectionState = "closed"; }
 }
 
@@ -206,6 +213,7 @@ beforeEach(() => {
   compatibilityAudioClientId = 7;
   TestSocket.instances.length = 0;
   TestPeer.instances.length = 0;
+  TestPeer.connectOnAnswer = true;
   AudioContextStub.processors.length = 0;
   AudioContextStub.instances.length = 0;
   AudioContextStub.sources.length = 0;
@@ -748,11 +756,15 @@ test("channel traversal preserves sibling predecessors and handles a deep direct
   assert.equal(deep.channelTree.value.at(-1).depth, 4_999);
 });
 
-async function connectWebRtc() {
+async function connectWebRtc({ negotiateOnly = false } = {}) {
   const socket = await connect();
   socket.receive({ type: "connected", tsClientId: 1, webrtcAvailable: true });
   await nextTurn();
   assert.ok(socket.messages.some(message => message.type === "webrtcOffer"));
+  if (!negotiateOnly) {
+    socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "connected-answer" } } });
+    await nextTurn();
+  }
   return { socket, peer: TestPeer.instances.at(-1) };
 }
 
@@ -1539,6 +1551,28 @@ test("a successful old WebRTC answer cannot activate WebRTC for a replacement co
   assert.ok(current.messages.some(message => message instanceof ArrayBuffer && message.byteLength === 1920));
 });
 
+test("an answer without connected media keeps compatibility audio and a retry can time out", async t => {
+  const deadlines = [];
+  const setTimer = window.setTimeout.bind(window);
+  t.mock.method(window, "setTimeout", (callback, ms) => {
+    if (ms === 15_000) deadlines.push(callback);
+    return setTimer(callback, ms);
+  });
+  TestPeer.connectOnAnswer = false;
+  const {socket,peer} = await connectWebRtc({ negotiateOnly: true });
+  peer.connectionState = "connecting";
+  socket.receive({type:"webrtcAnswer",payload:{sdp:{type:"answer",sdp:"no-media"}}});
+  await nextTurn();
+  assertCompatibilityAudio(socket);
+  assert.equal((await audioSample(socket)).transport, "negotiating");
+  assert.equal(deadlines.length, 1);
+  deadlines[0]();
+  await nextTurn();
+  assert.equal(peer.connectionState, "closed");
+  assert.match(voice.state.audioNotice, /WEBRTC_CONNECTION_TIMEOUT/);
+  assertCompatibilityAudio(socket);
+});
+
 test("reconnect WebRTC keeps compatibility audio until ready without reconnecting TeamSpeak", async () => {
   const getUserMedia = navigator.mediaDevices.getUserMedia;
   let microphoneRequests = 0;
@@ -1567,9 +1601,16 @@ test("reconnect WebRTC keeps compatibility audio until ready without reconnectin
   assert.equal(voice.state.webrtcReconnecting, true);
   assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
   assertCompatibilityAudio(socket);
+  TestPeer.connectOnAnswer = false;
   socket.receive({ type: "webrtcAnswer", payload: { sdp: { type: "answer", sdp: "reconnected-answer" } } });
   await nextTurn();
   assert.equal(current.remoteDescription.sdp, "reconnected-answer");
+  assert.equal(voice.state.webrtcReconnecting, true);
+  assert.equal(voice.state.audioNoticeCode, "WEBRTC_FAILED");
+  assertCompatibilityAudio(socket);
+  current.connectionState = "connected";
+  current.onconnectionstatechange();
+  await nextTurn();
   assert.equal(voice.state.webrtcReconnecting, false);
   assert.equal(voice.state.audioNoticeCode, "");
   assert.equal(voice.state.connected, true);
@@ -1969,7 +2010,7 @@ test("a probe started before peer allocation cannot survive a failed transport a
 });
 
 test("disconnect clears the WebRTC answer deadline immediately", async () => {
-  await connectWebRtc();
+  await connectWebRtc({ negotiateOnly: true });
   assert.ok(browserTimers.size > 0);
   voice.disconnect();
   assert.equal(browserTimers.size, 0);
@@ -2019,7 +2060,7 @@ test("an answer timeout keeps the session and offers a WebRTC retry", async t =>
     if (ms === 8_000) deadlines.push(callback);
     return setTimer(callback, ms);
   });
-  const { socket, peer } = await connectWebRtc();
+  const { socket, peer } = await connectWebRtc({ negotiateOnly: true });
   assert.equal(deadlines.length, 1);
   deadlines[0]();
   await nextTurn();

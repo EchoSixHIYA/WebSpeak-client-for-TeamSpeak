@@ -258,6 +258,10 @@ export class WebRtcAudioSession {
     };
   }
 
+  get isConnected(): boolean {
+    return !this.closed && this.peer.connectionState === "connected";
+  }
+
   getStats(): WebRtcAudioStats {
     return { ...this.stats, webrtcQueueCurrentFrames: this.getQueueFrameCount() };
   }

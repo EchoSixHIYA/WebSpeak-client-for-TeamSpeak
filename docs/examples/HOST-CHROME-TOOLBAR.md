@@ -12,12 +12,12 @@ A minimal schema v3 open skin that docks the trusted recovery entry into the pag
 
 ```text
 host-chrome-toolbar/
-  manifest.json   # schema v3, version 1.1.1, minAppVersion 0.3.3, author WebSpeak Community
+  manifest.json   # schema v3, version 1.1.2, minAppVersion 0.3.4-dev.0, author WebSpeak Community
   chrome.json     # one grouped toolbar slot with a home/voice anchor list
   skin.css        # light page theme, Classic toolbar tokens and header space
 ```
 
-This package requires WebSpeak 0.3.3. WebSpeak 0.3.2 does not accept `mode`, `appearance`, or anchor candidate arrays, so importing it there cannot provide toolbar-mode behavior. Older slots without those fields remain valid and keep their capsule presentation.
+This package requires WebSpeak 0.3.4-dev.0 or later. Released WebSpeak 0.3.3 and earlier do not accept `mode`, `appearance`, or anchor candidate arrays, so importing it there cannot provide toolbar-mode behavior. Older slots without those fields remain valid and keep their capsule presentation.
 
 `skin.css` uses only public `data-ws-part` hooks and sets `--skin-host-toolbar-*` / `--skin-recovery-toolbar-*` variables. It never targets the host toolbar DOM, the recovery capsule, the authorization dialog or the load-failure banner.
 

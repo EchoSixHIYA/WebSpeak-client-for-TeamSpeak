@@ -73,11 +73,9 @@ WEBSPEAK_TURN_REST_TTL_SECONDS=21600
 
 ## 数据库与回滚
 
-- 本构建把数据库迁移到 schema 14。schema 13→14 只新增可空的语音覆盖列，
-  现有行继续继承环境变量；新数据库仍从 schema 1 顺序迁移。
-- 旧版本二进制会拒绝 schema 14。升级前应备份数据库及对应的 `master.key`；
-  回退二进制时必须恢复匹配的备份。只回退代码而保留 schema 14 数据库会导致
-  旧版本无法启动。
+- 语音覆盖配置写入现有 metadata 表，数据库保持 schema 13；未设置的值继承
+  环境变量，TURN 密钥继续加密保存。
+- 0.3.3 会忽略并保留这些元数据，可以在自动更新健康检查失败后直接恢复旧代码。
 - 恢复非 Cloudflare 旧音频行为：选择 `legacy`，或确保没有控制台覆盖后设置
   `WEBSPEAK_VOICE_PROFILE=legacy`。
 - 关闭 Opus：取消控制台选项或设置 `WEBSPEAK_VOICE_OPUS_WS=0`。

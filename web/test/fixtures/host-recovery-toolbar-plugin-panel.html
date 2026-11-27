@@ -69,6 +69,13 @@ const rectOf = (element) => {
 };
 const withinViewport = (rect) => rect.left >= -0.5 && rect.top >= -0.5
   && rect.right <= innerWidth + 0.5 && rect.bottom <= innerHeight + 0.5;
+// Controls may overflow a narrow anchor; they must remain clamped on screen.
+const alignedWithAnchor = (inner, outer, align = "end") => {
+  const desiredLeft = align === "start" ? outer.left : outer.right - inner.width;
+  const left = Math.min(Math.max(4, desiredLeft), Math.max(4, innerWidth - 4 - inner.width));
+  const top = Math.min(Math.max(4, outer.top + (outer.height - inner.height) / 2), Math.max(4, innerHeight - 4 - inner.height));
+  return Math.abs(inner.left - left) <= 0.5 && Math.abs(inner.top - top) <= 0.5;
+};
 const withinRect = (inner, outer) => inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5
   && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
 const rectsOverlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
@@ -257,7 +264,9 @@ try {
   const voiceAnchorRect = rectOf(document.getElementById("voice-anchor"));
   const afterSwitch = {
     ...snapshot(),
-    insideVoiceAnchor: openToolbars().every((bar) => withinRect(rectOf(bar), voiceAnchorRect)),
+    alignedWithVoiceAnchor: openToolbars().every((bar) => alignedWithAnchor(rectOf(bar), voiceAnchorRect,
+      mode === "split" && actions(bar).includes("built-in") ? "start" : "end")),
+    anchorRect: voiceAnchorRect,
     resolvedVoice: resolveSkinAnchor(anchorList, document, "community.plugin-panel-fixture")?.id,
   };
 

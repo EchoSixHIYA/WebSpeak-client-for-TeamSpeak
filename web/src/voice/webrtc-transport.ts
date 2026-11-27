@@ -41,6 +41,7 @@ interface Attempt {
   active: boolean;
   closed: boolean;
   answerTimer: number | null;
+  connectionTimer: number | null;
   cancelIce: (() => void) | null;
 }
 
@@ -73,6 +74,8 @@ export function createWebRtcTransport(options: TransportOptions) {
       previous.active = false;
       if (previous.answerTimer !== null) window.clearTimeout(previous.answerTimer);
       previous.answerTimer = null;
+      if (previous.connectionTimer !== null) window.clearTimeout(previous.connectionTimer);
+      previous.connectionTimer = null;
       const cancelIce = previous.cancelIce;
       previous.cancelIce = null;
       if (cancelIce) clean(cancelIce);
@@ -84,6 +87,7 @@ export function createWebRtcTransport(options: TransportOptions) {
     if (peer) {
       clean(() => { peer.ontrack = null; });
       clean(() => { peer.onconnectionstatechange = null; });
+      clean(() => { peer.onicecandidateerror = null; });
       clean(() => peer.close());
     }
   }
@@ -96,6 +100,15 @@ export function createWebRtcTransport(options: TransportOptions) {
     const failureGeneration = generation;
     const isFailureCurrent = (): boolean => generation === failureGeneration && record.connection.isCurrent();
     if (isFailureCurrent()) await options.onFailure(reason, isFailureCurrent);
+  }
+
+  function ready(record: Attempt): void {
+    if (!isCurrent(record) || record.active || record.peer?.connectionState !== "connected"
+      || record.peer.remoteDescription?.type !== "answer") return;
+    if (record.connectionTimer !== null) window.clearTimeout(record.connectionTimer);
+    record.connectionTimer = null;
+    record.active = true;
+    options.onReady();
   }
 
   async function waitForIce(record: Attempt, peer: RTCPeerConnection): Promise<void> {
@@ -120,7 +133,7 @@ export function createWebRtcTransport(options: TransportOptions) {
   async function start(connection: Connection): Promise<void> {
     stop();
     const record: Attempt = { connection, peer: null, input: null, meter: null,
-      active: false, closed: false, answerTimer: null, cancelIce: null };
+      active: false, closed: false, answerTimer: null, connectionTimer: null, cancelIce: null };
     current = record;
     let microphone: Microphone | null;
     try { microphone = await options.prepareMicrophone(); }
@@ -161,10 +174,10 @@ export function createWebRtcTransport(options: TransportOptions) {
       peer.onconnectionstatechange = () => {
         options.onConnectionState?.(peer.connectionState);
         if (isCurrent(record) && peer.connectionState === "failed") void failAttempt(record, "WEBRTC_CONNECTION_FAILED");
+        else ready(record);
       };
       options.onConnectionState?.(peer.connectionState);
 
-      record.active = true;
       const offer = await peer.createOffer();
       if (!isCurrent(record)) return;
       await peer.setLocalDescription({ ...offer, sdp: addOpusFmtpParameters(offer.sdp ?? "", ["stereo=1"]) });
@@ -196,8 +209,16 @@ export function createWebRtcTransport(options: TransportOptions) {
       if (!isCurrent(record)) return;
       if (record.answerTimer !== null) window.clearTimeout(record.answerTimer);
       record.answerTimer = null;
-      record.active = true;
-      options.onReady();
+      // An SDP answer acknowledges signaling, not a working ICE/DTLS path.
+      // Keep compatibility audio until the peer really connects, and bound
+      // attempts that remain stuck in "connecting" without a failed event.
+      ready(record);
+      if (!record.active && record.connectionTimer === null) {
+        record.connectionTimer = window.setTimeout(() => {
+          record.connectionTimer = null;
+          if (isCurrent(record) && !record.active) void failAttempt(record, "WEBRTC_CONNECTION_TIMEOUT");
+        }, 15_000);
+      }
     } catch { await failAttempt(record, "WEBRTC_ANSWER_REJECTED"); }
   }
 

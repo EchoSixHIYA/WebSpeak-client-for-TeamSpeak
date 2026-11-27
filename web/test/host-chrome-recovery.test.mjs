@@ -700,7 +700,7 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
 
   const initial = payload.initial;
   assert.equal(initial.toolbarOpen, true, "the toolbar did not dock into the declared anchor");
-  assert.equal(initial.insideAnchor, true, "the toolbar is not placed inside the page anchor");
+  assert.equal(initial.alignedWithAnchor, true, JSON.stringify(initial));
   assert.equal(initial.insideViewport, true);
   assert.equal(initial.actionCount, 2, "the group slot must render both independent host buttons");
   assert.deepEqual(initial.labels, ["Integrierten Skin verwenden", "Anwendungsbibliothek"]);
@@ -729,7 +729,7 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
   }
 
   assert.equal(payload.afterSwitch.toolbarOpen, true, "the toolbar did not survive the home -> voice page switch");
-  assert.equal(payload.afterSwitch.insideVoiceAnchor, true, "the toolbar stayed on the previous page anchor");
+  assert.equal(payload.afterSwitch.alignedWithVoiceAnchor, true, "the toolbar stayed on the previous page anchor");
   assert.equal(payload.afterSwitch.resolvedVoice, "voice-anchor", "the candidate list did not resolve the voice anchor");
 
   assert.equal(payload.fallback.toolbarOpen, false, "the toolbar stayed visible with a broken anchor");
@@ -738,7 +738,7 @@ test("toolbar-mode recovery docks plain host buttons, de-duplicates the library 
   assert.equal(payload.fallback.launcherSuppressed, true, "the fallback capsule must keep exactly one library entry");
 
   assert.equal(payload.redocked.toolbarOpen, true, "the toolbar did not re-dock after the anchor returned");
-  assert.equal(payload.redocked.insideVoiceAnchor, true);
+  assert.equal(payload.redocked.alignedWithVoiceAnchor, true);
   assert.equal(payload.redocked.capsuleOpen, false);
 
   assert.equal(payload.shortcut.capsuleOpen, true, "the shortcut did not summon the recovery capsule");
@@ -844,7 +844,7 @@ test("real PluginPanel launcher is de-duplicated by group and split toolbars on 
   assert.equal(group.clicks.builtIn, true);
   assert.equal(group.clicks.library, true);
   assert.equal(group.afterSwitch.toolbars[0].open, true, "the toolbar did not survive the page switch");
-  assert.equal(group.afterSwitch.insideVoiceAnchor, true);
+  assert.equal(group.afterSwitch.alignedWithVoiceAnchor, true);
   assert.equal(group.afterSwitch.resolvedVoice, "voice-anchor");
   assert.equal(group.fallback.toolbars[0].open, false, "the toolbar stayed docked with a broken anchor");
   assert.equal(group.fallback.capsuleVisible, true);
@@ -873,7 +873,7 @@ test("real PluginPanel launcher is de-duplicated by group and split toolbars on 
   assert.equal(split.clicks.library, true, "the library split toolbar button was not clickable");
   assert.equal(split.afterSwitch.toolbars[0].open, true);
   assert.equal(split.afterSwitch.toolbars[1].open, true);
-  assert.equal(split.afterSwitch.insideVoiceAnchor, true);
+  assert.equal(split.afterSwitch.alignedWithVoiceAnchor, true);
   for (const lang of ["de", "ru", "ja"]) {
     observableButtons({ visibleActions: split.languages[lang] }, `${lang} split desktop`);
   }

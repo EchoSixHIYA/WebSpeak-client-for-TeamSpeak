@@ -158,6 +158,8 @@ export function createOpusUplink(options: OpusUplinkOptions) {
     if (!active || closed || !samples.length) return active;
     let offset = 0;
     while (offset < samples.length) {
+      // An encode error can deactivate the encoder inside this loop.
+      if (!active) return false;
       const copy = Math.min(VOICE_FRAME_SAMPLES - pendingLength, samples.length - offset);
       pending.set(samples.subarray(offset, offset + copy), pendingLength);
       pendingLength += copy;
@@ -171,7 +173,14 @@ export function createOpusUplink(options: OpusUplinkOptions) {
   function resetStream(): void {
     pendingLength = 0;
     timestampUs = 0;
-    try { encoder?.reset(); } catch { /* reset is best effort */ }
+    try {
+      // WebCodecs reset clears configuration as well as pending output.
+      encoder?.reset();
+      encoder?.configure(OPUS_CONFIG);
+    } catch (error) {
+      options.onFallback(error instanceof Error ? error.message : "OPUS_RESET_FAILED");
+      deactivate();
+    }
   }
 
   function close(): void {

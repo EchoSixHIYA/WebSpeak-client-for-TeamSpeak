@@ -925,7 +925,7 @@ export function useVoiceWebSocket() {
     const sequence = voiceConnection.generation;
     const socket = ws.value;
     const isCurrent = () => generation === inputDeviceGeneration && sequence === voiceConnection.generation;
-    const shouldRestartWebRtc = webrtc.active && Boolean(ws.value);
+    const shouldRestartWebRtc = Boolean(webrtc.peer) && Boolean(ws.value);
     try {
       // Keep the current peer alive until the replacement microphone is ready.
       if (micStream) await startMicrophone();
@@ -1485,7 +1485,7 @@ export function useVoiceWebSocket() {
     voxAttack = 0;
     voxRelease = 0;
     accumLen = 0;
-    if (webrtc.active) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+    if (webrtc.peer) micStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
     webrtc.input?.setVolume(muted ? 0 : inputVolume.value);
     sendCmd("setMicrophoneMuted", { muted });
     if (muted && state.tsClientId) clearSpeaking(state.tsClientId);

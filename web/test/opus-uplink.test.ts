@@ -9,15 +9,16 @@ function fakeUplink() {
   let dropped = 0;
   let configured = false;
   const encoder = {
-    state: "configured" as const,
+    state: "unconfigured" as "unconfigured" | "configured" | "closed",
     encodeQueueSize: 0,
-    configure() { configured = true; },
+    configure() { configured = true; this.state = "configured"; },
     encode(data: AudioData) {
+      if (this.state !== "configured") throw new DOMException("Encoder is not configured", "InvalidStateError");
       encoded.push(data);
       output?.({ byteLength: 3, copyTo(target: Uint8Array) { target.set([1, 2, 3]); } });
     },
-    reset() {},
-    close() {},
+    reset() { this.state = "unconfigured"; },
+    close() { this.state = "closed"; },
   };
   const uplink = createOpusUplink({
     send(frame) { sent.push(frame); return true; },
@@ -41,9 +42,18 @@ test("Opus uplink accumulates 960 samples, emits tagged frames and resets on VOX
   f.uplink.push(new Float32Array(480));
   assert.equal(f.encoded.length, 2);
   f.uplink.resetStream();
+  assert.equal(f.encoder.state, "configured");
   f.uplink.push(new Float32Array(960));
   assert.equal(f.encoded.length, 3);
   f.uplink.disable();
+  assert.equal(f.uplink.active, false);
+});
+
+test("an encoder error partway through a large capture chunk exits the loop and falls back", async () => {
+  const f = fakeUplink();
+  await f.uplink.init();
+  f.encoder.encode = () => { throw new DOMException("Encoding failed", "EncodingError"); };
+  assert.equal(f.uplink.push(new Float32Array(4096)), false);
   assert.equal(f.uplink.active, false);
 });
 

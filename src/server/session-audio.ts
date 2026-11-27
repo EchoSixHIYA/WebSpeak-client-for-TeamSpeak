@@ -41,7 +41,7 @@ export interface SessionAudioOptions {
   isCurrent(): boolean;
   isReady(): boolean;
   selfId(): number;
-  peer(): Pick<WebRtcAudioSession, "pushTeamSpeakVoice"> | null;
+  peer(): Pick<WebRtcAudioSession, "pushTeamSpeakVoice" | "isConnected"> | null;
   whisperTargets(): readonly number[] | null;
   sendJson(message: ServerMessage): void;
   /** Tests that assert synchronous SDK calls can opt out; production keeps pacing. */
@@ -64,7 +64,9 @@ export class SessionAudioTransport {
     this.encoder = encoder;
     this.logger = options.logger ?? null;
     this.pacer = options.pacing === false ? null : new AudioPacer(
-      (data, codec) => this.sendVoice(data, codec),
+      (data, codec) => {
+        if (!this.mediaPeer()) this.sendVoice(data, codec);
+      },
       {
         now: this.rateClock,
         onStats: stats => {
@@ -79,6 +81,11 @@ export class SessionAudioTransport {
 
   private isCurrent(): boolean {
     return !this.closed && this.options.isCurrent() && this.options.socket.readyState === WebSocket.OPEN;
+  }
+
+  private mediaPeer() {
+    const peer = this.options.peer();
+    return peer?.isConnected ? peer : null;
   }
 
   private recordIngress(): void {
@@ -153,7 +160,7 @@ export class SessionAudioTransport {
     // route is down is discarded whatever its size, so calling it malformed would
     // misattribute the drop and raise a spurious client error in the browser.
     // Late TCP frames from before a WebRTC switch must not duplicate RTP audio.
-    if (!this.options.isReady() || this.options.peer()) { stats.ingressDroppedFrames++; return; }
+    if (!this.options.isReady() || this.mediaPeer()) { stats.ingressDroppedFrames++; return; }
     const legacyPcm = frame.length === AUDIO_FRAME_BYTES ? frame : null;
     const taggedPcm = frame.length === TAGGED_PCM_FRAME_BYTES && frame[0] === PCM_FRAME_TAG ? frame.subarray(1) : null;
     const opus = frame.length > 1 && frame.length <= MAX_OPUS_FRAME_BYTES + 1 && frame[0] === OPUS_FRAME_TAG
@@ -227,7 +234,7 @@ export class SessionAudioTransport {
     stats.egressLastAt = now;
     const key = String(data.clientId);
     stats.egressFramesByClient[key] = (stats.egressFramesByClient[key] ?? 0) + 1;
-    const peer = this.options.peer();
+    const peer = this.mediaPeer();
     if (peer) {
       try { peer.pushTeamSpeakVoice(data); stats.egressFrames++; }
       catch { stats.egressDroppedFrames++; }

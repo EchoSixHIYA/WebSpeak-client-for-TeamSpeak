@@ -490,8 +490,8 @@ test("the distributable host chrome toolbar declares its first compatible runtim
   assert.deepEqual(bundledArchive, archive, "the downloadable example and bundled skin stay in sync");
   const skin = await importSkinPack(new File([archive], "host-chrome-toolbar.wskin", { type: "application/octet-stream" }));
   assert.equal(skin.id, "community.host-chrome-toolbar");
-  assert.equal(skin.minAppVersion, "0.3.3", "mode, appearance and anchor arrays are unavailable in WebSpeak 0.3.2");
-  assert.equal(skin.version, "1.1.1");
+  assert.equal(skin.minAppVersion, "0.3.4-dev.0", "released WebSpeak 0.3.3 rejects the new toolbar slot fields");
+  assert.equal(skin.version, "1.1.2");
   assert.equal(APP_VERSION, skin.minAppVersion, "the running build must satisfy the example's declared minimum");
   assert.equal(skin.schemaVersion, 3);
   assert.equal(skin.packageType, "open-skin");
